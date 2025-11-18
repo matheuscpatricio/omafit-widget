@@ -485,7 +485,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   </ul>
                 </div>
                 <a
-                  href="mailto:contato@omafit.com"
+                  href="mailto:contato@omafit.co"
                   className="w-full py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center justify-center"
                 >
                   Entrar em Contato
@@ -601,7 +601,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">Documentação</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Tutoriais</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contato</a></li>
+                <li><a href="mailto:contato@omafit.co" className="hover:text-white transition-colors">Contato</a></li>
                 
               </ul>
             </div>

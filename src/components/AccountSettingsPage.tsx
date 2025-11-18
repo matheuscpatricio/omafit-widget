@@ -131,7 +131,7 @@ export function AccountSettingsPage() {
     if (!plan) return;
 
     if (planId === 'enterprise') {
-      window.location.href = 'mailto:contato@omafit.com?subject=Interesse no Plano Enterprise';
+      window.location.href = 'mailto:contato@omafit.co?subject=Interesse no Plano Enterprise';
       return;
     }
 
