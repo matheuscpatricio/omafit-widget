@@ -164,7 +164,6 @@ const handleSubmit = async () => {
     console.error('Erro no try-on:', error);
     setError(error.message || 'Erro no processamento da imagem');
     setStep('confirm');
-  } finally {
     setLoading(false);
   }
 };
@@ -186,9 +185,11 @@ const handleSubmit = async () => {
         }
 
         const statusData = await statusResponse.json();
-        
+        console.log('📊 Status data:', statusData);
+
         if (statusData.status === 'completed' && statusData.output && statusData.output.length > 0) {
           clearInterval(pollInterval);
+          console.log('✅ Setting result image:', statusData.output[0]);
           setResult(statusData.output[0]);
 
           if (sizeData && sizeChart.length > 0) {
@@ -204,6 +205,7 @@ const handleSubmit = async () => {
             }
           }
 
+          console.log('🎯 Setting step to result, loading to false');
           setStep('result');
           setLoading(false);
         } else if (statusData.status === 'failed' || statusData.status === 'error') {
