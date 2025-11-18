@@ -1,0 +1,750 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Mail, DollarSign, Package } from 'lucide-react';
+import { PlanCalculator } from './PlanCalculator';
+import { PricingModal } from './PricingModal';
+import { supabase } from '../lib/supabase';
+
+interface LandingPageProps {
+  onGetStarted: (priceId?: string) => void;
+  onLogin: () => void;
+}
+
+export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
+  const navigate = useNavigate();
+  const [scrollY, setScrollY] = useState(0);
+  const [showHeader, setShowHeader] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrollY(currentScrollY);
+      // Show header after scrolling past the video hero section
+      setShowHeader(currentScrollY > window.innerHeight * 0.8);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            setVisibleSections((prev) => new Set(prev).add(entry.target.id));
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    );
+
+    const animatedElements = document.querySelectorAll('[data-animate]');
+    animatedElements.forEach((el) => {
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (showVideoModal || showPricingModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showVideoModal, showPricingModal]);
+
+  const handleOpenPricingModal = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session) {
+      navigate('/dashboard');
+    } else {
+      setShowPricingModal(true);
+    }
+  };
+
+  const handleSelectPlan = (priceId: string) => {
+    setShowPricingModal(false);
+    onGetStarted(priceId);
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header - Always visible, transparent initially, white on scroll */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        showHeader
+          ? 'bg-white shadow-lg'
+          : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-black'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+            </div>
+
+            <nav className="hidden md:flex space-x-8">
+              <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Recursos</a>
+              <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Benefícios</a>
+              <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Planos</a>
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onLogin}
+                className={`px-4 py-2 rounded-lg transition-all font-medium ${
+                  showHeader
+                    ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                    : 'text-gray hover:text-gray-200 hover:bg-white/10'
+                }`}
+              >
+                Login
+              </button>
+              <button
+                onClick={handleOpenPricingModal}
+                className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-1 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
+              >
+                Registrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section - Image Only */}
+      <section className="relative w-full overflow-hidden bg-gray-100" style={{ height: 'full', minHeight: '600px', maxHeight: '1200px' }}>
+        {/* Desktop Image */}
+        <div className="hidden md:flex w-full h-full items-center justify-center ">
+          <img
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/omafitbanner%20(2).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvb21hZml0YmFubmVyICgyKS5wbmciLCJpYXQiOjE3NjMyOTkyNTEsImV4cCI6NDkxNjg5OTI1MX0.ZES3Xp30GHvz-JeaZFeNMVo9qvsGpxvoI7X8esCL37I"
+            alt="Hero"
+            className="w-full h-full object-cover object-center"
+            loading="eager"
+          />
+        </div>
+
+        {/* Mobile Image */}
+        <div className="flex md:hidden w-full h-full items-center justify-center px-0">
+          <img
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Omafit%20image%20(5).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvT21hZml0IGltYWdlICg1KS5wbmciLCJpYXQiOjE3NjMyOTkyODIsImV4cCI6NDkxNjg5OTI4Mn0.aTVgmoItZORvj8wYduy-jaf-rsvn-BiuZhlKkkosXic"
+            alt="Hero Mobile"
+            className="w-full h-full object-cover"
+            loading="eager"
+          />
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-12 sm:py-16 bg-white" data-animate="stats">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+            <div className="text-center" data-animate="stat-1">
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2">40%</div>
+              <div className="text-gray-600 text-sm sm:text-base">Aumento na Conversão</div>
+            </div>
+            <div className="text-center" data-animate="stat-2">
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2">64%</div>
+              <div className="text-gray-600 text-sm sm:text-base">Redução em Devoluções</div>
+            </div>
+            <div className="text-center" data-animate="stat-3">
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2">95%</div>
+              <div className="text-gray-600 text-sm sm:text-base">Satisfação do Cliente</div>
+            </div>
+            <div className="text-center" data-animate="stat-4">
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2">5min</div>
+              <div className="text-gray-600 text-sm sm:text-base">Tempo de Integração</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="py-16 sm:py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
+              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
+                A venda é impulsionada por identidade, ao ver-se com a roupa, o cliente ativa o circuito da autoimagem
+              </p>
+            </div>
+
+            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
+              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
+                Medo do cliente de se arrepender da compra é dissolvido após usar nossa calculadora
+              </p>
+            </div>
+
+            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
+              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
+                Fortalece o marketing orgânico, com clientes compartilhando o resultado do try on.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-16 sm:py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="hidden md:block w-full h-full object-cover"
+            >
+              <source
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Recursos%20Omafit%20Desktop.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvUmVjdXJzb3MgT21hZml0IERlc2t0b3AubXA0IiwiaWF0IjoxNzYzMjM2MDQxLCJleHAiOjQ5MTY4MzYwNDF9.49JO99CvlQbV19x48tpVYRtDvN_eirRPmzVsD13HJq8"
+                type="video/mp4"
+              />
+            </video>
+
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="md:hidden w-full h-full object-cover"
+            >
+              <source
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/recursosomafitmobile.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvcmVjdXJzb3NvbWFmaXRtb2JpbGUubXA0IiwiaWF0IjoxNzYzMjM2MDc0LCJleHAiOjQ5MTY4MzYwNzR9.vGLkwP7lk8QbIZgATvNYP66TIWCcoKK-AlMhyHHxSV0"
+                type="video/mp4"
+              />
+            </video>
+          </div>
+
+          <div
+            id="tech-tagline"
+            data-animate="tech-tagline"
+            className="text-center mt-12 opacity-0 translate-y-8 transition-all duration-1000 ease-out"
+            style={{
+              opacity: visibleSections.has('tech-tagline') ? 1 : 0,
+              transform: visibleSections.has('tech-tagline') ? 'translateY(0)' : 'translateY(2rem)'
+            }}
+          >
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
+              Sua marca, agora com uma experiência{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#810707] to-red-700">
+                tech-drive
+              </span>
+            </h3>
+          </div>
+        </div>
+      </section>
+
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-16 sm:py-20 bg-white" data-animate="pricing">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Descubra seu plano
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-600">
+              Escolha o plano ideal para o tamanho do seu negócio
+            </p>
+          </div>
+
+          {/* Plan Calculator */}
+          <PlanCalculator />
+
+          {/* Mobile: Horizontal Scroll / Desktop: Grid */}
+          <div className="lg:grid lg:grid-cols-5 lg:gap-6">
+            <div className="flex lg:contents gap-6 overflow-x-auto pb-6 lg:pb-0 snap-x snap-mandatory scrollbar-hide">
+            {/* Basic Plan */}
+            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
+              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-gray-900">Basic</h3>
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <ShoppingBag className="w-5 h-5 text-gray-700" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-gray-900">R$ 130</span>
+                      <span className="text-gray-500 text-sm">/mês</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">100 imagens/mês • R$ 1,30/img</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 pt-4 mb-5">
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Integração Shopify</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Dashboard analytics</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Suporte por e-mail</span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={handleOpenPricingModal}
+                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
+                >
+                  Assinar Agora
+                </button>
+              </div>
+            </div>
+
+            {/* Starter Plan */}
+            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
+              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-gray-900">Starter</h3>
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Package className="w-5 h-5 text-green-700" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-gray-900">R$ 550</span>
+                      <span className="text-gray-500 text-sm">/mês</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">500 imagens/mês • R$ 1,10/img</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 pt-4 mb-5">
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Integração Shopify</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Dashboard analytics</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Suporte por e-mail</span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={handleOpenPricingModal}
+                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
+                >
+                  Assinar Agora
+                </button>
+              </div>
+            </div>
+
+            {/* Growth Plan - Most Popular */}
+            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
+              <div className="relative bg-[#810707] rounded-xl p-6 h-full border-2 border-[#810707] shadow-lg hover:shadow-2xl transition-all duration-300">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <div className="bg-yellow-400 rounded-full shadow-md px-2 py-1 flex flex-row items-center">
+                    <span className="text-gray-900 text-xs font-bold uppercase">
+                    Mais Popular
+                    </span>
+                  </div>
+                </div>
+                <div className="mb-5 mt-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-white">Growth</h3>
+                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-white">R$ 975</span>
+                      <span className="text-red-200 text-sm">/mês</span>
+                    </div>
+                    <p className="text-sm text-red-200 mt-1">1.000 imagens/mês • R$ 0,98/img</p>
+                  </div>
+                </div>
+                <div className="border-t border-white/20 pt-4 mb-5">
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-white">Tudo do plano Starter</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-white">Analytics avançado</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-white">Suporte prioritário</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-white">API personalizada</span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={handleOpenPricingModal}
+                  className="w-full py-3 bg-white text-[#810707] rounded-lg hover:bg-gray-100 transition-colors font-bold"
+                >
+                  Assinar Agora
+                </button>
+              </div>
+            </div>
+
+            {/* Scale Plan */}
+            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
+              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-gray-900">Scale</h3>
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-blue-700" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-gray-900">R$ 2.400</span>
+                      <span className="text-gray-500 text-sm">/mês</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">3.000 imagens/mês • R$ 0,80/img</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 pt-4 mb-5">
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Tudo do plano Growth</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Suporte 24/7</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Gerente de conta</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Webhooks avançados</span>
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={handleOpenPricingModal}
+                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
+                >
+                  Assinar Agora
+                </button>
+              </div>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
+              <div className="relative bg-gray-900 rounded-xl p-6 h-full border-2 border-gray-700 hover:border-gray-600 transition-all duration-300 hover:shadow-xl">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-white">Enterprise</h3>
+                    <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                      <Star className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-white">Custom</span>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">Imagens ilimitadas</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-700 pt-4 mb-5">
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-300">Tudo do plano Scale</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-300">SLA garantido</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-300">Infraestrutura dedicada</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-300">Dev. customizado</span>
+                    </li>
+                  </ul>
+                </div>
+                <a
+                  href="mailto:contato@omafit.com"
+                  className="w-full py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center justify-center"
+                >
+                  Entrar em Contato
+                </a>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 sm:py-20 bg-gradient-to-r from-[#810707] to-red-700">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="landing-title text-3xl sm:text-4xl font-bold text-white mb-6 animate-swipe-up">
+            Pronto para expandir sua marca?
+          </h2>
+          <p className="text-lg sm:text-xl text-red-100 mb-8 animate-swipe-up-delay-1">
+            Junte-se a centenas de marcas que já aumentaram suas vendas com o Omafit
+          </p>
+          <button
+            onClick={handleOpenPricingModal}
+            className="bg-white text-[#810707] px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
+          >
+            Assine Agora
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <p className="text-red-200 text-sm mt-4 animate-swipe-up-delay-3">
+            
+          </p>
+        </div>
+      </section>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div
+            className="relative w-full max-w-5xl aspect-video"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors text-4xl font-light w-10 h-10 flex items-center justify-center"
+              aria-label="Fechar vídeo"
+            >
+              ×
+            </button>
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full rounded-lg shadow-2xl omafit-demo-video"
+              style={{ pointerEvents: 'none' }}
+            >
+              <source
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Omafit.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvT21hZml0Lm1wNCIsImlhdCI6MTc2MDYzMTM5MCwiZXhwIjo0OTE0MjMxMzkwfQ.7L2glLT1JydZkigq2J-jdrp-PtWUV_yHVW8MFznYBRk"
+                type="video/mp4"
+              />
+            </video>
+            <style>{`
+              .omafit-demo-video::-webkit-media-controls {
+                display: none !important;
+              }
+              .omafit-demo-video::-webkit-media-controls-enclosure {
+                display: none !important;
+              }
+              .omafit-demo-video::-webkit-media-controls-panel {
+                display: none !important;
+              }
+              .omafit-demo-video::--webkit-media-controls-play-button {
+                display: none !important;
+              }
+              .omafit-demo-video::-webkit-media-controls-start-playback-button {
+                display: none !important;
+              }
+            `}</style>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center mb-4">
+                <div className="bg-gradient-to-r from-[#810707] to-red-700 text-white rounded-lg w-8 h-8 flex items-center justify-center mr-3">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <span className="text-xl font-bold" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+              </div>
+              <p className="text-gray-400">
+                Revolucionando o e-commerce com try-on virtual powered by IA.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-4">Produto</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Recursos</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Preços</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Integrações</a></li>
+                
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-4">Suporte</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Documentação</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Tutoriais</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Contato</a></li>
+                
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-4">Empresa</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Sobre</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+                
+                <li><a href="#" className="hover:text-white transition-colors">Privacidade</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2025 Omafit. Todos os direitos reservados.</p>
+          </div>
+        </div>
+      </footer>
+
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        onSelectPlan={handleSelectPlan}
+      />
+    </div>
+  );
+}
+
+// Add animation CSS
+const styles = `
+  @keyframes swipeUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  .animate-swipe-up {
+    animation: swipeUp 0.8s ease-out forwards;
+  }
+
+  .animate-swipe-up-delay-1 {
+    animation: swipeUp 0.8s ease-out 0.2s forwards;
+    opacity: 0;
+  }
+
+  .animate-swipe-up-delay-2 {
+    animation: swipeUp 0.8s ease-out 0.4s forwards;
+    opacity: 0;
+  }
+
+  .animate-swipe-up-delay-3 {
+    animation: swipeUp 0.8s ease-out 0.6s forwards;
+    opacity: 0;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Intersection Observer animations */
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-swipe-up,
+    .animate-swipe-up-delay-1,
+    .animate-swipe-up-delay-2,
+    .animate-swipe-up-delay-3 {
+      opacity: 0;
+      transform: translateY(60px);
+      transition: all 0.8s ease-out;
+    }
+
+    .animate-swipe-up.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .animate-swipe-up-delay-1.in-view {
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: 0.2s;
+    }
+
+    .animate-swipe-up-delay-2.in-view {
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: 0.4s;
+    }
+
+    .animate-swipe-up-delay-3.in-view {
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: 0.6s;
+    }
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .animate-swipe-up,
+    .animate-swipe-up-delay-1,
+    .animate-swipe-up-delay-2,
+    .animate-swipe-up-delay-3 {
+      transform: translateY(30px);
+    }
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+
+  // Intersection Observer for scroll animations
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+      }
+    });
+  }, observerOptions);
+
+  // Observe elements when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const animatedElements = document.querySelectorAll('.animate-swipe-up, .animate-swipe-up-delay-1, .animate-swipe-up-delay-2, .animate-swipe-up-delay-3');
+    animatedElements.forEach(el => observer.observe(el));
+  });
+}

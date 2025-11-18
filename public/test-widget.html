@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste do Widget OmaFit</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .product-card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .product-image {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .product-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .product-price {
+      font-size: 20px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    .add-to-cart {
+      background: #000;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .add-to-cart:hover {
+      background: #333;
+    }
+  </style>
+
+  <!-- Meta tag para detecção de imagem -->
+  <meta id="omafit-featured-image" data-src="https://images.pexels.com/photos/1536619/pexels-photo-1536619.jpeg">
+</head>
+<body>
+  <div class="product-card">
+    <img
+      class="product-image"
+      src="https://images.pexels.com/photos/1536619/pexels-photo-1536619.jpeg"
+      alt="Vestido Vermelho"
+    >
+    <h1 class="product-title">Vestido Vermelho Elegante</h1>
+    <p class="product-price">R$ 299,90</p>
+
+    <button class="add-to-cart">Adicionar ao Carrinho</button>
+
+    <!-- WIDGET OMAFIT AQUI -->
+    <div class="omafit-widget">
+      <a href="#" class="omafit-try-on-link" onclick="openOmafitModal(); return false;">
+        Experimentar virtualmente
+      </a>
+    </div>
+
+    <script>
+    (function() {
+      // Função para obter a imagem principal do produto da página
+      function getProductImageFromPage() {
+        const metaImage = document.querySelector('#omafit-featured-image');
+        if (metaImage && metaImage.dataset && metaImage.dataset.src) {
+          return metaImage.dataset.src;
+        }
+
+        // Fallback caso não encontre o <meta>
+        const fallbackImg = document.querySelector('.product__media img[src*="cdn.shopify.com"]');
+        return fallbackImg ? fallbackImg.src : null;
+      }
+
+      // Configuração do OmaFit
+      const OMAFIT_CONFIG = {
+        apiUrl: 'http://localhost:5173', // URL LOCAL PARA TESTE
+        widgetKey: 'wgt_fd9480c6f4a1bb9a', // WIDGET KEY PARA TESTE (mpatricio621@gmail.com)
+        getProductImage: getProductImageFromPage,
+        linkText: 'Experimentar virtualmente',
+        storeName: 'Minha Loja',
+        productId: 'test-product-001',
+        productName: 'Vestido Vermelho Elegante',
+
+        // Cores personalizadas - ALTERE AQUI PARA TESTAR DIFERENTES CORES!
+        colors: {
+          primary: '#1E40AF', // Azul - ALTERE ESTA COR PARA TESTAR
+          background: '#ffffff',
+          text: '#1E40AF', // Azul - ALTERE ESTA COR PARA TESTAR
+          overlay: '#1E40AFCC'
+        }
+      };
+
+      // Aplicar estilos ao link
+      function applyLinkStyles() {
+        const links = document.querySelectorAll('.omafit-try-on-link');
+        links.forEach(link => {
+          // Herda a tipografia do tema da loja
+          link.style.fontFamily = 'inherit';
+          link.style.fontSize = 'inherit';
+          link.style.fontWeight = 'inherit';
+          link.style.lineHeight = 'inherit';
+
+          // Aplica cor e sublinhado
+          link.style.color = OMAFIT_CONFIG.colors.text;
+          link.style.textDecoration = 'underline';
+          link.style.textDecorationColor = OMAFIT_CONFIG.colors.primary;
+          link.style.textUnderlineOffset = '3px';
+          link.style.cursor = 'pointer';
+          link.style.transition = 'all 0.2s ease';
+
+          // Hover effect
+          link.addEventListener('mouseenter', function() {
+            this.style.opacity = '0.7';
+            this.style.textDecorationThickness = '2px';
+          });
+
+          link.addEventListener('mouseleave', function() {
+            this.style.opacity = '1';
+            this.style.textDecorationThickness = '1px';
+          });
+        });
+      }
+
+      // Função para converter imagem URL para Base64
+      async function imageUrlToBase64(url) {
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('Erro ao converter imagem para Base64:', error);
+          return null;
+        }
+      }
+
+      // Função para abrir o modal
+      window.openOmafitModal = async function() {
+        // Obter a imagem atual do produto na página
+        const currentProductImageUrl = OMAFIT_CONFIG.getProductImage();
+
+        if (!currentProductImageUrl) {
+          alert('Não foi possível encontrar a imagem do produto. Verifique se a página contém imagens do produto.');
+          return;
+        }
+
+        // Mostrar loading enquanto converte imagem
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.style.cssText =
+          'position: fixed;' +
+          'top: 0;' +
+          'left: 0;' +
+          'width: 100%;' +
+          'height: 100%;' +
+          'background: rgba(0, 0, 0, 0.7);' +
+          'z-index: 999998;' +
+          'display: flex;' +
+          'align-items: center;' +
+          'justify-content: center;';
+        loadingOverlay.innerHTML = '<div style="color: white; font-size: 18px;">Carregando...</div>';
+        document.body.appendChild(loadingOverlay);
+
+        // Converter imagem do produto para Base64
+        const garmentImageBase64 = await imageUrlToBase64(currentProductImageUrl);
+
+        if (!garmentImageBase64) {
+          document.body.removeChild(loadingOverlay);
+          alert('Erro ao carregar a imagem do produto. Tente novamente.');
+          return;
+        }
+
+        document.body.removeChild(loadingOverlay);
+
+        // Criar overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'omafit-modal-overlay';
+        overlay.style.cssText =
+          'position: fixed;' +
+          'top: 0;' +
+          'left: 0;' +
+          'width: 100%;' +
+          'height: 100%;' +
+          'background: ' + OMAFIT_CONFIG.colors.overlay + ';' +
+          'z-index: 999999;' +
+          'display: flex;' +
+          'align-items: center;' +
+          'justify-content: center;' +
+          'padding: 20px;' +
+          'box-sizing: border-box;' +
+          'backdrop-filter: blur(4px);';
+
+        // Criar iframe
+        const iframe = document.createElement('iframe');
+        const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(garmentImageBase64) +
+          '&productId=' + encodeURIComponent(OMAFIT_CONFIG.productId || 'unknown') +
+          '&productName=' + encodeURIComponent(OMAFIT_CONFIG.productName || 'Produto') +
+          '&widgetKey=' + encodeURIComponent(OMAFIT_CONFIG.widgetKey) +
+          '&config=' + encodeURIComponent(JSON.stringify({
+            storeName: OMAFIT_CONFIG.storeName || 'Omafit',
+            primaryColor: OMAFIT_CONFIG.colors.primary
+          }));
+        iframe.src = widgetUrl;
+        console.log('🔗 Widget URL:', widgetUrl);
+        iframe.style.cssText =
+          'width: 95vw;' +
+          'max-width: 1000px;' +
+          'height: 85vh;' +
+          'max-height: 800px;' +
+          'border: none;' +
+          'border-radius: 16px;' +
+          'background: ' + OMAFIT_CONFIG.colors.background + ';' +
+          'box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);';
+
+        // Botão de fechar
+        const closeButton = document.createElement('button');
+        closeButton.innerHTML = '×';
+        closeButton.style.cssText =
+          'position: absolute;' +
+          'top: 10px;' +
+          'right: 10px;' +
+          'width: 40px;' +
+          'height: 40px;' +
+          'border: none;' +
+          'border-radius: 50%;' +
+          'background: rgba(255, 255, 255, 0.9);' +
+          'color: ' + OMAFIT_CONFIG.colors.primary + ';' +
+          'font-size: 24px;' +
+          'cursor: pointer;' +
+          'display: flex;' +
+          'align-items: center;' +
+          'justify-content: center;' +
+          'z-index: 1000000;' +
+          'font-weight: bold;';
+
+        // Eventos de fechamento
+        const closeModal = function() {
+          if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+            document.body.style.overflow = '';
+          }
+        };
+
+        closeButton.addEventListener('click', closeModal);
+
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) {
+            closeModal();
+          }
+        });
+
+        // Fechar com ESC
+        const handleEscape = function(e) {
+          if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEscape);
+          }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Montar modal
+        overlay.appendChild(iframe);
+        overlay.appendChild(closeButton);
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+      };
+
+      // Inicializar quando DOM estiver pronto
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyLinkStyles);
+      } else {
+        applyLinkStyles();
+      }
+
+      // CSS adicional para responsividade
+      const style = document.createElement('style');
+      style.textContent = `
+        @media (max-width: 768px) {
+          .omafit-modal-overlay iframe {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-height: none !important;
+            border-radius: 0 !important;
+          }
+
+          .omafit-try-on-link {
+            font-size: 16px !important;
+          }
+        }
+
+        .omafit-try-on-link:focus {
+          outline: 2px solid ${OMAFIT_CONFIG.colors.primary};
+          outline-offset: 2px;
+        }
+      `;
+      document.head.appendChild(style);
+    })();
+    </script>
+  </div>
+</body>
+</html>
