@@ -112,6 +112,7 @@ Deno.serve(async (req: Request) => {
         person_image_url: model_image,
         clothing_image_url: garment_image,
         preserve_pose: true
+        aspect_ratio: 3:4
       }
     });
 
