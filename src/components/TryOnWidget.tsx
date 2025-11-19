@@ -572,11 +572,11 @@ const handleSubmit = async () => {
                   Visualize-se.
                 </h3>
               </div>
-              <div className="w-full max-w-md mx-auto h-80 md:h-96 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
+              <div className="w-full h-96 md:h-96 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
                 <img
                   src={result}
                   alt="Resultado do try-on"
-                  className="w-full h-full object-cover rounded-lg"
+                  className="max-w-full max-h-full object-contain"
                 />
               </div>
 
