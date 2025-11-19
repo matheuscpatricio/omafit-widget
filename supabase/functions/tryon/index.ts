@@ -27,7 +27,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('public_id is required. Please generate a valid widget code from your Omafit dashboard.');
     }
 
-    // Configure fal.ai client
     const falKey = Deno.env.get('FAL_KEY');
     if (!falKey) {
       throw new Error('FAL_KEY not configured');
@@ -37,13 +36,11 @@ Deno.serve(async (req: Request) => {
       credentials: falKey
     });
 
-    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Validate public_id
     const { data: widgetKeyData, error: widgetKeyError } = await supabaseClient
       .from('widget_keys')
       .select('id, user_id, status, usage_count')
@@ -62,7 +59,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('This widget has been deactivated. Please contact the store owner or generate a new widget.');
     }
 
-    // Check user subscription and credits
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
       .select('images_limit, images_used, status, period_end')
@@ -78,19 +74,16 @@ Deno.serve(async (req: Request) => {
       throw new Error('No active subscription found. Please subscribe to a plan to use the try-on feature.');
     }
 
-    // Check if period has expired
     const now = new Date();
     const periodEnd = new Date(subscription.period_end);
     if (now > periodEnd) {
       throw new Error('Your subscription period has expired. Please renew your subscription.');
     }
 
-    // Check if user has credits (-1 means unlimited)
     if (subscription.images_limit !== -1 && subscription.images_used >= subscription.images_limit) {
       throw new Error('You have reached your monthly image limit. Please upgrade your plan or wait for the next billing cycle.');
     }
 
-    // Create session record
     const { data: session, error: sessionError } = await supabaseClient
       .from('tryon_sessions')
       .insert([
@@ -108,15 +101,22 @@ Deno.serve(async (req: Request) => {
       throw new Error('Failed to create try-on session');
     }
 
-    // Submit to fal.ai queue
+    console.log('🚀 Submitting to fal.ai with input:', {
+      person_image_url: model_image.substring(0, 50) + '...',
+      clothing_image_url: garment_image.substring(0, 50) + '...',
+      preserve_pose: true
+    });
+
     const { request_id } = await fal.queue.submit("fal-ai/image-apps-v2/virtual-try-on", {
       input: {
         person_image_url: model_image,
-        clothing_image_url: garment_image
+        clothing_image_url: garment_image,
+        preserve_pose: true
       }
     });
 
-    // Update session with prediction ID
+    console.log('✅ Submitted to fal.ai, request_id:', request_id);
+
     await supabaseClient
       .from('tryon_sessions')
       .update({
@@ -125,9 +125,7 @@ Deno.serve(async (req: Request) => {
       })
       .eq('id', session.id);
 
-    // Increment usage counters
     await Promise.all([
-      // Increment widget key usage
       supabaseClient
         .from('widget_keys')
         .update({
@@ -136,7 +134,6 @@ Deno.serve(async (req: Request) => {
         })
         .eq('id', widgetKeyData.id),
 
-      // Increment subscription images used
       supabaseClient
         .from('subscriptions')
         .update({
