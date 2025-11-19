@@ -570,7 +570,7 @@ const handleSubmit = async () => {
               <div className="flex items-center justify-center gap-2 mb-4">
                 <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-green-500" />
                 <h3 className="text-2xl md:text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  Try-On Concluído!
+                  Visualize-se.
                 </h3>
               </div>
               <div className="w-full h-96 md:h-96 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
