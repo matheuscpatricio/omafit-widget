@@ -88,8 +88,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
   if (file) {
-    if (file.size > 10 * 1024 * 1024) {
-      setError('A imagem deve ter no máximo 10MB');
+    if (file.size > 5 * 1024 * 1024) {
+      setError('A imagem deve ter no máximo 5MB');
       return;
     }
 
@@ -477,7 +477,7 @@ const handleSubmit = async () => {
               <Camera className="w-12 h-12 md:w-16 md:h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
               <p className="text-sm md:text-base text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                JPG, PNG ou WEBP (máx. 10MB)
+                JPG, PNG ou WEBP (máx. 5MB)
               </p>
               <input
                 ref={fileInputRef}
