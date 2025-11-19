@@ -509,7 +509,7 @@ const handleSubmit = async () => {
                   <img
                     src={displayImage}
                     alt="Produto"
-                    className="max-w-full max-h-full object-contain"
+                    className="max-w-full max-h-full object-cover"
                   />
                 </div>
               </div>
@@ -520,7 +520,7 @@ const handleSubmit = async () => {
                   <img
                     src={imagePreview}
                     alt="Sua foto"
-                    className="max-w-full max-h-full object-contain"
+                    className="max-w-full max-h-full object-cover"
                   />
                 </div>
               </div>
@@ -576,7 +576,7 @@ const handleSubmit = async () => {
                 <img
                   src={result}
                   alt="Resultado do try-on"
-                  className="max-w-full max-h-full object-contain"
+                  className="max-w-full max-h-full object-cover"
                 />
               </div>
 
