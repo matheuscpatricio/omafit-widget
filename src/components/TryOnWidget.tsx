@@ -586,7 +586,7 @@ const handleSubmit = async () => {
                     <Ruler className="w-6 h-6 text-green-600 flex-shrink-0" />
                     <div>
                       <h4 className="font-semibold text-green-900 mb-1 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                        Tamanho Ideal: {calculatedSize}
+                        Seu tamanho Ideal: {calculatedSize}
                       </h4>
                       <p className="text-sm md:text-base text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
                         Com base na sua altura, peso e tipo físico
