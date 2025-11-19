@@ -53,6 +53,7 @@ Deno.serve(async (req: Request) => {
     );
 
     try {
+      // First check status
       const statusResult = await fal.queue.status("fal-ai/image-apps-v2/virtual-try-on", {
         requestId: predictionId,
         logs: true
@@ -67,18 +68,33 @@ Deno.serve(async (req: Request) => {
       let resultImage = null;
 
       if (statusResult.status === 'COMPLETED') {
-        const result = statusResult as any;
+        // Get the full result with the image
+        console.log('🔄 Fetching full result from fal.ai...');
+        const result = await fal.queue.result("fal-ai/image-apps-v2/virtual-try-on", {
+          requestId: predictionId
+        });
 
-        if (result.output && result.output.images && result.output.images.length > 0 && result.output.images[0].url) {
+        console.log('📦 Full result from fal.ai:', {
+          hasData: !!result.data,
+          requestId: result.requestId,
+          dataKeys: result.data ? Object.keys(result.data) : []
+        });
+
+        // Extract image from result
+        if (result.data && result.data.image && result.data.image.url) {
           dbStatus = 'completed';
-          resultImage = result.output.images[0].url;
-        } else if (result.output && result.output.image && result.output.image.url) {
+          resultImage = result.data.image.url;
+          console.log('✅ Image URL found:', resultImage);
+        } else if (result.data && result.data.images && result.data.images.length > 0 && result.data.images[0].url) {
           dbStatus = 'completed';
-          resultImage = result.output.image.url;
+          resultImage = result.data.images[0].url;
+          console.log('✅ Image URL found in array:', resultImage);
+        } else {
+          console.log('⚠️ Result structure:', JSON.stringify(result.data, null, 2));
         }
 
         if (resultImage) {
-          console.log('✅ Try-on completed:', { resultImage });
+          console.log('✅ Try-on completed, updating database');
 
           const { error: updateError } = await supabase
             .from('tryon_sessions')
@@ -98,8 +114,10 @@ Deno.serve(async (req: Request) => {
         }
       } else if (statusResult.status === 'IN_PROGRESS') {
         dbStatus = 'processing';
+        console.log('⏳ Still processing...');
       } else if (statusResult.status === 'FAILED') {
         dbStatus = 'failed';
+        console.log('❌ Processing failed');
 
         await supabase
           .from('tryon_sessions')
