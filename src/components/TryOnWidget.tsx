@@ -567,8 +567,7 @@ const handleSubmit = async () => {
         {step === 'result' && result && (
           <div className="space-y-4">
             <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-green-500" />
+              <div className="flex items-center justify-center mb-4">
                 <h3 className="text-2xl md:text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
                   Visualize-se.
                 </h3>
