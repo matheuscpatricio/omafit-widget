@@ -572,26 +572,22 @@ const handleSubmit = async () => {
                   Visualize-se.
                 </h3>
               </div>
-              <div className="w-full h-96 md:h-96 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
+              <div className="w-full h-96 md:h-96 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
                 <img
                   src={result}
                   alt="Resultado do try-on"
-                  className="max-w-full max-h-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               </div>
 
               {calculatedSize && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <div>
-                      <h4 className="font-semibold text-green-900 mb-1 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                        Seu tamanho Ideal: {calculatedSize}
-                      </h4>
-                      <p className="text-sm md:text-base text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                        Com base na sua altura, peso e tipo físico
-                      </p>
-                    </div>
-                  </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
+                  <h4 className="font-semibold text-green-900 mb-1 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Seu tamanho Ideal: {calculatedSize}
+                  </h4>
+                  <p className="text-sm md:text-base text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Com base na sua altura, peso e tipo físico
+                  </p>
                 </div>
               )}
 
