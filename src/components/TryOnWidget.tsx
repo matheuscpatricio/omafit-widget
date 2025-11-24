@@ -569,7 +569,7 @@ const handleSubmit = async () => {
             <div className="text-center">
               <div className="flex items-center justify-center mb-4">
                 <h3 className="text-2xl md:text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  Visualize-se.
+                  Sua prévia:
                 </h3>
               </div>
               <div className="w-full h-96 md:h-96 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
