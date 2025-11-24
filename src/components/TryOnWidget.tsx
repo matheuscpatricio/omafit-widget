@@ -592,7 +592,8 @@ const handleSubmit = async () => {
               )}
 
               <p className="text-sm md:text-base text-green-600 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                 Você ficou excepcional! Esse look realmente combina muito contigo!
+                 Você ficou excepcional! Esse look realmente combina muito contigo! 
+                Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
               </p>
             </div>
 
