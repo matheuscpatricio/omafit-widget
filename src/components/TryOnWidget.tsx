@@ -574,7 +574,7 @@ const handleSubmit = async () => {
                     Sua prévia:
                   </h3>
                 </div>
-                <div className="w-full h-96 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
+                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-4 flex items-center justify-center">
                   <img
                     src={result}
                     alt="Resultado do try-on"
@@ -616,7 +616,7 @@ const handleSubmit = async () => {
                     Sua prévia:
                   </h3>
                 </div>
-                <div className="w-full h-[600px] rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden flex items-center justify-center">
                   <img
                     src={result}
                     alt="Resultado do try-on"
