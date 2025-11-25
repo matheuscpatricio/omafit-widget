@@ -166,7 +166,7 @@ export function AuthForm() {
           {!isLogin && (
                 <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Nome
+              Nome da loja
             </label>
             <div className="relative">
               <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -176,7 +176,7 @@ export function AuthForm() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#810707] focus:border-[#810707] transition-all outline-none text-gray-900"
-                placeholder="Seu nome"
+                placeholder="Nome da sua loja"
               />
             </div>
           </div>
