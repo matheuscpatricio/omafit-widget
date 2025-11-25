@@ -566,43 +566,91 @@ const handleSubmit = async () => {
         {/* Step 6: Result */}
         {step === 'result' && result && (
           <div className="space-y-4">
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-4">
-                <h3 className="text-2xl md:text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  Sua prévia:
-                </h3>
-              </div>
-              <div className="w-full h-96 md:h-[600px] rounded-lg overflow-hidden mb-4 flex items-center justify-center">
-                <img
-                  src={result}
-                  alt="Resultado do try-on"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              {calculatedSize && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                  <h4 className="font-semibold text-green-900 mb-1 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                    Seu tamanho Ideal: {calculatedSize}
-                  </h4>
-                  <p className="text-sm md:text-base text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                    Com base na sua altura, peso e tipo físico
-                  </p>
+            {/* Mobile Layout */}
+            <div className="md:hidden space-y-4">
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <h3 className="text-2xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Sua prévia:
+                  </h3>
                 </div>
-              )}
+                <div className="w-full h-96 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
+                  <img
+                    src={result}
+                    alt="Resultado do try-on"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
 
-              <p className="text-sm md:text-base text-green-600 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                 Você ficou excepcional! Esse look realmente combina muito contigo! 
-                Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
-              </p>
+                {calculatedSize && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
+                    <h4 className="font-semibold text-green-900 mb-1 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho Ideal: {calculatedSize}
+                    </h4>
+                    <p className="text-sm text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Com base na sua altura, peso e tipo físico
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-sm text-green-600 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                   Você ficou excepcional! Esse look realmente combina muito contigo!
+                  Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
+                </p>
+              </div>
+
+              <button
+                onClick={resetWidget}
+                className="w-full bg-gray-100 text-gray-700 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
+              >
+                Novo Try-On
+              </button>
             </div>
 
-            <button
-              onClick={resetWidget}
-              className="w-full bg-gray-100 text-gray-700 py-3 md:py-4 text-base md:text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
-                          >
-              Novo Try-On
-            </button>
+            {/* Desktop Layout */}
+            <div className="hidden md:flex md:gap-6">
+              {/* Left Side: Image */}
+              <div className="md:w-1/2">
+                <div className="mb-4">
+                  <h3 className="text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Sua prévia:
+                  </h3>
+                </div>
+                <div className="w-full h-[600px] rounded-lg overflow-hidden flex items-center justify-center">
+                  <img
+                    src={result}
+                    alt="Resultado do try-on"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side: Info and Actions */}
+              <div className="md:w-1/2 flex flex-col justify-center space-y-6">
+                {calculatedSize && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                    <h4 className="font-semibold text-green-900 mb-2 text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho Ideal: {calculatedSize}
+                    </h4>
+                    <p className="text-lg text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Com base na sua altura, peso e tipo físico
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-lg text-green-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Você ficou excepcional! Esse look realmente combina muito contigo!
+                  Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
+                </p>
+
+                <button
+                  onClick={resetWidget}
+                  className="w-full bg-gray-100 text-gray-700 py-4 text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
+                >
+                  Novo Try-On
+                </button>
+              </div>
+            </div>
           </div>
         )}
         </div>
