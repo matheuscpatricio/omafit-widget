@@ -160,7 +160,7 @@ export function PrivacyPolicyPage() {
               <li>Solicitar informações sobre compartilhamento de dados</li>
             </ul>
             <p className="text-gray-700 mt-4">
-              Para exercer seus direitos, entre em contato conosco em: <a href="mailto:privacidade@omafit.co" className="text-[#810707] font-semibold hover:underline">privacidade@omafit.co</a>
+              Para exercer seus direitos, entre em contato conosco em: <a href="mailto:contato@omafit.co" className="text-[#810707] font-semibold hover:underline">contato@omafit.co</a>
             </p>
           </section>
 
@@ -210,9 +210,8 @@ export function PrivacyPolicyPage() {
               Se você tiver dúvidas sobre esta Política de Privacidade ou sobre como tratamos seus dados,
               entre em contato:
             </p>
-            <div className="space-y-2 text-gray-700">
-              <p><strong>E-mail:</strong> <a href="mailto:privacidade@omafit.co" className="text-[#810707] hover:underline">privacidade@omafit.co</a></p>
-              <p><strong>Suporte:</strong> <a href="mailto:contato@omafit.co" className="text-[#810707] hover:underline">contato@omafit.co</a></p>
+            <div className="space-y-2 text-gray-700">              
+              <p><strong>E-mail:</strong> <a href="mailto:contato@omafit.co" className="text-[#810707] hover:underline">contato@omafit.co</a></p>
             </div>
           </section>
 
