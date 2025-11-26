@@ -156,10 +156,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         {/* Centered Text with Animation */}
         <div className="relative z-10 h-full flex items-center justify-center">
           <div className="text-center px-4 animate-fade-in-up">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
               Encante seus clientes com uma<br />experiência envolvente
             </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg">
+            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
               When techno meets fashion.
             </p>
           </div>
@@ -556,17 +556,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             {/* Nuvemshop */}
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]">
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 mb-6 flex items-center justify-center">
-                  <svg viewBox="0 0 200 200" className="w-full h-full">
-                    <defs>
-                      <linearGradient id="nuvemGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style={{stopColor: '#00A0DC'}} />
-                        <stop offset="100%" style={{stopColor: '#0066CC'}} />
-                      </linearGradient>
-                    </defs>
-                    <path d="M100,20 L180,60 L180,140 L100,180 L20,140 L20,60 Z" fill="url(#nuvemGradient)" />
-                    <circle cx="100" cy="100" r="30" fill="white" />
-                  </svg>
+                <div className="w-32 h-24 mb-6 flex items-center justify-center">
+                  <img
+                    src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/vagasbyintera_nuvemshop-tiendanube-og.png"
+                    alt="Nuvemshop"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">Nuvemshop</h3>
                 <p className="text-gray-600 mb-4">

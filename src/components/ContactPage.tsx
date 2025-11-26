@@ -5,7 +5,7 @@ import { ArrowLeft, Mail, MessageSquare, Send, CheckCircle, Phone, MapPin } from
 export function ContactPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    storeName: '',
     email: '',
     subject: '',
     message: ''
@@ -18,7 +18,7 @@ export function ContactPage() {
     setIsSubmitting(true);
 
     const mailtoLink = `mailto:contato@omafit.co?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(
-      `Nome: ${formData.name}\nE-mail: ${formData.email}\n\nMensagem:\n${formData.message}`
+      `Nome da Loja: ${formData.storeName}\nE-mail: ${formData.email}\n\nMensagem:\n${formData.message}`
     )}`;
 
     window.location.href = mailtoLink;
@@ -26,7 +26,7 @@ export function ContactPage() {
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSubmitted(true);
-      setFormData({ name: '', email: '', subject: '', message: '' });
+      setFormData({ storeName: '', email: '', subject: '', message: '' });
 
       setTimeout(() => {
         setIsSubmitted(false);
@@ -159,18 +159,18 @@ export function ContactPage() {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                          Nome Completo *
+                        <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-2">
+                          Nome da Loja *
                         </label>
                         <input
                           type="text"
-                          id="name"
-                          name="name"
+                          id="storeName"
+                          name="storeName"
                           required
-                          value={formData.name}
+                          value={formData.storeName}
                           onChange={handleChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
-                          placeholder="Seu nome"
+                          placeholder="Nome da sua loja"
                         />
                       </div>
 
