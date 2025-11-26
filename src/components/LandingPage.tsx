@@ -88,13 +88,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-black'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+              <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-white'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
             </div>
 
             <nav className="hidden md:flex space-x-8">
-              <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Recursos</a>
-              <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Benefícios</a>
-              <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-gray hover:text-gray-200'}`}>Planos</a>
+              <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Recursos</a>
+              <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Benefícios</a>
+              <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Planos</a>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -103,7 +103,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 className={`px-4 py-2 rounded-lg transition-all font-medium ${
                   showHeader
                     ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
-                    : 'text-gray hover:text-gray-200 hover:bg-white/10'
+                    : 'text-white hover:text-gray-200 hover:bg-white/10'
                 }`}
               >
                 Login
