@@ -119,10 +119,16 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </header>
 
-      {/* Hero Section - Image Only */}
-      <section className="relative w-full overflow-hidden bg-gray-100" style={{ height: 'full', minHeight: '600px', maxHeight: '1200px' }}>
-        {/* Desktop Image */}
-        <div className="hidden md:flex w-full h-full items-center justify-center ">
+      {/* Hero Section - Parallax Banner with Text */}
+      <section className="relative w-full overflow-hidden bg-gray-100" style={{ height: '100vh', minHeight: '600px' }}>
+        {/* Parallax Background - Desktop */}
+        <div
+          className="hidden md:flex absolute inset-0 w-full h-full"
+          style={{
+            transform: `translateY(${scrollY * 0.5}px)`,
+            transition: 'transform 0.1s ease-out'
+          }}
+        >
           <img
             src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/omafitbanner%20(2).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvb21hZml0YmFubmVyICgyKS5wbmciLCJpYXQiOjE3NjMyOTkyNTEsImV4cCI6NDkxNjg5OTI1MX0.ZES3Xp30GHvz-JeaZFeNMVo9qvsGpxvoI7X8esCL37I"
             alt="Hero"
@@ -131,14 +137,32 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           />
         </div>
 
-        {/* Mobile Image */}
-        <div className="flex md:hidden w-full h-full items-center justify-center px-0">
+        {/* Parallax Background - Mobile */}
+        <div
+          className="flex md:hidden absolute inset-0 w-full h-full"
+          style={{
+            transform: `translateY(${scrollY * 0.3}px)`,
+            transition: 'transform 0.1s ease-out'
+          }}
+        >
           <img
             src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Omafit%20image%20(5).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvT21hZml0IGltYWdlICg1KS5wbmciLCJpYXQiOjE3NjMyOTkyODIsImV4cCI6NDkxNjg5OTI4Mn0.aTVgmoItZORvj8wYduy-jaf-rsvn-BiuZhlKkkosXic"
             alt="Hero Mobile"
             className="w-full h-full object-cover"
             loading="eager"
           />
+        </div>
+
+        {/* Centered Text with Animation */}
+        <div className="relative z-10 h-full flex items-center justify-center">
+          <div className="text-center px-4 animate-fade-in-up">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl">
+              Encante seus clientes com uma<br />experiência envolvente
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg">
+              When techno meets fashion.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -497,6 +521,67 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Platforms Section */}
+      <section className="py-16 sm:py-20 bg-gray-50" data-animate="platforms">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Plataformas
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-600">
+              Integre facilmente com as principais plataformas de e-commerce
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Shopify */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-24 h-24 mb-6 flex items-center justify-center">
+                  <svg viewBox="0 0 448 512" className="w-full h-full" fill="#95BF47">
+                    <path d="M388.32,104.1a4.66,4.66,0,0,0-4.4-4c-2,0-37.23-.8-37.23-.8s-21.61-20.82-29.62-28.83V503.2L442.76,472S388.72,106.5,388.32,104.1ZM288.65,70.47a116.67,116.67,0,0,0-7.21-17.61C271,32.85,255.42,22,237,22a15,15,0,0,0-4,.4c-.4-.8-1.2-1.2-1.6-2C223.4,11.63,213,7.63,200.58,8c-24,.8-48,18-67.25,48.83-13.61,21.62-24,48.84-26.82,70.06-27.62,8.4-46.83,14.41-47.23,14.81-14,4.4-14.41,4.8-16,18-1.2,10-38,291.82-38,291.82L307.86,504V65.67a41.66,41.66,0,0,0-4.4.4S297.86,67.67,288.65,70.47ZM233.41,87.69c-16,4.8-33.63,10.4-50.84,15.61,4.8-18.82,14.41-37.63,25.62-50,4.4-4.4,10.41-9.61,17.21-12.81C232.21,54.86,233.81,74.48,233.41,87.69ZM200.58,24.44A27.49,27.49,0,0,1,215,28c-6.4,3.2-12.81,8.41-18.81,14.41-15.21,16.42-26.82,42-31.62,66.45-14.42,4.41-28.83,8.81-42,12.81C131.33,83.28,163.75,25.24,200.58,24.44ZM154.15,244.61c1.6,25.61,69.25,31.22,73.25,91.66,2.8,47.64-25.22,80.06-65.65,82.47-48.83,3.2-75.65-25.62-75.65-25.62l10.4-44s26.82,20.42,48.44,18.82c14-.8,19.22-12.41,18.81-20.42-2-33.62-57.24-31.62-60.84-86.86-3.2-46.44,27.22-93.27,94.47-97.68,26-1.6,39.23,4.81,39.23,4.81L221.4,225.39s-17.21-8-37.63-6.4C154.15,221,153.75,239.8,154.15,244.61ZM249.42,82.88c0-12-1.6-29.22-7.21-43.63,18.42,3.6,27.22,24,31.23,36.43Q262.63,78.68,249.42,82.88Z"/>
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Shopify</h3>
+                <p className="text-gray-600 mb-4">
+                  Integração nativa e fácil configuração em poucos cliques
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Check className="w-4 h-4 text-green-500" />
+                  <span>Configuração em 5 minutos</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Nuvemshop */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-24 h-24 mb-6 flex items-center justify-center">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    <defs>
+                      <linearGradient id="nuvemGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style={{stopColor: '#00A0DC'}} />
+                        <stop offset="100%" style={{stopColor: '#0066CC'}} />
+                      </linearGradient>
+                    </defs>
+                    <path d="M100,20 L180,60 L180,140 L100,180 L20,140 L20,60 Z" fill="url(#nuvemGradient)" />
+                    <circle cx="100" cy="100" r="30" fill="white" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Nuvemshop</h3>
+                <p className="text-gray-600 mb-4">
+                  Perfeita integração com a maior plataforma da América Latina
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Check className="w-4 h-4 text-green-500" />
+                  <span>Suporte em português</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-16 sm:py-20 bg-gradient-to-r from-[#810707] to-red-700">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -601,8 +686,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">Documentação</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Tutoriais</a></li>
-                <li><a href="mailto:contato@omafit.co" className="hover:text-white transition-colors">Contato</a></li>
-                
+                <li><a href="/contato" className="hover:text-white transition-colors">Contato</a></li>
+
               </ul>
             </div>
 
@@ -611,8 +696,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition-colors">Sobre</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                
-                <li><a href="#" className="hover:text-white transition-colors">Privacidade</a></li>
+
+                <li><a href="/privacidade" className="hover:text-white transition-colors">Privacidade</a></li>
               </ul>
             </div>
           </div>
@@ -645,6 +730,17 @@ const styles = `
     }
   }
 
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   @keyframes float {
     0%, 100% {
       transform: translateY(0px);
@@ -652,6 +748,10 @@ const styles = `
     50% {
       transform: translateY(-20px);
     }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 1.2s ease-out forwards;
   }
 
   .animate-swipe-up {
