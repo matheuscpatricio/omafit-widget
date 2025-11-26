@@ -130,7 +130,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           }}
         >
           <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/omafitbanner%20(2).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvb21hZml0YmFubmVyICgyKS5wbmciLCJpYXQiOjE3NjMyOTkyNTEsImV4cCI6NDkxNjg5OTI1MX0.ZES3Xp30GHvz-JeaZFeNMVo9qvsGpxvoI7X8esCL37I"
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/omafitbanner2.png"
             alt="Hero"
             className="w-full h-full object-cover object-center"
             loading="eager"
@@ -146,7 +146,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           }}
         >
           <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Omafit%20image%20(5).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvT21hZml0IGltYWdlICg1KS5wbmciLCJpYXQiOjE3NjMyOTkyODIsImV4cCI6NDkxNjg5OTI4Mn0.aTVgmoItZORvj8wYduy-jaf-rsvn-BiuZhlKkkosXic"
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/Omafit%20image%202.png"
             alt="Hero Mobile"
             className="w-full h-full object-cover"
             loading="eager"
