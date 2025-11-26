@@ -26,6 +26,15 @@ interface DashboardStats {
   subscription: Subscription | null;
 }
 
+const getPlanNameFromLimit = (imagesLimit: number): string => {
+  if (imagesLimit === -1) return 'Unlimited';
+  if (imagesLimit === 100) return 'Basic - 100 imagens';
+  if (imagesLimit === 500) return 'Starter - 500 imagens';
+  if (imagesLimit === 1000) return 'Growth - 1000 imagens';
+  if (imagesLimit === 3000) return 'Scale - 3000 imagens';
+  return 'Unknown Plan';
+};
+
 interface DashboardHomeProps {
   onNavigate: (page: string) => void;
 }
@@ -196,6 +205,11 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
               ? 'Tokens ilimitados'
               : 'Nenhum plano ativo'}
           </div>
+          {stats?.subscription && (
+            <div className="mt-2 text-xs text-gray-400">
+              {getPlanNameFromLimit(stats.subscription.images_limit)}
+            </div>
+          )}
           <button
             onClick={() => onNavigate('pricing')}
             className="mt-4 text-orange-600 text-sm font-medium hover:text-orange-700 flex items-center gap-1"

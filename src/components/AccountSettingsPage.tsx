@@ -106,16 +106,24 @@ export function AccountSettingsPage() {
     try {
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('plan_id, status')
+        .select('plan_id, status, images_limit')
         .eq('user_id', user.id)
         .eq('status', 'active')
+        .maybeSingle();
 
-      console.log(data)
+      console.log('Subscription data:', data);
 
       if (error) throw error;
 
-      if (data) {
-        setCurrentPlan(data[0].plan_id);
+      if (data && data.images_limit) {
+        let planId = 'basic';
+        if (data.images_limit === 100) planId = 'basic';
+        else if (data.images_limit === 500) planId = 'starter';
+        else if (data.images_limit === 1000) planId = 'growth';
+        else if (data.images_limit === 3000) planId = 'scale';
+        else if (data.images_limit === -1) planId = 'enterprise';
+
+        setCurrentPlan(planId);
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -224,7 +232,7 @@ export function AccountSettingsPage() {
           <div>
             <h3 className="text-lg font-bold text-gray-900">Plano Atual</h3>
             <p className="text-gray-700">
-              {plans.find(p => p.id === currentPlan)?.name || 'Basic'}
+              {plans.find(p => p.id === currentPlan)?.name || 'Basic'} - {plans.find(p => p.id === currentPlan)?.tryonLimit === -1 ? 'Ilimitado' : `${plans.find(p => p.id === currentPlan)?.tryonLimit} imagens`}
             </p>
           </div>
         </div>
