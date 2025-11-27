@@ -117,28 +117,34 @@ Deno.serve(async (req: Request) => {
       throw new Error('This widget has been deactivated. Please contact the store owner or generate a new widget.');
     }
 
-    const { data: apiConfigs, error: apiConfigError } = await supabaseClient
+    const { data: globalApiConfig } = await supabaseClient
       .from('api_config')
-      .select('key_name, key_value')
-      .eq('user_id', widgetKeyData.user_id)
-      .in('key_name', ['fal_api_key', 'fashn_api_key']);
+      .select('key_value')
+      .eq('key_name', 'global_fal_api_key')
+      .maybeSingle();
 
-    if (apiConfigError) {
-      console.error('❌ Error fetching FAL API key:', apiConfigError);
-      throw new Error('Failed to fetch API configuration');
+    let falApiKey = globalApiConfig?.key_value;
+
+    if (!falApiKey) {
+      const { data: userApiConfigs } = await supabaseClient
+        .from('api_config')
+        .select('key_value')
+        .eq('user_id', widgetKeyData.user_id)
+        .in('key_name', ['fal_api_key', 'fashn_api_key'])
+        .maybeSingle();
+
+      falApiKey = userApiConfigs?.key_value;
     }
 
-    const apiConfig = apiConfigs && apiConfigs.length > 0 ? apiConfigs[0] : null;
-
-    if (!apiConfig || !apiConfig.key_value) {
+    if (!falApiKey) {
       throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
     }
 
     fal.config({
-      credentials: apiConfig.key_value
+      credentials: falApiKey
     });
 
-    console.log('✅ FAL API key configured for user:', widgetKeyData.user_id);
+    console.log('✅ FAL API key configured');
 
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
