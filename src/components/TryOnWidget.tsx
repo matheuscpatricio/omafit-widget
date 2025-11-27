@@ -370,7 +370,7 @@ const handleSubmit = async () => {
               <h2 className="text-base sm:text-lg font-semibold text-gray-900" style={{ fontFamily }}>{storeName}</h2>
             </div>
           )}
-          {step !== 'info' && step !== 'processing' && (
+          {step !== 'info' && step !== 'processing' && step !== 'result' && (
             <button
               onClick={goBack}
               className="absolute left-0 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-all duration-300 ease-in-out"
@@ -551,22 +551,22 @@ const handleSubmit = async () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-medium text-primary mb-2 text-center text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
-                <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
                   <img
                     src={displayImage}
                     alt="Produto"
-                    className="max-w-full max-h-full object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               </div>
-              
+
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-medium text-primary mb-2 text-center text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
-                <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
                   <img
                     src={imagePreview}
                     alt="Sua foto"
-                    className="max-w-full max-h-full object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               </div>
