@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LandingPage } from './components/LandingPage';
 import { DashboardPage } from './components/DashboardPage';
@@ -16,6 +16,7 @@ import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { ContactPage } from './components/ContactPage';
 import { PricingPage } from './components/PricingPage';
+import { supabase } from './lib/supabase';
 
 function DashboardWrapper() {
   const navigate = useNavigate();
@@ -52,9 +53,50 @@ function AuthWrapper() {
   );
 }
 
+function OAuthRedirectHandler() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleOAuthRedirect = async () => {
+      const hash = location.hash;
+
+      if (hash && hash.includes('access_token')) {
+        console.log('OAuth callback detectado, processando...');
+
+        try {
+          const { data, error } = await supabase.auth.getSession();
+
+          if (error) {
+            console.error('Erro ao obter sessão:', error);
+            navigate('/auth?mode=login&error=auth_failed');
+            return;
+          }
+
+          if (data?.session) {
+            console.log('Sessão OAuth válida, redirecionando para dashboard...');
+            navigate('/dashboard', { replace: true });
+          } else {
+            console.log('Nenhuma sessão encontrada');
+            navigate('/auth?mode=login', { replace: true });
+          }
+        } catch (err) {
+          console.error('Erro no callback OAuth:', err);
+          navigate('/auth?mode=login&error=callback_failed', { replace: true });
+        }
+      }
+    };
+
+    handleOAuthRedirect();
+  }, [location, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <Router>
+      <OAuthRedirectHandler />
       <Routes>
         <Route path="/" element={<LandingPageWrapper />} />
         <Route path="/auth" element={<AuthWrapper />} />
