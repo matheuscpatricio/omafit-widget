@@ -192,7 +192,7 @@ export function DashboardPage() {
               <li className="flex items-start gap-2 md:gap-3">
                 <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
-                  <span className="font-semibold">Use imagens FRONTAIS nos produtos:</span> É essencial que as imagens do produto sejam de frente para a câmera, o Omafit gerará imagens melhores
+                  <span className="font-semibold">Use imagens FRONTAIS nos produtos:</span> É essencial que as imagens do produto sejam de frente para a câmera (se for com modelo ele/a deve estar olhando para a frente), o Omafit gerará imagens melhores
                 </div>
               </li>
               <li className="flex items-start gap-2 md:gap-3">
