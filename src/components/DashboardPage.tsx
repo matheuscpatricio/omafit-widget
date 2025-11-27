@@ -15,6 +15,35 @@ export function DashboardPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const getPlanName = (planId: string, imagesLimit: number): string => {
+    const planMap: { [key: string]: string } = {
+      'basic': 'Basic',
+      'starter': 'Starter',
+      'growth': 'Growth',
+      'scale': 'Scale',
+      '130': 'Basic',
+      'plan_130': 'Basic',
+      '550': 'Starter',
+      'plan_550': 'Starter',
+      '975': 'Growth',
+      'plan_975': 'Growth',
+      '2400': 'Scale',
+      'plan_2400': 'Scale'
+    };
+
+    const normalizedPlanId = planId.toLowerCase();
+    if (planMap[normalizedPlanId]) {
+      return planMap[normalizedPlanId];
+    }
+
+    if (imagesLimit === 100) return 'Basic';
+    if (imagesLimit === 500) return 'Starter';
+    if (imagesLimit === 1000) return 'Growth';
+    if (imagesLimit === 3000) return 'Scale';
+
+    return planId.charAt(0).toUpperCase() + planId.slice(1);
+  };
+
   useEffect(() => {
     if (user) {
       fetchDashboardData();
@@ -115,7 +144,7 @@ export function DashboardPage() {
                 <Package className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Plano {subscription.plan_id.charAt(0).toUpperCase() + subscription.plan_id.slice(1)}</h3>
+                <h3 className="text-lg font-bold text-gray-900">Plano {getPlanName(subscription.plan_id, subscription.images_limit)}</h3>
                 <p className="text-sm text-gray-600">
                   {subscription.images_limit === -1
                     ? 'Imagens ilimitadas'
