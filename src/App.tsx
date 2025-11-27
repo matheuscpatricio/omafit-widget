@@ -18,32 +18,11 @@ import { ContactPage } from './components/ContactPage';
 import { PricingPage } from './components/PricingPage';
 
 function DashboardWrapper() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'analytics':
-        return <AdvancedAnalytics />;
-      case 'shopify':
-        return <ShopifyConfigPage />;
-      case 'widget':
-        return <WidgetGeneratorPage />;
-      case 'size-chart':
-        return <SizeChartManager />;
-      case 'feedback':
-        return <FeedbackPage />;
-      case 'account':
-        return <AccountSettingsPage />;
-      default:
-        return <DashboardPage />;
-    }
-  };
+  const navigate = useNavigate();
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
+    <Layout onNavigate={navigate}>
+      <DashboardPage />
     </Layout>
   );
 }
@@ -94,6 +73,54 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardWrapper />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><AdvancedAnalytics /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cadastro-loja"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><ShopifyConfigPage /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/widget-generator"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><WidgetGeneratorPage /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/size-chart"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><SizeChartManager /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/feedback"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><FeedbackPage /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><AccountSettingsPage /></Layout>
             </ProtectedRoute>
           }
         />
