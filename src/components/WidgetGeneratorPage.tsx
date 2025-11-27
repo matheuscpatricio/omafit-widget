@@ -604,27 +604,47 @@ export function WidgetGeneratorPage() {
     }
 
 
+    // Container para o iframe e botão de fechar
+    const iframeContainer = document.createElement('div');
+    iframeContainer.style.cssText =
+      'position: relative;' +
+      'width: 95vw;' +
+      'max-width: 1000px;' +
+      'height: 85vh;' +
+      'max-height: 800px;';
+
     // Botão de fechar
     const closeButton = document.createElement('button');
     closeButton.innerHTML = '×';
     closeButton.style.cssText =
       'position: absolute;' +
-      'top: 10px;' +
-      'right: 10px;' +
-      'width: 40px;' +
-      'height: 40px;' +
+      'top: 16px;' +
+      'right: 16px;' +
+      'width: 36px;' +
+      'height: 36px;' +
       'border: none;' +
-      'border-radius: 50%;' +
-      'background: rgba(255, 255, 255, 0.9);' +
-      'color: ' + OMAFIT_CONFIG.colors.primary + ';' +
-      'font-size: 24px;' +
+      'border-radius: 0;' +
+      'background: transparent;' +
+      'color: #333;' +
+      'font-size: 32px;' +
       'cursor: pointer;' +
       'display: flex;' +
       'align-items: center;' +
       'justify-content: center;' +
-      'z-index: 1000000;' +
-      'font-weight: bold;' +
-      'box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
+      'z-index: 1000001;' +
+      'font-weight: 300;' +
+      'line-height: 1;' +
+      'padding: 0;' +
+      'transition: opacity 0.2s;' +
+      'opacity: 0.7;';
+
+    // Hover effect
+    closeButton.addEventListener('mouseenter', function() {
+      this.style.opacity = '1';
+    });
+    closeButton.addEventListener('mouseleave', function() {
+      this.style.opacity = '0.7';
+    });
 
     // Eventos de fechamento
     const closeModal = function() {
@@ -668,9 +688,10 @@ export function WidgetGeneratorPage() {
 
     // Montar modal
     loadingContainer.appendChild(spinner);
+    iframeContainer.appendChild(iframe);
+    iframeContainer.appendChild(closeButton);
     overlay.appendChild(loadingContainer);
-    overlay.appendChild(iframe);
-    overlay.appendChild(closeButton);
+    overlay.appendChild(iframeContainer);
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
@@ -739,6 +760,12 @@ export function WidgetGeneratorPage() {
     '    background: transparent !important;' +
     '    backdrop-filter: none !important;' +
     '  }' +
+    '  .omafit-modal-overlay > div {' +
+    '    width: 100vw !important;' +
+    '    height: 100vh !important;' +
+    '    max-width: none !important;' +
+    '    max-height: none !important;' +
+    '  }' +
     '  .omafit-modal-overlay iframe {' +
     '    width: 100vw !important;' +
     '    height: 100vh !important;' +
@@ -747,7 +774,7 @@ export function WidgetGeneratorPage() {
     '    border-radius: 0 !important;' +
     '  }' +
     '  .omafit-modal-overlay button {' +
-    '    position: fixed !important;' +
+    '    position: absolute !important;' +
     '    top: 16px !important;' +
     '    right: 16px !important;' +
     '  }' +
