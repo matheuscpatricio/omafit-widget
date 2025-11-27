@@ -112,10 +112,14 @@ export function AuthForm() {
     setSuccess('');
 
     try {
+      const redirectUrl = priceId
+        ? `${window.location.origin}/pricing?priceId=${priceId}`
+        : `${window.location.origin}/pricing`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

@@ -220,10 +220,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl">
             <video
-              autoPlay
-              loop
-              muted
-              playsInline
+              controls
               className="hidden md:block w-full h-full object-cover"
             >
               <source
@@ -233,10 +230,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </video>
 
             <video
-              autoPlay
-              loop
-              muted
-              playsInline
+              controls
               className="md:hidden w-full h-full object-cover"
             >
               <source

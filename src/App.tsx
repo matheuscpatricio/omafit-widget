@@ -14,6 +14,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { ContactPage } from './components/ContactPage';
+import { PricingPage } from './components/PricingPage';
 
 function DashboardWrapper() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -77,6 +78,14 @@ function App() {
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
         <Route path="/contato" element={<ContactPage />} />
+        <Route
+          path="/pricing"
+          element={
+            <ProtectedRoute>
+              <PricingPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

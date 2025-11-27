@@ -181,16 +181,20 @@ const handleSubmit = async () => {
         );
 
         if (!statusResponse.ok) {
+          const errorText = await statusResponse.text();
+          console.error('❌ Status check failed:', statusResponse.status, errorText);
           throw new Error('Erro ao verificar status');
         }
 
         const statusData = await statusResponse.json();
         console.log('📊 Status data:', statusData);
 
-        if (statusData.status === 'completed' && statusData.output && statusData.output.length > 0) {
-          clearInterval(pollInterval);
-          console.log('✅ Setting result image:', statusData.output[0]);
-          setResult(statusData.output[0]);
+        if (statusData.status === 'completed' && statusData.output) {
+          const imageUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
+          if (imageUrl) {
+            clearInterval(pollInterval);
+            console.log('✅ Setting result image:', imageUrl);
+            setResult(imageUrl);
 
           if (sizeData && sizeChart.length > 0) {
             const sizeResult = calculateIdealSize(
@@ -205,9 +209,10 @@ const handleSubmit = async () => {
             }
           }
 
-          console.log('🎯 Setting step to result, loading to false');
-          setStep('result');
-          setLoading(false);
+            console.log('🎯 Setting step to result, loading to false');
+            setStep('result');
+            setLoading(false);
+          }
         } else if (statusData.status === 'failed' || statusData.status === 'error') {
           clearInterval(pollInterval);
           setError('Falha no processamento da imagem. Tente novamente.');
