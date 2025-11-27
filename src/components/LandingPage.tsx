@@ -18,8 +18,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [showVideoControls, setShowVideoControls] = useState(false);
   const videoDesktopRef = useRef<HTMLVideoElement>(null);
   const videoMobileRef = useRef<HTMLVideoElement>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -94,6 +96,16 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       }
       setIsVideoPlaying(!isVideoPlaying);
     }
+
+    setShowVideoControls(true);
+
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowVideoControls(false);
+    }, 2000);
   };
 
   return (
@@ -269,9 +281,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             {/* Custom Play/Pause Button */}
             <button
               onClick={toggleVideoPlayback}
-              className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-all group"
+              className="absolute inset-0 flex items-center justify-center transition-all group"
             >
-              <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
+              <div
+                className={`w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transform transition-all duration-300 ${
+                  showVideoControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                } group-hover:scale-110`}
+              >
                 {isVideoPlaying ? (
                   <Pause className="w-10 h-10 text-[#810707]" />
                 ) : (
