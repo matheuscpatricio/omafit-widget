@@ -183,7 +183,13 @@ const handleSubmit = async () => {
         if (!statusResponse.ok) {
           const errorText = await statusResponse.text();
           console.error('❌ Status check failed:', statusResponse.status, errorText);
-          throw new Error('Erro ao verificar status');
+
+          if (statusResponse.status === 404) {
+            console.log('⚠️ Prediction not found, continuing to poll...');
+            return;
+          }
+
+          throw new Error(`Erro ao verificar status: ${statusResponse.status}`);
         }
 
         const statusData = await statusResponse.json();

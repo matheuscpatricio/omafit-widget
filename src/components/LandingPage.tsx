@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Mail, DollarSign, Package } from 'lucide-react';
+import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Pause, Mail, DollarSign, Package } from 'lucide-react';
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
@@ -17,6 +17,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const videoDesktopRef = useRef<HTMLVideoElement>(null);
+  const videoMobileRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -75,6 +78,22 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const handleSelectPlan = (priceId: string) => {
     setShowPricingModal(false);
     onGetStarted(priceId);
+  };
+
+  const toggleVideoPlayback = () => {
+    const desktopVideo = videoDesktopRef.current;
+    const mobileVideo = videoMobileRef.current;
+
+    if (desktopVideo && mobileVideo) {
+      if (isVideoPlaying) {
+        desktopVideo.pause();
+        mobileVideo.pause();
+      } else {
+        desktopVideo.play();
+        mobileVideo.play();
+      }
+      setIsVideoPlaying(!isVideoPlaying);
+    }
   };
 
   return (
@@ -218,9 +237,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Features Section */}
       <section id="features" className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl">
+          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl group">
             <video
-              controls
+              ref={videoDesktopRef}
+              loop
+              playsInline
+              disablePictureInPicture
+              controlsList="nodownload nofullscreen noremoteplayback"
               className="hidden md:block w-full h-full object-cover"
             >
               <source
@@ -230,7 +253,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </video>
 
             <video
-              controls
+              ref={videoMobileRef}
+              loop
+              playsInline
+              disablePictureInPicture
+              controlsList="nodownload nofullscreen noremoteplayback"
               className="md:hidden w-full h-full object-cover"
             >
               <source
@@ -238,6 +265,20 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 type="video/mp4"
               />
             </video>
+
+            {/* Custom Play/Pause Button */}
+            <button
+              onClick={toggleVideoPlayback}
+              className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-all group"
+            >
+              <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
+                {isVideoPlaying ? (
+                  <Pause className="w-10 h-10 text-[#810707]" />
+                ) : (
+                  <Play className="w-10 h-10 text-[#810707] ml-1" />
+                )}
+              </div>
+            </button>
           </div>
 
           <div
