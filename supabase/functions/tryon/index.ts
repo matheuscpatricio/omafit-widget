@@ -192,6 +192,7 @@ Deno.serve(async (req: Request) => {
       person_image_url: modelImageUrl,
       clothing_image_url: garmentImageUrl,
       preserve_pose: true
+      aspect_ratio: "3:4"
     };
 
     console.log('🚀 Submitting to fal.ai with input:', {
