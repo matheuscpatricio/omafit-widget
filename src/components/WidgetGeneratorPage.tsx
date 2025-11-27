@@ -774,10 +774,9 @@ export function WidgetGeneratorPage() {
     '    border-radius: 0 !important;' +
     '  }' +
     '  .omafit-modal-overlay button {' +
-    '    position: absolute !important;' +
     '    top: 12px !important;' +
-    '    right: 0 !important;' +
-    '    padding: 4px !important;' +
+    '    right: 12px !important;' +
+    '    z-index: 1000002 !important;' +
     '  }' +
     '}' +
     '.omafit-try-on-link:focus {' +
@@ -786,45 +785,7 @@ export function WidgetGeneratorPage() {
     '}';
   document.head.appendChild(style);
 })();
-</script>
-
-<!--
-INSTRUÇÕES DE INSTALAÇÃO:
-
-1. INSTALAÇÃO NO SHOPIFY:
-   - Copie este código completo
-   - Cole no template do produto (product.liquid ou theme.liquid)
-   - Posicione onde deseja que o link apareça
-   - O widget já está configurado com a URL correta: ${currentUrl}
-
-2. SEGURANÇA E AUTENTICAÇÃO:
-   - Este widget possui um identificador público: ${publicId}
-   - Este identificador está vinculado à sua conta Omafit
-   - A validação de segurança acontece no servidor
-   - Seus créditos são validados automaticamente antes de processar
-
-3. PERSONALIZAÇÃO APLICADA:
-   - Cor do texto do link: ${linkColor}
-   - Cor predominante do pop-up: ${popupColor}
-   - Texto do link: "${linkText}"${storeName ? `\n   - Nome da loja: "${storeName}"` : ''}
-
-4. COMO FUNCIONA:
-   - Cliente clica no link "${linkText}"
-   - Sistema valida automaticamente sua chave e créditos disponíveis
-   - Modal abre com todos os produtos disponíveis
-   - Cliente seleciona o produto desejado
-   - Cliente faz upload da foto
-   - Resultado exibido no próprio modal
-   - Crédito é debitado automaticamente da sua conta
-
-5. FUNCIONALIDADES:
-   - Seleção de produtos integrada
-   - Modal responsivo (desktop e mobile)
-   - Busca e filtros de produtos
-   - Upload de foto com instruções
-   - Resultado em tempo real
-   - Proteção contra uso não autorizado
--->`;
+</script>`;
   };
 
   const copyToClipboard = async () => {
