@@ -112,7 +112,7 @@ export function AuthForm() {
     setSuccess('');
 
     try {
-      const baseUrl = 'https://omafit.co';
+      const baseUrl = window.location.origin;
       let redirectUrl;
 
       if (isLogin) {

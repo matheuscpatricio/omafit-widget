@@ -17,8 +17,8 @@ export function AuthCallback() {
         }
 
         if (data?.session) {
-          // Successfully authenticated
-          navigate('/');
+          // Successfully authenticated - redirect to dashboard
+          navigate('/dashboard');
         } else {
           // No session found
           navigate('/?error=no_session');
