@@ -157,7 +157,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="relative z-10 h-full flex items-center justify-center">
           <div className="text-center px-4 animate-fade-in-up">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-              Encante seus clientes com uma<br />experiência envolvente
+              Encante seus clientes com uma<br /><span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
               When techno meets fashion.
@@ -373,8 +373,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             {/* Growth Plan - Most Popular */}
             <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
               <div className="relative bg-[#810707] rounded-xl p-6 h-full border-2 border-[#810707] shadow-lg hover:shadow-2xl transition-all duration-300">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <div className="bg-yellow-400 rounded-full shadow-md px-2 py-1 flex flex-row items-center">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                  <div className="bg-yellow-400 rounded-full shadow-md px-3 py-1 flex flex-row items-center">
                     <span className="text-gray-900 text-xs font-bold uppercase">
                     Mais Popular
                     </span>
@@ -554,8 +554,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
 
             {/* Nuvemshop */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]">
-              <div className="flex flex-col items-center text-center">
+            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] relative overflow-hidden">
+              {/* Em Breve Badge */}
+              <div className="absolute top-4 right-4">
+                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                  Em Breve
+                </div>
+              </div>
+              <div className="flex flex-col items-center text-center opacity-75">
                 <div className="w-32 h-24 mb-6 flex items-center justify-center">
                   <img
                     src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/vagasbyintera_nuvemshop-tiendanube-og.png"
@@ -568,7 +574,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   Perfeita integração com a maior plataforma da América Latina
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Check className="w-4 h-4 text-green-500" />
+                  <Check className="w-4 h-4 text-gray-400" />
                   <span>Suporte em português</span>
                 </div>
               </div>
