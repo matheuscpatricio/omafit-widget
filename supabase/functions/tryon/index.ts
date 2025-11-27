@@ -42,6 +42,7 @@ Deno.serve(async (req: Request) => {
     );
 
     let modelImageUrl = model_image;
+    let garmentImageUrl = garment_image;
 
     if (model_image.startsWith('data:')) {
       console.log('📤 Uploading base64 model image to storage...');
@@ -73,6 +74,38 @@ Deno.serve(async (req: Request) => {
 
       modelImageUrl = urlData.publicUrl;
       console.log('✅ Model image uploaded:', modelImageUrl);
+    }
+
+    if (garment_image.startsWith('data:')) {
+      console.log('📤 Uploading base64 garment image to storage...');
+
+      const base64Data = garment_image.split(',')[1];
+      const mimeType = garment_image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
+      const extension = mimeType.split('/')[1];
+
+      const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+      const fileName = `tryon-garments/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+
+      const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        .from('tryon-images')
+        .upload(fileName, imageBuffer, {
+          contentType: mimeType,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw new Error(`Failed to upload garment image: ${uploadError.message}`);
+      }
+
+      const { data: urlData } = supabaseClient.storage
+        .from('tryon-images')
+        .getPublicUrl(fileName);
+
+      garmentImageUrl = urlData.publicUrl;
+      console.log('✅ Garment image uploaded:', garmentImageUrl);
     }
 
     const { data: widgetKeyData, error: widgetKeyError } = await supabaseClient
@@ -135,22 +168,45 @@ Deno.serve(async (req: Request) => {
       throw new Error('Failed to create try-on session');
     }
 
+    const falInput = {
+      person_image_url: modelImageUrl,
+      clothing_image_url: garmentImageUrl,
+      preserve_pose: true,
+      aspect_ratio: "3:4"
+    };
+
     console.log('🚀 Submitting to fal.ai with input:', {
       person_image_url: modelImageUrl.substring(0, 80) + '...',
-      clothing_image_url: garment_image.substring(0, 80) + '...',
-      preserve_pose: true
+      clothing_image_url: garmentImageUrl.substring(0, 80) + '...',
+      preserve_pose: true,
+      aspect_ratio: "3:4",
+      inputType: typeof falInput,
+      isObject: typeof falInput === 'object' && falInput !== null
     });
 
-    const { request_id } = await fal.queue.submit("fal-ai/image-apps-v2/virtual-try-on", {
-      input: {
-        person_image_url: modelImageUrl,
-        clothing_image_url: garment_image,
-        preserve_pose: true,
-        aspect_ratio: "3:4"
-      }
-    });
-
-    console.log('✅ Submitted to fal.ai, request_id:', request_id);
+    let request_id;
+    try {
+      const submitResult = await fal.queue.submit("fal-ai/image-apps-v2/virtual-try-on", {
+        input: falInput
+      });
+      request_id = submitResult.request_id;
+      console.log('✅ Submitted to fal.ai, request_id:', request_id);
+    } catch (falError) {
+      console.error('❌ Fal.ai submission error:', {
+        message: falError.message,
+        name: falError.name,
+        stack: falError.stack,
+        falInput: {
+          person_image_url_type: typeof modelImageUrl,
+          clothing_image_url_type: typeof garmentImageUrl,
+          person_image_url_length: modelImageUrl?.length,
+          clothing_image_url_length: garmentImageUrl?.length,
+          person_image_url_starts: modelImageUrl?.substring(0, 50),
+          clothing_image_url_starts: garmentImageUrl?.substring(0, 50)
+        }
+      });
+      throw new Error(`Failed to submit to fal.ai: ${falError.message}`);
+    }
 
     await supabaseClient
       .from('tryon_sessions')
