@@ -166,7 +166,7 @@ export function SizeChartManager() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Tabela de Medidas</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Insira sua Tabela</h2>
             <p className="text-sm text-gray-600 mt-1">
               Configure a tabela de medidas da sua loja para a calculadora de tamanhos
             </p>

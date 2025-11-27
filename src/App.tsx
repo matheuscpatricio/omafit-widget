@@ -10,6 +10,7 @@ import { AccountSettingsPage } from './components/AccountSettingsPage';
 import { SizeChartManager } from './components/SizeChartManager';
 import { WidgetPage } from './components/WidgetPage';
 import { AuthForm } from './components/AuthForm';
+import { FeedbackPage } from './components/FeedbackPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
@@ -31,6 +32,8 @@ function DashboardWrapper() {
         return <WidgetGeneratorPage />;
       case 'size-chart':
         return <SizeChartManager />;
+      case 'feedback':
+        return <FeedbackPage />;
       case 'account':
         return <AccountSettingsPage />;
       default:

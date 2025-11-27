@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Settings, Code, Store, Zap, TrendingUp, Menu, X, LogOut, ChevronLeft, ChevronRight, CreditCard, Ruler } from 'lucide-react';
+import { BarChart3, Settings, Code, Store, Zap, TrendingUp, Menu, X, LogOut, ChevronLeft, ChevronRight, CreditCard, Ruler, MessageSquare } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,6 +26,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
     { id: 'shopify', label: 'Shopify Config', icon: Store },
     { id: 'widget', label: 'Widget Generator', icon: Code },
     { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler },
+    { id: 'feedback', label: 'Sugestões e Melhorias', icon: MessageSquare },
     { id: 'account', label: 'Configurações da Conta', icon: CreditCard },
   ];
 
