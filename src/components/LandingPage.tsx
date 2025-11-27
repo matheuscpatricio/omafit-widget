@@ -424,14 +424,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             {/* Growth Plan - Most Popular */}
             <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
               <div className="relative bg-[#810707] rounded-xl p-6 h-full border-2 border-[#810707] shadow-lg hover:shadow-2xl transition-all duration-300">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
-                  <div className="bg-yellow-400 rounded-full shadow-md px-3 py-1 flex flex-row items-center">
-                    <span className="text-gray-900 text-xs font-bold uppercase">
-                    Mais Popular
-                    </span>
-                  </div>
-                </div>
-                <div className="mb-5 mt-2">
+                <div className="mb-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-2xl font-bold text-white">Growth</h3>
                     <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
