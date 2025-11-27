@@ -202,19 +202,19 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div className="text-center" data-animate="stat-1">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Playwrite NO", cursive' }}>40%</div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
               <div className="text-gray-600 text-sm sm:text-base">Aumento na Conversão</div>
             </div>
             <div className="text-center" data-animate="stat-2">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Playwrite NO", cursive' }}>64%</div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
               <div className="text-gray-600 text-sm sm:text-base">Redução em Devoluções</div>
             </div>
             <div className="text-center" data-animate="stat-3">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Playwrite NO", cursive' }}>95%</div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
               <div className="text-gray-600 text-sm sm:text-base">Satisfação do Cliente</div>
             </div>
             <div className="text-center" data-animate="stat-4">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Playwrite NO", cursive' }}>5min</div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
               <div className="text-gray-600 text-sm sm:text-base">Tempo de Integração</div>
             </div>
           </div>
