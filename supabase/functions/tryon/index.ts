@@ -185,17 +185,13 @@ Deno.serve(async (req: Request) => {
     const falInput = {
       person_image_url: modelImageUrl,
       clothing_image_url: garmentImageUrl,
-      preserve_pose: true,
-      aspect_ratio: "3:4"
+      preserve_pose: true
     };
 
     console.log('🚀 Submitting to fal.ai with input:', {
       person_image_url: modelImageUrl.substring(0, 80) + '...',
       clothing_image_url: garmentImageUrl.substring(0, 80) + '...',
-      preserve_pose: true,
-      aspect_ratio: "3:4",
-      inputType: typeof falInput,
-      isObject: typeof falInput === 'object' && falInput !== null
+      preserve_pose: true
     });
 
     let request_id;
@@ -209,15 +205,10 @@ Deno.serve(async (req: Request) => {
       console.error('❌ Fal.ai submission error:', {
         message: falError.message,
         name: falError.name,
-        stack: falError.stack,
-        falInput: {
-          person_image_url_type: typeof modelImageUrl,
-          clothing_image_url_type: typeof garmentImageUrl,
-          person_image_url_length: modelImageUrl?.length,
-          clothing_image_url_length: garmentImageUrl?.length,
-          person_image_url_starts: modelImageUrl?.substring(0, 50),
-          clothing_image_url_starts: garmentImageUrl?.substring(0, 50)
-        }
+        body: (falError as any).body,
+        status: (falError as any).status,
+        statusText: (falError as any).statusText,
+        sentInput: falInput
       });
       throw new Error(`Failed to submit to fal.ai: ${falError.message}`);
     }
