@@ -515,15 +515,6 @@ const handleSubmit = async () => {
         {/* Step 3: Photo Upload */}
         {step === 'photo' && (
           <div className="space-y-4">
-            <div className="text-center mb-3">
-              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                Sua foto
-              </h3>
-              <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                Para melhores resultados, siga as instruções
-              </p>
-            </div>
-
             {availableImages.length > 1 && (
               <div className="mb-4">
                 <div className="text-center mb-3">
@@ -578,6 +569,15 @@ const handleSubmit = async () => {
                 </div>
               </div>
             )}
+
+            <div className="text-center mb-3">
+              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Sua foto
+              </h3>
+              <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Para melhores resultados, siga as instruções
+              </p>
+            </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
               <div className="flex items-start gap-3">

@@ -288,73 +288,69 @@ export function WidgetGeneratorPage() {
 
   // Função para obter todas as imagens do produto na página
   function getAllProductImages() {
-    const images = new Set();
+    const images = [];
 
-    // Seletores para IGNORAR (imagens que não são do produto principal)
-    const ignoredSelectors = [
-      '.size-chart',
-      '.size-guide',
-      '[class*="related"]',
-      '[class*="recommended"]',
-      '[class*="suggestions"]',
-      '[class*="upsell"]',
-      '[class*="recently"]',
-      '.footer',
-      '.header',
-      '.navigation',
-      '[class*="cart"]'
-    ];
-
-    // Função para verificar se elemento está em área ignorada
-    function isInIgnoredArea(element) {
-      let parent = element.parentElement;
-      while (parent) {
-        for (const selector of ignoredSelectors) {
-          if (parent.matches && parent.matches(selector)) {
-            return true;
-          }
-        }
-        parent = parent.parentElement;
-      }
-      return false;
-    }
-
-    // 1. Shopify: Buscar imagens principais do produto
-    const shopifySelectors = [
-      '.product__media img[src*="cdn.shopify.com"]',
-      '.product-single__photos img',
-      '.product__media-list img',
-      '[data-product-single-media-wrapper] img'
-    ];
-
-    for (const selector of shopifySelectors) {
-      const imgs = document.querySelectorAll(selector);
-      imgs.forEach(img => {
-        if (img.src && !isInIgnoredArea(img) && img.naturalWidth > 400 && img.naturalHeight > 400) {
-          // Limpar parâmetros de tamanho da URL para obter imagem em melhor qualidade
+    // 1. Prioridade máxima: ID especial #omafit-product-images
+    const omafitContainer = document.querySelector('#omafit-product-images');
+    if (omafitContainer) {
+      const omafitImgs = omafitContainer.querySelectorAll('img');
+      omafitImgs.forEach(img => {
+        if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
           const cleanUrl = img.src.split('?')[0];
-          images.add(normalizeUrl(cleanUrl));
+          images.push(normalizeUrl(cleanUrl));
         }
       });
+      if (images.length > 0) {
+        console.log('✅ Imagens encontradas via #omafit-product-images:', images.length);
+        return images.slice(0, 10);
+      }
     }
 
-    // 2. Buscar em containers específicos de produto
-    const productContainers = document.querySelectorAll('.product__media, .product-images, .product-gallery, [class*="product-image"]');
-    productContainers.forEach(container => {
-      if (!isInIgnoredArea(container)) {
+    // 2. Buscar em seletores específicos de galerias de produto
+    const gallerySelectors = [
+      '.product__media-list',
+      '.product-single__photos',
+      '.product__media-wrapper',
+      '.product-gallery',
+      '[data-product-gallery]'
+    ];
+
+    for (const selector of gallerySelectors) {
+      const container = document.querySelector(selector);
+      if (container) {
         const imgs = container.querySelectorAll('img');
         imgs.forEach(img => {
-          if (img.src && img.naturalWidth > 400 && img.naturalHeight > 400) {
+          if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
             const cleanUrl = img.src.split('?')[0];
-            images.add(normalizeUrl(cleanUrl));
+            const normalizedUrl = normalizeUrl(cleanUrl);
+            if (!images.includes(normalizedUrl)) {
+              images.push(normalizedUrl);
+            }
           }
         });
+        if (images.length > 0) {
+          console.log('Imagens encontradas via ' + selector + ':', images.length);
+          break;
+        }
       }
-    });
+    }
 
-    const imagesArray = Array.from(images);
-    console.log('🔍 Imagens filtradas do produto:', imagesArray.length);
-    return imagesArray.slice(0, 10); // Limitar a 10 imagens
+    // 3. Fallback: buscar em .product__media apenas
+    if (images.length === 0) {
+      const productMedia = document.querySelectorAll('.product__media img');
+      productMedia.forEach(img => {
+        if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
+          const cleanUrl = img.src.split('?')[0];
+          const normalizedUrl = normalizeUrl(cleanUrl);
+          if (!images.includes(normalizedUrl)) {
+            images.push(normalizedUrl);
+          }
+        }
+      });
+      console.log('✅ Imagens encontradas via .product__media:', images.length);
+    }
+
+    return images.slice(0, 10);
   }
 
   // Função para obter imagem do produto na página
