@@ -682,7 +682,7 @@ const handleSubmit = async () => {
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-yellow-800 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                ⏱️ Tempo estimado: 20-40 segundos
+                 Tempo estimado: 20-40 segundos
               </p>
             </div>
           </div>
