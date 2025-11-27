@@ -113,11 +113,18 @@ export function AuthForm() {
 
     try {
       const baseUrl = 'https://omafit.co';
-      const redirectUrl = priceId
-        ? `${baseUrl}/pricing?priceId=${priceId}`
-        : `${baseUrl}/pricing`;
+      let redirectUrl;
+
+      if (isLogin) {
+        redirectUrl = `${baseUrl}/dashboard`;
+      } else {
+        redirectUrl = priceId
+          ? `${baseUrl}/pricing?priceId=${priceId}`
+          : `${baseUrl}/pricing`;
+      }
 
       console.log('🔐 Google OAuth redirect URL:', redirectUrl);
+      console.log('🔐 Is Login mode:', isLogin);
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
