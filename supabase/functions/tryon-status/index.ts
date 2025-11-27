@@ -142,20 +142,31 @@ Deno.serve(async (req: Request) => {
     } catch (error) {
       console.error('❌ Status check failed:', error);
 
+      let errorMessage = error.message || 'Unknown error';
+      let errorStatus = 'error';
+
       if (error.message && error.message.includes('not found')) {
-        return new Response(JSON.stringify({
-          prediction_id: predictionId,
-          status: 'not_found',
-          error: 'Prediction not found - may have expired'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        errorStatus = 'not_found';
+        errorMessage = 'Prediction not found - may have expired';
+      } else if (error.message && error.message.toLowerCase().includes('unprocessable')) {
+        errorStatus = 'failed';
+        errorMessage = 'Image processing failed - please ensure images are valid and publicly accessible';
+      } else if (error.message && error.message.toLowerCase().includes('invalid image')) {
+        errorStatus = 'failed';
+        errorMessage = 'Invalid image format - please use JPEG or PNG images';
       }
+
+      await supabase
+        .from('tryon_sessions')
+        .update({
+          fashn_status: 'failed'
+        })
+        .eq('fashn_prediction_id', predictionId);
 
       return new Response(JSON.stringify({
         prediction_id: predictionId,
-        status: 'error',
-        error: error.message
+        status: errorStatus,
+        error: errorMessage
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

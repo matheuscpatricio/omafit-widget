@@ -41,6 +41,40 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
+    let modelImageUrl = model_image;
+
+    if (model_image.startsWith('data:')) {
+      console.log('📤 Uploading base64 model image to storage...');
+
+      const base64Data = model_image.split(',')[1];
+      const mimeType = model_image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
+      const extension = mimeType.split('/')[1];
+
+      const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+      const fileName = `tryon-models/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+
+      const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        .from('tryon-images')
+        .upload(fileName, imageBuffer, {
+          contentType: mimeType,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw new Error(`Failed to upload model image: ${uploadError.message}`);
+      }
+
+      const { data: urlData } = supabaseClient.storage
+        .from('tryon-images')
+        .getPublicUrl(fileName);
+
+      modelImageUrl = urlData.publicUrl;
+      console.log('✅ Model image uploaded:', modelImageUrl);
+    }
+
     const { data: widgetKeyData, error: widgetKeyError } = await supabaseClient
       .from('widget_keys')
       .select('id, user_id, status, usage_count')
@@ -102,14 +136,14 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('🚀 Submitting to fal.ai with input:', {
-      person_image_url: model_image.substring(0, 50) + '...',
-      clothing_image_url: garment_image.substring(0, 50) + '...',
+      person_image_url: modelImageUrl.substring(0, 80) + '...',
+      clothing_image_url: garment_image.substring(0, 80) + '...',
       preserve_pose: true
     });
 
     const { request_id } = await fal.queue.submit("fal-ai/image-apps-v2/virtual-try-on", {
       input: {
-        person_image_url: model_image,
+        person_image_url: modelImageUrl,
         clothing_image_url: garment_image,
         preserve_pose: true,
         aspect_ratio: "3:4"
@@ -159,10 +193,29 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
+    console.error('❌ Try-on error:', error);
+
+    let errorMessage = error.message || 'Unknown error occurred';
+    let statusCode = 500;
+
+    if (error.message && error.message.includes('required')) {
+      statusCode = 400;
+    } else if (error.message && error.message.includes('Invalid widget')) {
+      statusCode = 401;
+    } else if (error.message && error.message.includes('subscription')) {
+      statusCode = 402;
+    } else if (error.message && error.message.includes('limit')) {
+      statusCode = 429;
+    }
+
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: errorMessage,
+        error_code: statusCode
+      }),
       {
-        status: 500,
+        status: statusCode,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
