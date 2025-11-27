@@ -536,24 +536,6 @@ export function WidgetGeneratorPage() {
       'text-align: center;' +
       'z-index: 1000000;';
 
-    // Adicionar prévia da imagem do produto
-    const productPreview = document.createElement('div');
-    productPreview.style.cssText =
-      'background: white;' +
-      'border-radius: 12px;' +
-      'padding: 20px;' +
-      'margin-bottom: 20px;' +
-      'box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
-
-    const productImg = document.createElement('img');
-    productImg.src = productImage;
-    productImg.style.cssText =
-      'max-width: 200px;' +
-      'max-height: 200px;' +
-      'border-radius: 8px;' +
-      'display: block;' +
-      'margin: 0 auto;';
-
     const loadingText = document.createElement('div');
     loadingText.style.cssText =
       'color: white;' +
@@ -563,20 +545,19 @@ export function WidgetGeneratorPage() {
       'font-weight: 500;';
     loadingText.textContent = 'Carregando try-on virtual...';
 
-    productPreview.appendChild(productImg);
-    loadingContainer.appendChild(productPreview);
-    loadingContainer.appendChild(loadingText);
-
     // Adicionar loading spinner
     const spinner = document.createElement('div');
     spinner.style.cssText =
-      'width: 40px;' +
-      'height: 40px;' +
+      'width: 50px;' +
+      'height: 50px;' +
       'border: 4px solid rgba(255,255,255,0.3);' +
       'border-top-color: white;' +
       'border-radius: 50%;' +
       'animation: spin 1s linear infinite;' +
-      'margin: 15px auto 0;';
+      'margin: 0 auto 15px;';
+
+    loadingContainer.appendChild(spinner);
+    loadingContainer.appendChild(loadingText);
 
     // Remover spinner quando iframe carregar
     iframe.addEventListener('load', function() {
@@ -687,7 +668,6 @@ export function WidgetGeneratorPage() {
     document.addEventListener('keydown', handleEscape);
 
     // Montar modal
-    loadingContainer.appendChild(spinner);
     iframeContainer.appendChild(iframe);
     iframeContainer.appendChild(closeButton);
     overlay.appendChild(loadingContainer);
@@ -760,7 +740,7 @@ export function WidgetGeneratorPage() {
     '    background: transparent !important;' +
     '    backdrop-filter: none !important;' +
     '  }' +
-    '  .omafit-modal-overlay > div {' +
+    '  .omafit-modal-overlay > div:not([style*="transform: translate"]) {' +
     '    width: 100vw !important;' +
     '    height: 100vh !important;' +
     '    max-width: none !important;' +
@@ -773,10 +753,16 @@ export function WidgetGeneratorPage() {
     '    max-height: none !important;' +
     '    border-radius: 0 !important;' +
     '  }' +
-    '  .omafit-modal-overlay button {' +
+    '  .omafit-modal-overlay > div > button {' +
+    '    position: absolute !important;' +
     '    top: 12px !important;' +
     '    right: 12px !important;' +
     '    z-index: 1000002 !important;' +
+    '    background: white !important;' +
+    '    border-radius: 50% !important;' +
+    '    width: 40px !important;' +
+    '    height: 40px !important;' +
+    '    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;' +
     '  }' +
     '}' +
     '.omafit-try-on-link:focus {' +
