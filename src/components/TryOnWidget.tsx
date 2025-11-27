@@ -442,21 +442,18 @@ const handleSubmit = async () => {
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
-              <div className="flex items-start gap-3">
-                <Sparkles className="w-5 h-5 md:w-5 md:h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
-                  <p className="text-sm md:text-base text-blue-700">
-                    Nossa tecnologia aplica digitalmente este produto em uma foto sua,
-                    mostrando como ele ficaria no seu corpo de forma realista.
-                  </p>
-                </div>
+              <div className="text-center">
+                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
+                <p className="text-sm md:text-base text-blue-700">
+                  Nossa tecnologia aplica digitalmente este produto em uma foto sua,
+                  mostrando como ele ficaria no seu corpo de forma realista.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3 md:space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm md:text-base flex-shrink-0">
+                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
                 </div>
                 <div>
@@ -466,7 +463,7 @@ const handleSubmit = async () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm md:text-base flex-shrink-0">
+                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   2
                 </div>
                 <div>
@@ -476,7 +473,7 @@ const handleSubmit = async () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm md:text-base flex-shrink-0">
+                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   3
                 </div>
                 <div>
@@ -709,8 +706,8 @@ const handleSubmit = async () => {
 
                 {calculatedSize && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                    <h4 className="font-semibold text-green-900 mb-1 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                      Seu tamanho Ideal: {calculatedSize}
+                    <h4 className="font-bold text-green-900 mb-1 text-xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho Ideal: <span className="text-2xl">{calculatedSize}</span>
                     </h4>
                     <p className="text-sm text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Com base na sua altura, peso e tipo físico
@@ -754,8 +751,8 @@ const handleSubmit = async () => {
               <div className="md:w-1/2 flex flex-col justify-center space-y-6">
                 {calculatedSize && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                    <h4 className="font-semibold text-green-900 mb-2 text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                      Seu tamanho Ideal: {calculatedSize}
+                    <h4 className="font-bold text-green-900 mb-2 text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho Ideal: <span className="text-3xl">{calculatedSize}</span>
                     </h4>
                     <p className="text-lg text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Com base na sua altura, peso e tipo físico
