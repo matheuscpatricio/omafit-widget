@@ -286,6 +286,39 @@ export function WidgetGeneratorPage() {
     return url;
   }
 
+  // Função para obter todas as imagens do produto na página
+  function getAllProductImages() {
+    const images = new Set();
+
+    // 1. Shopify: Buscar todas as imagens de thumbnails e media
+    const shopifySelectors = [
+      '.product__media img[src*="cdn.shopify.com"]',
+      '.product-single__photo img',
+      '[data-product-media] img',
+      '.product-thumbnails img',
+      '.product__media-list img'
+    ];
+
+    for (const selector of shopifySelectors) {
+      const imgs = document.querySelectorAll(selector);
+      imgs.forEach(img => {
+        if (img.src) {
+          images.add(normalizeUrl(img.src));
+        }
+      });
+    }
+
+    // 2. Buscar em containers de produto
+    const productImages = document.querySelectorAll('.product__media img, .product-images img, [class*="product"] img');
+    productImages.forEach(img => {
+      if (img.naturalWidth > 300 && img.naturalHeight > 300 && img.src) {
+        images.add(normalizeUrl(img.src));
+      }
+    });
+
+    return Array.from(images);
+  }
+
   // Função para obter imagem do produto na página
   function getProductImageFromPage() {
     // 1. Prioridade: elemento #omafit-featured-image
@@ -401,6 +434,10 @@ export function WidgetGeneratorPage() {
       return;
     }
 
+    // Obter todas as imagens do produto
+    const allProductImages = getAllProductImages();
+    console.log('📸 Total de imagens encontradas:', allProductImages.length);
+
     // Criar overlay
     const overlay = document.createElement('div');
     overlay.className = 'omafit-modal-overlay';
@@ -430,6 +467,7 @@ export function WidgetGeneratorPage() {
       fontFamily: OMAFIT_CONFIG.fontFamily
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
+      '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +
       '&productId=' + encodeURIComponent(OMAFIT_CONFIG.productId || 'unknown') +
       '&productName=' + encodeURIComponent(OMAFIT_CONFIG.productName || 'Produto') +
       '&publicId=' + encodeURIComponent(OMAFIT_CONFIG.publicId) +

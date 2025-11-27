@@ -3,6 +3,7 @@ import { TryOnWidget } from './TryOnWidget';
 
 export function WidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
+  const [productImages, setProductImages] = useState<string[]>([]);
   const [productId, setProductId] = useState<string>('');
   const [productName, setProductName] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('Omafit');
@@ -14,6 +15,7 @@ export function WidgetPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const image = params.get('productImage');
+    const imagesParam = params.get('productImages');
     const id = params.get('productId');
     const name = params.get('productName');
     const configParam = params.get('config');
@@ -21,6 +23,17 @@ export function WidgetPage() {
 
     if (image) {
       setProductImage(image);
+    }
+
+    if (imagesParam) {
+      try {
+        const images = JSON.parse(decodeURIComponent(imagesParam));
+        if (Array.isArray(images)) {
+          setProductImages(images);
+        }
+      } catch (error) {
+        console.error('Error parsing images:', error);
+      }
     }
 
     if (id) {
@@ -72,6 +85,7 @@ export function WidgetPage() {
       <div className="w-full sm:max-w-2xl max-h-[85vh] overflow-auto">
         <TryOnWidget
           garmentImage={productImage}
+          productImages={productImages}
           productId={productId}
           productName={productName}
           storeName={storeName}
