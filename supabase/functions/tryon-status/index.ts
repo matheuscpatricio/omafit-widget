@@ -32,11 +32,65 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 Checking status for prediction:', predictionId);
 
-    const falKey = Deno.env.get('FAL_KEY');
-    if (!falKey) {
-      console.error('❌ FAL_KEY not configured');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('tryon_sessions')
+      .select(`
+        id,
+        product_id,
+        products!inner(user_id)
+      `)
+      .eq('fashn_prediction_id', predictionId)
+      .maybeSingle();
+
+    if (sessionError) {
+      console.error('❌ Error fetching session:', sessionError);
       return new Response(JSON.stringify({
-        error: 'API key not configured'
+        error: 'Failed to fetch session'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!sessionData) {
+      console.error('❌ Session not found for prediction:', predictionId);
+      return new Response(JSON.stringify({
+        error: 'Session not found'
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const userId = (sessionData.products as any).user_id;
+
+    const { data: apiConfigs, error: apiConfigError } = await supabase
+      .from('api_config')
+      .select('key_name, key_value')
+      .eq('user_id', userId)
+      .in('key_name', ['fal_api_key', 'fashn_api_key']);
+
+    if (apiConfigError) {
+      console.error('❌ Error fetching FAL API key:', apiConfigError);
+      return new Response(JSON.stringify({
+        error: 'Failed to fetch API configuration'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const apiConfig = apiConfigs && apiConfigs.length > 0 ? apiConfigs[0] : null;
+
+    if (!apiConfig || !apiConfig.key_value) {
+      console.error('❌ FAL API key not configured for user:', userId);
+      return new Response(JSON.stringify({
+        error: 'FAL API key not configured'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -44,16 +98,12 @@ Deno.serve(async (req: Request) => {
     }
 
     fal.config({
-      credentials: falKey
+      credentials: apiConfig.key_value
     });
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    console.log('✅ FAL API key configured for user:', userId);
 
     try {
-      // First check status
       const statusResult = await fal.queue.status("fal-ai/image-apps-v2/virtual-try-on", {
         requestId: predictionId,
         logs: true

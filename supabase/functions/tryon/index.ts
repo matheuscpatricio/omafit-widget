@@ -27,15 +27,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('public_id is required. Please generate a valid widget code from your Omafit dashboard.');
     }
 
-    const falKey = Deno.env.get('FAL_KEY');
-    if (!falKey) {
-      throw new Error('FAL_KEY not configured');
-    }
-
-    fal.config({
-      credentials: falKey
-    });
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -125,6 +116,29 @@ Deno.serve(async (req: Request) => {
     if (widgetKeyData.status !== 'active') {
       throw new Error('This widget has been deactivated. Please contact the store owner or generate a new widget.');
     }
+
+    const { data: apiConfigs, error: apiConfigError } = await supabaseClient
+      .from('api_config')
+      .select('key_name, key_value')
+      .eq('user_id', widgetKeyData.user_id)
+      .in('key_name', ['fal_api_key', 'fashn_api_key']);
+
+    if (apiConfigError) {
+      console.error('❌ Error fetching FAL API key:', apiConfigError);
+      throw new Error('Failed to fetch API configuration');
+    }
+
+    const apiConfig = apiConfigs && apiConfigs.length > 0 ? apiConfigs[0] : null;
+
+    if (!apiConfig || !apiConfig.key_value) {
+      throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
+    }
+
+    fal.config({
+      credentials: apiConfig.key_value
+    });
+
+    console.log('✅ FAL API key configured for user:', widgetKeyData.user_id);
 
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
