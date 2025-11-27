@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Package, Zap } from 'lucide-react';
+import { Package, AlertTriangle } from 'lucide-react';
 
 interface Subscription {
   plan_id: string;
@@ -175,40 +175,41 @@ export function DashboardPage() {
       )}
 
       {/* Tips Section */}
-      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 p-4 md:p-6">
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-300 p-4 md:p-6">
         <div className="flex items-start gap-3 md:gap-4">
-          <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Zap className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-amber-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-3">Dicas para maximizar seus resultados</h3>
+            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1">Leia com atenção</h3>
+            <p className="text-xs md:text-sm text-gray-600 mb-3">Vídeos tutoriais disponíveis abaixo</p>
             <ul className="space-y-3 text-sm md:text-base text-gray-700">
               <li className="flex items-start gap-2 md:gap-3">
-                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
                   <span className="font-semibold">Posicione o widget estrategicamente:</span> Coloque o botão de try-on próximo ao botão "Adicionar ao Carrinho" na página do produto para aumentar a taxa de conversão em até 40%
                 </div>
               </li>
               <li className="flex items-start gap-2 md:gap-3">
-                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
                   <span className="font-semibold">Use imagens FRONTAIS nos produtos:</span> É essencial que as imagens do produto sejam de frente para a câmera (se for com modelo ele/a deve estar olhando para a frente), o Omafit gerará imagens melhores
                 </div>
               </li>
               <li className="flex items-start gap-2 md:gap-3">
-                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
                   <span className="font-semibold">Acompanhe as métricas:</span> Verifique regularmente o Analytics para entender quais produtos têm mais engajamento e ajustar sua estratégia
                 </div>
               </li>
               <li className="flex items-start gap-2 md:gap-3">
-                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
                   <span className="font-semibold">Personalize o widget:</span> Ajuste as cores e textos do widget para combinar com a identidade visual da sua loja
                 </div>
               </li>
               <li className="flex items-start gap-2 md:gap-3">
-                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-2 flex-shrink-0"></div>
                 <div>
                   <span className="font-semibold">Promova a função:</span> Destaque o try-on virtual em suas campanhas de marketing para aumentar o engajamento dos clientes
                 </div>
