@@ -434,10 +434,10 @@ const handleSubmit = async () => {
           <div className="space-y-4">
             <div className="text-center">
               <h3 className="text-2xl md:text-2xl font-semibold mb-2" style={{ color: primaryColor }}>
-                Virtual Try-On
+                Sua experiência visual
               </h3>
               <p className="text-gray-600 text-base md:text-lg mb-3">
-                Garanta que se vestirá bem, antes mesmo de pagar!
+                Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
 
