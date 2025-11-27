@@ -618,8 +618,8 @@ export function WidgetGeneratorPage() {
     closeButton.innerHTML = '×';
     closeButton.style.cssText =
       'position: absolute;' +
-      'top: 16px;' +
-      'right: 16px;' +
+      'top: 12px;' +
+      'right: 12px;' +
       'width: 36px;' +
       'height: 36px;' +
       'border: none;' +
@@ -634,7 +634,7 @@ export function WidgetGeneratorPage() {
       'z-index: 1000001;' +
       'font-weight: 300;' +
       'line-height: 1;' +
-      'padding: 0;' +
+      'padding: 4px;' +
       'transition: opacity 0.2s;' +
       'opacity: 0.7;';
 
@@ -775,8 +775,9 @@ export function WidgetGeneratorPage() {
     '  }' +
     '  .omafit-modal-overlay button {' +
     '    position: absolute !important;' +
-    '    top: 16px !important;' +
-    '    right: 16px !important;' +
+    '    top: 12px !important;' +
+    '    right: 0 !important;' +
+    '    padding: 4px !important;' +
     '  }' +
     '}' +
     '.omafit-try-on-link:focus {' +
