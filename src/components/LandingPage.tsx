@@ -161,7 +161,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           }}
         >
           <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/omafitbanner2.png"
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/bannervermelho.png"
             alt="Hero"
             className="w-full h-full object-cover object-center"
             loading="eager"
@@ -177,7 +177,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           }}
         >
           <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/Omafit%20image%202.png"
+            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/bannermobilevermelho.png"
             alt="Hero Mobile"
             className="w-full h-full object-cover"
             loading="eager"
