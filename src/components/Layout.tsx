@@ -5,11 +5,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
-  currentPage: string;
-  onPageChange: (page: string) => void;
+  onNavigate: (path: string) => void;
 }
 
-export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+export function Layout({ children, onNavigate }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { signOut, user } = useAuth();
@@ -21,19 +20,21 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
   };
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-    { id: 'analytics', label: 'Analytics Avançado', icon: TrendingUp },
-    { id: 'shopify', label: 'Shopify Config', icon: Store },
-    { id: 'widget', label: 'Widget Generator', icon: Code },
-    { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler },
-    { id: 'feedback', label: 'Sugestões e Melhorias', icon: MessageSquare },
-    { id: 'account', label: 'Configurações da Conta', icon: CreditCard },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/dashboard' },
+    { id: 'analytics', label: 'Analytics Avançado', icon: TrendingUp, path: '/analytics' },
+    { id: 'cadastro-loja', label: 'Cadastro de Loja', icon: Store, path: '/cadastro-loja' },
+    { id: 'widget-generator', label: 'Widget Generator', icon: Code, path: '/widget-generator' },
+    { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler, path: '/size-chart' },
+    { id: 'feedback', label: 'Sugestões e Melhorias', icon: MessageSquare, path: '/feedback' },
+    { id: 'account', label: 'Configurações da Conta', icon: CreditCard, path: '/account' },
   ];
 
-  const handlePageChange = (page: string) => {
-    onPageChange(page);
+  const handlePageChange = (path: string) => {
+    navigate(path);
     setMobileMenuOpen(false);
   };
+
+  const currentPath = window.location.pathname;
 
   return (
     <div className="min-h-screen bg-white flex flex-col md:flex-row">
@@ -99,9 +100,9 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             return (
               <button
                 key={item.id}
-                onClick={() => handlePageChange(item.id)}
+                onClick={() => handlePageChange(item.path)}
                 className={`w-full flex items-center px-6 py-3 text-left transition-colors ${
-                  currentPage === item.id
+                  currentPath === item.path
                     ? 'bg-white text-[#810707] border-r-4 border-[#810707]'
                     : 'text-white hover:bg-red-800 hover:text-white'
                 }`}
@@ -137,11 +138,13 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
         <header className="bg-white shadow-sm border-b border-gray-200 hidden md:block">
           <div className="px-4 md:px-6 py-4">
             <h2 className="text-xl md:text-2xl font-semibold text-[#810707]">
-              {currentPage === 'dashboard' ? 'Dashboard' :
-               currentPage === 'analytics' ? 'Analytics Avançado' :
-               currentPage === 'shopify' ? 'Configuração Shopify' :
-               currentPage === 'widget' ? 'Gerador de Widget' :
-               currentPage === 'account' ? 'Configurações da Conta' : currentPage}
+              {currentPath === '/dashboard' ? 'Dashboard' :
+               currentPath === '/analytics' ? 'Analytics Avançado' :
+               currentPath === '/cadastro-loja' ? 'Cadastro de Loja' :
+               currentPath === '/widget-generator' ? 'Gerador de Widget' :
+               currentPath === '/size-chart' ? 'Tabela de Medidas' :
+               currentPath === '/feedback' ? 'Sugestões e Melhorias' :
+               currentPath === '/account' ? 'Configurações da Conta' : 'Omafit Admin'}
             </h2>
           </div>
         </header>

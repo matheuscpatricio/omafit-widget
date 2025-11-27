@@ -48,8 +48,71 @@ export function WidgetGeneratorPage() {
   useEffect(() => {
     if (user) {
       loadOrCreateWidgetKey();
+      loadWidgetConfig();
     }
   }, [user]);
+
+  const loadWidgetConfig = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('widget_keys')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        if (data.name) setLinkText(data.name);
+
+        const config = data as any;
+        if (config.link_color) setLinkColor(config.link_color);
+        if (config.popup_color) setPopupColor(config.popup_color);
+        if (config.store_name) setStoreName(config.store_name);
+        if (config.store_logo) setStoreLogo(config.store_logo);
+        if (config.font_family) setFontFamily(config.font_family);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
+  const saveWidgetConfig = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('widget_keys')
+        .update({
+          name: linkText,
+          link_color: linkColor,
+          popup_color: popupColor,
+          store_name: storeName,
+          store_logo: storeLogo,
+          font_family: fontFamily,
+        })
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      setError('Erro ao salvar configurações');
+    }
+  };
+
+  useEffect(() => {
+    if (publicId && linkText && linkColor && popupColor && fontFamily) {
+      const timeoutId = setTimeout(() => {
+        saveWidgetConfig();
+      }, 1000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [linkText, linkColor, popupColor, storeName, storeLogo, fontFamily]);
 
   // Inject widget into test div when publicId is ready
   useEffect(() => {
