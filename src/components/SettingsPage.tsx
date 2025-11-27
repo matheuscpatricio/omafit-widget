@@ -1,19 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Save, Key, User, Shield } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export function SettingsPage() {
   const { user } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadApiKey();
+  }, [user]);
+
+  const loadApiKey = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('api_config')
+        .select('key_value')
+        .eq('user_id', user.id)
+        .in('key_name', ['fal_api_key', 'fashn_api_key'])
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setApiKey(data.key_value);
+      }
+    } catch (err) {
+      console.error('Error loading API key:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSaveApiKey = async () => {
+    if (!user || !apiKey.trim()) {
+      setError('Por favor, insira uma chave de API válida');
+      return;
+    }
+
     setSaving(true);
-    // In a real app, you'd save this to your backend
-    setTimeout(() => {
+    setError('');
+
+    try {
+      const { data: existing } = await supabase
+        .from('api_config')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('key_name', ['fal_api_key', 'fashn_api_key'])
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('api_config')
+          .update({
+            key_value: apiKey,
+            key_name: 'fal_api_key',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('api_config')
+          .insert({
+            user_id: user.id,
+            key_name: 'fal_api_key',
+            key_value: apiKey
+          });
+
+        if (error) throw error;
+      }
+
+      alert('✅ Chave da API salva com sucesso!');
+    } catch (err) {
+      console.error('Error saving API key:', err);
+      setError('Erro ao salvar chave da API. Tente novamente.');
+    } finally {
       setSaving(false);
-      alert('Configurações salvas com sucesso!');
-    }, 1000);
+    }
   };
 
   return (
@@ -72,20 +142,24 @@ export function SettingsPage() {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={loading}
+                className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Obtenha sua chave em fashn.ai
+                Obtenha sua chave em <a href="https://www.fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">fal.ai</a>
               </p>
+              {error && (
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              )}
             </div>
-            
+
             <button
               onClick={handleSaveApiKey}
-              disabled={saving}
+              disabled={saving || loading}
               className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 text-white py-2 rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saving ? 'Salvando...' : loading ? 'Carregando...' : 'Salvar'}
             </button>
           </div>
         </div>
