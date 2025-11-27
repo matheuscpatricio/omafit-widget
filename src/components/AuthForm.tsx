@@ -237,7 +237,7 @@ export function AuthForm() {
             </div>
             {!isLogin && (
               <p className="text-xs text-gray-500 mt-2">
-                Mínimo de 6 caracteres
+                Mínimo de 8 caracteres (com letras, números e símbolos)
               </p>
             )}
           </div>
