@@ -169,7 +169,20 @@ const handleSubmit = async () => {
 };
 
   const startPolling = (predictionId: string) => {
+    let pollCount = 0;
+    const maxPolls = 60;
+
     const pollInterval = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        clearInterval(pollInterval);
+        setError('Tempo de processamento excedido. Por favor, tente novamente.');
+        setStep('confirm');
+        setLoading(false);
+        return;
+      }
+
       try {
         const statusResponse = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon-status/${predictionId}`,
@@ -181,15 +194,37 @@ const handleSubmit = async () => {
         );
 
         if (!statusResponse.ok) {
-          const errorText = await statusResponse.text();
-          console.error('❌ Status check failed:', statusResponse.status, errorText);
+          console.error('❌ Status check failed:', statusResponse.status);
+
+          try {
+            const errorData = await statusResponse.json();
+            console.error('Error details:', errorData);
+
+            if (errorData.status === 'error' || errorData.status === 'failed') {
+              clearInterval(pollInterval);
+              setError(errorData.error || 'Falha no processamento da imagem. Tente novamente.');
+              setStep('confirm');
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to parse error response:', e);
+          }
 
           if (statusResponse.status === 404) {
             console.log('⚠️ Prediction not found, continuing to poll...');
             return;
           }
 
-          throw new Error(`Erro ao verificar status: ${statusResponse.status}`);
+          if (statusResponse.status >= 500) {
+            clearInterval(pollInterval);
+            setError('Erro no servidor. Por favor, tente novamente.');
+            setStep('confirm');
+            setLoading(false);
+            return;
+          }
+
+          return;
         }
 
         const statusData = await statusResponse.json();
@@ -221,16 +256,16 @@ const handleSubmit = async () => {
           }
         } else if (statusData.status === 'failed' || statusData.status === 'error') {
           clearInterval(pollInterval);
-          setError('Falha no processamento da imagem. Tente novamente.');
+          const errorMsg = statusData.error || 'Falha no processamento da imagem. Por favor, verifique se a imagem está clara e tente novamente.';
+          setError(errorMsg);
           setStep('confirm');
           setLoading(false);
         } else if (statusData.status === 'not_found') {
           clearInterval(pollInterval);
-          setError('Sessão expirada. Tente novamente.');
+          setError('Sessão expirada. Por favor, tente novamente.');
           setStep('confirm');
           setLoading(false);
         } else {
-          // Still processing
           const messages = [
             'Analisando sua foto...',
             'Aplicando o produto...',
