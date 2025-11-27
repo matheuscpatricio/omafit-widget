@@ -245,18 +245,22 @@ export function AccountSettingsPage() {
           const isCurrentPlan = plan.id === currentPlan;
           const isUpgrading = upgrading === plan.id;
 
+          const currentPlanIndex = plans.findIndex(p => p.id === currentPlan);
+          const thisPlanIndex = plans.findIndex(p => p.id === plan.id);
+          const showRecommended = plan.recommended && thisPlanIndex > currentPlanIndex;
+
           return (
             <div
               key={plan.id}
               className={`relative bg-white rounded-xl border-2 p-6 transition-all ${
-                plan.recommended
+                showRecommended
                   ? 'border-[#810707] shadow-lg scale-105'
                   : isCurrentPlan
                   ? 'border-green-500 shadow-md'
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
               }`}
             >
-              {plan.recommended && (
+              {showRecommended && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-[#810707] text-white px-4 py-1 rounded-full text-sm font-semibold">
                     Recomendado
