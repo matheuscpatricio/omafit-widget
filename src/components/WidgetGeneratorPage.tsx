@@ -754,9 +754,9 @@ export function WidgetGeneratorPage() {
     '    border-radius: 0 !important;' +
     '  }' +
     '  .omafit-modal-overlay > div > button {' +
-    '    position: absolute !important;' +
-    '    top: 12px !important;' +
-    '    right: 12px !important;' +
+    '    position: fixed !important;' +
+    '    top: 20px !important;' +
+    '    right: 16px !important;' +
     '    z-index: 1000002 !important;' +
     '    background: white !important;' +
     '    border-radius: 50% !important;' +
