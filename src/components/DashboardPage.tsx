@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Package, AlertTriangle } from 'lucide-react';
+import { Package, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface Subscription {
   plan_id: string;
@@ -129,7 +129,7 @@ export function DashboardPage() {
           </div>
           <div className="hidden lg:block">
             <div className="w-24 h-24 lg:w-32 lg:h-32 bg-white/10 rounded-full flex items-center justify-center">
-              <Zap className="w-12 h-12 lg:w-16 lg:h-16 text-white" />
+              <Sparkles className="w-12 h-12 lg:w-16 lg:h-16 text-white" />
             </div>
           </div>
         </div>
