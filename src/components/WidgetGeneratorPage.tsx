@@ -290,33 +290,71 @@ export function WidgetGeneratorPage() {
   function getAllProductImages() {
     const images = new Set();
 
-    // 1. Shopify: Buscar todas as imagens de thumbnails e media
+    // Seletores para IGNORAR (imagens que não são do produto principal)
+    const ignoredSelectors = [
+      '.size-chart',
+      '.size-guide',
+      '[class*="related"]',
+      '[class*="recommended"]',
+      '[class*="suggestions"]',
+      '[class*="upsell"]',
+      '[class*="recently"]',
+      '.footer',
+      '.header',
+      '.navigation',
+      '[class*="cart"]'
+    ];
+
+    // Função para verificar se elemento está em área ignorada
+    function isInIgnoredArea(element) {
+      let parent = element.parentElement;
+      while (parent) {
+        for (const selector of ignoredSelectors) {
+          if (parent.matches && parent.matches(selector)) {
+            return true;
+          }
+        }
+        parent = parent.parentElement;
+      }
+      return false;
+    }
+
+    // 1. Shopify: Buscar imagens principais do produto
     const shopifySelectors = [
       '.product__media img[src*="cdn.shopify.com"]',
-      '.product-single__photo img',
-      '[data-product-media] img',
-      '.product-thumbnails img',
-      '.product__media-list img'
+      '.product-single__photos img',
+      '.product__media-list img',
+      '[data-product-single-media-wrapper] img'
     ];
 
     for (const selector of shopifySelectors) {
       const imgs = document.querySelectorAll(selector);
       imgs.forEach(img => {
-        if (img.src) {
-          images.add(normalizeUrl(img.src));
+        if (img.src && !isInIgnoredArea(img) && img.naturalWidth > 400 && img.naturalHeight > 400) {
+          // Limpar parâmetros de tamanho da URL para obter imagem em melhor qualidade
+          const cleanUrl = img.src.split('?')[0];
+          images.add(normalizeUrl(cleanUrl));
         }
       });
     }
 
-    // 2. Buscar em containers de produto
-    const productImages = document.querySelectorAll('.product__media img, .product-images img, [class*="product"] img');
-    productImages.forEach(img => {
-      if (img.naturalWidth > 300 && img.naturalHeight > 300 && img.src) {
-        images.add(normalizeUrl(img.src));
+    // 2. Buscar em containers específicos de produto
+    const productContainers = document.querySelectorAll('.product__media, .product-images, .product-gallery, [class*="product-image"]');
+    productContainers.forEach(container => {
+      if (!isInIgnoredArea(container)) {
+        const imgs = container.querySelectorAll('img');
+        imgs.forEach(img => {
+          if (img.src && img.naturalWidth > 400 && img.naturalHeight > 400) {
+            const cleanUrl = img.src.split('?')[0];
+            images.add(normalizeUrl(cleanUrl));
+          }
+        });
       }
     });
 
-    return Array.from(images);
+    const imagesArray = Array.from(images);
+    console.log('🔍 Imagens filtradas do produto:', imagesArray.length);
+    return imagesArray.slice(0, 10); // Limitar a 10 imagens
   }
 
   // Função para obter imagem do produto na página

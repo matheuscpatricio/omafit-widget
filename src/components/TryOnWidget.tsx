@@ -40,6 +40,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
   const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
   const [availableImages, setAvailableImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState('Gerando sua prévia...');
   const [isVisible, setIsVisible] = useState(false);
@@ -55,6 +56,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     setAvailableImages(images);
     setSelectedProductImage(images[0]);
+    setCurrentImageIndex(0);
 
     setProduct({
       id: productId,
@@ -63,6 +65,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       category: 'auto'
     });
   }, [garmentImage, productId, productName, productImages]);
+
+  React.useEffect(() => {
+    if (availableImages.length > 0) {
+      setSelectedProductImage(availableImages[currentImageIndex]);
+    }
+  }, [currentImageIndex, availableImages]);
 
   useEffect(() => {
     const loadSizeChart = async () => {
@@ -311,6 +319,15 @@ const handleSubmit = async () => {
     setResult(null);
     setError('');
     setPredictionId(null);
+    setCurrentImageIndex(0);
+  };
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % availableImages.length);
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + availableImages.length) % availableImages.length);
   };
 
   const goBack = () => {
@@ -341,7 +358,7 @@ const handleSubmit = async () => {
     );
   }
 
-  const displayImage = selectedProductImage || product.garment_image;
+  const displayImage = step === 'photo' ? selectedProductImage : product.garment_image;
 
   return (
     <>
@@ -508,46 +525,58 @@ const handleSubmit = async () => {
             </div>
 
             {availableImages.length > 1 && (
-              <>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
-                  <div className="flex items-start gap-3">
-                    <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h4 className="font-medium text-blue-800 mb-1 text-sm md:text-base">Escolha a imagem do produto</h4>
-                      <p className="text-sm text-blue-700">
-                        Selecione uma imagem <strong>frontal</strong> do produto para melhores resultados
-                      </p>
-                    </div>
-                  </div>
+              <div className="mb-4">
+                <div className="text-center mb-3">
+                  <h4 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Imagem do Produto
+                  </h4>
+                  <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    (escolha uma imagem frontal do produto)
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {availableImages.map((image, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedProductImage(image)}
-                      className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-                        selectedProductImage === image
-                          ? 'border-primary shadow-lg'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100">
-                        <img
-                          src={image}
-                          alt={`Imagem ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                <div className="relative">
+                  <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      src={selectedProductImage}
+                      alt="Produto"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {availableImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      >
+                        <ArrowLeft className="w-5 h-5" />
+                      </button>
+
+                      <button
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                      </button>
+
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {availableImages.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              index === currentImageIndex
+                                ? 'bg-primary w-6'
+                                : 'bg-white/70 hover:bg-white'
+                            }`}
+                          />
+                        ))}
                       </div>
-                      {selectedProductImage === image && (
-                        <div className="absolute top-1 right-1 bg-primary text-white rounded-full p-1">
-                          <CheckCircle className="w-4 h-4" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                    </>
+                  )}
                 </div>
-              </>
+              </div>
             )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
