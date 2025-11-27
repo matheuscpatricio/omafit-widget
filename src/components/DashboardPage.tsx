@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { TrendingUp, Users, Eye, Package, BarChart3, Zap } from 'lucide-react';
-
-interface DashboardStats {
-  totalTryons: number;
-  successfulTryons: number;
-  failedTryons: number;
-}
+import { Package, Zap } from 'lucide-react';
 
 interface Subscription {
   plan_id: string;
@@ -18,11 +12,6 @@ interface Subscription {
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalTryons: 0,
-    successfulTryons: 0,
-    failedTryons: 0
-  });
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,23 +56,6 @@ export function DashboardPage() {
         }
       }
 
-      // Fetch try-on sessions stats
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('tryon_sessions')
-        .select('fashn_status')
-        .order('created_at', { ascending: false });
-
-      if (!sessionsError && sessions) {
-        const successful = sessions.filter(s => s.fashn_status === 'completed').length;
-        const failed = sessions.filter(s => s.fashn_status === 'failed').length;
-
-        setStats({
-          totalTryons: sessions.length,
-          successfulTryons: successful,
-          failedTryons: failed
-        });
-      }
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -102,8 +74,6 @@ export function DashboardPage() {
       </div>
     );
   }
-
-  const successRate = stats.totalTryons > 0 ? Math.round((stats.successfulTryons / stats.totalTryons) * 100) : 0;
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -219,52 +189,56 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-xs md:text-sm font-medium">Total Try-ons</p>
-              <p className="text-2xl md:text-3xl font-bold text-[#810707] mt-1">{stats.totalTryons}</p>
+      {/* Tutorial Videos Section */}
+      <div className="space-y-4 md:space-y-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900">Tutoriais</h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Tutorial Video 1 */}
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="relative aspect-video bg-gray-100">
+              <video
+                controls
+                className="w-full h-full object-cover"
+              >
+                <source src="" type="video/mp4" />
+              </video>
             </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-[#810707] bg-opacity-10 rounded-lg flex items-center justify-center">
-              <Eye className="w-5 h-5 md:w-6 md:h-6 text-[#810707]" />
+            <div className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-1">Tutorial 1</h3>
+              <p className="text-sm text-gray-600">Descrição do tutorial</p>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-xs md:text-sm font-medium">Sucessos</p>
-              <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1">{stats.successfulTryons}</p>
+          {/* Tutorial Video 2 */}
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="relative aspect-video bg-gray-100">
+              <video
+                controls
+                className="w-full h-full object-cover"
+              >
+                <source src="" type="video/mp4" />
+              </video>
             </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+            <div className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-1">Tutorial 2</h3>
+              <p className="text-sm text-gray-600">Descrição do tutorial</p>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-xs md:text-sm font-medium">Falhas</p>
-              <p className="text-2xl md:text-3xl font-bold text-red-600 mt-1">{stats.failedTryons}</p>
+          {/* Tutorial Video 3 */}
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="relative aspect-video bg-gray-100">
+              <video
+                controls
+                className="w-full h-full object-cover"
+              >
+                <source src="" type="video/mp4" />
+              </video>
             </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 md:w-6 md:h-6 text-red-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-xs md:text-sm font-medium">Taxa de Sucesso</p>
-              <p className="text-2xl md:text-3xl font-bold text-[#810707] mt-1">{successRate}%</p>
-            </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-[#810707] bg-opacity-10 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 md:w-6 md:h-6 text-[#810707]" />
+            <div className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-1">Tutorial 3</h3>
+              <p className="text-sm text-gray-600">Descrição do tutorial</p>
             </div>
           </div>
         </div>
