@@ -474,6 +474,9 @@ export function WidgetGeneratorPage() {
     const allProductImages = getAllProductImages();
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
 
+    // Detectar se é mobile
+    const isMobile = window.innerWidth <= 768;
+
     // Criar overlay
     const overlay = document.createElement('div');
     overlay.className = 'omafit-modal-overlay';
@@ -488,7 +491,7 @@ export function WidgetGeneratorPage() {
       'display: flex;' +
       'align-items: center;' +
       'justify-content: center;' +
-      'padding: 20px;' +
+      (isMobile ? 'padding: 0;' : 'padding: 20px;') +
       'box-sizing: border-box;' +
       'backdrop-filter: blur(0px);' +
       'transition: all 0.4s ease-in-out;' +
@@ -645,11 +648,14 @@ export function WidgetGeneratorPage() {
 
     closeButton.addEventListener('click', closeModal);
 
-    overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) {
-        closeModal();
-      }
-    });
+    // No desktop, permite fechar clicando no overlay
+    if (!isMobile) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+          closeModal();
+        }
+      });
+    }
 
     // Fechar com ESC
     const handleEscape = function(e) {
@@ -670,8 +676,10 @@ export function WidgetGeneratorPage() {
 
     // Animar entrada com delay para permitir o render
     setTimeout(function() {
-      overlay.style.background = 'rgba(0, 0, 0, 0.6)';
-      overlay.style.backdropFilter = 'blur(4px)';
+      if (!isMobile) {
+        overlay.style.background = 'rgba(0, 0, 0, 0.6)';
+        overlay.style.backdropFilter = 'blur(4px)';
+      }
       overlay.style.opacity = '1';
       iframe.style.transform = 'scale(1)';
       iframe.style.opacity = '1';
@@ -727,11 +735,21 @@ export function WidgetGeneratorPage() {
   const style = document.createElement('style');
   style.textContent =
     '@media (max-width: 768px) {' +
+    '  .omafit-modal-overlay {' +
+    '    background: transparent !important;' +
+    '    backdrop-filter: none !important;' +
+    '  }' +
     '  .omafit-modal-overlay iframe {' +
     '    width: 100vw !important;' +
     '    height: 100vh !important;' +
+    '    max-width: none !important;' +
     '    max-height: none !important;' +
     '    border-radius: 0 !important;' +
+    '  }' +
+    '  .omafit-modal-overlay button {' +
+    '    position: fixed !important;' +
+    '    top: 16px !important;' +
+    '    right: 16px !important;' +
     '  }' +
     '}' +
     '.omafit-try-on-link:focus {' +
