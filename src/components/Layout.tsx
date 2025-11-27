@@ -23,7 +23,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/dashboard' },
     { id: 'analytics', label: 'Analytics Avançado', icon: TrendingUp, path: '/analytics' },
     { id: 'cadastro-loja', label: 'Cadastro de Loja', icon: Store, path: '/cadastro-loja' },
-    { id: 'widget-generator', label: 'Widget Generator', icon: Code, path: '/widget-generator' },
+    { id: 'widget-generator', label: 'Gerador de Widget', icon: Code, path: '/widget-generator' },
     { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler, path: '/size-chart' },
     { id: 'feedback', label: 'Sugestões e Melhorias', icon: MessageSquare, path: '/feedback' },
     { id: 'account', label: 'Configurações da Conta', icon: CreditCard, path: '/account' },

@@ -43,6 +43,7 @@ export function WidgetGeneratorPage() {
     { name: 'Playfair Display', value: '\'Playfair Display\', serif' },
     { name: 'Raleway', value: 'Raleway, sans-serif' },
     { name: 'Google Sans', value: '\'Google Sans\', sans-serif' },
+    { name: 'Inter', value: 'Inter, sans-serif' },
   ];
 
   useEffect(() => {
@@ -264,7 +265,8 @@ export function WidgetGeneratorPage() {
   const fontsToLoad = [
     'Outfit:wght@100..900',
     'Playfair+Display:wght@400..900',
-    'Raleway:wght@100..900'
+    'Raleway:wght@100..900',
+    'Inter:opsz,wght@14..32,100..900'
   ];
 
   fontsToLoad.forEach(font => {
@@ -1090,18 +1092,30 @@ INSTRUÇÕES DE INSTALAÇÃO:
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Fonte do Widget
               </label>
-              <select
-                value={fontFamily}
-                onChange={(e) => setFontFamily(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
-              >
+              <div className="space-y-2">
                 {fontOptions.map((font) => (
-                  <option key={font.value} value={font.value}>
-                    {font.name}
-                  </option>
+                  <button
+                    key={font.value}
+                    onClick={() => setFontFamily(font.value)}
+                    className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
+                      fontFamily === font.value
+                        ? 'border-[#810707] bg-red-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">{font.name}</span>
+                      <span
+                        className="text-base"
+                        style={{ fontFamily: font.value }}
+                      >
+                        Exemplo Aa
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
                 Define a tipografia usada no widget
               </p>
             </div>
@@ -1306,24 +1320,6 @@ INSTRUÇÕES DE INSTALAÇÃO:
         </div>
       </div>
 
-      {/* Widget Test Section */}
-      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200 p-4 md:p-6">
-        <h3 className="text-lg md:text-xl font-semibold text-[#810707] mb-4">🧪 Testar Widget</h3>
-        <p className="text-gray-700 mb-4">
-          Clique no link abaixo para testar o widget com as configurações atuais:
-        </p>
-        <div
-          ref={widgetTestRef}
-          className="p-6 bg-white rounded-lg border-2 border-dashed border-purple-300 min-h-[100px] flex items-center justify-center"
-        >
-          {!publicId && (
-            <p className="text-gray-500">Carregando widget...</p>
-          )}
-        </div>
-        <p className="text-xs text-gray-500 mt-3">
-          * O widget aparecerá acima. Se não funcionar, verifique se você tem produtos cadastrados e se o identificador do widget foi gerado corretamente.
-        </p>
-      </div>
 
       {/* Widget Features */}
       <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
