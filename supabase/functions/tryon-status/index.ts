@@ -40,11 +40,7 @@ Deno.serve(async (req: Request) => {
     console.log('📡 Fetching session from database...');
     const { data: sessionData, error: sessionError } = await supabase
       .from('tryon_sessions')
-      .select(`
-        id,
-        product_id,
-        products!inner(user_id)
-      `)
+      .select('id, product_id')
       .eq('fashn_prediction_id', predictionId)
       .maybeSingle();
 
@@ -75,7 +71,13 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const userId = (sessionData.products as any).user_id;
+    const { data: productData } = await supabase
+      .from('products')
+      .select('user_id')
+      .eq('id', sessionData.product_id)
+      .maybeSingle();
+
+    const userId = productData?.user_id;
 
     const { data: globalApiConfig } = await supabase
       .from('api_config')
