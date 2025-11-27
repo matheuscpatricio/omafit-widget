@@ -13,9 +13,10 @@ interface TryOnWidgetProps {
   primaryColor?: string;
   fontFamily?: string;
   publicId?: string;
+  productImages?: string[];
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit, sans-serif', publicId }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit, sans-serif', publicId, productImages = [] }: TryOnWidgetProps) {
 
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
@@ -36,7 +37,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
+  const [step, setStep] = useState<'info' | 'select-image' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
+  const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
+  const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState('Gerando sua prévia...');
   const [isVisible, setIsVisible] = useState(false);
@@ -48,6 +51,10 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
+    const images = productImages.length > 0 ? productImages : [decodedImage];
+
+    setAvailableImages(images);
+    setSelectedProductImage(images[0]);
 
     setProduct({
       id: productId,
@@ -55,7 +62,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       garment_image: decodedImage,
       category: 'auto'
     });
-  }, [garmentImage, productId, productName]);
+  }, [garmentImage, productId, productName, productImages]);
 
   useEffect(() => {
     const loadSizeChart = async () => {
@@ -130,7 +137,7 @@ const handleSubmit = async () => {
 
     const payload = {
       model_image: modelImageDataUrl,
-      garment_image: product.garment_image,
+      garment_image: selectedProductImage || product.garment_image,
       customer_email: 'widget@omafit.com',
       product_name: product.name,
       product_id: product.id,
@@ -308,8 +315,11 @@ const handleSubmit = async () => {
 
   const goBack = () => {
     switch (step) {
-      case 'calculator':
+      case 'select-image':
         setStep('info');
+        break;
+      case 'calculator':
+        setStep(availableImages.length > 1 ? 'select-image' : 'info');
         break;
       case 'photo':
         setStep('calculator');
@@ -334,7 +344,7 @@ const handleSubmit = async () => {
     );
   }
 
-  const displayImage = product.garment_image;
+  const displayImage = selectedProductImage || product.garment_image;
 
   return (
     <>
@@ -463,7 +473,7 @@ const handleSubmit = async () => {
             </div>
 
             <button
-              onClick={() => setStep('calculator')}
+              onClick={() => setStep(availableImages.length > 1 ? 'select-image' : 'calculator')}
               className="w-full bg-primary text-white py-3 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
                           >
               Começar Agora
@@ -473,6 +483,68 @@ const handleSubmit = async () => {
             <p className="text-xs md:text-sm text-center text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
+          </div>
+        )}
+
+        {/* Step 1.5: Select Product Image */}
+        {step === 'select-image' && (
+          <div className="space-y-4">
+            <div className="text-center mb-3">
+              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Escolha a Imagem
+              </h3>
+              <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Selecione qual imagem do produto usar no try-on
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-blue-800 mb-1 text-base">Dica Importante</h4>
+                  <p className="text-sm text-blue-700">
+                    Para melhores resultados, escolha uma imagem <strong>frontal</strong> do produto, onde a peça seja claramente visível.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {availableImages.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedProductImage(image)}
+                  className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                    selectedProductImage === image
+                      ? 'border-primary shadow-lg scale-105'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="aspect-[3/4] bg-gray-100">
+                    <img
+                      src={image}
+                      alt={`Imagem ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {selectedProductImage === image && (
+                    <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1">
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setStep('calculator')}
+              className="w-full bg-primary text-white py-3 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
+              disabled={!selectedProductImage}
+            >
+              Continuar
+              <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+            </button>
           </div>
         )}
 
