@@ -446,6 +446,7 @@ const handleSubmit = async () => {
 
         {/* Coluna do conteúdo (direita no desktop) */}
         <div className={`flex-1 p-4 md:p-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+          <div className="md:max-w-2xl md:mx-auto">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -924,6 +925,7 @@ const handleSubmit = async () => {
             </div>
           </div>
         )}
+        </div>
         </div>
       </div>
     </div>
