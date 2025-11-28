@@ -442,7 +442,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-4 md:p-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-4 md:p-8 md:px-12 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -454,15 +454,15 @@ const handleSubmit = async () => {
         {step === 'info' && (
           <div className="space-y-4 animate-fade-in">
             <div className="text-center">
-              <h3 className="text-2xl md:text-2xl font-semibold mb-2" style={{ color: primaryColor }}>
+              <h3 className="text-2xl md:text-3xl font-semibold mb-2 md:mb-3" style={{ color: primaryColor }}>
                 Sua experiência visual
               </h3>
-              <p className="text-gray-600 text-base md:text-lg mb-3">
+              <p className="text-gray-600 text-base md:text-lg mb-3 md:mb-4">
                 Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-5 mb-3">
               <div className="text-center">
                 <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
                 <p className="text-sm md:text-base text-blue-700">
@@ -472,7 +472,7 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-3 md:space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
@@ -506,13 +506,13 @@ const handleSubmit = async () => {
 
             <button
               onClick={() => setStep('calculator')}
-              className="w-full bg-primary text-white py-3 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
+              className="w-full bg-primary text-white py-3 md:py-3.5 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
                           >
               Começar Agora
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
-            <p className="text-xs md:text-sm text-center text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <p className="text-xs md:text-sm text-center text-gray-500 mt-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
           </div>
@@ -705,21 +705,21 @@ const handleSubmit = async () => {
 
               {/* Right Side: Photo Upload */}
               <div className="md:w-1/2 flex flex-col justify-center">
-                <div className="text-center mb-4">
-                  <h3 className="text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <div className="text-center mb-3">
+                  <h3 className="text-2xl font-semibold text-primary mb-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     Sua foto
                   </h3>
-                  <p className="text-gray-600 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <p className="text-gray-600 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     Para melhores resultados, siga as instruções
                   </p>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <Info className="w-6 h-6 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-medium text-blue-800 mb-2 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
-                      <ul className="text-base text-blue-700 space-y-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      <h4 className="font-medium text-blue-800 mb-1 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
+                      <ul className="text-sm text-blue-700 space-y-0.5" style={{ fontFamily: 'Outfit, sans-serif' }}>
                         <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
                         <li>• <strong>De frente</strong> - olhando para a câmera</li>
                         <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
@@ -732,11 +732,11 @@ const handleSubmit = async () => {
 
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
                 >
-                  <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2 text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
-                  <p className="text-base text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-1 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
+                  <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     JPG, PNG ou WEBP (máx. 5MB)
                   </p>
                   <input
@@ -754,9 +754,9 @@ const handleSubmit = async () => {
 
         {/* Step 4: Confirm */}
         {step === 'confirm' && imagePreview && (
-          <div className="space-y-4 max-w-4xl mx-auto animate-fade-in">
-            <div className="text-center mb-4">
-              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
+            <div className="text-center mb-3 md:mb-4">
+              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
                 Confirmar dados
               </h3>
               <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
@@ -764,8 +764,8 @@ const handleSubmit = async () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              <div className="bg-gray-50 rounded-lg p-4 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+              <div className="bg-gray-50 rounded-lg p-4 md:p-5">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
@@ -776,7 +776,7 @@ const handleSubmit = async () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 md:p-6">
+              <div className="bg-gray-50 rounded-lg p-4 md:p-5">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
@@ -791,16 +791,16 @@ const handleSubmit = async () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('photo')}
-                className="flex-1 bg-gray-100 text-gray-700 py-3 md:py-4 text-base md:text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
+                className="flex-1 bg-gray-100 text-gray-700 py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                               >
                 Alterar
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex-1 bg-primary text-white py-3 md:py-4 text-base md:text-lg rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 bg-primary text-white py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50"
                               >
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
+                <Sparkles className="w-5 h-5" />
                 Processar
               </button>
             </div>
@@ -809,7 +809,7 @@ const handleSubmit = async () => {
 
         {/* Step 5: Processing */}
         {step === 'processing' && (
-          <div className="text-center py-10 md:py-16 animate-fade-in">
+          <div className="text-center py-10 md:py-12 animate-fade-in">
             <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6"></div>
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
               {processingMessage}
@@ -817,7 +817,7 @@ const handleSubmit = async () => {
             <p className="text-gray-600 mb-4 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
               Estamos criando seu try-on virtual. Isso pode levar até 1 minuto.
             </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
               <p className="text-yellow-800 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
                  Tempo estimado: 20-40 segundos
               </p>
@@ -873,11 +873,11 @@ const handleSubmit = async () => {
             </div>
 
             {/* Desktop Layout */}
-            <div className="hidden md:flex md:gap-6">
+            <div className="hidden md:flex md:gap-8">
               {/* Left Side: Image */}
               <div className="md:w-1/2">
-                <div className="mb-4">
-                  <h3 className="text-3xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <div className="mb-3">
+                  <h3 className="text-2xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     Sua prévia:
                   </h3>
                 </div>
@@ -891,29 +891,29 @@ const handleSubmit = async () => {
               </div>
 
               {/* Right Side: Info and Actions */}
-              <div className="md:w-1/2 flex flex-col justify-center space-y-6">
+              <div className="md:w-1/2 flex flex-col justify-center space-y-4">
                 {calculatedSize && (
                   <div className="text-center">
-                    <p className="text-lg text-gray-700 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-base text-gray-700 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Seu tamanho ideal:
                     </p>
-                    <p className="text-6xl font-bold mb-3" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
                       {calculatedSize}
                     </p>
-                    <p className="text-base text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-sm text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Com base na sua altura, peso e tipo físico
                     </p>
                   </div>
                 )}
 
-                <p className="text-lg text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-base text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
                   Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
 
                 <button
                   onClick={resetWidget}
-                  className="w-full bg-gray-100 text-gray-700 py-4 text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
+                  className="w-full bg-gray-100 text-gray-700 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                 >
                   Novo Try-On
                 </button>
