@@ -45,6 +45,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [processingMessage, setProcessingMessage] = useState('Gerando sua prévia...');
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     setIsVisible(true);
@@ -330,6 +332,25 @@ const handleSubmit = async () => {
     setCurrentImageIndex((prev) => (prev - 1 + availableImages.length) % availableImages.length);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current - touchEndX.current > 50) {
+      nextImage();
+    }
+    if (touchEndX.current - touchStartX.current > 50) {
+      prevImage();
+    }
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  };
+
   const goBack = () => {
     switch (step) {
       case 'calculator':
@@ -528,7 +549,12 @@ const handleSubmit = async () => {
                   </div>
 
                   <div className="relative">
-                    <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden">
+                    <div
+                      className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden"
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
                       <img
                         src={selectedProductImage}
                         alt="Produto"
