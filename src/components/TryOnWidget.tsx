@@ -512,10 +512,113 @@ const handleSubmit = async () => {
         {/* Step 3: Photo Upload */}
         {step === 'photo' && (
           <div className="space-y-4">
-            {availableImages.length > 1 && (
-              <div className="mb-4">
+            {/* Mobile Layout */}
+            <div className="md:hidden space-y-4">
+              {availableImages.length > 1 && (
+                <div className="mb-4">
+                  <div className="text-center mb-3">
+                    <h4 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Imagem do Produto
+                    </h4>
+                    <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      (escolha uma imagem frontal do produto)
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                      <img
+                        src={selectedProductImage}
+                        alt="Produto"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {availableImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={prevImage}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        >
+                          <ArrowLeft className="w-5 h-5" />
+                        </button>
+
+                        <button
+                          onClick={nextImage}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        >
+                          <ArrowRight className="w-5 h-5" />
+                        </button>
+
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                          {availableImages.map((_, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setCurrentImageIndex(index)}
+                              className={`w-2 h-2 rounded-full transition-all ${
+                                index === currentImageIndex
+                                  ? 'bg-primary w-6'
+                                  : 'bg-white/70 hover:bg-white'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-center mb-3">
+                <h3 className="text-2xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Sua foto
+                </h3>
+                <p className="text-gray-600 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Para melhores resultados, siga as instruções
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-blue-800 mb-2 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
+                    <ul className="text-sm text-blue-700 space-y-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
+                      <li>• <strong>De frente</strong> - olhando para a câmera</li>
+                      <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
+                      <li>• <strong>Boa iluminação</strong> - ambiente bem iluminado</li>
+                      <li>• <strong>Fundo neutro</strong> - preferencialmente liso</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+              >
+                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-2 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
+                <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  JPG, PNG ou WEBP (máx. 5MB)
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* Desktop Layout */}
+            <div className="hidden md:flex md:gap-6">
+              {/* Left Side: Product Carousel */}
+              <div className="md:w-1/2">
                 <div className="text-center mb-3">
-                  <h4 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <h4 className="text-xl font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     Imagem do Produto
                   </h4>
                   <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
@@ -523,7 +626,45 @@ const handleSubmit = async () => {
                   </p>
                 </div>
 
-                <div className="relative">
+                {availableImages.length > 1 ? (
+                  <div className="relative">
+                    <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                      <img
+                        src={selectedProductImage}
+                        alt="Produto"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {availableImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            index === currentImageIndex
+                              ? 'bg-primary w-6'
+                              : 'bg-white/70 hover:bg-white'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                   <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
                     <img
                       src={selectedProductImage}
@@ -531,83 +672,54 @@ const handleSubmit = async () => {
                       className="w-full h-full object-cover"
                     />
                   </div>
+                )}
+              </div>
 
-                  {availableImages.length > 1 && (
-                    <>
-                      <button
-                        onClick={prevImage}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                      </button>
+              {/* Right Side: Photo Upload */}
+              <div className="md:w-1/2 flex flex-col justify-center">
+                <div className="text-center mb-4">
+                  <h3 className="text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Sua foto
+                  </h3>
+                  <p className="text-gray-600 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Para melhores resultados, siga as instruções
+                  </p>
+                </div>
 
-                      <button
-                        onClick={nextImage}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
-                      >
-                        <ArrowRight className="w-5 h-5" />
-                      </button>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="w-6 h-6 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-medium text-blue-800 mb-2 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
+                      <ul className="text-base text-blue-700 space-y-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                        <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
+                        <li>• <strong>De frente</strong> - olhando para a câmera</li>
+                        <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
+                        <li>• <strong>Boa iluminação</strong> - ambiente bem iluminado</li>
+                        <li>• <strong>Fundo neutro</strong> - preferencialmente liso</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
 
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                        {availableImages.map((_, index) => (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentImageIndex(index)}
-                            className={`w-2 h-2 rounded-full transition-all ${
-                              index === currentImageIndex
-                                ? 'bg-primary w-6'
-                                : 'bg-white/70 hover:bg-white'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+                >
+                  <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-2 text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
+                  <p className="text-base text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    JPG, PNG ou WEBP (máx. 5MB)
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
                 </div>
               </div>
-            )}
-
-            <div className="text-center mb-3">
-              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                Sua foto
-              </h3>
-              <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                Para melhores resultados, siga as instruções
-              </p>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
-              <div className="flex items-start gap-3">
-                <Info className="w-5 h-5 md:w-6 md:h-6 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
-                  <ul className="text-sm md:text-base text-blue-700 space-y-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                    <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
-                    <li>• <strong>De frente</strong> - olhando para a câmera</li>
-                    <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
-                    <li>• <strong>Boa iluminação</strong> - ambiente bem iluminado</li>
-                    <li>• <strong>Fundo neutro</strong> - preferencialmente liso</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 md:p-10 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
-            >
-              <Camera className="w-12 h-12 md:w-16 md:h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2 text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
-              <p className="text-sm md:text-base text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                JPG, PNG ou WEBP (máx. 5MB)
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-                              />
             </div>
           </div>
         )}
