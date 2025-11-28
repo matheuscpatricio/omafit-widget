@@ -528,7 +528,7 @@ const handleSubmit = async () => {
                   </div>
 
                   <div className="relative">
-                    <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden">
                       <img
                         src={selectedProductImage}
                         alt="Produto"
@@ -630,7 +630,7 @@ const handleSubmit = async () => {
 
                 {availableImages.length > 1 ? (
                   <div className="relative">
-                    <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden">
                       <img
                         src={selectedProductImage}
                         alt="Produto"
@@ -667,7 +667,7 @@ const handleSubmit = async () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
+                  <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden">
                     <img
                       src={selectedProductImage}
                       alt="Produto"
@@ -741,7 +741,7 @@ const handleSubmit = async () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="bg-gray-50 rounded-lg p-4 md:p-6">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
-                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
+                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={selectedProductImage}
                     alt="Produto"
@@ -752,7 +752,7 @@ const handleSubmit = async () => {
 
               <div className="bg-gray-50 rounded-lg p-4 md:p-6">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
-                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
+                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={imagePreview}
                     alt="Sua foto"
