@@ -407,8 +407,8 @@ const handleSubmit = async () => {
 
       {/* Layout com duas colunas no desktop */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Coluna da imagem (esquerda no desktop) - Esconde na calculadora e resultado */}
-        {step !== 'calculator' && step !== 'result' && (
+        {/* Coluna da imagem (esquerda no desktop) - Esconde na calculadora, resultado e upload */}
+        {step !== 'calculator' && step !== 'result' && step !== 'photo' && (
           <div className="md:w-2/5 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
@@ -421,7 +421,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-4 md:p-6 overflow-y-auto ${step === 'calculator' || step === 'result' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-4 md:p-6 overflow-y-auto ${step === 'calculator' || step === 'result' || step === 'photo' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -741,7 +741,7 @@ const handleSubmit = async () => {
                 <h4 className="font-medium text-primary mb-2 text-center text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
                 <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
                   <img
-                    src={displayImage}
+                    src={selectedProductImage}
                     alt="Produto"
                     className="w-full h-full object-cover"
                   />
