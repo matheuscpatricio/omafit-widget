@@ -407,8 +407,8 @@ const handleSubmit = async () => {
 
       {/* Layout com duas colunas no desktop */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Coluna da imagem (esquerda no desktop) - Esconde na calculadora, resultado e upload */}
-        {step !== 'calculator' && step !== 'result' && step !== 'photo' && (
+        {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
+        {step === 'info' && (
           <div className="md:w-2/5 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
@@ -421,7 +421,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-4 md:p-6 overflow-y-auto ${step === 'calculator' || step === 'result' || step === 'photo' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-4 md:p-6 overflow-y-auto ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -726,8 +726,8 @@ const handleSubmit = async () => {
 
         {/* Step 4: Confirm */}
         {step === 'confirm' && imagePreview && (
-          <div className="space-y-4">
-            <div className="text-center mb-3">
+          <div className="space-y-4 max-w-4xl mx-auto">
+            <div className="text-center mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
                 Confirmar dados
               </h3>
@@ -736,9 +736,9 @@ const handleSubmit = async () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-medium text-primary mb-2 text-center text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="bg-gray-50 rounded-lg p-4 md:p-6">
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
                 <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
                   <img
                     src={selectedProductImage}
@@ -748,8 +748,8 @@ const handleSubmit = async () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-medium text-primary mb-2 text-center text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
+              <div className="bg-gray-50 rounded-lg p-4 md:p-6">
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
                 <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
                   <img
                     src={imagePreview}
