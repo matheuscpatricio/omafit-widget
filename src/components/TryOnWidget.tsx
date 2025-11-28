@@ -421,7 +421,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-4 md:p-6 overflow-y-auto ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-4 md:p-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -431,7 +431,7 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             <div className="text-center">
               <h3 className="text-2xl md:text-2xl font-semibold mb-2" style={{ color: primaryColor }}>
                 Sua experiência visual
@@ -499,6 +499,7 @@ const handleSubmit = async () => {
 
         {/* Step 2: Size Calculator */}
         {step === 'calculator' && (
+          <div className="animate-fade-in">
           <SizeCalculator
             onComplete={(data) => {
               setSizeData(data);
@@ -507,11 +508,12 @@ const handleSubmit = async () => {
             onBack={() => setStep('info')}
             primaryColor={primaryColor}
           />
+          </div>
         )}
 
         {/* Step 3: Photo Upload */}
         {step === 'photo' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             {/* Mobile Layout */}
             <div className="md:hidden space-y-4">
               {availableImages.length > 1 && (
@@ -726,7 +728,7 @@ const handleSubmit = async () => {
 
         {/* Step 4: Confirm */}
         {step === 'confirm' && imagePreview && (
-          <div className="space-y-4 max-w-4xl mx-auto">
+          <div className="space-y-4 max-w-4xl mx-auto animate-fade-in">
             <div className="text-center mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
                 Confirmar dados
@@ -781,7 +783,7 @@ const handleSubmit = async () => {
 
         {/* Step 5: Processing */}
         {step === 'processing' && (
-          <div className="text-center py-10 md:py-16">
+          <div className="text-center py-10 md:py-16 animate-fade-in">
             <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6"></div>
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
               {processingMessage}
@@ -799,7 +801,7 @@ const handleSubmit = async () => {
 
         {/* Step 6: Result */}
         {step === 'result' && result && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             {/* Mobile Layout */}
             <div className="md:hidden space-y-4">
               <div className="text-center">
@@ -817,17 +819,20 @@ const handleSubmit = async () => {
                 </div>
 
                 {calculatedSize && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                    <h4 className="font-bold text-green-900 mb-1 text-xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                      Seu tamanho Ideal: <span className="text-2xl">{calculatedSize}</span>
-                    </h4>
-                    <p className="text-sm text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <div className="text-center mb-4">
+                    <p className="text-base text-gray-700 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho ideal:
+                    </p>
+                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
+                      {calculatedSize}
+                    </p>
+                    <p className="text-sm text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Com base na sua altura, peso e tipo físico
                     </p>
                   </div>
                 )}
 
-                <p className="text-sm text-green-600 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-sm text-gray-900 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
                    Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
@@ -862,17 +867,20 @@ const handleSubmit = async () => {
               {/* Right Side: Info and Actions */}
               <div className="md:w-1/2 flex flex-col justify-center space-y-6">
                 {calculatedSize && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                    <h4 className="font-bold text-green-900 mb-2 text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                      Seu tamanho Ideal: <span className="text-3xl">{calculatedSize}</span>
-                    </h4>
-                    <p className="text-lg text-green-700" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <div className="text-center">
+                    <p className="text-lg text-gray-700 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      Seu tamanho ideal:
+                    </p>
+                    <p className="text-6xl font-bold mb-3" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
+                      {calculatedSize}
+                    </p>
+                    <p className="text-base text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
                       Com base na sua altura, peso e tipo físico
                     </p>
                   </div>
                 )}
 
-                <p className="text-lg text-green-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-lg text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
                   Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
