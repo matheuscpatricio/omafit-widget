@@ -288,71 +288,59 @@ export function WidgetGeneratorPage() {
     return url;
   }
 
-  // Função para obter todas as imagens do produto na página
-  function getAllProductImages() {
-    const images = [];
+  // Função para obter apenas imagens do produto diretamente dos dados do Shopify
+  async function getOnlyProductImages() {
+    // 1. Tenta meta.product
+    if (window.meta && window.meta.product) {
+      const p = window.meta.product;
+      const imgs = [];
 
-    // 1. Prioridade máxima: ID especial #omafit-product-images
-    const omafitContainer = document.querySelector('#omafit-product-images');
-    if (omafitContainer) {
-      const omafitImgs = omafitContainer.querySelectorAll('img');
-      omafitImgs.forEach(img => {
-        if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
-          const cleanUrl = img.src.split('?')[0];
-          images.push(normalizeUrl(cleanUrl));
-        }
-      });
-      if (images.length > 0) {
-        console.log('✅ Imagens encontradas via #omafit-product-images:', images.length);
-        return images.slice(0, 10);
-      }
-    }
-
-    // 2. Buscar em seletores específicos de galerias de produto
-    const gallerySelectors = [
-      '.product__media-list',
-      '.product-single__photos',
-      '.product__media-wrapper',
-      '.product-gallery',
-      '[data-product-gallery]'
-    ];
-
-    for (const selector of gallerySelectors) {
-      const container = document.querySelector(selector);
-      if (container) {
-        const imgs = container.querySelectorAll('img');
-        imgs.forEach(img => {
-          if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
-            const cleanUrl = img.src.split('?')[0];
-            const normalizedUrl = normalizeUrl(cleanUrl);
-            if (!images.includes(normalizedUrl)) {
-              images.push(normalizedUrl);
-            }
-          }
+      if (Array.isArray(p.media)) {
+        p.media.forEach(m => {
+          if (m.src) imgs.push(normalizeUrl(m.src));
+          else if (m.preview_image && m.preview_image.src) imgs.push(normalizeUrl(m.preview_image.src));
         });
-        if (images.length > 0) {
-          console.log('Imagens encontradas via ' + selector + ':', images.length);
-          break;
-        }
+      }
+
+      if (Array.isArray(p.images)) {
+        p.images.forEach(i => imgs.push(normalizeUrl(i)));
+      }
+
+      if (imgs.length > 0) {
+        console.log('✅ Imagens encontradas via window.meta.product:', imgs.length);
+        return [...new Set(imgs)];
       }
     }
 
-    // 3. Fallback: buscar em .product__media apenas
-    if (images.length === 0) {
-      const productMedia = document.querySelectorAll('.product__media img');
-      productMedia.forEach(img => {
-        if (img.src && img.naturalWidth > 200 && img.naturalHeight > 200) {
-          const cleanUrl = img.src.split('?')[0];
-          const normalizedUrl = normalizeUrl(cleanUrl);
-          if (!images.includes(normalizedUrl)) {
-            images.push(normalizedUrl);
-          }
-        }
-      });
-      console.log('✅ Imagens encontradas via .product__media:', images.length);
+    // 2. Tenta ShopifyAnalytics
+    if (
+      window.ShopifyAnalytics &&
+      window.ShopifyAnalytics.meta &&
+      window.ShopifyAnalytics.meta.product &&
+      Array.isArray(window.ShopifyAnalytics.meta.product.images)
+    ) {
+      const imgs = window.ShopifyAnalytics.meta.product.images.map(i => normalizeUrl(i));
+      console.log('✅ Imagens encontradas via ShopifyAnalytics:', imgs.length);
+      return imgs;
     }
 
-    return images.slice(0, 10);
+    // 3. Fallback universal: JSON do produto
+    const handle = window.location.pathname.split('/products/')[1];
+    if (handle) {
+      try {
+        const res = await fetch('/products/' + handle + '.js');
+        const product = await res.json();
+        if (Array.isArray(product.images)) {
+          const imgs = product.images.map(i => normalizeUrl(i));
+          console.log('✅ Imagens encontradas via product.js:', imgs.length);
+          return imgs;
+        }
+      } catch (e) {
+        console.error('Erro ao buscar produto:', e);
+      }
+    }
+
+    return [];
   }
 
   // Função para obter imagem do produto na página
@@ -461,7 +449,7 @@ export function WidgetGeneratorPage() {
   };
 
   // Função para abrir o modal
-  window.openOmafitModal = function() {
+  window.openOmafitModal = async function() {
     // Obter a imagem atual do produto na página
     const productImage = OMAFIT_CONFIG.getProductImage();
 
@@ -470,8 +458,8 @@ export function WidgetGeneratorPage() {
       return;
     }
 
-    // Obter todas as imagens do produto
-    const allProductImages = getAllProductImages();
+    // Obter todas as imagens do produto dos dados do Shopify
+    const allProductImages = await getOnlyProductImages();
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
 
     // Detectar se é mobile
