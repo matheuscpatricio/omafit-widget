@@ -12,60 +12,93 @@ interface SizeEntry {
   order: number;
 }
 
+type Gender = 'male' | 'female' | 'unisex';
+
+interface GenderChart {
+  id: string | null;
+  entries: SizeEntry[];
+}
+
 export function SizeChartManager() {
   const { user } = useAuth();
-  const [sizeChart, setSizeChart] = useState<SizeEntry[]>([]);
+  const [selectedGenders, setSelectedGenders] = useState<Gender[]>(['unisex']);
+  const [activeGender, setActiveGender] = useState<Gender>('unisex');
+  const [charts, setCharts] = useState<Record<Gender, GenderChart>>({
+    male: { id: null, entries: [] },
+    female: { id: null, entries: [] },
+    unisex: { id: null, entries: [] }
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sizeChartId, setSizeChartId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
-      loadSizeChart();
+      loadSizeCharts();
     }
   }, [user]);
 
-  const loadSizeChart = async () => {
+  const loadSizeCharts = async () => {
     try {
       setLoading(true);
 
-      const { data: charts, error: chartsError } = await supabase
+      const { data: chartsData, error: chartsError } = await supabase
         .from('size_charts')
-        .select('id')
-        .eq('user_id', user?.id)
-        .maybeSingle();
+        .select('id, gender')
+        .eq('user_id', user?.id);
 
       if (chartsError) throw chartsError;
 
-      if (charts) {
-        setSizeChartId(charts.id);
+      const newCharts: Record<Gender, GenderChart> = {
+        male: { id: null, entries: [] },
+        female: { id: null, entries: [] },
+        unisex: { id: null, entries: [] }
+      };
 
-        const { data: entries, error: entriesError } = await supabase
-          .from('size_chart_entries')
-          .select('*')
-          .eq('size_chart_id', charts.id)
-          .order('order', { ascending: true });
+      const gendersWithData: Gender[] = [];
 
-        if (entriesError) throw entriesError;
+      if (chartsData && chartsData.length > 0) {
+        for (const chart of chartsData) {
+          const gender = chart.gender as Gender;
+          newCharts[gender].id = chart.id;
+          gendersWithData.push(gender);
 
-        if (entries && entries.length > 0) {
-          setSizeChart(entries.map(e => ({
-            id: e.id,
-            size_name: e.size_name,
-            bust: e.bust.toString(),
-            waist: e.waist.toString(),
-            hips: e.hips.toString(),
-            order: e.order
-          })));
-        } else {
-          setSizeChart([createEmptyEntry(0)]);
+          const { data: entries, error: entriesError } = await supabase
+            .from('size_chart_entries')
+            .select('*')
+            .eq('size_chart_id', chart.id)
+            .order('order', { ascending: true });
+
+          if (entriesError) throw entriesError;
+
+          if (entries && entries.length > 0) {
+            newCharts[gender].entries = entries.map(e => ({
+              id: e.id,
+              size_name: e.size_name,
+              bust: e.bust.toString(),
+              waist: e.waist.toString(),
+              hips: e.hips.toString(),
+              order: e.order
+            }));
+          } else {
+            newCharts[gender].entries = [createEmptyEntry(0)];
+          }
         }
+
+        setSelectedGenders(gendersWithData);
+        setActiveGender(gendersWithData[0] || 'unisex');
       } else {
-        setSizeChart([createEmptyEntry(0)]);
+        setSelectedGenders(['unisex']);
+        newCharts.unisex.entries = [createEmptyEntry(0)];
       }
+
+      setCharts(newCharts);
     } catch (error) {
-      console.error('Error loading size chart:', error);
-      setSizeChart([createEmptyEntry(0)]);
+      console.error('Error loading size charts:', error);
+      setCharts({
+        male: { id: null, entries: [createEmptyEntry(0)] },
+        female: { id: null, entries: [createEmptyEntry(0)] },
+        unisex: { id: null, entries: [createEmptyEntry(0)] }
+      });
     } finally {
       setLoading(false);
     }
@@ -79,78 +112,138 @@ export function SizeChartManager() {
     order
   });
 
+  const handleGenderSelection = (gender: Gender, checked: boolean) => {
+    if (checked) {
+      const newGenders = [...selectedGenders, gender];
+      setSelectedGenders(newGenders);
+      setActiveGender(gender);
+      if (charts[gender].entries.length === 0) {
+        setCharts({
+          ...charts,
+          [gender]: { ...charts[gender], entries: [createEmptyEntry(0)] }
+        });
+      }
+    } else {
+      const newGenders = selectedGenders.filter(g => g !== gender);
+      if (newGenders.length === 0) {
+        alert('Você precisa ter pelo menos uma tabela de medidas');
+        return;
+      }
+      setSelectedGenders(newGenders);
+      if (activeGender === gender) {
+        setActiveGender(newGenders[0]);
+      }
+    }
+  };
+
   const addEntry = () => {
-    setSizeChart([...sizeChart, createEmptyEntry(sizeChart.length)]);
+    const currentEntries = charts[activeGender].entries;
+    setCharts({
+      ...charts,
+      [activeGender]: {
+        ...charts[activeGender],
+        entries: [...currentEntries, createEmptyEntry(currentEntries.length)]
+      }
+    });
   };
 
   const removeEntry = (index: number) => {
-    const newChart = sizeChart.filter((_, i) => i !== index);
-    setSizeChart(newChart.map((entry, i) => ({ ...entry, order: i })));
+    const currentEntries = charts[activeGender].entries;
+    const newEntries = currentEntries.filter((_, i) => i !== index);
+    setCharts({
+      ...charts,
+      [activeGender]: {
+        ...charts[activeGender],
+        entries: newEntries.map((entry, i) => ({ ...entry, order: i }))
+      }
+    });
   };
 
   const updateEntry = (index: number, field: keyof SizeEntry, value: string) => {
-    const newChart = [...sizeChart];
-    newChart[index] = { ...newChart[index], [field]: value };
-    setSizeChart(newChart);
+    const currentEntries = [...charts[activeGender].entries];
+    currentEntries[index] = { ...currentEntries[index], [field]: value };
+    setCharts({
+      ...charts,
+      [activeGender]: {
+        ...charts[activeGender],
+        entries: currentEntries
+      }
+    });
   };
 
   const saveSizeChart = async () => {
     try {
       setSaving(true);
 
-      const validEntries = sizeChart.filter(
-        e => e.size_name && e.bust && e.waist && e.hips
-      );
+      for (const gender of selectedGenders) {
+        const validEntries = charts[gender].entries.filter(
+          e => e.size_name && e.bust && e.waist && e.hips
+        );
 
-      if (validEntries.length === 0) {
-        alert('Por favor, preencha pelo menos um tamanho completo');
-        return;
+        if (validEntries.length === 0) {
+          alert(`Por favor, preencha pelo menos um tamanho completo para a tabela ${getGenderLabel(gender)}`);
+          setSaving(false);
+          return;
+        }
+
+        let chartId = charts[gender].id;
+
+        if (!chartId) {
+          const { data: newChart, error: chartError } = await supabase
+            .from('size_charts')
+            .insert({ user_id: user?.id, gender })
+            .select()
+            .single();
+
+          if (chartError) throw chartError;
+          chartId = newChart.id;
+
+          setCharts(prev => ({
+            ...prev,
+            [gender]: { ...prev[gender], id: chartId }
+          }));
+        }
+
+        const { error: deleteError } = await supabase
+          .from('size_chart_entries')
+          .delete()
+          .eq('size_chart_id', chartId);
+
+        if (deleteError) throw deleteError;
+
+        const entries = validEntries.map((entry, index) => ({
+          size_chart_id: chartId,
+          size_name: entry.size_name,
+          bust: parseFloat(entry.bust),
+          waist: parseFloat(entry.waist),
+          hips: parseFloat(entry.hips),
+          order: index
+        }));
+
+        const { error: insertError } = await supabase
+          .from('size_chart_entries')
+          .insert(entries);
+
+        if (insertError) throw insertError;
       }
 
-      let chartId = sizeChartId;
-
-      if (!chartId) {
-        const { data: newChart, error: chartError } = await supabase
-          .from('size_charts')
-          .insert({ user_id: user?.id })
-          .select()
-          .single();
-
-        if (chartError) throw chartError;
-        chartId = newChart.id;
-        setSizeChartId(chartId);
-      }
-
-      const { error: deleteError } = await supabase
-        .from('size_chart_entries')
-        .delete()
-        .eq('size_chart_id', chartId);
-
-      if (deleteError) throw deleteError;
-
-      const entries = validEntries.map((entry, index) => ({
-        size_chart_id: chartId,
-        size_name: entry.size_name,
-        bust: parseFloat(entry.bust),
-        waist: parseFloat(entry.waist),
-        hips: parseFloat(entry.hips),
-        order: index
-      }));
-
-      const { error: insertError } = await supabase
-        .from('size_chart_entries')
-        .insert(entries);
-
-      if (insertError) throw insertError;
-
-      alert('Tabela de medidas salva com sucesso!');
-      loadSizeChart();
+      alert('Tabelas de medidas salvas com sucesso!');
+      loadSizeCharts();
     } catch (error) {
       console.error('Error saving size chart:', error);
-      alert('Erro ao salvar tabela de medidas');
+      alert('Erro ao salvar tabelas de medidas');
     } finally {
       setSaving(false);
     }
+  };
+
+  const getGenderLabel = (gender: Gender): string => {
+    const labels: Record<Gender, string> = {
+      male: 'Masculino',
+      female: 'Feminino',
+      unisex: 'Unissex'
+    };
+    return labels[gender];
   };
 
   if (loading) {
@@ -166,9 +259,9 @@ export function SizeChartManager() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Insira sua Tabela</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Tabelas de Medidas</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Configure a tabela de medidas da sua loja para a calculadora de tamanhos
+              Configure as tabelas de medidas por gênero para a calculadora de tamanhos
             </p>
           </div>
           <button
@@ -180,6 +273,45 @@ export function SizeChartManager() {
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Selecione os gêneros que deseja configurar:
+          </label>
+          <div className="flex gap-4">
+            {(['male', 'female', 'unisex'] as Gender[]).map(gender => (
+              <label key={gender} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedGenders.includes(gender)}
+                  onChange={(e) => handleGenderSelection(gender, e.target.checked)}
+                  className="w-4 h-4 text-[#810707] border-gray-300 rounded focus:ring-[#810707]"
+                />
+                <span className="text-sm text-gray-700">{getGenderLabel(gender)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {selectedGenders.length > 1 && (
+          <div className="mb-6">
+            <div className="flex gap-2 border-b border-gray-200">
+              {selectedGenders.map(gender => (
+                <button
+                  key={gender}
+                  onClick={() => setActiveGender(gender)}
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    activeGender === gender
+                      ? 'text-[#810707] border-b-2 border-[#810707]'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {getGenderLabel(gender)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -194,7 +326,7 @@ export function SizeChartManager() {
               </tr>
             </thead>
             <tbody>
-              {sizeChart.map((entry, index) => (
+              {charts[activeGender].entries.map((entry, index) => (
                 <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-2 px-2">
                     <GripVertical className="w-4 h-4 text-gray-400" />
@@ -238,7 +370,8 @@ export function SizeChartManager() {
                   <td className="py-2 px-2">
                     <button
                       onClick={() => removeEntry(index)}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Remover linha"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -251,20 +384,11 @@ export function SizeChartManager() {
 
         <button
           onClick={addEntry}
-          className="mt-4 flex items-center gap-2 px-4 py-2 text-[#810707] border border-[#810707] rounded-lg hover:bg-red-50 transition-colors"
+          className="mt-4 flex items-center gap-2 px-4 py-2 text-sm text-[#810707] border border-[#810707] rounded-lg hover:bg-red-50 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Adicionar Tamanho
+          Adicionar Linha
         </button>
-
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Como medir:</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li><strong>Busto:</strong> Medida da parte mais larga do peito</li>
-            <li><strong>Cintura:</strong> Medida da parte mais estreita do tronco</li>
-            <li><strong>Quadril:</strong> Medida da parte mais larga dos quadris</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

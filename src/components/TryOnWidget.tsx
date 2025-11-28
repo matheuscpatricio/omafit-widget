@@ -76,10 +76,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   useEffect(() => {
     const loadSizeChart = async () => {
+      if (!sizeData?.gender) return;
+
       try {
         const { data: charts } = await supabase
           .from('size_charts')
           .select('id')
+          .eq('gender', sizeData.gender)
           .limit(1)
           .maybeSingle();
 
@@ -100,7 +103,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, []);
+  }, [sizeData?.gender]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
