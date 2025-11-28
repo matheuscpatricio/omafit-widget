@@ -445,8 +445,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-4 md:p-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
-          <div className="md:max-w-2xl md:mx-auto">
+        <div className={`flex-1 p-4 md:px-8 md:py-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -456,17 +455,17 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-3 md:space-y-4 animate-fade-in">
             <div className="text-center">
-              <h3 className="text-2xl md:text-3xl font-semibold mb-2 md:mb-3" style={{ color: primaryColor }}>
+              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 Sua experiência visual
               </h3>
-              <p className="text-gray-600 text-base md:text-lg mb-3 md:mb-4">
+              <p className="text-gray-600 text-base md:text-lg mb-2 md:mb-3">
                 Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-5 mb-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
               <div className="text-center">
                 <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
                 <p className="text-sm md:text-base text-blue-700">
@@ -476,7 +475,7 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            <div className="space-y-3 md:space-y-3">
+            <div className="space-y-2 md:space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
@@ -925,7 +924,6 @@ const handleSubmit = async () => {
             </div>
           </div>
         )}
-        </div>
         </div>
       </div>
     </div>
