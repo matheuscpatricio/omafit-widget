@@ -258,6 +258,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               ref={videoDesktopRef}
               loop
               playsInline
+              preload="metadata"
               disablePictureInPicture
               controlsList="nodownload nofullscreen noremoteplayback"
               className="hidden md:block w-full h-full object-cover"
@@ -272,6 +273,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               ref={videoMobileRef}
               loop
               playsInline
+              preload="metadata"
               disablePictureInPicture
               controlsList="nodownload nofullscreen noremoteplayback"
               className="md:hidden w-full h-full object-cover"
