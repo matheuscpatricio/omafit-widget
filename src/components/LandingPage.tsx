@@ -284,7 +284,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
             {/* Mobile: Initial Touch Message */}
             {!hasPlayedOnce && (
-              <div className="md:hidden absolute inset-0 flex items-center justify-center bg-black/40">
+              <div className="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center px-4">
                   <div className="bg-white/95 rounded-2xl px-6 py-4 shadow-2xl">
                     <Play className="w-8 h-8 text-[#810707] mx-auto mb-2" />
