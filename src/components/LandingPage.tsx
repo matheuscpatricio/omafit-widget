@@ -259,7 +259,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               className="hidden md:block w-full h-full object-cover"
             >
               <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Recursos%20Omafit%20Desktop.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvUmVjdXJzb3MgT21hZml0IERlc2t0b3AubXA0IiwiaWF0IjoxNzYzMjM2MDQxLCJleHAiOjQ5MTY4MzYwNDF9.49JO99CvlQbV19x48tpVYRtDvN_eirRPmzVsD13HJq8"
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/funcionalides.mp4"
                 type="video/mp4"
               />
             </video>
