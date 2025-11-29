@@ -273,7 +273,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               className="md:hidden w-full h-full object-cover"
             >
               <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/recursosomafitmobile.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvcmVjdXJzb3NvbWFmaXRtb2JpbGUubXA0IiwiaWF0IjoxNzYzMjM2MDc0LCJleHAiOjQ5MTY4MzYwNzR9.vGLkwP7lk8QbIZgATvNYP66TIWCcoKK-AlMhyHHxSV0"
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/funcionalides.mp4"
                 type="video/mp4"
               />
             </video>
