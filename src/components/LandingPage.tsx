@@ -17,9 +17,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
   const [showVideoControls, setShowVideoControls] = useState(false);
-  const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
   const videoDesktopRef = useRef<HTMLVideoElement>(null);
   const videoMobileRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -94,9 +93,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       } else {
         desktopVideo.play();
         mobileVideo.play();
-        if (!hasPlayedOnce) {
-          setHasPlayedOnce(true);
-        }
       }
       setIsVideoPlaying(!isVideoPlaying);
     }
@@ -256,6 +252,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl group">
             <video
               ref={videoDesktopRef}
+              autoPlay
+              muted
               loop
               playsInline
               preload="metadata"
@@ -271,6 +269,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
             <video
               ref={videoMobileRef}
+              autoPlay
+              muted
               loop
               playsInline
               preload="metadata"
@@ -283,20 +283,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 type="video/mp4"
               />
             </video>
-
-            {/* Mobile: Initial Touch Message */}
-            {!hasPlayedOnce && (
-              <div className="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center px-4">
-                  <div className="bg-white/95 rounded-2xl px-6 py-4 shadow-2xl">
-                    <Play className="w-8 h-8 text-[#810707] mx-auto mb-2" />
-                    <p className="text-gray-900 font-medium text-base">
-                      Toque para assistir o vídeo
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Custom Play/Pause Button */}
             <button
