@@ -259,7 +259,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               className="hidden md:block w-full h-full object-cover"
             >
               <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/funcionalides.mp4"
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
                 type="video/mp4"
               />
             </video>
@@ -273,7 +273,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               className="md:hidden w-full h-full object-cover"
             >
               <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/funcionalides.mp4"
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
                 type="video/mp4"
               />
             </video>
