@@ -253,7 +253,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <video
               ref={videoDesktopRef}
               autoPlay
-              muted
               loop
               playsInline
               preload="metadata"
@@ -270,7 +269,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <video
               ref={videoMobileRef}
               autoPlay
-              muted
               loop
               playsInline
               preload="metadata"
