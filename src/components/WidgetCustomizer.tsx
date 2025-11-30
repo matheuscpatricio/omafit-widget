@@ -24,7 +24,6 @@ export function WidgetCustomizer({ product, onClose }: WidgetCustomizerProps) {
       secondaryColor: '#06B6D4',
       textColor: '#1F2937',
       borderRadius: '12px',
-      fontFamily: 'Outfit, sans-serif',
       buttonStyle: 'gradient',
       showBrand: true,
       customCSS: '',
@@ -66,8 +65,7 @@ export function WidgetCustomizer({ product, onClose }: WidgetCustomizerProps) {
             secondaryColor: '#06B6D4',
             textColor: '#1F2937',
             borderRadius: '12px',
-            fontFamily: 'Outfit, sans-serif',
-            buttonStyle: 'gradient',
+                  buttonStyle: 'gradient',
             showBrand: true,
             customCSS: '',
             storeName: '',
@@ -219,7 +217,7 @@ Produto: ${product.name}
     'border-radius: ' + config.modalConfig.borderRadius + ';' +
     'cursor: pointer;' +
     'font-weight: 600;' +
-    'font-family: ' + config.modalConfig.fontFamily + ';' +
+    'font-family: inherit;' +
     'font-size: 16px;' +
     'transition: all 0.3s ease;' +
     'box-shadow: 0 4px 12px rgba(0,0,0,0.15);' +
@@ -328,7 +326,7 @@ Produto: ${product.name}
 
 <style>
   .omafit-widget-container {
-    font-family: ${modalConfig.fontFamily};
+    font-family: inherit;
   }
   
   .omafit-try-on-btn:focus {
@@ -416,24 +414,6 @@ Produto: ${product.name}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fonte do Widget
-                </label>
-                <select
-                  value={formData.modal_config.fontFamily}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    modal_config: { ...formData.modal_config, fontFamily: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="Outfit, sans-serif">Outfit (Atual)</option>
-                  <option value="'Playfair Display', serif">Playfair Display</option>
-                  <option value="Raleway, sans-serif">Raleway</option>
-                  <option value="'Google Sans', sans-serif">Google Sans</option>
-                </select>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

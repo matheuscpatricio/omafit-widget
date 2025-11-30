@@ -11,12 +11,11 @@ interface TryOnWidgetProps {
   storeName?: string;
   storeLogo?: string;
   primaryColor?: string;
-  fontFamily?: string;
   publicId?: string;
   productImages?: string[];
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit, sans-serif', publicId, productImages = [] }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', publicId, productImages = [] }: TryOnWidgetProps) {
 
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
@@ -390,7 +389,7 @@ const handleSubmit = async () => {
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Playfair+Display:wght@400..900&family=Raleway:wght@100..900&display=swap');
 
         * {
-          font-family: ${fontFamily} !important;
+          font-family: inherit !important;
         }
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
@@ -399,7 +398,7 @@ const handleSubmit = async () => {
         .hover\\:border-primary:hover { border-color: ${primaryColor} !important; }
         .focus\\:ring-primary:focus { --tw-ring-color: ${primaryColor} !important; }
       `}</style>
-      <div className={`w-full h-full bg-white overflow-hidden rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'} flex flex-col`} style={{ fontFamily }}>
+      <div className={`w-full h-full bg-white overflow-hidden rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'} flex flex-col`}>
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center justify-center relative">
@@ -415,7 +414,7 @@ const handleSubmit = async () => {
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor }}>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900" style={{ fontFamily }}>{storeName}</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{storeName}</h2>
             </div>
           )}
           {step !== 'info' && step !== 'processing' && step !== 'result' && (
@@ -481,8 +480,8 @@ const handleSubmit = async () => {
                   1
                 </div>
                 <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Calculadora de tamanho</h4>
-                  <p className="text-sm md:text-base text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>Informe suas medidas para descobrir o tamanho ideal</p>
+                  <h4 className="font-medium text-primary text-base md:text-lg">Calculadora de tamanho</h4>
+                  <p className="text-sm md:text-base text-gray-600">Informe suas medidas para descobrir o tamanho ideal</p>
                 </div>
               </div>
 
@@ -491,8 +490,8 @@ const handleSubmit = async () => {
                   2
                 </div>
                 <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Envie sua foto</h4>
-                  <p className="text-sm md:text-base text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>Corpo inteiro, de frente, sem obstáculos</p>
+                  <h4 className="font-medium text-primary text-base md:text-lg">Envie sua foto</h4>
+                  <p className="text-sm md:text-base text-gray-600">Corpo inteiro, de frente, sem obstáculos</p>
                 </div>
               </div>
 
@@ -501,8 +500,8 @@ const handleSubmit = async () => {
                   3
                 </div>
                 <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Veja o resultado</h4>
-                  <p className="text-sm md:text-base text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>IA mostra o produto em você + tamanho ideal</p>
+                  <h4 className="font-medium text-primary text-base md:text-lg">Veja o resultado</h4>
+                  <p className="text-sm md:text-base text-gray-600">IA mostra o produto em você + tamanho ideal</p>
                 </div>
               </div>
             </div>
@@ -515,7 +514,7 @@ const handleSubmit = async () => {
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
-            <p className="text-xs md:text-sm text-center text-gray-500 mt-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <p className="text-xs md:text-sm text-center text-gray-500 mt-3">
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
           </div>
@@ -543,10 +542,10 @@ const handleSubmit = async () => {
               {availableImages.length > 1 && (
                 <div className="mb-4">
                   <div className="text-center mb-3">
-                    <h4 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <h4 className="text-lg font-semibold text-gray-800">
                       Imagem do Produto
                     </h4>
-                    <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-sm text-gray-500">
                       (escolha uma imagem frontal do produto)
                     </p>
                   </div>
@@ -601,10 +600,10 @@ const handleSubmit = async () => {
               )}
 
               <div className="text-center mb-3">
-                <h3 className="text-2xl font-semibold text-primary mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <h3 className="text-2xl font-semibold text-primary mb-2">
                   Sua foto
                 </h3>
-                <p className="text-gray-600 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-gray-600 text-sm">
                   Para melhores resultados, siga as instruções
                 </p>
               </div>
@@ -613,8 +612,8 @@ const handleSubmit = async () => {
                 <div className="flex items-start gap-3">
                   <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <h4 className="font-medium text-blue-800 mb-2 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
-                    <ul className="text-sm text-blue-700 space-y-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <h4 className="font-medium text-blue-800 mb-2 text-sm">Instruções para sua foto:</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
                       <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
                       <li>• <strong>De frente</strong> - olhando para a câmera</li>
                       <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
@@ -630,8 +629,8 @@ const handleSubmit = async () => {
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
               >
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
-                <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-gray-600 mb-2 text-base">Clique para enviar sua foto</p>
+                <p className="text-sm text-gray-500">
                   JPG, PNG ou WEBP (máx. 5MB)
                 </p>
                 <input
@@ -649,10 +648,10 @@ const handleSubmit = async () => {
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
                 <div className="text-center mb-3">
-                  <h4 className="text-xl font-semibold text-gray-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <h4 className="text-xl font-semibold text-gray-800">
                     Imagem do Produto
                   </h4>
-                  <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <p className="text-sm text-gray-500">
                     (escolha uma imagem frontal do produto)
                   </p>
                 </div>
@@ -709,10 +708,10 @@ const handleSubmit = async () => {
               {/* Right Side: Photo Upload */}
               <div className="md:w-1/2 flex flex-col justify-center">
                 <div className="text-center mb-3">
-                  <h3 className="text-2xl font-semibold text-primary mb-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <h3 className="text-2xl font-semibold text-primary mb-1">
                     Sua foto
                   </h3>
-                  <p className="text-gray-600 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <p className="text-gray-600 text-sm">
                     Para melhores resultados, siga as instruções
                   </p>
                 </div>
@@ -721,8 +720,8 @@ const handleSubmit = async () => {
                   <div className="flex items-start gap-2">
                     <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-medium text-blue-800 mb-1 text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Instruções para sua foto:</h4>
-                      <ul className="text-sm text-blue-700 space-y-0.5" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                      <h4 className="font-medium text-blue-800 mb-1 text-sm">Instruções para sua foto:</h4>
+                      <ul className="text-sm text-blue-700 space-y-0.5">
                         <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
                         <li>• <strong>De frente</strong> - olhando para a câmera</li>
                         <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
@@ -738,8 +737,8 @@ const handleSubmit = async () => {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
                 >
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 mb-1 text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Clique para enviar sua foto</p>
-                  <p className="text-sm text-gray-500" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <p className="text-gray-600 mb-1 text-base">Clique para enviar sua foto</p>
+                  <p className="text-sm text-gray-500">
                     JPG, PNG ou WEBP (máx. 5MB)
                   </p>
                   <input
@@ -759,17 +758,17 @@ const handleSubmit = async () => {
         {step === 'confirm' && imagePreview && (
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
             <div className="text-center mb-3 md:mb-4">
-              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2">
                 Confirmar dados
               </h3>
-              <p className="text-gray-600 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              <p className="text-gray-600 text-sm md:text-base">
                 Verifique se está tudo correto antes de processar
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               <div className="bg-gray-50 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Produto:</h4>
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Produto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={selectedProductImage}
@@ -780,7 +779,7 @@ const handleSubmit = async () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Sua foto:</h4>
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Sua foto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={imagePreview}
@@ -814,14 +813,14 @@ const handleSubmit = async () => {
         {step === 'processing' && (
           <div className="text-center py-10 md:py-12 animate-fade-in">
             <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6"></div>
-            <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>
-            <p className="text-gray-600 mb-4 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <p className="text-gray-600 mb-4 text-sm md:text-base">
               Estamos criando seu try-on virtual. Isso pode levar até 1 minuto.
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
-              <p className="text-yellow-800 text-sm md:text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              <p className="text-yellow-800 text-sm md:text-base">
                  Tempo estimado: 20-40 segundos
               </p>
             </div>
@@ -835,7 +834,7 @@ const handleSubmit = async () => {
             <div className="md:hidden space-y-4">
               <div className="text-center">
                 <div className="flex items-center justify-center mb-4">
-                  <h3 className="text-2xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <h3 className="text-2xl font-semibold text-primary">
                     Sua prévia:
                   </h3>
                 </div>
@@ -849,19 +848,19 @@ const handleSubmit = async () => {
 
                 {calculatedSize && (
                   <div className="text-center mb-4">
-                    <p className="text-base text-gray-700 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-base text-gray-700 mb-2">
                       Seu tamanho ideal:
                     </p>
-                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor }}>
                       {calculatedSize}
                     </p>
-                    <p className="text-sm text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-sm text-gray-600">
                       Com base na sua altura, peso e tipo físico
                     </p>
                   </div>
                 )}
 
-                <p className="text-sm text-gray-900 mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-sm text-gray-900 mb-4">
                    Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
@@ -880,7 +879,7 @@ const handleSubmit = async () => {
               {/* Left Side: Image */}
               <div className="md:w-1/2">
                 <div className="mb-3">
-                  <h3 className="text-2xl font-semibold text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  <h3 className="text-2xl font-semibold text-primary">
                     Sua prévia:
                   </h3>
                 </div>
@@ -897,19 +896,19 @@ const handleSubmit = async () => {
               <div className="md:w-1/2 flex flex-col justify-center space-y-4">
                 {calculatedSize && (
                   <div className="text-center">
-                    <p className="text-base text-gray-700 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-base text-gray-700 mb-2">
                       Seu tamanho ideal:
                     </p>
-                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor, fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor }}>
                       {calculatedSize}
                     </p>
-                    <p className="text-sm text-gray-600" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <p className="text-sm text-gray-600">
                       Com base na sua altura, peso e tipo físico
                     </p>
                   </div>
                 )}
 
-                <p className="text-base text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                <p className="text-base text-gray-900">
                   Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>

@@ -9,7 +9,6 @@ export function WidgetPage() {
   const [storeName, setStoreName] = useState<string>('Omafit');
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
-  const [fontFamily, setFontFamily] = useState<string>('Outfit, sans-serif');
   const [publicId, setPublicId] = useState<string>('');
 
   useEffect(() => {
@@ -60,9 +59,6 @@ export function WidgetPage() {
         if (config.primaryColor) {
           setPrimaryColor(config.primaryColor);
         }
-        if (config.fontFamily) {
-          setFontFamily(config.fontFamily);
-        }
       } catch (error) {
         console.error('Error parsing config:', error);
       }
@@ -74,7 +70,7 @@ export function WidgetPage() {
       <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-lg">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707] mx-auto mb-4"></div>
-          <p className="text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>Carregando produto...</p>
+          <p className="text-gray-600">Carregando produto...</p>
         </div>
       </div>
     );
@@ -91,7 +87,6 @@ export function WidgetPage() {
           storeName={storeName}
           storeLogo={storeLogo}
           primaryColor={primaryColor}
-          fontFamily={fontFamily}
           publicId={publicId}
         />
       </div>
