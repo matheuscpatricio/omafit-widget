@@ -14,7 +14,6 @@ export function WidgetGeneratorPage() {
   const [popupColor, setPopupColor] = useState('#810707');
   const [storeName, setStoreName] = useState('');
   const [storeLogo, setStoreLogo] = useState('');
-  const [fontFamily, setFontFamily] = useState('Outfit, sans-serif');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -29,22 +28,6 @@ export function WidgetGeneratorPage() {
   const [result, setResult] = useState<string | null>(null);
   const [copiedResult, setCopiedResult] = useState(false);
 
-  const colorOptions = [
-    { name: 'Vermelho', value: '#810707' },
-    { name: 'Preto', value: '#000000' },
-    { name: 'Azul', value: '#1E40AF' },
-    { name: 'Rosa', value: '#DB2777' },
-    { name: 'Bege', value: '#A16B4E' },
-    { name: 'Verde', value: '#047857' },
-  ];
-
-  const fontOptions = [
-    { name: 'Outfit (Padrão)', value: 'Outfit, sans-serif' },
-    { name: 'Playfair Display', value: '\'Playfair Display\', serif' },
-    { name: 'Raleway', value: 'Raleway, sans-serif' },
-    { name: 'Google Sans', value: '\'Google Sans\', sans-serif' },
-    { name: 'Inter', value: 'Inter, sans-serif' },
-  ];
 
   useEffect(() => {
     if (user) {
@@ -74,7 +57,6 @@ export function WidgetGeneratorPage() {
         if (config.popup_color) setPopupColor(config.popup_color);
         if (config.store_name) setStoreName(config.store_name);
         if (config.store_logo) setStoreLogo(config.store_logo);
-        if (config.font_family) setFontFamily(config.font_family);
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -93,7 +75,6 @@ export function WidgetGeneratorPage() {
           popup_color: popupColor,
           store_name: storeName,
           store_logo: storeLogo,
-          font_family: fontFamily,
         })
         .eq('user_id', user.id)
         .eq('status', 'active');
@@ -113,7 +94,7 @@ export function WidgetGeneratorPage() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [linkText, linkColor, popupColor, storeName, storeLogo, fontFamily]);
+  }, [linkText, linkColor, popupColor, storeName, storeLogo]);
 
   // Inject widget into test div when publicId is ready
   useEffect(() => {
@@ -136,7 +117,7 @@ export function WidgetGeneratorPage() {
         document.body.appendChild(newScript);
       });
     }
-  }, [publicId, linkText, linkColor, popupColor, storeName, storeLogo, fontFamily]);
+  }, [publicId, linkText, linkColor, popupColor, storeName, storeLogo]);
 
   const loadOrCreateWidgetKey = async () => {
     if (!user) return;
@@ -439,7 +420,6 @@ export function WidgetGeneratorPage() {
     linkText: '${linkText.replace(/'/g, "\\'")}',
     storeName: '${storeName.replace(/'/g, "\\'")}',
     storeLogo: '${storeLogo.replace(/'/g, "\\'")}',
-    fontFamily: '${fontFamily.replace(/'/g, "\\'")}',
     colors: {
       primary: '${popupColor}',
       background: '#ffffff',
@@ -490,8 +470,7 @@ export function WidgetGeneratorPage() {
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
       primaryColor: OMAFIT_CONFIG.colors.primary,
-      storeLogo: OMAFIT_CONFIG.storeLogo,
-      fontFamily: OMAFIT_CONFIG.fontFamily
+      storeLogo: OMAFIT_CONFIG.storeLogo
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
       '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +
@@ -1069,37 +1048,6 @@ export function WidgetGeneratorPage() {
               )}
             </div>
 
-            <div>
-              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                Fonte do Widget
-              </label>
-              <div className="space-y-2">
-                {fontOptions.map((font) => (
-                  <button
-                    key={font.value}
-                    onClick={() => setFontFamily(font.value)}
-                    className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                      fontFamily === font.value
-                        ? 'border-[#810707] bg-red-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{font.name}</span>
-                      <span
-                        className="text-base"
-                        style={{ fontFamily: font.value }}
-                      >
-                        Exemplo Aa
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Define a tipografia usada no widget
-              </p>
-            </div>
 
             <div>
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
@@ -1118,50 +1066,50 @@ export function WidgetGeneratorPage() {
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Cor do Texto do Link
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setLinkColor(color.value)}
-                    className={`p-3 border-2 rounded-lg flex items-center gap-2 transition-all ${
-                      linkColor === color.value
-                        ? 'border-gray-800 bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div
-                      className="w-6 h-6 rounded-full border border-gray-300"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    <span className="text-sm font-medium text-gray-700">{color.name}</span>
-                  </button>
-                ))}
+              <div className="flex items-center gap-4">
+                <input
+                  type="color"
+                  value={linkColor}
+                  onChange={(e) => setLinkColor(e.target.value)}
+                  className="w-20 h-12 border border-gray-300 rounded-lg cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={linkColor}
+                  onChange={(e) => setLinkColor(e.target.value)}
+                  placeholder="#810707"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent uppercase"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Escolha a cor visualmente ou insira o código hex (ex: #810707)
+              </p>
             </div>
 
             <div>
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Cor Predominante do Pop-up
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setPopupColor(color.value)}
-                    className={`p-3 border-2 rounded-lg flex items-center gap-2 transition-all ${
-                      popupColor === color.value
-                        ? 'border-gray-800 bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div
-                      className="w-6 h-6 rounded-full border border-gray-300"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    <span className="text-sm font-medium text-gray-700">{color.name}</span>
-                  </button>
-                ))}
+              <div className="flex items-center gap-4">
+                <input
+                  type="color"
+                  value={popupColor}
+                  onChange={(e) => setPopupColor(e.target.value)}
+                  className="w-20 h-12 border border-gray-300 rounded-lg cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={popupColor}
+                  onChange={(e) => setPopupColor(e.target.value)}
+                  placeholder="#810707"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent uppercase"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Escolha a cor visualmente ou insira o código hex (ex: #810707)
+              </p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -1177,7 +1125,7 @@ export function WidgetGeneratorPage() {
                 </a>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                * O link herda automaticamente a tipografia do tema da sua loja
+                * O link e o widget herdam automaticamente a tipografia do tema da sua loja
               </p>
             </div>
           </div>
