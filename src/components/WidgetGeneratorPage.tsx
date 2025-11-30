@@ -444,20 +444,20 @@ export function WidgetGeneratorPage() {
     const tryOnLink = document.querySelector('.omafit-try-on-link');
     let linkFont = 'inherit';
     let fontWeight = 'inherit';
-    let fontSize = 'inherit';
+    let fontStyle = 'normal';
 
     if (tryOnLink) {
       const computedStyle = window.getComputedStyle(tryOnLink);
       linkFont = computedStyle.fontFamily;
       fontWeight = computedStyle.fontWeight;
-      fontSize = computedStyle.fontSize;
-      console.log('🔤 Fonte capturada do link:', { fontFamily: linkFont, fontWeight, fontSize });
+      fontStyle = computedStyle.fontStyle;
+      console.log('🔤 Fonte capturada do link:', { fontFamily: linkFont, fontWeight, fontStyle });
     } else {
       const bodyStyle = window.getComputedStyle(document.body);
       linkFont = bodyStyle.fontFamily;
       fontWeight = bodyStyle.fontWeight;
-      fontSize = bodyStyle.fontSize;
-      console.log('🔤 Fonte capturada do body:', { fontFamily: linkFont, fontWeight, fontSize });
+      fontStyle = bodyStyle.fontStyle;
+      console.log('🔤 Fonte capturada do body:', { fontFamily: linkFont, fontWeight, fontStyle });
     }
 
     // Obter todas as imagens do produto dos dados do Shopify
@@ -496,7 +496,7 @@ export function WidgetGeneratorPage() {
       storeLogo: OMAFIT_CONFIG.storeLogo,
       fontFamily: linkFont,
       fontWeight: fontWeight,
-      fontSize: fontSize
+      fontStyle: fontStyle
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
       '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +
