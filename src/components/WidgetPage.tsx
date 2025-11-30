@@ -11,7 +11,7 @@ export function WidgetPage() {
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
   const [fontFamily, setFontFamily] = useState<string>('');
   const [fontWeight, setFontWeight] = useState<string>('');
-  const [fontSize, setFontSize] = useState<string>('');
+  const [fontStyle, setFontStyle] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
 
   useEffect(() => {
@@ -69,8 +69,8 @@ export function WidgetPage() {
         if (config.fontWeight) {
           setFontWeight(config.fontWeight);
         }
-        if (config.fontSize) {
-          setFontSize(config.fontSize);
+        if (config.fontStyle) {
+          setFontStyle(config.fontStyle);
         }
       } catch (error) {
         console.error('Error parsing config:', error);
@@ -102,7 +102,7 @@ export function WidgetPage() {
           primaryColor={primaryColor}
           fontFamily={fontFamily}
           fontWeight={fontWeight}
-          fontSize={fontSize}
+          fontStyle={fontStyle}
           publicId={publicId}
         />
       </div>
