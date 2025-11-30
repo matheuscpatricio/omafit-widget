@@ -386,6 +386,8 @@ const handleSubmit = async () => {
 
   const displayImage = step === 'photo' ? selectedProductImage : product.garment_image;
 
+  console.log('🎨 Estilos aplicados no widget:', { fontFamily, fontWeight, fontStyle });
+
   return (
     <>
       <style>{`
@@ -394,7 +396,11 @@ const handleSubmit = async () => {
         * {
           font-family: ${fontFamily} !important;
           font-weight: ${fontWeight} !important;
-          font-style: ${fontStyle} !important;
+          font-style: normal !important;
+        }
+
+        em, i, cite, var, address, dfn {
+          font-style: normal !important;
         }
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
