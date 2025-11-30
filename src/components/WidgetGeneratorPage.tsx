@@ -45,6 +45,8 @@ export function WidgetGeneratorPage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -87,7 +89,7 @@ export function WidgetGeneratorPage() {
   };
 
   useEffect(() => {
-    if (publicId && linkText && linkColor && popupColor && fontFamily) {
+    if (publicId && linkText && linkColor && popupColor) {
       const timeoutId = setTimeout(() => {
         saveWidgetConfig();
       }, 1000);
