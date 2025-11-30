@@ -440,6 +440,10 @@ export function WidgetGeneratorPage() {
       return;
     }
 
+    // Capturar a fonte do link "Experimentar virtualmente"
+    const tryOnLink = document.querySelector('.omafit-try-on-link');
+    const linkFont = tryOnLink ? window.getComputedStyle(tryOnLink).fontFamily : window.getComputedStyle(document.body).fontFamily;
+
     // Obter todas as imagens do produto dos dados do Shopify
     const allProductImages = await getOnlyProductImages();
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
@@ -470,14 +474,11 @@ export function WidgetGeneratorPage() {
     // Criar iframe do widget com a imagem do produto
     const iframe = document.createElement('iframe');
 
-    // Capturar a fonte da página da loja
-    const bodyFont = window.getComputedStyle(document.body).fontFamily;
-
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
       primaryColor: OMAFIT_CONFIG.colors.primary,
       storeLogo: OMAFIT_CONFIG.storeLogo,
-      fontFamily: bodyFont
+      fontFamily: linkFont
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
       '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +
