@@ -10,6 +10,8 @@ export function WidgetPage() {
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
   const [fontFamily, setFontFamily] = useState<string>('');
+  const [fontWeight, setFontWeight] = useState<string>('');
+  const [fontSize, setFontSize] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function WidgetPage() {
     if (configParam) {
       try {
         const config = JSON.parse(decodeURIComponent(configParam));
+        console.log('📦 Config recebido no widget:', config);
         if (config.storeName) {
           setStoreName(config.storeName);
         }
@@ -62,6 +65,12 @@ export function WidgetPage() {
         }
         if (config.fontFamily) {
           setFontFamily(config.fontFamily);
+        }
+        if (config.fontWeight) {
+          setFontWeight(config.fontWeight);
+        }
+        if (config.fontSize) {
+          setFontSize(config.fontSize);
         }
       } catch (error) {
         console.error('Error parsing config:', error);
@@ -92,6 +101,8 @@ export function WidgetPage() {
           storeLogo={storeLogo}
           primaryColor={primaryColor}
           fontFamily={fontFamily}
+          fontWeight={fontWeight}
+          fontSize={fontSize}
           publicId={publicId}
         />
       </div>
