@@ -11,11 +11,12 @@ interface TryOnWidgetProps {
   storeName?: string;
   storeLogo?: string;
   primaryColor?: string;
+  fontFamily?: string;
   publicId?: string;
   productImages?: string[];
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', publicId, productImages = [] }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'inherit', publicId, productImages = [] }: TryOnWidgetProps) {
 
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
@@ -389,7 +390,7 @@ const handleSubmit = async () => {
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Playfair+Display:wght@400..900&family=Raleway:wght@100..900&display=swap');
 
         * {
-          font-family: inherit !important;
+          font-family: ${fontFamily} !important;
         }
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
