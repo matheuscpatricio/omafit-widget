@@ -469,10 +469,15 @@ export function WidgetGeneratorPage() {
 
     // Criar iframe do widget com a imagem do produto
     const iframe = document.createElement('iframe');
+
+    // Capturar a fonte da página da loja
+    const bodyFont = window.getComputedStyle(document.body).fontFamily;
+
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
       primaryColor: OMAFIT_CONFIG.colors.primary,
-      storeLogo: OMAFIT_CONFIG.storeLogo
+      storeLogo: OMAFIT_CONFIG.storeLogo,
+      fontFamily: bodyFont
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
       '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +

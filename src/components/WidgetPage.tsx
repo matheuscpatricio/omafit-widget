@@ -9,6 +9,7 @@ export function WidgetPage() {
   const [storeName, setStoreName] = useState<string>('Omafit');
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
+  const [fontFamily, setFontFamily] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
 
   useEffect(() => {
@@ -59,6 +60,9 @@ export function WidgetPage() {
         if (config.primaryColor) {
           setPrimaryColor(config.primaryColor);
         }
+        if (config.fontFamily) {
+          setFontFamily(config.fontFamily);
+        }
       } catch (error) {
         console.error('Error parsing config:', error);
       }
@@ -77,7 +81,7 @@ export function WidgetPage() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4">
+    <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>
       <div className="w-full sm:max-w-2xl max-h-[85vh] overflow-auto">
         <TryOnWidget
           garmentImage={productImage}
