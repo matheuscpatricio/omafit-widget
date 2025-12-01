@@ -148,7 +148,9 @@ export function PlanCalculator() {
                   Ver Detalhes do Plano
                 </button>
                 <a
-                  href="#"
+                  href="https://wa.me/5573991391471"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex-1 bg-gray-100 text-gray-900 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-200 transition-all font-semibold text-center text-sm sm:text-base"
                 >
                   Falar com Especialista

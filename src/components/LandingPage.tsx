@@ -679,7 +679,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               style={{ pointerEvents: 'none' }}
             >
               <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/sign/Video%20banner/Omafit.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZmNjMjUzNy1jNTJhLTQ1M2UtODdkYy1kNDVmYzRlZmNhZjEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlbyBiYW5uZXIvT21hZml0Lm1wNCIsImlhdCI6MTc2MDYzMTM5MCwiZXhwIjo0OTE0MjMxMzkwfQ.7L2glLT1JydZkigq2J-jdrp-PtWUV_yHVW8MFznYBRk"
+                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/Omafit.mp4"
                 type="video/mp4"
               />
             </video>
