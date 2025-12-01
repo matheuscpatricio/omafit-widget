@@ -83,13 +83,32 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         return;
       }
 
-      console.log('📊 Carregando size chart para gender:', sizeData.gender);
+      if (!publicId) {
+        console.log('⚠️ Não há publicId para buscar size chart');
+        return;
+      }
+
+      console.log('📊 Carregando size chart para gender:', sizeData.gender, 'publicId:', publicId);
 
       try {
+        const { data: widgetKey } = await supabase
+          .from('widget_keys')
+          .select('user_id')
+          .eq('public_id', publicId)
+          .maybeSingle();
+
+        if (!widgetKey) {
+          console.log('❌ Widget key não encontrada para publicId:', publicId);
+          return;
+        }
+
+        console.log('👤 User ID do widget:', widgetKey.user_id);
+
         const { data: charts } = await supabase
           .from('size_charts')
           .select('id')
           .eq('gender', sizeData.gender)
+          .eq('user_id', widgetKey.user_id)
           .limit(1)
           .maybeSingle();
 
@@ -109,7 +128,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             console.log('✅ Size chart definido com', entries.length, 'entries');
           }
         } else {
-          console.log('❌ Nenhum chart encontrado para gender:', sizeData.gender);
+          console.log('❌ Nenhum chart encontrado para gender:', sizeData.gender, 'user_id:', widgetKey.user_id);
         }
       } catch (error) {
         console.error('❌ Error loading size chart:', error);
@@ -117,7 +136,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender]);
+  }, [sizeData?.gender, publicId]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
