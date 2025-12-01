@@ -78,7 +78,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   useEffect(() => {
     const loadSizeChart = async () => {
-      if (!sizeData?.gender) return;
+      if (!sizeData?.gender) {
+        console.log('⚠️ Não há gender no sizeData:', sizeData);
+        return;
+      }
+
+      console.log('📊 Carregando size chart para gender:', sizeData.gender);
 
       try {
         const { data: charts } = await supabase
@@ -88,6 +93,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           .limit(1)
           .maybeSingle();
 
+        console.log('📊 Charts encontrados:', charts);
+
         if (charts) {
           const { data: entries } = await supabase
             .from('size_chart_entries')
@@ -95,12 +102,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             .eq('size_chart_id', charts.id)
             .order('order');
 
+          console.log('📊 Entries encontradas:', entries?.length);
+
           if (entries) {
             setSizeChart(entries);
+            console.log('✅ Size chart definido com', entries.length, 'entries');
           }
+        } else {
+          console.log('❌ Nenhum chart encontrado para gender:', sizeData.gender);
         }
       } catch (error) {
-        console.error('Error loading size chart:', error);
+        console.error('❌ Error loading size chart:', error);
       }
     };
 
@@ -260,6 +272,7 @@ const handleSubmit = async () => {
             setResult(imageUrl);
 
           if (sizeData && sizeChart.length > 0) {
+            console.log('📏 Calculando tamanho com dados:', { sizeData, sizeChartLength: sizeChart.length });
             const sizeResult = calculateIdealSize(
               sizeData.height,
               sizeData.weight,
@@ -267,9 +280,15 @@ const handleSubmit = async () => {
               sizeData.fit,
               sizeChart
             );
+            console.log('📏 Resultado do cálculo:', sizeResult);
             if (sizeResult) {
               setCalculatedSize(sizeResult.size);
+              console.log('✅ Tamanho definido:', sizeResult.size);
+            } else {
+              console.log('❌ Nenhum resultado do cálculo');
             }
+          } else {
+            console.log('⚠️ Cálculo não realizado - sizeData:', sizeData, 'sizeChart.length:', sizeChart?.length);
           }
 
             console.log('🎯 Setting step to result, loading to false');
