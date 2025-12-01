@@ -104,13 +104,29 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
         console.log('👤 User ID do widget:', widgetKey.user_id);
 
-        const { data: charts } = await supabase
+        let { data: charts } = await supabase
           .from('size_charts')
           .select('id')
           .eq('gender', sizeData.gender)
           .eq('user_id', widgetKey.user_id)
           .limit(1)
           .maybeSingle();
+
+        if (!charts) {
+          console.log('📊 Chart específico não encontrado, tentando unisex...');
+          const { data: unisexChart } = await supabase
+            .from('size_charts')
+            .select('id')
+            .eq('gender', 'unisex')
+            .eq('user_id', widgetKey.user_id)
+            .limit(1)
+            .maybeSingle();
+
+          charts = unisexChart;
+          if (charts) {
+            console.log('✅ Usando size chart unisex como fallback');
+          }
+        }
 
         console.log('📊 Charts encontrados:', charts);
 
@@ -128,7 +144,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             console.log('✅ Size chart definido com', entries.length, 'entries');
           }
         } else {
-          console.log('❌ Nenhum chart encontrado para gender:', sizeData.gender, 'user_id:', widgetKey.user_id);
+          console.log('❌ Nenhum chart encontrado (nem específico nem unisex) para user_id:', widgetKey.user_id);
         }
       } catch (error) {
         console.error('❌ Error loading size chart:', error);
