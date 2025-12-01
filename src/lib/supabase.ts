@@ -3,11 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('🔧 Configuração Supabase DETALHADA:', {
-  url: supabaseUrl,
+console.log('🔧 Configuração Supabase:', {
   urlValid: supabaseUrl?.includes('supabase.co'),
-  anonKeyLength: supabaseAnonKey?.length || 0,
-  anonKeyPrefix: supabaseAnonKey?.substring(0, 20) + '...',
   hasUrl: !!supabaseUrl,
   hasKey: !!supabaseAnonKey,
   environment: import.meta.env.MODE
