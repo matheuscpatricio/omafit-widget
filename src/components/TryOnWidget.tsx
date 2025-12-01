@@ -91,24 +91,21 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       console.log('📊 Carregando size chart para gender:', sizeData.gender, 'publicId:', publicId);
 
       try {
-        const { data: widgetKey } = await supabase
-          .from('widget_keys')
-          .select('user_id')
-          .eq('public_id', publicId)
-          .maybeSingle();
+        const { data: userId, error: rpcError } = await supabase
+          .rpc('get_widget_user_id', { p_public_id: publicId });
 
-        if (!widgetKey) {
-          console.log('❌ Widget key não encontrada para publicId:', publicId);
+        if (rpcError || !userId) {
+          console.log('❌ Widget key não encontrada para publicId:', publicId, rpcError);
           return;
         }
 
-        console.log('👤 User ID do widget:', widgetKey.user_id);
+        console.log('👤 User ID do widget:', userId);
 
         let { data: charts } = await supabase
           .from('size_charts')
           .select('id')
           .eq('gender', sizeData.gender)
-          .eq('user_id', widgetKey.user_id)
+          .eq('user_id', userId)
           .limit(1)
           .maybeSingle();
 
@@ -118,7 +115,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             .from('size_charts')
             .select('id')
             .eq('gender', 'unisex')
-            .eq('user_id', widgetKey.user_id)
+            .eq('user_id', userId)
             .limit(1)
             .maybeSingle();
 
@@ -144,7 +141,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             console.log('✅ Size chart definido com', entries.length, 'entries');
           }
         } else {
-          console.log('❌ Nenhum chart encontrado (nem específico nem unisex) para user_id:', widgetKey.user_id);
+          console.log('❌ Nenhum chart encontrado (nem específico nem unisex) para user_id:', userId);
         }
       } catch (error) {
         console.error('❌ Error loading size chart:', error);
