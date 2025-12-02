@@ -490,7 +490,7 @@ export function AdvancedAnalytics() {
       <div>
         <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <Users className="w-6 h-6 text-[#810707]" />
-          Métricas de Usuários
+          Métricas de Uso
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-xl shadow-sm border p-6">
