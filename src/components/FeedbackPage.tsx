@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 export function FeedbackPage() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     subject: '',
-    message: '',
-    name: '',
-    email: ''
+    message: ''
   });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -24,8 +24,13 @@ export function FeedbackPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.subject || !formData.message || !formData.name || !formData.email) {
+    if (!formData.subject || !formData.message) {
       alert('Por favor, preencha todos os campos');
+      return;
+    }
+
+    if (!user?.email) {
+      alert('Erro: usuário não autenticado');
       return;
     }
 
@@ -33,8 +38,7 @@ export function FeedbackPage() {
 
     try {
       const emailBody = `
-Nome: ${formData.name}
-Email: ${formData.email}
+Email: ${user.email}
 Assunto: ${formData.subject}
 
 Mensagem:
@@ -48,9 +52,7 @@ ${formData.message}
       setSent(true);
       setFormData({
         subject: '',
-        message: '',
-        name: '',
-        email: ''
+        message: ''
       });
 
       setTimeout(() => setSent(false), 5000);
@@ -93,39 +95,13 @@ ${formData.message}
           </div>
         )}
 
+        <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <p className="text-sm text-gray-700">
+            <strong>Enviando como:</strong> {user?.email}
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Nome
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Seu nome"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="seu@email.com"
-              required
-            />
-          </div>
-
           <div>
             <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
               Assunto
