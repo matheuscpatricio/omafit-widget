@@ -52,6 +52,15 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   useEffect(() => {
     setIsVisible(true);
+
+    try {
+      const parentFont = window.parent.getComputedStyle(window.parent.document.body).fontFamily;
+      if (parentFont && parentFont !== 'inherit') {
+        document.body.style.fontFamily = parentFont;
+      }
+    } catch (e) {
+      console.warn('Não foi possível puxar a fonte do parent:', e);
+    }
   }, []);
 
   React.useEffect(() => {
@@ -442,16 +451,14 @@ const handleSubmit = async () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Playfair+Display:wght@400..900&family=Raleway:wght@100..900&display=swap');
-
         * {
-          font-family: ${fontFamily} !important;
-          font-weight: ${fontWeight} !important;
-          font-style: normal !important;
+          font-family: inherit !important;
+          font-weight: inherit !important;
+          font-style: inherit !important;
         }
 
         em, i, cite, var, address, dfn {
-          font-style: normal !important;
+          font-style: inherit !important;
         }
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
