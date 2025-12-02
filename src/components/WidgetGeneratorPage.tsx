@@ -1125,20 +1125,25 @@ export function WidgetGeneratorPage() {
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Fonte do Widget
               </label>
+              <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400&family=Playfair+Display:wght@400&family=Raleway:wght@400&family=Inter:wght@400&family=Roboto:wght@400&family=Open+Sans:wght@400&family=Montserrat:wght@400&family=Lato:wght@400&family=Poppins:wght@400&display=swap');
+                .font-selector option { padding: 8px 0; }
+              `}</style>
               <select
                 value={selectedFont}
                 onChange={(e) => setSelectedFont(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
+                className="font-selector w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent text-base"
+                style={{ fontFamily: selectedFont }}
               >
-                <option value="Outfit">Outfit</option>
-                <option value="Playfair Display">Playfair Display</option>
-                <option value="Raleway">Raleway</option>
-                <option value="Inter">Inter</option>
-                <option value="Roboto">Roboto</option>
-                <option value="Open Sans">Open Sans</option>
-                <option value="Montserrat">Montserrat</option>
-                <option value="Lato">Lato</option>
-                <option value="Poppins">Poppins</option>
+                <option value="Outfit" style={{ fontFamily: 'Outfit, sans-serif' }}>Outfit</option>
+                <option value="Playfair Display" style={{ fontFamily: 'Playfair Display, serif' }}>Playfair Display</option>
+                <option value="Raleway" style={{ fontFamily: 'Raleway, sans-serif' }}>Raleway</option>
+                <option value="Inter" style={{ fontFamily: 'Inter, sans-serif' }}>Inter</option>
+                <option value="Roboto" style={{ fontFamily: 'Roboto, sans-serif' }}>Roboto</option>
+                <option value="Open Sans" style={{ fontFamily: 'Open Sans, sans-serif' }}>Open Sans</option>
+                <option value="Montserrat" style={{ fontFamily: 'Montserrat, sans-serif' }}>Montserrat</option>
+                <option value="Lato" style={{ fontFamily: 'Lato, sans-serif' }}>Lato</option>
+                <option value="Poppins" style={{ fontFamily: 'Poppins, sans-serif' }}>Poppins</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
                 Selecione a fonte que será usada em todo o widget
