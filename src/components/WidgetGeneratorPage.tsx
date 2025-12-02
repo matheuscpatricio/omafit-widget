@@ -1121,7 +1121,7 @@ export function WidgetGeneratorPage() {
                 </a>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                * O link e o widget herdam automaticamente a tipografia do tema da sua loja
+                * O link herda automaticamente a tipografia do tema da sua loja
               </p>
             </div>
           </div>
