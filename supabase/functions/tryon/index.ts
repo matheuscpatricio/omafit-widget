@@ -184,6 +184,7 @@ Deno.serve(async (req: Request) => {
           product_id,
           customer_email: clientIp,
           model_image,
+          user_id: widgetKeyData.user_id,
           fashn_status: 'processing',
           session_start_time: sessionStartTime,
           processing_start_time: sessionStartTime,
