@@ -53,15 +53,45 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   useEffect(() => {
     setIsVisible(true);
 
-    try {
-      const storeFont = window.parent.getComputedStyle(window.parent.document.body).fontFamily;
-      if (storeFont && storeFont !== 'inherit') {
-        document.documentElement.style.setProperty('--omafit-font', storeFont);
-        document.body.style.fontFamily = storeFont;
+    function applyStoreFont() {
+      try {
+        let parentFont = null;
+
+        if (window.frameElement && window.frameElement.dataset && window.frameElement.dataset.font) {
+          parentFont = window.frameElement.dataset.font;
+          console.log('✅ Fonte extraída do data-font do iframe:', parentFont);
+        } else {
+          const storeFont = window.parent.getComputedStyle(window.parent.document.body).fontFamily;
+          if (storeFont && storeFont !== 'inherit') {
+            parentFont = storeFont;
+            console.log('✅ Fonte extraída do parent.document.body:', parentFont);
+          }
+        }
+
+        if (parentFont) {
+          document.documentElement.style.setProperty('--omafit-font', parentFont);
+          document.body.style.fontFamily = parentFont;
+
+          const firstFontName = parentFont.split(',')[0].trim().replace(/['"]/g, '');
+
+          if (firstFontName && !firstFontName.includes('system-ui') && !firstFontName.includes('sans-serif') && !firstFontName.includes('serif')) {
+            const fontLink = document.createElement('link');
+            fontLink.rel = 'stylesheet';
+            fontLink.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(firstFontName)}:wght@400;500;600;700&display=swap`;
+            document.head.appendChild(fontLink);
+            console.log('🔤 Importando fonte do Google Fonts:', firstFontName);
+          }
+
+          const style = document.createElement('style');
+          style.textContent = `* { font-family: var(--omafit-font), sans-serif !important; }`;
+          document.head.appendChild(style);
+        }
+      } catch (e) {
+        console.warn('Não foi possível puxar a fonte do parent:', e);
       }
-    } catch (e) {
-      console.warn('Não foi possível puxar a fonte do parent:', e);
     }
+
+    applyStoreFont();
   }, []);
 
   React.useEffect(() => {
@@ -452,19 +482,6 @@ const handleSubmit = async () => {
   return (
     <>
       <style>{`
-        :root {
-          --omafit-font: inherit;
-        }
-
-        * {
-          font-family: var(--omafit-font, inherit) !important;
-          font-weight: inherit !important;
-          font-style: inherit !important;
-        }
-
-        em, i, cite, var, address, dfn {
-          font-style: inherit !important;
-        }
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
         .border-primary { border-color: ${primaryColor} !important; }

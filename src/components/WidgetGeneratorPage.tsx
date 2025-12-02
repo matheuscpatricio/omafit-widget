@@ -487,8 +487,12 @@ export function WidgetGeneratorPage() {
       'transition: all 0.4s ease-in-out;' +
       'opacity: 0;';
 
+    // Extrair fonte da loja antes de criar o iframe
+    const storeFont = window.getComputedStyle(document.body).fontFamily;
+
     // Criar iframe do widget com a imagem do produto
     const iframe = document.createElement('iframe');
+    iframe.dataset.font = storeFont;
 
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
