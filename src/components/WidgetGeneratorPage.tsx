@@ -14,6 +14,7 @@ export function WidgetGeneratorPage() {
   const [popupColor, setPopupColor] = useState('#810707');
   const [storeName, setStoreName] = useState('');
   const [storeLogo, setStoreLogo] = useState('');
+  const [selectedFont, setSelectedFont] = useState('Outfit');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -59,6 +60,7 @@ export function WidgetGeneratorPage() {
         if (config.popup_color) setPopupColor(config.popup_color);
         if (config.store_name) setStoreName(config.store_name);
         if (config.store_logo) setStoreLogo(config.store_logo);
+        if (config.font_family) setSelectedFont(config.font_family);
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -77,6 +79,7 @@ export function WidgetGeneratorPage() {
           popup_color: popupColor,
           store_name: storeName,
           store_logo: storeLogo,
+          font_family: selectedFont,
         })
         .eq('user_id', user.id)
         .eq('status', 'active');
@@ -119,7 +122,7 @@ export function WidgetGeneratorPage() {
         document.body.appendChild(newScript);
       });
     }
-  }, [publicId, linkText, linkColor, popupColor, storeName, storeLogo]);
+  }, [publicId, linkText, linkColor, popupColor, storeName, storeLogo, selectedFont]);
 
   const loadOrCreateWidgetKey = async () => {
     if (!user) return;
@@ -422,6 +425,7 @@ export function WidgetGeneratorPage() {
     linkText: '${linkText.replace(/'/g, "\\'")}',
     storeName: '${storeName.replace(/'/g, "\\'")}',
     storeLogo: '${storeLogo.replace(/'/g, "\\'")}',
+    fontFamily: '${selectedFont.replace(/'/g, "\\'")}',
     colors: {
       primary: '${popupColor}',
       background: '#ffffff',
@@ -440,25 +444,6 @@ export function WidgetGeneratorPage() {
       return;
     }
 
-    // Capturar a fonte completa do link "Experimentar virtualmente"
-    const tryOnLink = document.querySelector('.omafit-try-on-link');
-    let linkFont = 'inherit';
-    let fontWeight = 'inherit';
-    let fontStyle = 'normal';
-
-    if (tryOnLink) {
-      const computedStyle = window.getComputedStyle(tryOnLink);
-      linkFont = computedStyle.fontFamily;
-      fontWeight = computedStyle.fontWeight;
-      fontStyle = computedStyle.fontStyle;
-      console.log('🔤 Fonte capturada do link:', { fontFamily: linkFont, fontWeight, fontStyle });
-    } else {
-      const bodyStyle = window.getComputedStyle(document.body);
-      linkFont = bodyStyle.fontFamily;
-      fontWeight = bodyStyle.fontWeight;
-      fontStyle = bodyStyle.fontStyle;
-      console.log('🔤 Fonte capturada do body:', { fontFamily: linkFont, fontWeight, fontStyle });
-    }
 
     // Obter todas as imagens do produto dos dados do Shopify
     const allProductImages = await getOnlyProductImages();
@@ -487,53 +472,14 @@ export function WidgetGeneratorPage() {
       'transition: all 0.4s ease-in-out;' +
       'opacity: 0;';
 
-    // Função para capturar todas as fontes da loja
-    function getAllStoreFonts() {
-      const rootStyles = window.getComputedStyle(document.documentElement);
-
-      const vars = [
-        '--font-body',
-        '--font-heading',
-        '--font-primary',
-        '--font-secondary',
-        '--font-stack-body',
-        '--font-stack-heading',
-        '--type-body-font',
-        '--type-header-font'
-      ];
-
-      const foundFonts = [];
-
-      vars.forEach(function(v) {
-        const val = rootStyles.getPropertyValue(v).trim();
-        if (val && foundFonts.indexOf(val) === -1) {
-          foundFonts.push(val);
-        }
-      });
-
-      const bodyFont = window.getComputedStyle(document.body).fontFamily;
-      if (bodyFont && foundFonts.indexOf(bodyFont) === -1) {
-        foundFonts.push(bodyFont);
-      }
-
-      return foundFonts;
-    }
-
-    // Capturar todas as fontes da loja
-    const fonts = getAllStoreFonts();
-    console.log('🔤 Fontes detectadas da loja:', fonts);
-
     // Criar iframe do widget com a imagem do produto
     const iframe = document.createElement('iframe');
-    iframe.dataset.fonts = JSON.stringify(fonts);
 
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
       primaryColor: OMAFIT_CONFIG.colors.primary,
       storeLogo: OMAFIT_CONFIG.storeLogo,
-      fontFamily: linkFont,
-      fontWeight: fontWeight,
-      fontStyle: fontStyle
+      fontFamily: OMAFIT_CONFIG.fontFamily
     };
     const widgetUrl = OMAFIT_CONFIG.apiUrl + '/widget?productImage=' + encodeURIComponent(productImage) +
       '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages)) +
@@ -1172,6 +1118,30 @@ export function WidgetGeneratorPage() {
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 Escolha a cor visualmente ou insira o código hex (ex: #810707)
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
+                Fonte do Widget
+              </label>
+              <select
+                value={selectedFont}
+                onChange={(e) => setSelectedFont(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
+              >
+                <option value="Outfit">Outfit</option>
+                <option value="Playfair Display">Playfair Display</option>
+                <option value="Raleway">Raleway</option>
+                <option value="Inter">Inter</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Open Sans">Open Sans</option>
+                <option value="Montserrat">Montserrat</option>
+                <option value="Lato">Lato</option>
+                <option value="Poppins">Poppins</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Selecione a fonte que será usada em todo o widget
               </p>
             </div>
 

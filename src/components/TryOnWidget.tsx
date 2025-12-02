@@ -12,13 +12,11 @@ interface TryOnWidgetProps {
   storeLogo?: string;
   primaryColor?: string;
   fontFamily?: string;
-  fontWeight?: string;
-  fontStyle?: string;
   publicId?: string;
   productImages?: string[];
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'inherit', fontWeight = 'inherit', fontStyle = 'normal', publicId, productImages = [] }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [] }: TryOnWidgetProps) {
 
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
@@ -52,58 +50,6 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   useEffect(() => {
     setIsVisible(true);
-
-    function importFont(family: string) {
-      if (!family) return;
-
-      const clean = family.replace(/['"]/g, "").split(',')[0].trim();
-
-      if (clean.includes('var(')) return;
-      if (clean.includes('shopify')) return;
-      if (clean.includes('system-ui')) return;
-      if (clean.includes('sans-serif')) return;
-      if (clean.includes('serif')) return;
-      if (clean.includes('monospace')) return;
-
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(clean)}:wght@300;400;500;600;700&display=swap`;
-      document.head.appendChild(link);
-      console.log('🔤 Importando fonte:', clean);
-    }
-
-    function applyFontsFromParent() {
-      try {
-        const raw = window.frameElement?.dataset?.fonts;
-        if (!raw) {
-          console.warn('⚠️ Nenhuma fonte encontrada no data-fonts do iframe');
-          return;
-        }
-
-        const fonts = JSON.parse(raw);
-        if (!Array.isArray(fonts) || fonts.length === 0) {
-          console.warn('⚠️ Array de fontes vazio ou inválido');
-          return;
-        }
-
-        console.log('✅ Fontes extraídas do data-fonts:', fonts);
-
-        document.documentElement.style.setProperty('--omafit-font', fonts[0]);
-        document.body.style.fontFamily = fonts[0];
-
-        const style = document.createElement('style');
-        style.innerHTML = `* { font-family: var(--omafit-font), sans-serif !important; }`;
-        document.head.appendChild(style);
-
-        fonts.forEach((f: string) => {
-          importFont(f);
-        });
-      } catch (e) {
-        console.error('❌ Erro ao aplicar fontes do parent:', e);
-      }
-    }
-
-    applyFontsFromParent();
   }, []);
 
   React.useEffect(() => {
@@ -489,11 +435,17 @@ const handleSubmit = async () => {
 
   const displayImage = step === 'photo' ? selectedProductImage : product.garment_image;
 
-  console.log('🎨 Estilos aplicados no widget:', { fontFamily, fontWeight, fontStyle });
+  console.log('🎨 Estilos aplicados no widget:', { fontFamily });
 
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
+
+        * {
+          font-family: '${fontFamily}', sans-serif !important;
+        }
+
         .bg-primary { background-color: ${primaryColor} !important; }
         .text-primary { color: ${primaryColor} !important; }
         .border-primary { border-color: ${primaryColor} !important; }
