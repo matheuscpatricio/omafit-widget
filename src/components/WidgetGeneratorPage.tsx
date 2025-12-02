@@ -949,48 +949,6 @@ export function WidgetGeneratorPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
-      {/* Widget Key Info */}
-      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 p-4 md:p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Identificador do Widget</h3>
-            <p className="text-gray-700 mb-3">
-              Seu widget possui um identificador único que permite validação segura no servidor e controla automaticamente seus créditos.
-            </p>
-            {generatingKey ? (
-              <div className="flex items-center gap-2 text-gray-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                <span className="text-sm">Gerando identificador...</span>
-              </div>
-            ) : publicId ? (
-              <div className="bg-white rounded-lg p-3 border border-green-200">
-                <div className="flex items-center justify-between gap-2">
-                  <code className="text-sm font-mono text-green-700 break-all">{publicId}</code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(publicId);
-                    }}
-                    className="text-green-600 hover:text-green-700 flex-shrink-0"
-                    title="Copiar identificador"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Este identificador está vinculado à sua conta. A validação de segurança acontece no servidor.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-red-50 rounded-lg p-3 border border-red-200">
-                <p className="text-sm text-red-700">Erro ao gerar identificador. Recarregue a página.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Info Banner */}
       <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 p-4 md:p-6">
@@ -1205,26 +1163,61 @@ export function WidgetGeneratorPage() {
           {showPreview && (
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-800 mb-2">Preview do Modal:</h4>
+              <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
+              `}</style>
               <div className="p-4 rounded-lg" style={{ backgroundColor: popupColor }}>
-                <div className="bg-white rounded-lg p-4 max-w-sm mx-auto">
-                  <div className="text-center">
-                    <h4 className="text-lg font-semibold mb-2" style={{ color: popupColor }}>Omafit</h4>
-                    <p className="text-gray-600 text-sm mb-4">Exemplo de Produto</p>
-                    <div className="aspect-square bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
-                      {result && (
-                              <img
-                  src={result}
-                  alt="Resultado"
-                  className="w-full rounded-lg shadow-lg"
-                />
-                      )}
-
-                      {!result && (
-                      <Code className="w-12 h-12 text-gray-300" />
-              
+                <div className="bg-white rounded-lg overflow-hidden shadow-xl max-w-md mx-auto" style={{ fontFamily: selectedFont }}>
+                  {/* Header */}
+                  <div className="bg-white border-b border-gray-200 p-3">
+                    <div className="flex items-center justify-center relative">
+                      {storeLogo ? (
+                        <img src={storeLogo} alt="Logo" className="h-8 object-contain" />
+                      ) : (
+                        <span className="text-lg font-semibold" style={{ color: popupColor }}>Omafit</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">Modal com cores personalizadas</p>
+                  </div>
+                  {/* Content */}
+                  <div className="p-4">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">Camisa Polo Premium</h3>
+                      <p className="text-sm text-gray-500">Produto de exemplo</p>
+                    </div>
+                    <div className="aspect-[3/4] bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                      <img
+                        src="https://images.pexels.com/photos/1926769/pexels-photo-1926769.jpeg?auto=compress&cs=tinysrgb&w=400"
+                        alt="Modelo"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {/* Step info simulation */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Altura (cm)</label>
+                        <input
+                          type="text"
+                          value="175"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
+                        <input
+                          type="text"
+                          value="70"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                        />
+                      </div>
+                      <button
+                        className="w-full py-3 rounded-lg text-white font-medium text-sm transition-colors"
+                        style={{ backgroundColor: popupColor }}
+                      >
+                        Continuar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
