@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { generateSampleAnalyticsData } from '../utils/generateSampleData';
 import {
   DollarSign,
   Users,
@@ -16,9 +15,7 @@ import {
   Zap,
   BarChart3,
   Percent,
-  ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw
+  ArrowUpRight
 } from 'lucide-react';
 
 interface AdvancedMetrics {
@@ -65,29 +62,10 @@ export function AdvancedAnalytics() {
   const [metrics, setMetrics] = useState<AdvancedMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30');
-  const [generatingSample, setGeneratingSample] = useState(false);
 
   useEffect(() => {
-
-      fetchAdvancedMetrics();
-
+    fetchAdvancedMetrics();
   }, [user, timeRange]);
-
-  const handleGenerateSampleData = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    };
-
-    setGeneratingSample(true);
-    
-    const success = await generateSampleAnalyticsData(user.id);
-    
-    if (success) {
-      await fetchAdvancedMetrics();
-    }
-    setGeneratingSample(false);
-  };
 
   const fetchAdvancedMetrics = async () => {
     if (!user) {
@@ -311,26 +289,16 @@ export function AdvancedAnalytics() {
           <h2 className="text-3xl font-bold text-gray-800">Analytics Avançado</h2>
           <p className="text-gray-600 mt-1">Métricas detalhadas do desempenho do Omafit</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleGenerateSampleData}
-            disabled={generatingSample}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 ${generatingSample ? 'animate-spin' : ''}`} />
-            {generatingSample ? 'Gerando...' : 'Gerar Dados de Exemplo'}
-          </button>
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
-          >
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
-            <option value="365">Último ano</option>
-          </select>
-        </div>
+        <select
+          value={timeRange}
+          onChange={(e) => setTimeRange(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
+        >
+          <option value="7">Últimos 7 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="365">Último ano</option>
+        </select>
       </div>
 
       {/* Revenue Metrics */}

@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { model_image, garment_image, customer_email, product_name, product_id, public_id } = await req.json();
+    const { model_image, garment_image, product_name, product_id, public_id } = await req.json();
 
     if (!model_image || !garment_image) {
       throw new Error('model_image and garment_image are required');
@@ -26,6 +26,10 @@ Deno.serve(async (req: Request) => {
     if (!public_id) {
       throw new Error('public_id is required. Please generate a valid widget code from your Omafit dashboard.');
     }
+
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+                     req.headers.get('x-real-ip') ||
+                     'unknown';
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -178,7 +182,7 @@ Deno.serve(async (req: Request) => {
       .insert([
         {
           product_id,
-          customer_email,
+          customer_email: clientIp,
           model_image,
           fashn_status: 'processing',
           session_start_time: sessionStartTime,
