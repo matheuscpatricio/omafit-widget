@@ -65,10 +65,32 @@ interface AdvancedMetrics {
   averageHeight: number;
   averageWeight: number;
   topSizes: Array<{ size: string; count: number; percentage: number }>;
-  topBodyType: { type: string; count: number; percentage: number };
-  topAdjustment: { adjustment: string; count: number; percentage: number };
-  bodyTypeDistribution: Array<{ type: string; count: number; percentage: number }>;
+  topBodyType: { label: string; image: string; count: number; percentage: number };
+  topFitPreference: { label: string; count: number; percentage: number };
+  bodyTypeDistribution: Array<{ label: string; image: string; count: number; percentage: number }>;
 }
+
+const bodyTypesMale = [
+  { label: 'Ectomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg' },
+  { label: 'Atlético magro', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg' },
+  { label: 'Médio', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg' },
+  { label: 'Mesomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg' },
+  { label: 'Endomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg' }
+];
+
+const bodyTypesFemale = [
+  { label: 'Muito magra', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg' },
+  { label: 'Magra', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg' },
+  { label: 'Média', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg' },
+  { label: 'Curvilínea', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg' },
+  { label: 'Plus', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg' }
+];
+
+const fitOptions = [
+  { label: 'Justa' },
+  { label: 'Na medida' },
+  { label: 'Solta' }
+];
 
 export function AdvancedAnalytics() {
   const { user } = useAuth();
@@ -282,42 +304,58 @@ export function AdvancedAnalytics() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 3);
 
-      // Body type distribution
-      const bodyTypeCounts = measurementsData.reduce((acc, m) => {
-        if (m.body_type) {
-          acc[m.body_type] = (acc[m.body_type] || 0) + 1;
-        }
-        return acc;
-      }, {} as Record<string, number>);
+      // Body type distribution (agrupado por gender + index)
+      const bodyTypeMap: Record<string, { label: string; image: string; count: number }> = {};
 
-      const bodyTypeDistribution = Object.entries(bodyTypeCounts)
-        .map(([type, count]) => ({
-          type,
-          count,
-          percentage: (count / measurementsData.length) * 100
+      measurementsData.forEach(m => {
+        if (m.gender && m.body_type_index !== null && m.body_type_index !== undefined) {
+          const bodyTypes = m.gender === 'male' ? bodyTypesMale : bodyTypesFemale;
+          const bodyType = bodyTypes[m.body_type_index];
+          if (bodyType) {
+            const key = `${m.gender}-${m.body_type_index}`;
+            if (!bodyTypeMap[key]) {
+              bodyTypeMap[key] = { label: bodyType.label, image: bodyType.image, count: 0 };
+            }
+            bodyTypeMap[key].count++;
+          }
+        }
+      });
+
+      const bodyTypeDistribution = Object.values(bodyTypeMap)
+        .map(item => ({
+          label: item.label,
+          image: item.image,
+          count: item.count,
+          percentage: (item.count / measurementsData.length) * 100
         }))
         .sort((a, b) => b.count - a.count);
 
-      const topBodyType = bodyTypeDistribution[0] || { type: 'N/A', count: 0, percentage: 0 };
+      const topBodyType = bodyTypeDistribution[0] || {
+        label: 'N/A',
+        image: '',
+        count: 0,
+        percentage: 0
+      };
 
-      // Body adjustment distribution
-      const adjustmentCounts = measurementsData.reduce((acc, m) => {
-        if (m.body_adjustment) {
-          acc[m.body_adjustment] = (acc[m.body_adjustment] || 0) + 1;
+      // Fit preference distribution
+      const fitCounts: Record<number, number> = {};
+
+      measurementsData.forEach(m => {
+        if (m.fit_preference_index !== null && m.fit_preference_index !== undefined) {
+          fitCounts[m.fit_preference_index] = (fitCounts[m.fit_preference_index] || 0) + 1;
         }
-        return acc;
-      }, {} as Record<string, number>);
+      });
 
-      const topAdjustmentEntry = Object.entries(adjustmentCounts)
+      const topFitEntry = Object.entries(fitCounts)
         .sort(([, a], [, b]) => b - a)[0];
 
-      const topAdjustment = topAdjustmentEntry
+      const topFitPreference = topFitEntry
         ? {
-            adjustment: topAdjustmentEntry[0],
-            count: topAdjustmentEntry[1],
-            percentage: (topAdjustmentEntry[1] / measurementsData.length) * 100
+            label: fitOptions[parseInt(topFitEntry[0])].label,
+            count: topFitEntry[1],
+            percentage: (topFitEntry[1] / measurementsData.length) * 100
           }
-        : { adjustment: 'N/A', count: 0, percentage: 0 };
+        : { label: 'N/A', count: 0, percentage: 0 };
 
       setMetrics({
         totalRevenue,
@@ -344,7 +382,7 @@ export function AdvancedAnalytics() {
         averageWeight,
         topSizes,
         topBodyType,
-        topAdjustment,
+        topFitPreference,
         bodyTypeDistribution
       });
     } catch (error) {
@@ -645,10 +683,22 @@ export function AdvancedAnalytics() {
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-gray-600 text-sm font-medium">Corpo Mais Escolhido</p>
-              <UserCircle className="w-5 h-5 text-teal-600" />
             </div>
-            <p className="text-2xl font-bold text-teal-600 capitalize">{metrics?.topBodyType.type || 'N/A'}</p>
-            <p className="text-xs text-gray-500 mt-1">{metrics?.topBodyType.percentage.toFixed(0) || 0}% dos usuários</p>
+            {metrics?.topBodyType.image ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={metrics.topBodyType.image}
+                  alt={metrics.topBodyType.label}
+                  className="w-16 h-16 object-contain rounded-lg border"
+                />
+                <div>
+                  <p className="text-lg font-bold text-teal-600">{metrics.topBodyType.label}</p>
+                  <p className="text-xs text-gray-500 mt-1">{metrics.topBodyType.percentage.toFixed(0)}% dos usuários</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-teal-600">N/A</p>
+            )}
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -656,8 +706,8 @@ export function AdvancedAnalytics() {
               <p className="text-gray-600 text-sm font-medium">Ajuste Mais Usado</p>
               <Sliders className="w-5 h-5 text-orange-600" />
             </div>
-            <p className="text-2xl font-bold text-orange-600 capitalize">{metrics?.topAdjustment.adjustment || 'N/A'}</p>
-            <p className="text-xs text-gray-500 mt-1">{metrics?.topAdjustment.percentage.toFixed(0) || 0}% dos usuários</p>
+            <p className="text-2xl font-bold text-orange-600">{metrics?.topFitPreference.label || 'N/A'}</p>
+            <p className="text-xs text-gray-500 mt-1">{metrics?.topFitPreference.percentage.toFixed(0) || 0}% dos usuários</p>
           </div>
         </div>
       </div>
@@ -707,15 +757,19 @@ export function AdvancedAnalytics() {
             Distribuição de Tipos de Corpo
           </h3>
           {metrics?.bodyTypeDistribution && metrics.bodyTypeDistribution.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {metrics.bodyTypeDistribution.map((body, index) => {
                 const colors = ['bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
                 return (
-                  <div key={body.type} className="group relative">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`}></div>
-                        <span className="font-medium text-gray-700 capitalize">{body.type}</span>
+                  <div key={`${body.label}-${index}`} className="group relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={body.image}
+                          alt={body.label}
+                          className="w-10 h-10 object-contain rounded border"
+                        />
+                        <span className="font-medium text-gray-700">{body.label}</span>
                       </div>
                       <span className="text-sm font-semibold text-gray-600">{body.percentage.toFixed(1)}%</span>
                     </div>
