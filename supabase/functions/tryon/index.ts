@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { model_image, garment_image, product_name, product_id, public_id } = await req.json();
+    const { model_image, garment_image, product_name, product_id, public_id, user_measurements } = await req.json();
 
     if (!model_image || !garment_image) {
       throw new Error('model_image and garment_image are required');
@@ -209,6 +209,22 @@ Deno.serve(async (req: Request) => {
           images_processed: 1,
         }
       ]);
+
+    if (user_measurements) {
+      await supabaseClient
+        .from('user_measurements')
+        .insert([
+          {
+            tryon_session_id: session.id,
+            gender: user_measurements.gender,
+            height: user_measurements.height,
+            weight: user_measurements.weight,
+            body_type_index: user_measurements.body_type_index,
+            fit_preference_index: user_measurements.fit_preference_index,
+            recommended_size: user_measurements.recommended_size
+          }
+        ]);
+    }
 
     const falInput = {
       person_image_url: modelImageUrl,

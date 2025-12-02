@@ -13,6 +13,8 @@ export interface SizeCalculatorData {
   weight: number;
   bodyType: number;
   fit: number;
+  bodyTypeIndex?: number;
+  fitIndex?: number;
 }
 
 const bodyTypesMale = [
@@ -70,7 +72,9 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
       height: heightNum,
       weight: weightNum,
       bodyType: bodyTypes[bodyTypeIndex].factor,
-      fit: fitOptions[fitIndex].factor
+      fit: fitOptions[fitIndex].factor,
+      bodyTypeIndex,
+      fitIndex
     });
   };
 

@@ -198,6 +198,14 @@ const handleSubmit = async () => {
       product_name: product.name,
       product_id: product.id,
       public_id: publicId,
+      user_measurements: sizeData ? {
+        gender: sizeData.gender,
+        height: sizeData.height,
+        weight: sizeData.weight,
+        body_type_index: sizeData.bodyTypeIndex,
+        fit_preference_index: sizeData.fitIndex,
+        recommended_size: calculatedSize
+      } : null
     };
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
