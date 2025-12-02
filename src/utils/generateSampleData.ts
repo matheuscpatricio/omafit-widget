@@ -67,15 +67,29 @@ export async function generateSampleAnalyticsData(userId: string) {
 
     if (customerError) throw customerError;
 
-    // Get all tryon sessions for this user
-    const { data: sessions } = await supabase
-      .from('tryon_sessions')
-      .select('id, product_id')
-      .in('product_id', products.map(p => p.id));
+    // Create sample tryon sessions
+    const sampleSessions = [];
+    for (let i = 0; i < 30; i++) {
+      const randomProduct = products[Math.floor(Math.random() * products.length)];
+      sampleSessions.push({
+        product_id: randomProduct.id,
+        customer_email: sampleEmails[Math.floor(Math.random() * sampleEmails.length)],
+        model_image: 'https://example.com/model.jpg',
+        result_image: 'https://example.com/result.jpg',
+        fashn_status: 'completed',
+      });
+    }
 
-    if (sessions && sessions.length > 0) {
+    const { data: insertedSessions, error: sessionsError } = await supabase
+      .from('tryon_sessions')
+      .insert(sampleSessions)
+      .select('id');
+
+    if (sessionsError) throw sessionsError;
+
+    if (insertedSessions && insertedSessions.length > 0) {
       // Generate session analytics
-      const sessionAnalytics = sessions.map(session => ({
+      const sessionAnalytics = insertedSessions.map(session => ({
         tryon_session_id: session.id,
         user_id: userId,
         duration_seconds: Math.floor(Math.random() * 180) + 30,

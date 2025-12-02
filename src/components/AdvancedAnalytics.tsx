@@ -102,32 +102,56 @@ export function AdvancedAnalytics() {
       dateFilter.setDate(dateFilter.getDate() - parseInt(timeRange));
 
       // Get all orders
-      const { data: orders } = await supabase
+      const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
+        .eq('user_id', user.id)
         .gte('order_date', dateFilter.toISOString());
 
-      // Get all tryon sessions
-      const { data: sessions } = await supabase
-        .from('tryon_sessions')
-        .select('*, session_analytics(*)')
-        .gte('created_at', dateFilter.toISOString());
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+      }
 
-      // Get session analytics
-      const { data: sessionAnalytics } = await supabase
-        .from('session_analytics')
+      // Get all tryon sessions
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('tryon_sessions')
         .select('*')
         .gte('created_at', dateFilter.toISOString());
 
+      if (sessionsError) {
+        console.error('Error fetching sessions:', sessionsError);
+      }
+
+      // Get session analytics
+      const { data: sessionAnalytics, error: sessionAnalyticsError } = await supabase
+        .from('session_analytics')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('created_at', dateFilter.toISOString());
+
+      if (sessionAnalyticsError) {
+        console.error('Error fetching session analytics:', sessionAnalyticsError);
+      }
+
       // Get products with analytics
-      const { data: products } = await supabase
+      const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, name, garment_image');
+        .select('id, name, garment_image')
+        .eq('user_id', user.id);
+
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+      }
 
       // Get customer analytics
-      const { data: customerAnalytics } = await supabase
+      const { data: customerAnalytics, error: customerAnalyticsError } = await supabase
         .from('customer_analytics')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (customerAnalyticsError) {
+        console.error('Error fetching customer analytics:', customerAnalyticsError);
+      }
 
       // Calculate metrics
       const ordersData = orders || [];
