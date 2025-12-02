@@ -97,10 +97,11 @@ export function AdvancedAnalytics() {
   const [metrics, setMetrics] = useState<AdvancedMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30');
+  const [selectedGender, setSelectedGender] = useState<'all' | 'male' | 'female'>('all');
 
   useEffect(() => {
     fetchAdvancedMetrics();
-  }, [user, timeRange]);
+  }, [user, timeRange, selectedGender]);
 
   const fetchAdvancedMetrics = async () => {
     if (!user) {
@@ -166,22 +167,28 @@ export function AdvancedAnalytics() {
         console.error('Error fetching customer analytics:', customerAnalyticsError);
       }
 
-      // Get user measurements
-      const { data: measurements, error: measurementsError } = await supabase
-        .from('user_measurements')
-        .select('*')
-        .in('tryon_session_id', sessionAnalyticsData.map(sa => sa.tryon_session_id));
-
-      if (measurementsError) {
-        console.error('Error fetching measurements:', measurementsError);
-      }
-
       // Calculate metrics
       const ordersData = orders || [];
       const sessionsData = sessions || [];
       const sessionAnalyticsData = sessionAnalytics || [];
       const productsData = products || [];
       const customerData = customerAnalytics || [];
+
+      // Get user measurements (only for sessions that belong to this user)
+      let measurementsQuery = supabase
+        .from('user_measurements')
+        .select('*')
+        .in('tryon_session_id', sessionAnalyticsData.map(sa => sa.tryon_session_id));
+
+      if (selectedGender !== 'all') {
+        measurementsQuery = measurementsQuery.eq('gender', selectedGender);
+      }
+
+      const { data: measurements, error: measurementsError } = await measurementsQuery;
+
+      if (measurementsError) {
+        console.error('Error fetching measurements:', measurementsError);
+      }
 
       // Revenue metrics
       const totalRevenue = ordersData.reduce((sum, order) => sum + Number(order.order_value), 0);
@@ -650,10 +657,46 @@ export function AdvancedAnalytics() {
 
       {/* User Body Metrics */}
       <div>
-        <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <UserCircle className="w-6 h-6 text-[#810707]" />
-          Métricas dos Usuários
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <UserCircle className="w-6 h-6 text-[#810707]" />
+            Métricas dos Usuários
+          </h3>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedGender('all')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedGender === 'all'
+                  ? 'bg-[#810707] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setSelectedGender('male')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedGender === 'male'
+                  ? 'bg-[#810707] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Masculino
+            </button>
+            <button
+              onClick={() => setSelectedGender('female')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedGender === 'female'
+                  ? 'bg-[#810707] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Feminino
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center justify-between mb-2">
