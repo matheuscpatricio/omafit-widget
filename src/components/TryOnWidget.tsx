@@ -54,9 +54,10 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     setIsVisible(true);
 
     try {
-      const parentFont = window.parent.getComputedStyle(window.parent.document.body).fontFamily;
-      if (parentFont && parentFont !== 'inherit') {
-        document.body.style.fontFamily = parentFont;
+      const storeFont = window.parent.getComputedStyle(window.parent.document.body).fontFamily;
+      if (storeFont && storeFont !== 'inherit') {
+        document.documentElement.style.setProperty('--omafit-font', storeFont);
+        document.body.style.fontFamily = storeFont;
       }
     } catch (e) {
       console.warn('Não foi possível puxar a fonte do parent:', e);
@@ -451,8 +452,12 @@ const handleSubmit = async () => {
   return (
     <>
       <style>{`
+        :root {
+          --omafit-font: inherit;
+        }
+
         * {
-          font-family: inherit !important;
+          font-family: var(--omafit-font, inherit) !important;
           font-weight: inherit !important;
           font-style: inherit !important;
         }
