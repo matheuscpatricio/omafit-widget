@@ -171,6 +171,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('You have reached your monthly image limit. Please upgrade your plan or wait for the next billing cycle.');
     }
 
+    const sessionStartTime = new Date().toISOString();
+
     const { data: session, error: sessionError } = await supabaseClient
       .from('tryon_sessions')
       .insert([
@@ -179,6 +181,8 @@ Deno.serve(async (req: Request) => {
           customer_email,
           model_image,
           fashn_status: 'processing',
+          session_start_time: sessionStartTime,
+          processing_start_time: sessionStartTime,
         }
       ])
       .select()
@@ -188,11 +192,25 @@ Deno.serve(async (req: Request) => {
       throw new Error('Failed to create try-on session');
     }
 
+    await supabaseClient
+      .from('session_analytics')
+      .insert([
+        {
+          tryon_session_id: session.id,
+          user_id: widgetKeyData.user_id,
+          duration_seconds: 0,
+          completed: false,
+          shared: false,
+          processing_time_seconds: 0,
+          images_processed: 1,
+        }
+      ]);
+
     const falInput = {
       person_image_url: modelImageUrl,
       clothing_image_url: garmentImageUrl,
-      preserve_pose: true
-      aspect_ratio: 3:4
+      preserve_pose: true,
+      aspect_ratio: "3:4"
     };
 
     console.log('🚀 Submitting to fal.ai with input:', {

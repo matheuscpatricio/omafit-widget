@@ -129,7 +129,6 @@ Deno.serve(async (req: Request) => {
       let resultImage = null;
 
       if (statusResult.status === 'COMPLETED') {
-        // Get the full result with the image
         console.log('🔄 Fetching full result from fal.ai...');
         const result = await fal.queue.result("fal-ai/image-apps-v2/virtual-try-on", {
           requestId: predictionId
@@ -141,7 +140,6 @@ Deno.serve(async (req: Request) => {
           dataKeys: result.data ? Object.keys(result.data) : []
         });
 
-        // Extract image from result
         if (result.data && result.data.image && result.data.image.url) {
           dbStatus = 'completed';
           resultImage = result.data.image.url;
@@ -157,11 +155,21 @@ Deno.serve(async (req: Request) => {
         if (resultImage) {
           console.log('✅ Try-on completed, updating database');
 
+          const processingEndTime = new Date().toISOString();
+
+          const { data: sessionInfo, error: sessionInfoError } = await supabase
+            .from('tryon_sessions')
+            .select('session_start_time, processing_start_time, id')
+            .eq('fashn_prediction_id', predictionId)
+            .maybeSingle();
+
           const { error: updateError } = await supabase
             .from('tryon_sessions')
             .update({
               fashn_status: 'completed',
-              result_image: resultImage
+              result_image: resultImage,
+              processing_end_time: processingEndTime,
+              session_end_time: processingEndTime,
             })
             .eq('fashn_prediction_id', predictionId);
 
@@ -169,6 +177,26 @@ Deno.serve(async (req: Request) => {
             console.error('❌ Database update failed:', updateError);
           } else {
             console.log('✅ Database updated successfully');
+
+            if (sessionInfo && sessionInfo.session_start_time && sessionInfo.processing_start_time) {
+              const sessionStartTime = new Date(sessionInfo.session_start_time);
+              const processingStartTime = new Date(sessionInfo.processing_start_time);
+              const endTime = new Date(processingEndTime);
+
+              const durationSeconds = Math.floor((endTime.getTime() - sessionStartTime.getTime()) / 1000);
+              const processingTimeSeconds = Math.floor((endTime.getTime() - processingStartTime.getTime()) / 1000);
+
+              await supabase
+                .from('session_analytics')
+                .update({
+                  completed: true,
+                  duration_seconds: durationSeconds,
+                  processing_time_seconds: processingTimeSeconds,
+                })
+                .eq('tryon_session_id', sessionInfo.id);
+
+              console.log('✅ Session analytics updated:', { durationSeconds, processingTimeSeconds });
+            }
           }
         } else {
           console.log('⚠️ No result image found in output');
