@@ -487,12 +487,45 @@ export function WidgetGeneratorPage() {
       'transition: all 0.4s ease-in-out;' +
       'opacity: 0;';
 
-    // Extrair fonte da loja antes de criar o iframe
-    const storeFont = window.getComputedStyle(document.body).fontFamily;
+    // Função para capturar todas as fontes da loja
+    function getAllStoreFonts() {
+      const rootStyles = window.getComputedStyle(document.documentElement);
+
+      const vars = [
+        '--font-body',
+        '--font-heading',
+        '--font-primary',
+        '--font-secondary',
+        '--font-stack-body',
+        '--font-stack-heading',
+        '--type-body-font',
+        '--type-header-font'
+      ];
+
+      const foundFonts = [];
+
+      vars.forEach(function(v) {
+        const val = rootStyles.getPropertyValue(v).trim();
+        if (val && foundFonts.indexOf(val) === -1) {
+          foundFonts.push(val);
+        }
+      });
+
+      const bodyFont = window.getComputedStyle(document.body).fontFamily;
+      if (bodyFont && foundFonts.indexOf(bodyFont) === -1) {
+        foundFonts.push(bodyFont);
+      }
+
+      return foundFonts;
+    }
+
+    // Capturar todas as fontes da loja
+    const fonts = getAllStoreFonts();
+    console.log('🔤 Fontes detectadas da loja:', fonts);
 
     // Criar iframe do widget com a imagem do produto
     const iframe = document.createElement('iframe');
-    iframe.dataset.font = storeFont;
+    iframe.dataset.fonts = JSON.stringify(fonts);
 
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
