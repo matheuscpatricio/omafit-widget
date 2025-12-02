@@ -751,8 +751,33 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </div>
 
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Omafit. Todos os direitos reservados.</p>
+          <div className="border-t border-gray-800 mt-8 pt-8">
+            <div className="flex flex-col items-center gap-4">
+              <a
+                href="https://www.instagram.com/omafit.co/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="Instagram do Omafit"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                </svg>
+              </a>
+              <p className="text-gray-400">&copy; 2025 Omafit. Todos os direitos reservados.</p>
+            </div>
           </div>
         </div>
       </footer>
