@@ -15,7 +15,12 @@ import {
   Zap,
   BarChart3,
   Percent,
-  ArrowUpRight
+  ArrowUpRight,
+  Ruler,
+  Weight,
+  Shirt,
+  UserCircle,
+  Sliders
 } from 'lucide-react';
 
 interface AdvancedMetrics {
@@ -55,6 +60,14 @@ interface AdvancedMetrics {
   abandonmentRate: number;
   shareRate: number;
   completionRate: number;
+
+  // User body metrics
+  averageHeight: number;
+  averageWeight: number;
+  topSizes: Array<{ size: string; count: number; percentage: number }>;
+  topBodyType: { type: string; count: number; percentage: number };
+  topAdjustment: { adjustment: string; count: number; percentage: number };
+  bodyTypeDistribution: Array<{ type: string; count: number; percentage: number }>;
 }
 
 export function AdvancedAnalytics() {
@@ -129,6 +142,16 @@ export function AdvancedAnalytics() {
 
       if (customerAnalyticsError) {
         console.error('Error fetching customer analytics:', customerAnalyticsError);
+      }
+
+      // Get user measurements
+      const { data: measurements, error: measurementsError } = await supabase
+        .from('user_measurements')
+        .select('*')
+        .in('tryon_session_id', sessionAnalyticsData.map(sa => sa.tryon_session_id));
+
+      if (measurementsError) {
+        console.error('Error fetching measurements:', measurementsError);
       }
 
       // Calculate metrics
@@ -231,6 +254,71 @@ export function AdvancedAnalytics() {
         ? (completedSessions / sessionsData.length) * 100
         : 0;
 
+      // User body metrics
+      const measurementsData = measurements || [];
+
+      const averageHeight = measurementsData.length > 0
+        ? measurementsData.reduce((sum, m) => sum + (m.height || 0), 0) / measurementsData.length
+        : 0;
+
+      const averageWeight = measurementsData.length > 0
+        ? measurementsData.reduce((sum, m) => sum + Number(m.weight || 0), 0) / measurementsData.length
+        : 0;
+
+      // Top 3 sizes
+      const sizeCounts = measurementsData.reduce((acc, m) => {
+        if (m.recommended_size) {
+          acc[m.recommended_size] = (acc[m.recommended_size] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const topSizes = Object.entries(sizeCounts)
+        .map(([size, count]) => ({
+          size,
+          count,
+          percentage: (count / measurementsData.length) * 100
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3);
+
+      // Body type distribution
+      const bodyTypeCounts = measurementsData.reduce((acc, m) => {
+        if (m.body_type) {
+          acc[m.body_type] = (acc[m.body_type] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const bodyTypeDistribution = Object.entries(bodyTypeCounts)
+        .map(([type, count]) => ({
+          type,
+          count,
+          percentage: (count / measurementsData.length) * 100
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const topBodyType = bodyTypeDistribution[0] || { type: 'N/A', count: 0, percentage: 0 };
+
+      // Body adjustment distribution
+      const adjustmentCounts = measurementsData.reduce((acc, m) => {
+        if (m.body_adjustment) {
+          acc[m.body_adjustment] = (acc[m.body_adjustment] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      const topAdjustmentEntry = Object.entries(adjustmentCounts)
+        .sort(([, a], [, b]) => b - a)[0];
+
+      const topAdjustment = topAdjustmentEntry
+        ? {
+            adjustment: topAdjustmentEntry[0],
+            count: topAdjustmentEntry[1],
+            percentage: (topAdjustmentEntry[1] / measurementsData.length) * 100
+          }
+        : { adjustment: 'N/A', count: 0, percentage: 0 };
+
       setMetrics({
         totalRevenue,
         revenueInfluencedByTryon,
@@ -251,7 +339,13 @@ export function AdvancedAnalytics() {
         topProducts,
         abandonmentRate,
         shareRate,
-        completionRate
+        completionRate,
+        averageHeight,
+        averageWeight,
+        topSizes,
+        topBodyType,
+        topAdjustment,
+        bodyTypeDistribution
       });
     } catch (error) {
       console.error('Error fetching advanced metrics:', error);
@@ -513,6 +607,131 @@ export function AdvancedAnalytics() {
             </div>
             <p className="text-2xl font-bold text-blue-600">{metrics?.shareRate.toFixed(1) || 0}%</p>
           </div>
+        </div>
+      </div>
+
+      {/* User Body Metrics */}
+      <div>
+        <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <UserCircle className="w-6 h-6 text-[#810707]" />
+          Métricas dos Usuários
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm font-medium">Altura Média</p>
+              <Ruler className="w-5 h-5 text-purple-600" />
+            </div>
+            <p className="text-2xl font-bold text-purple-600">{metrics?.averageHeight.toFixed(0) || 0} cm</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm font-medium">Peso Médio</p>
+              <Weight className="w-5 h-5 text-indigo-600" />
+            </div>
+            <p className="text-2xl font-bold text-indigo-600">{metrics?.averageWeight.toFixed(1) || 0} kg</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm font-medium">Tamanho Mais Simulado</p>
+              <Shirt className="w-5 h-5 text-pink-600" />
+            </div>
+            <p className="text-2xl font-bold text-pink-600">{metrics?.topSizes[0]?.size || 'N/A'}</p>
+            <p className="text-xs text-gray-500 mt-1">{metrics?.topSizes[0]?.percentage.toFixed(0) || 0}% dos usuários</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm font-medium">Corpo Mais Escolhido</p>
+              <UserCircle className="w-5 h-5 text-teal-600" />
+            </div>
+            <p className="text-2xl font-bold text-teal-600 capitalize">{metrics?.topBodyType.type || 'N/A'}</p>
+            <p className="text-xs text-gray-500 mt-1">{metrics?.topBodyType.percentage.toFixed(0) || 0}% dos usuários</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm font-medium">Ajuste Mais Usado</p>
+              <Sliders className="w-5 h-5 text-orange-600" />
+            </div>
+            <p className="text-2xl font-bold text-orange-600 capitalize">{metrics?.topAdjustment.adjustment || 'N/A'}</p>
+            <p className="text-xs text-gray-500 mt-1">{metrics?.topAdjustment.percentage.toFixed(0) || 0}% dos usuários</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts: Sizes and Body Types */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Size Distribution Bar Chart */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-[#810707]" />
+            Top 3 Tamanhos Mais Simulados
+          </h3>
+          {metrics?.topSizes && metrics.topSizes.length > 0 ? (
+            <div className="space-y-4">
+              {metrics.topSizes.map((size, index) => (
+                <div key={size.size} className="group relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-700">{size.size}</span>
+                    <span className="text-sm font-semibold text-[#810707]">{size.count} usuários</span>
+                  </div>
+                  <div className="relative h-8 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        index === 0 ? 'bg-pink-500' :
+                        index === 1 ? 'bg-pink-400' :
+                        'bg-pink-300'
+                      }`}
+                      style={{ width: `${size.percentage}%` }}
+                    >
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-white">
+                        {size.percentage.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-8">Nenhum dado disponível</p>
+          )}
+        </div>
+
+        {/* Body Type Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Percent className="w-5 h-5 text-[#810707]" />
+            Distribuição de Tipos de Corpo
+          </h3>
+          {metrics?.bodyTypeDistribution && metrics.bodyTypeDistribution.length > 0 ? (
+            <div className="space-y-3">
+              {metrics.bodyTypeDistribution.map((body, index) => {
+                const colors = ['bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
+                return (
+                  <div key={body.type} className="group relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`}></div>
+                        <span className="font-medium text-gray-700 capitalize">{body.type}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-600">{body.percentage.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${colors[index % colors.length]}`}
+                        style={{ width: `${body.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-8">Nenhum dado disponível</p>
+          )}
         </div>
       </div>
 
