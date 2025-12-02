@@ -1160,9 +1160,50 @@ export function WidgetGeneratorPage() {
             </div>
           </div>
 
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Code className="w-5 h-5 text-blue-600" />
+              Como Instalar na Shopify
+            </h4>
+            <ol className="space-y-3 text-gray-700">
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">1</span>
+                <span>Clique em <strong>Copiar</strong> acima para copiar o código do widget</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">2</span>
+                <span>Abra a <strong>Shopify</strong></span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">3</span>
+                <span>Vá em <strong>Loja online → Temas</strong></span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">4</span>
+                <span>Clique em <strong>Personalizar</strong> no tema ativo</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">5</span>
+                <span>Navegue até uma <strong>Página do produto</strong></span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">6</span>
+                <span>Na seção <strong>Informações do produto</strong>, adicione um bloco <strong>Liquid personalizado</strong> abaixo dos botões de comprar</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">7</span>
+                <span><strong>Cole o código</strong> copiado no campo do bloco Liquid</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">8</span>
+                <span>Clique em <strong>Salvar</strong></span>
+              </li>
+            </ol>
+          </div>
+
           {showPreview && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-800 mb-2">Preview do Modal:</h4>
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="font-medium text-gray-800 mb-3">Preview do Modal:</h4>
               <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
               `}</style>
@@ -1223,62 +1264,9 @@ export function WidgetGeneratorPage() {
               </div>
             </div>
           )}
-
-          <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto max-h-96">
-            <pre className="text-sm whitespace-pre-wrap font-mono">{generateWidget()}</pre>
-          </div>
         </div>
       </div>
 
-      {/* Installation Instructions */}
-      <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
-        <h3 className="text-lg md:text-xl font-semibold text-[#810707] mb-4">Como Instalar no Shopify</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-medium text-gray-800 mb-3">Método 1: Template do Produto</h4>
-            <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
-              <li>Vá para <strong>Online Store → Themes</strong></li>
-              <li>Clique em <strong>Actions → Edit code</strong></li>
-              <li>Encontre <code>templates/product.liquid</code></li>              
-              <li>Cole o código onde deseja que o link apareça</li>
-              <li>Salve as alterações</li>
-            </ol>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-gray-800 mb-3">Método 2: Seção Personalizada</h4>
-            <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
-              <li>Crie um novo arquivo em <code>sections/</code></li>
-              <li>Cole o código do widget</li>
-              <li>Adicione a seção no template do produto</li>
-              <li>Configure via Theme Customizer</li>
-              <li>Publique as alterações</li>
-            </ol>
-          </div>
-        </div>
-
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h4 className="font-medium text-green-800 mb-2">🎯 Fluxo do Cliente</h4>
-          <ol className="text-green-700 text-sm space-y-2 list-decimal list-inside">
-            <li><strong>Cliente clica</strong> no link "{linkText}"</li>
-            <li><strong>Modal abre</strong> exibindo o produto visualizado pelo usuário na página do produto</li>
-            <li><strong>Cliente informa</strong> suas medidas</li>
-            <li><strong>Cliente faz upload</strong> da foto seguindo as instruções</li>
-            <li><strong>IA processa</strong> e exibe o resultado em tempo real</li>
-            <li><strong>Cliente decide</strong> adicionar ao carrinho ou testar outro produto</li>
-          </ol>
-        </div>
-
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-medium text-blue-800 mb-2">💡 Dicas de Posicionamento</h4>
-          <ul className="text-blue-700 text-sm space-y-1 list-disc list-inside">
-            <li><strong>Próximo ao botão de carrinho</strong> - Área mais decisiva da venda</li>
-            <li><strong>Perto da descrição do produto</strong> - Onde o cliente pode se interessar</li>
-           
-          </ul>
-        </div>
-      </div>
 
 
       {/* Widget Features */}
