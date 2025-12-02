@@ -133,10 +133,10 @@ export function AdvancedAnalytics() {
         console.error('Error fetching session analytics:', sessionAnalyticsError);
       }
 
-      // Get products with analytics
+      // Get products with analytics (incluindo shopify_id para fazer match)
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, name, garment_image')
+        .select('id, shopify_id, name, garment_image')
         .eq('user_id', user.id);
 
       if (productsError) {
@@ -215,13 +215,26 @@ export function AdvancedAnalytics() {
         return acc;
       }, {} as Record<string, number>);
 
-      const topProducts = productsData
-        .map(product => ({
-          id: product.id,
-          name: product.name,
-          garment_image: product.garment_image,
-          tryonCount: productTryonCounts[product.id] || 0
-        }))
+      // Criar um mapa de shopify_id -> product
+      const shopifyIdToProduct = productsData.reduce((acc, product) => {
+        if (product.shopify_id) {
+          acc[product.shopify_id] = product;
+        }
+        acc[product.id] = product;
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Converter para array com nomes ou IDs
+      const topProducts = Object.entries(productTryonCounts)
+        .map(([productId, count]) => {
+          const product = shopifyIdToProduct[productId];
+          return {
+            id: productId,
+            name: product?.name || `Produto ${productId.substring(0, 8)}...`,
+            garment_image: product?.garment_image || null,
+            tryonCount: count
+          };
+        })
         .sort((a, b) => b.tryonCount - a.tryonCount)
         .slice(0, 10);
 

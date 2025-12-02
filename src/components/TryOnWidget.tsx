@@ -31,6 +31,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [product, setProduct] = useState<any>(null);
   const [modelImage, setModelImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState<string>('');
   const [sizeData, setSizeData] = useState<SizeCalculatorData | null>(null);
   const [calculatedSize, setCalculatedSize] = useState<string | null>(null);
   const [sizeChart, setSizeChart] = useState<any[]>([]);
@@ -195,7 +196,7 @@ const handleSubmit = async () => {
     const payload = {
       model_image: modelImageDataUrl,
       garment_image: selectedProductImage || product.garment_image,
-      customer_email: 'widget@omafit.com',
+      customer_email: customerEmail || 'anonimo@omafit.com',
       product_name: product.name,
       product_id: product.id,
       public_id: publicId,
@@ -527,6 +528,23 @@ const handleSubmit = async () => {
                   mostrando como ele ficaria no seu corpo de forma realista.
                 </p>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="customer-email" className="block text-sm font-medium text-gray-700 mb-2">
+                Seu email (opcional)
+              </label>
+              <input
+                type="email"
+                id="customer-email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Para receber notificações sobre promoções e novidades
+              </p>
             </div>
 
             <div className="space-y-2 md:space-y-3">
