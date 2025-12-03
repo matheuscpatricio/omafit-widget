@@ -235,8 +235,8 @@ export function DashboardPage() {
               </video>
             </div>
             <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-1">Tutorial 1</h3>
-              <p className="text-sm text-gray-600">Descrição do tutorial</p>
+              <h3 className="font-semibold text-gray-900 mb-1">Introdução</h3>
+              <p className="text-sm text-gray-600">Conheça o Omafit Admin</p>
             </div>
           </div>
 
@@ -251,8 +251,8 @@ export function DashboardPage() {
               </video>
             </div>
             <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-1">Tutorial 2</h3>
-              <p className="text-sm text-gray-600">Descrição do tutorial</p>
+              <h3 className="font-semibold text-gray-900 mb-1">Instale o widget do Omafit</h3>
+              <p className="text-sm text-gray-600">Aprenda a colocar o Omafit no seu site</p>
             </div>
           </div>
 
