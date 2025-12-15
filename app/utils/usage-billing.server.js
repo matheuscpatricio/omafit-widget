@@ -102,37 +102,37 @@ export async function registerImageUsageAndBill(shopDomain, imagesCount = 1, adm
 
     // Há imagens extras para cobrar - criar usage record na Shopify
 
-    // IMPORTANTE: Precisamos do shopify_usage_line_item_id
-    // Este ID vem da linha de item de uso da assinatura
-    // Por enquanto, vamos usar o shopify_app_subscription_id
-    // TODO: Na criação da assinatura, você pode adicionar uma linha de usage pricing
-    // e salvar o ID dela em shopify_usage_line_item_id
-
-    const subscriptionLineItemId = updatedShop.shopify_usage_line_item_id
-      || updatedShop.shopify_app_subscription_id;
+    const subscriptionLineItemId = updatedShop.shopify_usage_line_item_id;
 
     if (!subscriptionLineItemId) {
-      console.error('[Usage Billing] Subscription line item ID não encontrado');
+      console.warn('[Usage Billing] ⚠️ Usage line item ID não encontrado - uso registrado, mas cobrança pendente');
       return {
-        success: false,
-        error: 'Subscription line item ID não configurado',
-        billed: false
+        success: true,
+        billed: false,
+        reason: 'no_usage_line_item',
+        message: 'Uso registrado. Cobrança será processada quando a assinatura for ativada.',
+        usage: {
+          used: updatedShop.images_used_month,
+          included: updatedShop.images_included,
+          extraImages: billing.extraImages
+        }
       };
     }
 
-    // Criar cliente Admin se não foi passado
-    let admin = adminClient;
-    if (!admin) {
-      // TODO: Você precisa ter acesso ao admin client aqui
-      // Opção 1: Passar sempre como parâmetro
-      // Opção 2: Criar uma rota API que chama esta função
-      // Opção 3: Usar offline access token salvo no Supabase
-      console.error('[Usage Billing] Admin client não disponível');
+    // Se não tiver admin client, apenas registrar uso sem cobrar agora
+    if (!adminClient) {
+      console.warn('[Usage Billing] ⚠️ Admin client não disponível - uso registrado, cobrança será processada depois');
       return {
-        success: false,
-        error: 'Admin client não disponível',
+        success: true,
         billed: false,
-        note: 'Chame esta função passando o admin client ou via rota API'
+        reason: 'no_admin_client',
+        message: 'Uso registrado. Cobrança será processada no próximo ciclo.',
+        usage: {
+          used: updatedShop.images_used_month,
+          included: updatedShop.images_included,
+          extraImages: billing.extraImages,
+          pendingAmount: billing.amount
+        }
       };
     }
 
@@ -150,7 +150,7 @@ export async function registerImageUsageAndBill(shopDomain, imagesCount = 1, adm
     console.log('[Usage Billing] Criando usage record na Shopify:', variables);
 
     // Chamar a Shopify GraphQL API
-    const response = await admin.graphql(CREATE_USAGE_RECORD_MUTATION, { variables });
+    const response = await adminClient.graphql(CREATE_USAGE_RECORD_MUTATION, { variables });
     const responseJson = await response.json();
     const { appUsageRecordCreate } = responseJson.data || {};
 

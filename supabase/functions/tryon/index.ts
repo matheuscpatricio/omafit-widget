@@ -284,6 +284,48 @@ Deno.serve(async (req: Request) => {
         .eq('status', 'active')
     ]);
 
+    // ✅ BILLING SHOPIFY: Registrar uso de imagem e cobrar se necessário
+    try {
+      // Buscar shop_domain do usuário via shopify_stores
+      const { data: shopifyStore } = await supabaseClient
+        .from('shopify_stores')
+        .select('store_url')
+        .eq('user_id', widgetKeyData.user_id)
+        .maybeSingle();
+
+      if (shopifyStore && shopifyStore.store_url) {
+        const shopDomain = shopifyStore.store_url;
+        console.log(`[Billing] Registrando uso de imagem para loja: ${shopDomain}`);
+
+        // Chamar API de billing do app principal
+        const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://autumn-sophisticated-smoking-asian.trycloudflare.com';
+
+        const billingResponse = await fetch(`${appUrl}/api/billing/usage`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            shopDomain: shopDomain,
+            imagesCount: 1
+          })
+        });
+
+        if (billingResponse.ok) {
+          const billingResult = await billingResponse.json();
+          console.log('[Billing] ✅ Uso registrado:', billingResult);
+        } else {
+          const errorText = await billingResponse.text();
+          console.error('[Billing] ⚠️ Erro ao registrar uso:', errorText);
+        }
+      } else {
+        console.warn('[Billing] ⚠️ shop_domain não encontrado para user_id:', widgetKeyData.user_id);
+      }
+    } catch (billingError) {
+      // Não falhar a requisição principal se o billing der erro
+      console.error('[Billing] ⚠️ Erro ao processar billing:', billingError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

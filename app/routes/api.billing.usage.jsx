@@ -26,9 +26,6 @@ import { registerImageUsageAndBill } from '../utils/usage-billing.server';
 
 export const action = async ({ request }) => {
   try {
-    // Autenticar com Shopify
-    const { admin } = await authenticate.admin(request);
-
     // Parse do body
     const body = await request.json();
     const { shopDomain, imagesCount = 1 } = body;
@@ -42,6 +39,16 @@ export const action = async ({ request }) => {
     }
 
     console.log(`[API Usage] Registrando ${imagesCount} imagens para ${shopDomain}`);
+
+    // Tentar obter admin client da sessão Shopify (se disponível)
+    let admin = null;
+    try {
+      const auth = await authenticate.admin(request);
+      admin = auth.admin;
+    } catch (authError) {
+      // Se não tiver autenticação Shopify (chamada externa), admin será null
+      console.log('[API Usage] Chamada sem autenticação Shopify - processando sem admin client');
+    }
 
     // Registrar uso e cobrar se necessário
     const result = await registerImageUsageAndBill(shopDomain, imagesCount, admin);

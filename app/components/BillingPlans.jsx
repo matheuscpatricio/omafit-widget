@@ -219,10 +219,10 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
 
             <BlockStack gap="100">
               <Text variant="bodyMd" fontWeight="semibold">
-                O trial é gratuito?
+                Qual é o limite de cobrança por uso?
               </Text>
               <Text variant="bodyMd" tone="subdued">
-                Sim! Os planos Starter e Pro incluem 7 dias de trial gratuito. Você não será cobrado durante este período.
+                Há um limite de segurança (capped amount) na cobrança por imagens extras. Você nunca será cobrado além desse limite sem autorização.
               </Text>
             </BlockStack>
           </BlockStack>

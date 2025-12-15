@@ -53,6 +53,7 @@ export async function getPlanDetails(planName) {
  * @param {string} params.plan - Nome do plano
  * @param {Object} params.planDetails - Detalhes do plano
  * @param {string} params.subscriptionId - ID da assinatura Shopify
+ * @param {string} params.usageLineItemId - ID da linha de item de uso
  * @param {string} params.status - Status do billing
  * @returns {Promise<Object>} Dados da loja
  */
@@ -62,6 +63,7 @@ export async function upsertShopBilling({
   plan,
   planDetails,
   subscriptionId = null,
+  usageLineItemId = null,
   status = 'pending'
 }) {
   const now = new Date();
@@ -85,6 +87,10 @@ export async function upsertShopBilling({
 
   if (subscriptionId) {
     shopData.shopify_app_subscription_id = subscriptionId;
+  }
+
+  if (usageLineItemId) {
+    shopData.shopify_usage_line_item_id = usageLineItemId;
   }
 
   // Tenta fazer upsert (insert ou update)
