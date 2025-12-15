@@ -1179,7 +1179,7 @@ export function WidgetGeneratorPage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">4</span>
-                  <span>Encontre <strong>Omafit Virtual Try-On</strong> e ative o toggle</span>
+                  <span>Encontre <strong>Omafit</strong> e ative o toggle</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">5</span>
