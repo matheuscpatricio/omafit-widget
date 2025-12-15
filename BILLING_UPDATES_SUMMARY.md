@@ -69,7 +69,7 @@ const returnUrl = `${process.env.SHOPIFY_APP_URL || 'https://autumn-sophisticate
 
 **URL configurada:**
 ```
-https://autumn-sophisticated-smoking-asian.trycloudflare.com
+https://ranging-drill-proper-wayne.trycloudflare.com
 ```
 
 ---
