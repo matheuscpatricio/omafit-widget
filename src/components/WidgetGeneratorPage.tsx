@@ -74,9 +74,13 @@ export function WidgetGeneratorPage() {
       const { error } = await supabase
         .from('widget_keys')
         .update({
-          name: linkText,
+          link_text: linkText,
+          primary_color: linkColor,
           link_color: linkColor,
           popup_color: popupColor,
+          text_color: linkColor,
+          background_color: '#ffffff',
+          overlay_color: linkColor + 'CC',
           store_name: storeName,
           store_logo: storeLogo,
           font_family: selectedFont,
@@ -1127,71 +1131,82 @@ export function WidgetGeneratorPage() {
           </div>
         </div>
 
-        {/* Widget Code */}
+        {/* Widget Installation */}
         <div className="bg-white rounded-xl shadow-sm border p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-            <h3 className="text-lg md:text-xl font-semibold text-[#810707]">Código do Widget</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className="px-3 py-2 text-[#810707] border border-[#810707] rounded-lg hover:bg-[#810707] hover:text-white transition-all flex items-center gap-2"
-              >
-                <Eye className="w-4 h-4" />
-                {showPreview ? 'Ocultar' : 'Preview'}
-              </button>
-              <button
-                onClick={copyToClipboard}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  copied
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'bg-[#810707] text-white hover:bg-red-800'
-                }`}
-              >
-                {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copiado!' : 'Copiar'}
-              </button>
-            </div>
+            <h3 className="text-lg md:text-xl font-semibold text-[#810707]">Instalação do Widget</h3>
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="px-3 py-2 text-[#810707] border border-[#810707] rounded-lg hover:bg-[#810707] hover:text-white transition-all flex items-center gap-2"
+            >
+              <Eye className="w-4 h-4" />
+              {showPreview ? 'Ocultar' : 'Preview'}
+            </button>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6">
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Code className="w-5 h-5 text-blue-600" />
-              Como Instalar na Shopify
-            </h4>
-            <ol className="space-y-3 text-gray-700">
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">1</span>
-                <span>Clique em <strong>Copiar</strong> acima para copiar o código do widget</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">2</span>
-                <span>Abra a <strong>Shopify</strong></span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">3</span>
-                <span>Vá em <strong>Loja online → Temas</strong></span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">4</span>
-                <span>Clique em <strong>Personalizar</strong> no tema ativo</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">5</span>
-                <span>Navegue até uma <strong>Página do produto</strong></span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">6</span>
-                <span>Na seção <strong>Informações do produto</strong>, adicione um bloco <strong>Liquid personalizado</strong> abaixo dos botões de comprar</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">7</span>
-                <span><strong>Cole o código</strong> copiado no campo do bloco Liquid</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">8</span>
-                <span>Clique em <strong>Salvar</strong></span>
-              </li>
-            </ol>
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Suas personalizações foram salvas automaticamente!
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    Todas as alterações de cores, logo e fonte serão aplicadas automaticamente no seu widget.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6">
+              <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-600" />
+                Como Ativar o Widget na Shopify
+              </h4>
+              <ol className="space-y-3 text-gray-700 mb-4">
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">1</span>
+                  <span>Instale o <strong>App Omafit</strong> na sua loja Shopify (se ainda não instalou)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">2</span>
+                  <span>Clique no botão abaixo para abrir o <strong>Editor de Tema</strong></span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">3</span>
+                  <span>No Editor, clique em <strong>App embeds</strong> (ícone de quebra-cabeça no canto inferior esquerdo)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">4</span>
+                  <span>Encontre <strong>Omafit Virtual Try-On</strong> e ative o toggle</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">5</span>
+                  <span>Clique em <strong>Salvar</strong> no canto superior direito</span>
+                </li>
+              </ol>
+
+              <a
+                href={`https://admin.shopify.com/themes/current/editor`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#810707] text-white rounded-lg hover:bg-red-800 transition-all font-medium"
+              >
+                <Settings className="w-5 h-5" />
+                Abrir Editor de Tema da Shopify
+              </a>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Importante:</p>
+                  <p>O widget usa suas personalizações automaticamente. Não é necessário copiar ou colar nenhum código. Basta ativar o app embed no Editor de Tema.</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {showPreview && (
