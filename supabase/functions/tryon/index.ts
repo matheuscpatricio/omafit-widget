@@ -298,7 +298,7 @@ Deno.serve(async (req: Request) => {
         console.log(`[Billing] Registrando uso de imagem para loja: ${shopDomain}`);
 
         // Chamar API de billing do app principal
-        const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://autumn-sophisticated-smoking-asian.trycloudflare.com';
+        const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://ranging-drill-proper-wayne.trycloudflare.com';
 
         const billingResponse = await fetch(`${appUrl}/api/billing/usage`, {
           method: 'POST',

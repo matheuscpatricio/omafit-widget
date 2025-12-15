@@ -135,7 +135,7 @@ export const action = async ({ request }) => {
 
     // Montar variáveis para a mutation
     const planDisplayName = planDetails.display_name || plan.charAt(0).toUpperCase() + plan.slice(1);
-    const returnUrl = `${process.env.SHOPIFY_APP_URL || 'https://autumn-sophisticated-smoking-asian.trycloudflare.com'}/admin/billing/return`;
+    const returnUrl = `${process.env.SHOPIFY_APP_URL || 'https://ranging-drill-proper-wayne.trycloudflare.com'}/admin/billing/return`;
 
     // Calcular capped amount (limite máximo de cobrança por uso)
     // Exemplo: Se o plano inclui 100 imagens a $0.17 cada,
