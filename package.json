@@ -12,6 +12,7 @@
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
     "@google-cloud/firestore": "^7.11.2",
+    "@shopify/polaris": "^13.9.5",
     "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/supabase-js": "^2.39.0",
     "firebase": "^11.10.0",
