@@ -4,6 +4,7 @@ import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
+import NeuralNetworkHero from './ui/neural-network-hero';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -150,52 +151,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </header>
 
-      {/* Hero Section - Parallax Banner with Text */}
-      <section className="relative w-full overflow-hidden bg-gray-100" style={{ height: '100vh', minHeight: '600px' }}>
-        {/* Parallax Background - Desktop */}
-        <div
-          className="hidden md:flex absolute inset-0 w-full h-full"
-          style={{
-            transform: `translateY(${scrollY * 0.5}px)`,
-            transition: 'transform 0.1s ease-out'
-          }}
-        >
-          <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/omafitbanner2.png"
-            alt="Hero"
-            className="w-full h-full object-cover object-center"
-            loading="eager"
-          />
-        </div>
-
-        {/* Parallax Background - Mobile */}
-        <div
-          className="flex md:hidden absolute inset-0 w-full h-full"
-          style={{
-            transform: `translateY(${scrollY * 0.3}px)`,
-            transition: 'transform 0.1s ease-out'
-          }}
-        >
-          <img
-            src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/Omafit%20image%202.png"
-            alt="Hero Mobile"
-            className="w-full h-full object-cover"
-            loading="eager"
-          />
-        </div>
-
-        {/* Centered Text with Animation */}
-        <div className="relative z-10 h-full flex items-center justify-center">
-          <div className="text-center px-4 animate-fade-in-up">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-              Encante seus clientes com uma<br /><span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
-            </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-              When techno meets fashion.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Hero Section - Neural Network Background */}
+      <NeuralNetworkHero
+        title="Encante seus clientes com uma"
+        titleItalic="experiência envolvente"
+        description="When techno meets fashion."
+      />
 
       {/* Stats Section */}
       <section className="py-12 sm:py-16 bg-white" data-animate="stats">
