@@ -91,7 +91,7 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
   if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
+    return { error: 'Não autenticado' };
   }
 
   const shopDomain = session.shop;
