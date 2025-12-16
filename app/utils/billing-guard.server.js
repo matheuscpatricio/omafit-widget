@@ -5,8 +5,7 @@
  * antes de permitir acesso a features premium
  */
 
-import { json, redirect } from '@remix-run/node';
-import { getShopBilling, isEnterprisePlan } from './shopify-billing.server';
+import { getShopBilling } from './shopify-billing.server';
 
 /**
  * Verifica se a loja tem billing ativo
@@ -83,34 +82,22 @@ export async function checkBillingAccess(shopDomain, allowEnterprise = true) {
  * @param {string} shopDomain - Domínio da loja
  * @param {Object} options - Opções
  * @param {boolean} options.allowEnterprise - Permitir Enterprise (default: true)
- * @param {string} options.redirectTo - Redirecionar para esta URL se não tiver acesso (default: null)
- * @returns {Promise<Object|null>} null se tem acesso, Response se não tem
+ * @returns {Promise<Object|null>} null se tem acesso, objeto de erro se não tem
  */
 export async function requireBilling(shopDomain, options = {}) {
-  const { allowEnterprise = true, redirectTo = null } = options;
+  const { allowEnterprise = true } = options;
 
   const result = await checkBillingAccess(shopDomain, allowEnterprise);
 
   if (result.hasAccess) {
-    // Tem acesso, retornar null (deixar continuar)
     return null;
   }
 
-  // Não tem acesso
-  if (redirectTo) {
-    // Redirecionar para página de billing
-    return redirect(redirectTo);
-  } else {
-    // Retornar erro JSON
-    return json(
-      {
-        error: result.message,
-        reason: result.reason,
-        hasAccess: false
-      },
-      { status: 403 }
-    );
-  }
+  return {
+    error: result.message,
+    reason: result.reason,
+    hasAccess: false
+  };
 }
 
 /**
@@ -167,10 +154,7 @@ export async function checkImageLimit(shopDomain) {
  *   const { session } = await authenticate.admin(request);
  *   const shopDomain = session.shop;
  *
- *   // Verificar billing
- *   const billingError = await requireBilling(shopDomain, {
- *     redirectTo: '/app/billing'
- *   });
+ *   const billingError = await requireBilling(shopDomain);
  *   if (billingError) return billingError;
  *
  *   // Se chegou aqui, tem billing ativo!

@@ -5,7 +5,6 @@
  */
 
 import { useLoaderData } from '@remix-run/react';
-import { json } from '@remix-run/node';
 import {
   Page,
   Layout,
@@ -28,7 +27,7 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
   if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
+    return { error: 'Não autenticado' };
   }
 
   const shopDomain = session.shop;
@@ -36,27 +35,19 @@ export const loader = async ({ request }) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: usageRecords, error: usageError } = await supabase
+    const { data: usageRecords } = await supabase
       .from('shopify_usage_records')
-      .select('*')
+      .select('created_at, description, images_count, amount, currency, billing_month')
+      .eq('shop_domain', shopDomain)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    const { data: tryonSessions } = await supabase
+      .from('tryon_sessions')
+      .select('created_at, status')
       .eq('shop_domain', shopDomain)
       .order('created_at', { ascending: false })
       .limit(50);
-
-    if (usageError) {
-      console.error('[Usage History] Erro ao buscar registros:', usageError);
-    }
-
-    const { data: tryonSessions, error: sessionsError } = await supabase
-      .from('tryon_sessions')
-      .select('id, created_at, status, user_measurements')
-      .eq('shop_domain', shopDomain)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (sessionsError) {
-      console.error('[Usage History] Erro ao buscar sessões:', sessionsError);
-    }
 
     const dailyUsage = {};
     if (tryonSessions) {
@@ -72,9 +63,9 @@ export const loader = async ({ request }) => {
       });
     }
 
-    const dailyUsageArray = Object.values(dailyUsage).sort((a, b) =>
-      new Date(b.date) - new Date(a.date)
-    );
+    const dailyUsageArray = Object.values(dailyUsage)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10);
 
     const { data: shopBilling } = await supabase
       .from('shopify_shops')
@@ -82,23 +73,36 @@ export const loader = async ({ request }) => {
       .eq('shop_domain', shopDomain)
       .maybeSingle();
 
-    return json({
+    return {
       shop: shopDomain,
-      usageRecords: usageRecords || [],
+      usageRecords: (usageRecords || []).map(r => ({
+        created_at: r.created_at,
+        description: r.description,
+        images_count: r.images_count,
+        amount: r.amount,
+        currency: r.currency,
+        billing_month: r.billing_month
+      })),
       dailyUsage: dailyUsageArray,
-      shopBilling: shopBilling,
+      shopBilling: shopBilling ? {
+        images_used_month: shopBilling.images_used_month,
+        images_included: shopBilling.images_included,
+        plan: shopBilling.plan,
+        billing_cycle_start: shopBilling.billing_cycle_start,
+        billing_cycle_end: shopBilling.billing_cycle_end
+      } : null,
       totalSessions: tryonSessions?.length || 0
-    });
+    };
   } catch (error) {
     console.error('[Usage History] Erro ao carregar dados:', error);
-    return json({
+    return {
       shop: shopDomain,
       usageRecords: [],
       dailyUsage: [],
       shopBilling: null,
       totalSessions: 0,
       error: error.message
-    });
+    };
   }
 };
 

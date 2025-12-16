@@ -26,7 +26,6 @@ import {
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // GraphQL mutation para criar assinatura COM usage pricing
 const CREATE_SUBSCRIPTION_MUTATION = `#graphql
@@ -119,6 +118,7 @@ export const action = async ({ request }) => {
 
     // Buscar user_id da loja via shopify_stores
     console.log(`[Billing] Buscando user_id para shop: ${shopDomain}`);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data: storeData } = await supabase
       .from('shopify_stores')
       .select('user_id')

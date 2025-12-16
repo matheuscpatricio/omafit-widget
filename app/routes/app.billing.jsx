@@ -5,7 +5,6 @@
  */
 
 import { useLoaderData, useNavigate } from '@remix-run/react';
-import { json } from '@remix-run/node';
 import { Page, Layout, BlockStack } from '@shopify/polaris';
 import { authenticate } from '../shopify.server';
 import { BillingPlans } from '../components/BillingPlans';
@@ -17,36 +16,39 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
   if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
+    return { error: 'Não autenticado' };
   }
 
   const shopDomain = session.shop;
 
   try {
-    // Buscar informações de billing da loja
     const shopBilling = await getShopBilling(shopDomain);
 
-    // Buscar uso de imagens
     let usage = null;
     if (shopBilling && shopBilling.billing_status === 'active') {
       usage = await getImageUsageInfo(shopDomain);
     }
 
-    return json({
+    return {
       shop: shopDomain,
       currentPlan: shopBilling?.plan || null,
       billingStatus: shopBilling?.billing_status || null,
-      usage: usage
-    });
+      usage: usage ? {
+        used: usage.used || 0,
+        included: usage.included || 0,
+        remaining: usage.remaining || 0,
+        percentage: usage.percentage || 0
+      } : null
+    };
   } catch (error) {
     console.error('Erro ao carregar dados de billing:', error);
-    return json({
+    return {
       shop: shopDomain,
       currentPlan: null,
       billingStatus: null,
       usage: null,
       error: error.message
-    });
+    };
   }
 };
 

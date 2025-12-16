@@ -5,7 +5,6 @@
  */
 
 import { useLoaderData, useActionData, Form, useNavigation } from '@remix-run/react';
-import { json, redirect } from '@remix-run/node';
 import {
   Page,
   Layout,
@@ -31,7 +30,7 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
   if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
+    return { error: 'Não autenticado' };
   }
 
   const shopDomain = session.shop;
@@ -39,40 +38,32 @@ export const loader = async ({ request }) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: shopifyShop, error: shopError } = await supabase
+    const { data: shopifyShop } = await supabase
       .from('shopify_shops')
       .select('user_id')
       .eq('shop_domain', shopDomain)
       .maybeSingle();
 
-    if (shopError) {
-      console.error('[Widget Config] Erro ao buscar loja:', shopError);
-    }
-
     const userId = shopifyShop?.user_id;
 
     if (!userId) {
-      return json({
+      return {
         shop: shopDomain,
         config: null,
         error: 'Loja não encontrada no banco de dados'
-      });
+      };
     }
 
-    const { data: widgetConfig, error: configError } = await supabase
+    const { data: widgetConfig } = await supabase
       .from('widget_keys')
-      .select('*')
+      .select('link_text, primary_color, background_color, text_color, overlay_color, store_name, store_logo, font_family')
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (configError) {
-      console.error('[Widget Config] Erro ao buscar configuração:', configError);
-    }
-
-    return json({
+    return {
       shop: shopDomain,
       userId: userId,
       config: widgetConfig || {
@@ -85,14 +76,14 @@ export const loader = async ({ request }) => {
         store_logo: '',
         font_family: 'Outfit, sans-serif'
       }
-    });
+    };
   } catch (error) {
     console.error('[Widget Config] Erro ao carregar configuração:', error);
-    return json({
+    return {
       shop: shopDomain,
       config: null,
       error: error.message
-    });
+    };
   }
 };
 
@@ -183,16 +174,16 @@ export const action = async ({ request }) => {
       }
     }
 
-    return json({
+    return {
       success: true,
       message: 'Configuração salva com sucesso!'
-    });
+    };
   } catch (error) {
     console.error('[Widget Config] Erro ao salvar:', error);
-    return json({
+    return {
       success: false,
       error: error.message
-    }, { status: 500 });
+    };
   }
 };
 

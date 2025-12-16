@@ -5,7 +5,6 @@
  */
 
 import { useLoaderData } from '@remix-run/react';
-import { json } from '@remix-run/node';
 import {
   Page,
   Layout,
@@ -29,7 +28,7 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
   if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
+    return { error: 'Não autenticado' };
   }
 
   const shopDomain = session.shop;
@@ -37,34 +36,36 @@ export const loader = async ({ request }) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: plans, error: plansError } = await supabase
+    const { data: plans } = await supabase
       .from('billing_plans')
-      .select('*')
+      .select('name, display_name, monthly_price, currency, images_included, price_per_extra_image')
       .eq('active', true)
       .order('monthly_price', { ascending: true, nullsLast: true });
 
-    if (plansError) {
-      console.error('[Plans] Erro ao buscar planos:', plansError);
-      throw new Error('Erro ao carregar planos');
-    }
-
     const shopBilling = await getShopBilling(shopDomain);
 
-    return json({
+    return {
       shop: shopDomain,
       currentPlan: shopBilling?.plan || null,
       billingStatus: shopBilling?.billing_status || null,
-      plans: plans || []
-    });
+      plans: (plans || []).map(p => ({
+        name: p.name,
+        display_name: p.display_name,
+        monthly_price: p.monthly_price,
+        currency: p.currency,
+        images_included: p.images_included,
+        price_per_extra_image: p.price_per_extra_image
+      }))
+    };
   } catch (error) {
     console.error('[Plans] Erro ao carregar dados:', error);
-    return json({
+    return {
       shop: shopDomain,
       currentPlan: null,
       billingStatus: null,
       plans: [],
       error: error.message
-    });
+    };
   }
 };
 
