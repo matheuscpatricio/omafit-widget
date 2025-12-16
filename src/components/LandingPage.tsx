@@ -22,6 +22,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
   const [showVideoControls, setShowVideoControls] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const videoDesktopRef = useRef<HTMLVideoElement>(null);
   const videoMobileRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -81,6 +82,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     };
   }, [showVideoModal, showPricingModal]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % 3);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleOpenPricingModal = async () => {
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -136,11 +144,19 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-white'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
             </div>
 
-            <nav className="flex space-x-8">
-              <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Recursos</a>
-              <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Benefícios</a>
-              <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Planos</a>
-            </nav>
+            <div className="flex items-center gap-8">
+              <nav className="hidden md:flex space-x-8">
+                <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Recursos</a>
+                <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Benefícios</a>
+                <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Planos</a>
+              </nav>
+              <a
+                href="mailto:contato@omafit.co"
+                className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-2 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
+              >
+                Entrar em contato
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -319,82 +335,75 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Precision & Analytics Details */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
-            {/* Size Calculator */}
-            <div className="space-y-6" data-animate="calculator-detail">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#810707] to-red-700 rounded-2xl flex items-center justify-center mb-4">
-                <Ruler className="w-8 h-8 text-white" />
+      {/* Features Carousel */}
+      <section className="py-20 bg-white overflow-hidden">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative h-96">
+            <div
+              className="flex transition-transform duration-700 ease-in-out h-full"
+              style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+            >
+              {/* Slide 1 - Calculadora de Medidas */}
+              <div className="min-w-full h-full flex items-center justify-center px-8">
+                <div className="text-center max-w-3xl">
+                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                    Calculadora de Medidas de Alta Precisão
+                  </h3>
+                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                    Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas.
+                    O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.
+                  </p>
+                  <p className="text-base sm:text-lg text-gray-500">
+                    98% de acurácia na recomendação de tamanhos • Clientes que usam a calculadora têm 3x mais chance de finalizar a compra
+                  </p>
+                </div>
               </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900">
-                Calculadora de Medidas de Alta Precisão
-              </h3>
-              <p className="text-lg text-gray-600 leading-relaxed">
-                Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas.
-                O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.
-              </p>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Precisão Comprovada</h4>
-                    <p className="text-gray-600">98% de acurácia na recomendação de tamanhos, reduzindo drasticamente devoluções por erro de numeração</p>
-                  </div>
+
+              {/* Slide 2 - Analytics */}
+              <div className="min-w-full h-full flex items-center justify-center px-8">
+                <div className="text-center max-w-3xl">
+                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                    Analytics que Transformam Dados em Decisões
+                  </h3>
+                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                    Tenha acesso a insights profundos sobre o comportamento dos seus clientes.
+                    Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.
+                  </p>
+                  <p className="text-base sm:text-lg text-gray-500">
+                    Dashboard em tempo real • Insights de produto • ROI transparente
+                  </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Experiência Personalizada</h4>
-                    <p className="text-gray-600">Cada cliente recebe recomendações únicas baseadas em seu corpo e preferências de caimento</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Confiança na Compra</h4>
-                    <p className="text-gray-600">Clientes que usam a calculadora têm 3x mais chance de finalizar a compra</p>
-                  </div>
+              </div>
+
+              {/* Slide 3 - Personalização */}
+              <div className="min-w-full h-full flex items-center justify-center px-8">
+                <div className="text-center max-w-3xl">
+                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                    Personalização Total do Provador Virtual
+                  </h3>
+                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                    Customize cada detalhe do provador virtual para refletir a identidade da sua marca.
+                    Cores, fontes, layout e muito mais podem ser ajustados para criar uma experiência única e memorável.
+                  </p>
+                  <p className="text-base sm:text-lg text-gray-500">
+                    Fortalece o branding • Aumenta reconhecimento da marca • Experiência consistente em todos os pontos de contato
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Analytics */}
-            <div className="space-y-6" data-animate="analytics-detail">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center mb-4">
-                <BarChart3 className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900">
-                Analytics que Transformam Dados em Decisões
-              </h3>
-              <p className="text-lg text-gray-600 leading-relaxed">
-                Tenha acesso a insights profundos sobre o comportamento dos seus clientes.
-                Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.
-              </p>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Dashboard em Tempo Real</h4>
-                    <p className="text-gray-600">Monitore engajamento, conversões e uso do try-on instantaneamente</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Insights de Produto</h4>
-                    <p className="text-gray-600">Descubra quais produtos têm maior engajamento e quais precisam de ajustes de tamanho</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">ROI Transparente</h4>
-                    <p className="text-gray-600">Acompanhe o impacto direto do Omafit nas suas vendas e reduções de custos</p>
-                  </div>
-                </div>
-              </div>
+            {/* Indicators */}
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2">
+              {[0, 1, 2].map((index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    currentSlide === index ? 'bg-[#810707] w-8' : 'bg-gray-300'
+                  }`}
+                  aria-label={`Ir para slide ${index + 1}`}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -494,13 +503,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <p className="text-lg sm:text-xl text-red-100 mb-8 animate-swipe-up-delay-1">
             Junte-se a centenas de marcas que já aumentaram suas vendas com o Omafit
           </p>
-          <button
-            onClick={handleOpenPricingModal}
+          <a
+            href="mailto:contato@omafit.co"
             className="bg-white text-[#810707] px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
           >
-            Assine Agora
-            <ArrowRight className="w-5 h-5" />
-          </button>
+            Entrar em contato
+            <Mail className="w-5 h-5" />
+          </a>
           <p className="text-red-200 text-sm mt-4 animate-swipe-up-delay-3">
             
           </p>
