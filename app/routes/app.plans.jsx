@@ -4,7 +4,8 @@
  * Mostra todos os planos disponíveis e permite trocar de plano
  */
 
-import { useLoaderData } from '@remix-run/react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Page,
   Layout,
@@ -14,327 +15,161 @@ import {
   InlineStack,
   Badge,
   Button,
-  Banner
+  Banner,
+  Spinner
 } from '@shopify/polaris';
-import { useState } from 'react';
-import { authenticate } from '../shopify.server';
-import { getShopBilling, getPlanDetails } from '../utils/shopify-billing.server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-
-  if (!session || !session.shop) {
-    return { error: 'Não autenticado' };
-  }
-
-  const shopDomain = session.shop;
-
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { data: plans } = await supabase
-      .from('billing_plans')
-      .select('name, display_name, monthly_price, currency, images_included, price_per_extra_image')
-      .eq('active', true)
-      .order('monthly_price', { ascending: true, nullsLast: true });
-
-    const shopBilling = await getShopBilling(shopDomain);
-
-    return {
-      shop: shopDomain,
-      currentPlan: shopBilling?.plan || null,
-      billingStatus: shopBilling?.billing_status || null,
-      plans: (plans || []).map(p => ({
-        name: p.name,
-        display_name: p.display_name,
-        monthly_price: p.monthly_price,
-        currency: p.currency,
-        images_included: p.images_included,
-        price_per_extra_image: p.price_per_extra_image
-      }))
-    };
-  } catch (error) {
-    console.error('[Plans] Erro ao carregar dados:', error);
-    return {
-      shop: shopDomain,
-      currentPlan: null,
-      billingStatus: null,
-      plans: [],
-      error: error.message
-    };
-  }
-};
+import { startBillingSubscription } from './api.billing.start';
 
 export default function PlansPage() {
-  const { shop, currentPlan, billingStatus, plans, error } = useLoaderData();
-  const [loading, setLoading] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(null);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const shopDomain = searchParams.get('shop') || 'demo-shop.myshopify.com';
+  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState([]);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleSelectPlan = async (planName) => {
-    setErrorMessage(null);
-    setLoading(planName);
+  useEffect(() => {
+    loadData();
+  }, []);
 
+  const loadData = async () => {
     try {
-      if (planName === 'enterprise') {
-        window.open('mailto:contato@omafit.co?subject=Interesse no Plano Enterprise', '_blank');
-        setLoading(null);
-        return;
+      setLoading(true);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const [plansResponse, shopResponse] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/billing_plans?order=monthly_price.asc`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${supabaseUrl}/rest/v1/shopify_shops?shop_domain=eq.${shopDomain}`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
+
+      if (plansResponse.ok) {
+        const plansData = await plansResponse.json();
+        setPlans(plansData);
       }
 
-      const response = await fetch('/api/billing/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ plan: planName })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao iniciar assinatura');
+      if (shopResponse.ok) {
+        const shopData = await shopResponse.json();
+        setCurrentPlan(shopData[0]?.plan || null);
       }
-
-      if (data.confirmationUrl) {
-        window.top.location.href = data.confirmationUrl;
-      }
-    } catch (err) {
-      console.error('[Plans] Erro ao selecionar plano:', err);
-      setErrorMessage(err.message);
-      setLoading(null);
+    } catch (error) {
+      console.error('[Plans] Error loading data:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getPlanFeatures = (planName) => {
-    const features = {
-      starter: [
-        'Widget customizável',
-        'Analytics básico',
-        'Suporte via email',
-        'Integração com catálogo Shopify'
-      ],
-      pro: [
-        'Widget totalmente customizável',
-        'Analytics avançado',
-        'Suporte prioritário',
-        'Integração API',
-        'Relatórios detalhados',
-        'Múltiplas configurações de widget'
-      ],
-      enterprise: [
-        'Imagens ilimitadas',
-        'Gerente de conta dedicado',
-        'SLA garantido',
-        'Suporte 24/7',
-        'Onboarding personalizado',
-        'White label disponível',
-        'Desenvolvimento customizado',
-        'Prioridade no roadmap'
-      ]
-    };
+  const handleSelectPlan = async (planName) => {
+    try {
+      setSelectedPlan(planName);
+      setError(null);
 
-    return features[planName] || [];
+      const result = await startBillingSubscription(planName, shopDomain);
+
+      if (result.error) {
+        setError(result.error);
+        setSelectedPlan(null);
+        return;
+      }
+
+      if (result.confirmationUrl) {
+        window.location.href = result.confirmationUrl;
+      }
+    } catch (error) {
+      console.error('[Plans] Error selecting plan:', error);
+      setError(error.message);
+      setSelectedPlan(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <Page title="Plans">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400" inlineAlign="center">
+                <Spinner size="large" />
+                <Text variant="bodyMd">Loading plans...</Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
 
   return (
     <Page
-      title="Planos Omafit"
-      subtitle="Escolha o plano ideal para sua loja"
-      backAction={{ content: 'Dashboard', url: '/app' }}
+      title="Choose Your Plan"
+      backAction={{ content: 'Dashboard', onAction: () => navigate(`/app?shop=${shopDomain}`) }}
     >
       <Layout>
         {error && (
           <Layout.Section>
-            <Banner tone="critical">
-              <p>Erro ao carregar planos: {error}</p>
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {errorMessage && (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setErrorMessage(null)}>
-              <p>{errorMessage}</p>
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {currentPlan && (
-          <Layout.Section>
-            <Banner tone="info">
-              <p>
-                Seu plano atual: <strong>{currentPlan.toUpperCase()}</strong>
-                {billingStatus === 'active' ? ' (Ativo)' : ` (Status: ${billingStatus})`}
-              </p>
+            <Banner tone="critical" onDismiss={() => setError(null)}>
+              <p>{error}</p>
             </Banner>
           </Layout.Section>
         )}
 
         <Layout.Section>
           <BlockStack gap="400">
-            <InlineStack gap="400" align="start" wrap>
-              {plans.map((plan) => {
-                const isCurrent = currentPlan === plan.name;
-                const isLoading = loading === plan.name;
-                const isEnterprise = plan.name === 'enterprise';
-                const isPro = plan.name === 'pro';
-                const features = getPlanFeatures(plan.name);
+            {plans.map((plan) => (
+              <Card key={plan.plan_name}>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="200">
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text variant="headingLg" as="h2">
+                          {plan.display_name}
+                        </Text>
+                        {currentPlan === plan.plan_name && (
+                          <Badge tone="success">Current Plan</Badge>
+                        )}
+                      </InlineStack>
 
-                return (
-                  <div key={plan.name} style={{ flex: '1 1 300px', minWidth: '300px' }}>
-                    <Card>
-                      <BlockStack gap="400">
-                        <BlockStack gap="200">
-                          <InlineStack align="space-between" blockAlign="center" wrap>
-                            <Text variant="headingLg" as="h2">
-                              {plan.display_name}
-                            </Text>
-                            <InlineStack gap="200">
-                              {isPro && (
-                                <Badge tone="success">Mais Popular</Badge>
-                              )}
-                              {isEnterprise && (
-                                <Badge tone="info">Sob Consulta</Badge>
-                              )}
-                              {isCurrent && (
-                                <Badge tone="success">Plano Atual</Badge>
-                              )}
-                            </InlineStack>
-                          </InlineStack>
+                      <Text variant="bodyLg">
+                        {plan.currency} ${plan.monthly_price}/month
+                      </Text>
 
-                          {plan.monthly_price !== null ? (
-                            <BlockStack gap="100">
-                              <InlineStack align="start" blockAlign="end" gap="100">
-                                <Text variant="heading2xl" as="p">
-                                  {plan.currency} ${plan.monthly_price}
-                                </Text>
-                                <Text variant="bodyLg" tone="subdued">
-                                  /mês
-                                </Text>
-                              </InlineStack>
-                            </BlockStack>
-                          ) : (
-                            <BlockStack gap="100">
-                              <Text variant="heading2xl" as="p">
-                                Customizado
-                              </Text>
-                              <Text variant="bodyMd" tone="subdued">
-                                Entre em contato
-                              </Text>
-                            </BlockStack>
-                          )}
+                      <Text variant="bodyMd" tone="subdued">
+                        {plan.images_included} images included
+                      </Text>
 
-                          {plan.images_included && (
-                            <BlockStack gap="100">
-                              <Text variant="bodyLg" fontWeight="semibold">
-                                {plan.images_included} imagens/mês
-                              </Text>
-                              <Text variant="bodyMd" tone="subdued">
-                                {plan.currency} ${plan.price_per_extra_image} por imagem extra
-                              </Text>
-                            </BlockStack>
-                          )}
+                      <Text variant="bodyMd" tone="subdued">
+                        Extra images: {plan.currency} ${plan.price_per_extra_image} each
+                      </Text>
+                    </BlockStack>
 
-                          {isEnterprise && (
-                            <Text variant="bodyLg" fontWeight="semibold">
-                              Imagens ilimitadas
-                            </Text>
-                          )}
-                        </BlockStack>
-
-                        <BlockStack gap="200">
-                          <Text variant="headingSm" as="h3">
-                            Recursos incluídos:
-                          </Text>
-                          {features.map((feature, index) => (
-                            <InlineStack key={index} gap="200" blockAlign="start">
-                              <Text>✓</Text>
-                              <Text>{feature}</Text>
-                            </InlineStack>
-                          ))}
-                        </BlockStack>
-
-                        <Button
-                          variant={isPro ? 'primary' : 'secondary'}
-                          fullWidth
-                          onClick={() => handleSelectPlan(plan.name)}
-                          loading={isLoading}
-                          disabled={isCurrent || (loading && !isLoading)}
-                        >
-                          {isCurrent
-                            ? 'Plano Atual'
-                            : isEnterprise
-                            ? 'Fale Conosco'
-                            : 'Assinar Plano'}
-                        </Button>
-                      </BlockStack>
-                    </Card>
-                  </div>
-                );
-              })}
-            </InlineStack>
+                    <Button
+                      variant={currentPlan === plan.plan_name ? 'secondary' : 'primary'}
+                      onClick={() => handleSelectPlan(plan.plan_name)}
+                      loading={selectedPlan === plan.plan_name}
+                      disabled={currentPlan === plan.plan_name || selectedPlan !== null}
+                    >
+                      {currentPlan === plan.plan_name ? 'Current Plan' : 'Select Plan'}
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+            ))}
           </BlockStack>
-        </Layout.Section>
-
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text variant="headingMd" as="h2">
-                Perguntas Frequentes
-              </Text>
-
-              <BlockStack gap="400">
-                <BlockStack gap="100">
-                  <Text variant="bodyMd" fontWeight="semibold">
-                    Como funciona a cobrança por imagens extras?
-                  </Text>
-                  <Text variant="bodyMd" tone="subdued">
-                    Se você ultrapassar o limite de imagens incluídas no seu plano, cobraremos automaticamente por cada imagem adicional gerada, de acordo com a taxa do seu plano. A cobrança é feita através do sistema de billing da Shopify.
-                  </Text>
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text variant="bodyMd" fontWeight="semibold">
-                    Posso trocar de plano a qualquer momento?
-                  </Text>
-                  <Text variant="bodyMd" tone="subdued">
-                    Sim! Você pode fazer upgrade ou downgrade do seu plano a qualquer momento. O novo plano entrará em vigor imediatamente e a cobrança será ajustada proporcionalmente.
-                  </Text>
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text variant="bodyMd" fontWeight="semibold">
-                    Como funciona o limite de cobrança (capped amount)?
-                  </Text>
-                  <Text variant="bodyMd" tone="subdued">
-                    Há um limite de segurança na cobrança por imagens extras para evitar surpresas. Se você atingir esse limite, o sistema pausará a geração de novas imagens até que você aprove um novo limite ou até o próximo ciclo de billing.
-                  </Text>
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text variant="bodyMd" fontWeight="semibold">
-                    O que está incluído no plano Enterprise?
-                  </Text>
-                  <Text variant="bodyMd" tone="subdued">
-                    O plano Enterprise é totalmente customizável para atender às necessidades específicas da sua empresa. Inclui imagens ilimitadas, suporte dedicado, SLA garantido e muito mais. Entre em contato para uma proposta personalizada.
-                  </Text>
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text variant="bodyMd" fontWeight="semibold">
-                    Posso cancelar minha assinatura?
-                  </Text>
-                  <Text variant="bodyMd" tone="subdued">
-                    Sim, você pode cancelar sua assinatura a qualquer momento através das configurações de billing da sua loja Shopify. Não há multas ou taxas de cancelamento.
-                  </Text>
-                </BlockStack>
-              </BlockStack>
-            </BlockStack>
-          </Card>
         </Layout.Section>
       </Layout>
     </Page>

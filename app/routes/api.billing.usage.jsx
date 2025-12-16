@@ -20,46 +20,46 @@
  * }
  */
 
-import { json } from '@remix-run/node';
-import { authenticate } from '../shopify.server';
-import { registerImageUsageAndBill } from '../utils/usage-billing.server';
-
-export const action = async ({ request }) => {
+export const registerImageUsage = async (shopDomain, imagesCount = 1) => {
   try {
-    // Parse do body
-    const body = await request.json();
-    const { shopDomain, imagesCount = 1 } = body;
-
     if (!shopDomain) {
-      return json({ error: 'shopDomain é obrigatório' }, { status: 400 });
+      throw new Error('shopDomain is required');
     }
 
     if (typeof imagesCount !== 'number' || imagesCount < 1) {
-      return json({ error: 'imagesCount deve ser um número maior que 0' }, { status: 400 });
+      throw new Error('imagesCount must be a number greater than 0');
     }
 
-    console.log(`[API Usage] Registrando ${imagesCount} imagens para ${shopDomain}`);
+    console.log(`[API Usage] Registering ${imagesCount} images for ${shopDomain}`);
 
-    // Tentar obter admin client da sessão Shopify (se disponível)
-    let admin = null;
-    try {
-      const auth = await authenticate.admin(request);
-      admin = auth.admin;
-    } catch (authError) {
-      // Se não tiver autenticação Shopify (chamada externa), admin será null
-      console.log('[API Usage] Chamada sem autenticação Shopify - processando sem admin client');
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/shopify-billing-usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`
+      },
+      body: JSON.stringify({
+        shopDomain,
+        imagesCount
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error registering usage');
     }
 
-    // Registrar uso e cobrar se necessário
-    const result = await registerImageUsageAndBill(shopDomain, imagesCount, admin);
-
-    return json(result);
+    const result = await response.json();
+    return result;
 
   } catch (error) {
-    console.error('[API Usage] Erro:', error);
-    return json({
+    console.error('[API Usage] Error:', error);
+    return {
       success: false,
       error: error.message
-    }, { status: 500 });
+    };
   }
 };

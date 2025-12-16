@@ -4,107 +4,101 @@
  * Exibe os planos disponíveis e o uso atual de imagens
  */
 
-import { useLoaderData, useNavigate } from '@remix-run/react';
-import { Page, Layout, BlockStack } from '@shopify/polaris';
-import { authenticate } from '../shopify.server';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Page, Layout, BlockStack, Spinner, Card, Text } from '@shopify/polaris';
 import { BillingPlans } from '../components/BillingPlans';
 import { UsageIndicator } from '../components/UsageIndicator';
-import { getShopBilling } from '../utils/shopify-billing.server';
-import { getImageUsageInfo } from '../utils/usage-billing.server';
-
-export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-
-  if (!session || !session.shop) {
-    return { error: 'Não autenticado' };
-  }
-
-  const shopDomain = session.shop;
-
-  try {
-    const shopBilling = await getShopBilling(shopDomain);
-
-    let usage = null;
-    if (shopBilling && shopBilling.billing_status === 'active') {
-      usage = await getImageUsageInfo(shopDomain);
-    }
-
-    return {
-      shop: shopDomain,
-      currentPlan: shopBilling?.plan || null,
-      billingStatus: shopBilling?.billing_status || null,
-      usage: usage ? {
-        used: usage.used || 0,
-        included: usage.included || 0,
-        remaining: usage.remaining || 0,
-        percentage: usage.percentage || 0
-      } : null
-    };
-  } catch (error) {
-    console.error('Erro ao carregar dados de billing:', error);
-    return {
-      shop: shopDomain,
-      currentPlan: null,
-      billingStatus: null,
-      usage: null,
-      error: error.message
-    };
-  }
-};
 
 export default function BillingPage() {
-  const { shop, currentPlan, billingStatus, usage, error } = useLoaderData();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const shopDomain = searchParams.get('shop') || 'demo-shop.myshopify.com';
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(null);
 
-  const handleSelectPlan = async (planName) => {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
     try {
-      // Chamar API para iniciar billing
-      const response = await fetch('/api/billing/start', {
-        method: 'POST',
+      setLoading(true);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/shopify_shops?shop_domain=eq.${shopDomain}`, {
         headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ plan: planName })
+        }
       });
 
-      const data = await response.json();
+      if (response.ok) {
+        const shopData = await response.json();
+        const shop = shopData[0];
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao iniciar assinatura');
+        setData({
+          shop: shopDomain,
+          currentPlan: shop?.plan || null,
+          billingStatus: shop?.billing_status || null,
+          usage: shop ? {
+            used: shop.images_used_month || 0,
+            included: shop.images_included || 0,
+            remaining: Math.max(0, (shop.images_included || 0) - (shop.images_used_month || 0)),
+            percentage: shop.images_included > 0
+              ? Math.min(100, ((shop.images_used_month || 0) / shop.images_included) * 100)
+              : 0,
+            withinLimit: (shop.images_used_month || 0) <= (shop.images_included || 0)
+          } : null
+        });
       }
-
-      // Redirecionar para confirmationUrl da Shopify
-      if (data.confirmationUrl) {
-        // Usar window.top para sair do iframe do Shopify Admin
-        window.top.location.href = data.confirmationUrl;
-      }
-    } catch (err) {
-      console.error('Erro ao selecionar plano:', err);
-      alert(`Erro: ${err.message}`);
+    } catch (error) {
+      console.error('[Billing] Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleSelectPlan = async (plan) => {
+    navigate(`/app/plans?shop=${shopDomain}&plan=${plan}`);
+  };
+
+  if (loading) {
+    return (
+      <Page title="Billing">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400" inlineAlign="center">
+                <Spinner size="large" />
+                <Text variant="bodyMd">Loading...</Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
   return (
     <Page
-      title="Planos e Billing"
-      subtitle="Gerencie sua assinatura e uso de imagens"
+      title="Billing"
+      backAction={{ content: 'Dashboard', onAction: () => navigate(`/app?shop=${shopDomain}`) }}
     >
       <Layout>
-        {/* Uso atual (se houver plano ativo) */}
-        {usage && (
+        {data?.usage && (
           <Layout.Section>
-            <UsageIndicator usage={usage} />
+            <UsageIndicator usage={data.usage} />
           </Layout.Section>
         )}
 
-        {/* Planos disponíveis */}
         <Layout.Section>
-          <BlockStack gap="400">
-            <BillingPlans
-              currentPlan={currentPlan}
-              onSelectPlan={handleSelectPlan}
-            />
-          </BlockStack>
+          <BillingPlans
+            currentPlan={data?.currentPlan}
+            onSelectPlan={handleSelectPlan}
+          />
         </Layout.Section>
       </Layout>
     </Page>

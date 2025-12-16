@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from '@remix-run/react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Page,
   Layout,
@@ -19,12 +19,6 @@ import {
   Badge,
   ProgressBar
 } from '@shopify/polaris';
-import { authenticate } from '../shopify.server';
-
-export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-  return {};
-};
 
 export default function AnalyticsPage() {
   const [searchParams] = useSearchParams();
