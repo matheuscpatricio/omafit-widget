@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Pause, Mail, DollarSign, Package } from 'lucide-react';
+import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Pause, Mail, DollarSign, Package, Ruler, BarChart3 } from 'lucide-react';
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import NeuralNetworkHero from './ui/neural-network-hero';
+import { ZoomParallax } from './ui/zoom-parallax';
+import Lenis from '@studio-freight/lenis';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -25,15 +27,26 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    const lenis = new Lenis();
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       setScrollY(currentScrollY);
-      // Show header after scrolling past the video hero section
       setShowHeader(currentScrollY > window.innerHeight * 0.8);
     };
 
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      lenis.destroy();
+    };
   }, []);
 
   useEffect(() => {
@@ -123,30 +136,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-white'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
             </div>
 
-            <nav className="hidden md:flex space-x-8">
+            <nav className="flex space-x-8">
               <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Recursos</a>
               <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Benefícios</a>
               <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Planos</a>
             </nav>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onLogin}
-                className={`px-4 py-2 rounded-lg transition-all font-medium ${
-                  showHeader
-                    ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
-                    : 'text-white hover:text-gray-200 hover:bg-white/10'
-                }`}
-              >
-                Login
-              </button>
-              <button
-                onClick={handleOpenPricingModal}
-                className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-1 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
-              >
-                Registrar
-              </button>
-            </div>
           </div>
         </div>
       </header>
@@ -281,6 +275,131 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
+      {/* ZoomParallax Section - Precision & Analytics */}
+      <section className="relative bg-black">
+        <ZoomParallax
+          images={[
+            {
+              src: 'https://images.unsplash.com/photo-1558769132-cb1aea1f8e67?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Precisão na medição',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Analytics avançado',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=800&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Dados em tempo real',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Moda e tecnologia',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=800&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Dashboard intuitivo',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1558769132-92e717d613cd?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Medidas precisas',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              alt: 'Relatórios detalhados',
+            },
+          ]}
+        />
+
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center px-4 max-w-4xl">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-8 drop-shadow-2xl">
+              Precisão e Inteligência
+            </h2>
+          </div>
+        </div>
+      </section>
+
+      {/* Precision & Analytics Details */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+            {/* Size Calculator */}
+            <div className="space-y-6" data-animate="calculator-detail">
+              <div className="w-16 h-16 bg-gradient-to-br from-[#810707] to-red-700 rounded-2xl flex items-center justify-center mb-4">
+                <Ruler className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900">
+                Calculadora de Medidas de Alta Precisão
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas.
+                O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Precisão Comprovada</h4>
+                    <p className="text-gray-600">98% de acurácia na recomendação de tamanhos, reduzindo drasticamente devoluções por erro de numeração</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Experiência Personalizada</h4>
+                    <p className="text-gray-600">Cada cliente recebe recomendações únicas baseadas em seu corpo e preferências de caimento</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-[#810707] mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Confiança na Compra</h4>
+                    <p className="text-gray-600">Clientes que usam a calculadora têm 3x mais chance de finalizar a compra</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Analytics */}
+            <div className="space-y-6" data-animate="analytics-detail">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center mb-4">
+                <BarChart3 className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900">
+                Analytics que Transformam Dados em Decisões
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Tenha acesso a insights profundos sobre o comportamento dos seus clientes.
+                Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Dashboard em Tempo Real</h4>
+                    <p className="text-gray-600">Monitore engajamento, conversões e uso do try-on instantaneamente</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Insights de Produto</h4>
+                    <p className="text-gray-600">Descubra quais produtos têm maior engajamento e quais precisam de ajustes de tamanho</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">ROI Transparente</h4>
+                    <p className="text-gray-600">Acompanhe o impacto direto do Omafit nas suas vendas e reduções de custos</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* Pricing Section */}
       <section id="pricing" className="py-16 sm:py-20 bg-white" data-animate="pricing">
@@ -296,237 +415,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
           {/* Plan Calculator */}
           <PlanCalculator />
-
-          {/* Mobile: Horizontal Scroll / Desktop: Grid */}
-          <div className="lg:grid lg:grid-cols-5 lg:gap-6">
-            <div className="flex lg:contents gap-6 overflow-x-auto pb-6 lg:pb-0 snap-x snap-mandatory scrollbar-hide">
-            {/* Basic Plan */}
-            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
-              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-gray-900">Basic</h3>
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <ShoppingBag className="w-5 h-5 text-gray-700" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-gray-900">R$ 130</span>
-                      <span className="text-gray-500 text-sm">/mês</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">100 imagens/mês • R$ 1,30/img</p>
-                  </div>
-                </div>
-                <div className="border-t border-gray-200 pt-4 mb-5">
-                  <ul className="space-y-2.5">
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Integração Shopify</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Dashboard analytics</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Suporte por e-mail</span>
-                    </li>
-                  </ul>
-                </div>
-                <button
-                  onClick={handleOpenPricingModal}
-                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
-                >
-                  Assinar Agora
-                </button>
-              </div>
-            </div>
-
-            {/* Starter Plan */}
-            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
-              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-gray-900">Starter</h3>
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Package className="w-5 h-5 text-green-700" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-gray-900">R$ 550</span>
-                      <span className="text-gray-500 text-sm">/mês</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">500 imagens/mês • R$ 1,10/img</p>
-                  </div>
-                </div>
-                <div className="border-t border-gray-200 pt-4 mb-5">
-                  <ul className="space-y-2.5">
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Integração Shopify</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Dashboard analytics</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Suporte por e-mail</span>
-                    </li>
-                  </ul>
-                </div>
-                <button
-                  onClick={handleOpenPricingModal}
-                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
-                >
-                  Assinar Agora
-                </button>
-              </div>
-            </div>
-
-            {/* Growth Plan - Most Popular */}
-            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
-              <div className="relative bg-[#810707] rounded-xl p-6 h-full border-2 border-[#810707] shadow-lg hover:shadow-2xl transition-all duration-300">
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-white">Growth</h3>
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-white">R$ 975</span>
-                      <span className="text-red-200 text-sm">/mês</span>
-                    </div>
-                    <p className="text-sm text-red-200 mt-1">1.000 imagens/mês • R$ 0,98/img</p>
-                  </div>
-                </div>
-                <div className="border-t border-white/20 pt-4 mb-5">
-                  <ul className="space-y-2.5">
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-white">Tudo do plano Starter</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-white">Analytics avançado</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-white">Suporte prioritário</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-white">API personalizada</span>
-                    </li>
-                  </ul>
-                </div>
-                <button
-                  onClick={handleOpenPricingModal}
-                  className="w-full py-3 bg-white text-[#810707] rounded-lg hover:bg-gray-100 transition-colors font-bold"
-                >
-                  Assinar Agora
-                </button>
-              </div>
-            </div>
-
-            {/* Scale Plan */}
-            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
-              <div className="relative bg-white rounded-xl p-6 h-full border-2 border-gray-200 hover:border-[#810707] transition-all duration-300 hover:shadow-xl">
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-gray-900">Scale</h3>
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-blue-700" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-gray-900">R$ 2.400</span>
-                      <span className="text-gray-500 text-sm">/mês</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">3.000 imagens/mês • R$ 0,80/img</p>
-                  </div>
-                </div>
-                <div className="border-t border-gray-200 pt-4 mb-5">
-                  <ul className="space-y-2.5">
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Tudo do plano Growth</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Suporte 24/7</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Gerente de conta</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Webhooks avançados</span>
-                    </li>
-                  </ul>
-                </div>
-                <button
-                  onClick={handleOpenPricingModal}
-                  className="w-full py-3 bg-[#810707] text-white rounded-lg hover:bg-[#a00909] transition-colors font-medium"
-                >
-                  Assinar Agora
-                </button>
-              </div>
-            </div>
-
-            {/* Enterprise Plan */}
-            <div className="flex-shrink-0 w-80 lg:w-auto snap-start">
-              <div className="relative bg-gray-900 rounded-xl p-6 h-full border-2 border-gray-700 hover:border-gray-600 transition-all duration-300 hover:shadow-xl">
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-white">Enterprise</h3>
-                    <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
-                      <Star className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-white">Custom</span>
-                    </div>
-                    <p className="text-sm text-gray-400 mt-1">Imagens ilimitadas</p>
-                  </div>
-                </div>
-                <div className="border-t border-gray-700 pt-4 mb-5">
-                  <ul className="space-y-2.5">
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-300">Tudo do plano Scale</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-300">SLA garantido</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-300">Infraestrutura dedicada</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-[#810707] mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-300">Dev. customizado</span>
-                    </li>
-                  </ul>
-                </div>
-                <a
-                  href="mailto:contato@omafit.co"
-                  className="w-full py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center justify-center"
-                >
-                  Entrar em Contato
-                </a>
-              </div>
-            </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -544,7 +432,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Shopify */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]">
+            <a
+              href="https://apps.shopify.com/omafit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]"
+            >
               <div className="flex flex-col items-center text-center">
                 <div className="w-24 h-24 mb-6 flex items-center justify-center">
                   <svg viewBox="0 0 448 512" className="w-full h-full" fill="#95BF47">
@@ -560,7 +453,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <span>Configuração em 5 minutos</span>
                 </div>
               </div>
-            </div>
+            </a>
 
             {/* Nuvemshop */}
             <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] relative overflow-hidden">
