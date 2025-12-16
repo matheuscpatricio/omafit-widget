@@ -350,6 +350,13 @@ export default function DashboardPage() {
                 >
                   Ver Histórico de Uso
                 </Button>
+
+                <Button
+                  fullWidth
+                  onClick={() => navigate(`/app/analytics?shop=${shop}`)}
+                >
+                  Ver Analytics
+                </Button>
               </BlockStack>
             </BlockStack>
           </Card>
