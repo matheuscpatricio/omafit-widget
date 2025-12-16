@@ -8,6 +8,9 @@ export default defineConfig({
     include: ['@shopify/polaris'],
     exclude: ['lucide-react'],
   },
+  ssr: {
+    noExternal: ['@shopify/polaris'],
+  },
   server: {
     headers: {
       'Access-Control-Allow-Origin': '*',
