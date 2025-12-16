@@ -2,10 +2,11 @@
  * Página Principal/Dashboard - /app
  *
  * Dashboard principal que o lojista vê ao clicar em Apps > Omafit
+ * NOTA: Este é um componente React SPA, não uma rota Remix
  */
 
-import { useLoaderData, useNavigate } from '@remix-run/react';
-import { json } from '@remix-run/node';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Page,
   Layout,
@@ -16,69 +17,115 @@ import {
   Badge,
   Button,
   ProgressBar,
-  Banner
+  Banner,
+  Spinner
 } from '@shopify/polaris';
-import { authenticate } from '../shopify.server';
-import { getShopBilling } from '../utils/shopify-billing.server';
-import { getImageUsageInfo } from '../utils/usage-billing.server';
-
-export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-
-  if (!session || !session.shop) {
-    return json({ error: 'Não autenticado' }, { status: 401 });
-  }
-
-  const shopDomain = session.shop;
-
-  try {
-    const shopBilling = await getShopBilling(shopDomain);
-
-    let usage = null;
-    if (shopBilling && shopBilling.billing_status === 'active') {
-      usage = await getImageUsageInfo(shopDomain);
-    }
-
-    return json({
-      shop: shopDomain,
-      currentPlan: shopBilling?.plan || null,
-      billingStatus: shopBilling?.billing_status || null,
-      imagesIncluded: shopBilling?.images_included || 0,
-      imagesUsed: shopBilling?.images_used_month || 0,
-      pricePerExtra: shopBilling?.price_per_extra_image || 0,
-      currency: shopBilling?.currency || 'USD',
-      usage: usage
-    });
-  } catch (error) {
-    console.error('[Dashboard] Erro ao carregar dados:', error);
-    return json({
-      shop: shopDomain,
-      currentPlan: null,
-      billingStatus: null,
-      imagesIncluded: 0,
-      imagesUsed: 0,
-      pricePerExtra: 0,
-      currency: 'USD',
-      usage: null,
-      error: error.message
-    });
-  }
-};
 
 export default function DashboardPage() {
-  const {
-    shop,
-    currentPlan,
-    billingStatus,
-    imagesIncluded,
-    imagesUsed,
-    pricePerExtra,
-    currency,
-    usage,
-    error
-  } = useLoaderData();
-
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    shop: null,
+    currentPlan: null,
+    billingStatus: null,
+    imagesIncluded: 0,
+    imagesUsed: 0,
+    pricePerExtra: 0,
+    currency: 'USD',
+    usage: null
+  });
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Obter shop domain dos query params (passado pelo Shopify)
+      const shop = searchParams.get('shop') || 'demo-shop.myshopify.com';
+
+      // Opção 1: Chamar Edge Function que autentica com Shopify
+      // const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shopify-dashboard`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+      //   },
+      //   body: JSON.stringify({ shop })
+      // });
+
+      // Opção 2: Buscar diretamente do Supabase (para desenvolvimento/teste)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/shopify_shops?shop_domain=eq.${shop}`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao buscar dados: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const shopData = data[0] || null;
+
+      if (!shopData) {
+        // Loja não encontrada, criar registro básico
+        setDashboardData({
+          shop,
+          currentPlan: null,
+          billingStatus: 'inactive',
+          imagesIncluded: 0,
+          imagesUsed: 0,
+          pricePerExtra: 0,
+          currency: 'USD',
+          usage: {
+            percentage: 0,
+            remaining: 0
+          }
+        });
+        setLoading(false);
+        return;
+      }
+
+      const imagesUsed = shopData.images_used_month || 0;
+      const imagesIncluded = shopData.images_included || 0;
+      const remaining = Math.max(0, imagesIncluded - imagesUsed);
+      const percentage = imagesIncluded > 0
+        ? Math.min(100, Math.round((imagesUsed / imagesIncluded) * 100))
+        : 0;
+
+      setDashboardData({
+        shop: shopData.shop_domain,
+        currentPlan: shopData.plan,
+        billingStatus: shopData.billing_status,
+        imagesIncluded,
+        imagesUsed,
+        pricePerExtra: shopData.price_per_extra_image || 0,
+        currency: shopData.currency || 'USD',
+        usage: {
+          percentage,
+          remaining
+        }
+      });
+
+    } catch (err) {
+      console.error('[Dashboard] Erro ao carregar dados:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getBillingStatusBadge = (status) => {
     if (!status) return { tone: 'critical', label: 'Sem Plano' };
@@ -111,6 +158,34 @@ export default function DashboardPage() {
     return planNames[plan] || plan;
   };
 
+  if (loading) {
+    return (
+      <Page title="Dashboard Omafit">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400" inlineAlign="center">
+                <Spinner size="large" />
+                <Text variant="bodyMd">Carregando dados...</Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
+  const {
+    shop,
+    currentPlan,
+    billingStatus,
+    imagesIncluded,
+    imagesUsed,
+    pricePerExtra,
+    currency,
+    usage
+  } = dashboardData;
+
   const statusBadge = getBillingStatusBadge(billingStatus);
   const extraImages = Math.max(0, imagesUsed - imagesIncluded);
 
@@ -120,7 +195,6 @@ export default function DashboardPage() {
       subtitle="Bem-vindo ao provador virtual Omafit"
     >
       <Layout>
-        {/* Erro banner */}
         {error && (
           <Layout.Section>
             <Banner tone="critical">
@@ -129,7 +203,6 @@ export default function DashboardPage() {
           </Layout.Section>
         )}
 
-        {/* Info da loja e plano */}
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
@@ -169,7 +242,6 @@ export default function DashboardPage() {
           </Card>
         </Layout.Section>
 
-        {/* Uso do mês */}
         {billingStatus === 'active' && usage && (
           <Layout.Section>
             <Card>
@@ -236,8 +308,7 @@ export default function DashboardPage() {
           </Layout.Section>
         )}
 
-        {/* Sem plano ativo */}
-        {!billingStatus || billingStatus !== 'active' && (
+        {(!billingStatus || billingStatus !== 'active') && (
           <Layout.Section>
             <Banner
               tone="warning"
@@ -250,7 +321,6 @@ export default function DashboardPage() {
           </Layout.Section>
         )}
 
-        {/* Ações rápidas */}
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
@@ -285,7 +355,6 @@ export default function DashboardPage() {
           </Card>
         </Layout.Section>
 
-        {/* Card informativo */}
         <Layout.Section>
           <Card>
             <BlockStack gap="300">
