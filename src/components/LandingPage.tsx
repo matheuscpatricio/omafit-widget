@@ -294,6 +294,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* ZoomParallax Section - Precision & Analytics */}
       <section className="relative bg-black">
         <ZoomParallax
+          videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
           images={[
             {
               src: 'https://images.unsplash.com/photo-1558769132-cb1aea1f8e67?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
@@ -338,54 +339,54 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Features Carousel */}
       <section className="py-20 bg-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative h-96">
+          <div className="relative min-h-[32rem] md:h-96 pb-16 md:pb-0">
             <div
               className="flex transition-transform duration-700 ease-in-out h-full"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
               {/* Slide 1 - Calculadora de Medidas */}
-              <div className="min-w-full h-full flex items-center justify-center px-8">
+              <div className="min-w-full h-full flex items-center justify-center px-4 md:px-8">
                 <div className="text-center max-w-3xl">
-                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 md:mb-6">
                     Calculadora de Medidas de Alta Precisão
                   </h3>
-                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed mb-4 md:mb-6">
                     Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas.
                     O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.
                   </p>
-                  <p className="text-base sm:text-lg text-gray-500">
+                  <p className="text-sm sm:text-base md:text-lg text-gray-500">
                     98% de acurácia na recomendação de tamanhos • Clientes que usam a calculadora têm 3x mais chance de finalizar a compra
                   </p>
                 </div>
               </div>
 
               {/* Slide 2 - Analytics */}
-              <div className="min-w-full h-full flex items-center justify-center px-8">
+              <div className="min-w-full h-full flex items-center justify-center px-4 md:px-8">
                 <div className="text-center max-w-3xl">
-                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 md:mb-6">
                     Analytics que Transformam Dados em Decisões
                   </h3>
-                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed mb-4 md:mb-6">
                     Tenha acesso a insights profundos sobre o comportamento dos seus clientes.
                     Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.
                   </p>
-                  <p className="text-base sm:text-lg text-gray-500">
+                  <p className="text-sm sm:text-base md:text-lg text-gray-500">
                     Dashboard em tempo real • Insights de produto • ROI transparente
                   </p>
                 </div>
               </div>
 
               {/* Slide 3 - Personalização */}
-              <div className="min-w-full h-full flex items-center justify-center px-8">
+              <div className="min-w-full h-full flex items-center justify-center px-4 md:px-8">
                 <div className="text-center max-w-3xl">
-                  <h3 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                  <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 md:mb-6">
                     Personalização Total do Provador Virtual
                   </h3>
-                  <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-6">
+                  <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed mb-4 md:mb-6">
                     Customize cada detalhe do provador virtual para refletir a identidade da sua marca.
                     Cores, fontes, layout e muito mais podem ser ajustados para criar uma experiência única e memorável.
                   </p>
-                  <p className="text-base sm:text-lg text-gray-500">
+                  <p className="text-sm sm:text-base md:text-lg text-gray-500">
                     Fortalece o branding • Aumenta reconhecimento da marca • Experiência consistente em todos os pontos de contato
                   </p>
                 </div>
@@ -393,7 +394,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
 
             {/* Indicators */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2">
+            <div className="absolute bottom-4 md:bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
               {[0, 1, 2].map((index) => (
                 <button
                   key={index}
