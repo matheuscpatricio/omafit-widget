@@ -294,7 +294,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* ZoomParallax Section - Precision & Analytics */}
       <section className="relative bg-black">
         <ZoomParallax
-          videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
+          videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/video_1760123751873.mp4"
           images={[
             {
               src: 'https://images.unsplash.com/photo-1558769132-cb1aea1f8e67?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
