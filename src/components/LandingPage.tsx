@@ -34,7 +34,7 @@ function ZoomParallaxText() {
           className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-2xl mt-2 md:mt-4 text-right"
           transition={{ duration: 0.8, ease: "easeInOut" }}
         >
-          que fortalece sua{' '}
+          que fortalecem sua{' '}
           <span
             className="inline-block bg-clip-text text-transparent"
             style={{
