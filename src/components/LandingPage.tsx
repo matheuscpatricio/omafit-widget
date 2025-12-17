@@ -350,7 +350,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center px-4 max-w-4xl">
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-8 drop-shadow-2xl">
-              Precisão e Inteligência
+              precisão e inteligência
             </h2>
           </div>
         </div>
