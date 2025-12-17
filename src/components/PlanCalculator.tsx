@@ -10,10 +10,9 @@ interface Plan {
 }
 
 const plans: Plan[] = [
-  { id: 'basic', name: 'Basic', price: 130, tryons: 100, maxVisits: 10000 },
-  { id: 'starter', name: 'Starter', price: 550, tryons: 500, maxVisits: 70000 },
-  { id: 'growth', name: 'Growth', price: 975, tryons: 1000, maxVisits: 200000 },
-  { id: 'scale', name: 'Scale', price: 2400, tryons: 3000, maxVisits: 500000 },
+  { id: 'basic', name: 'Basic', price: 25, tryons: 100, maxVisits: 30000 },
+  { id: 'growth', name: 'Growth', price: 100, tryons: 500, maxVisits: 100000 },
+  { id: 'pro', name: 'Pro', price: 180, tryons: 1000, maxVisits: 300000 },
   { id: 'enterprise', name: 'Enterprise', price: 0, tryons: -1, maxVisits: Infinity }
 ];
 
@@ -66,21 +65,21 @@ export function PlanCalculator() {
             <input
               type="range"
               min="0"
-              max="1000000"
+              max="500000"
               step="1000"
               value={monthlyVisits}
               onChange={handleSliderChange}
               className="w-full h-2 sm:h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${((monthlyVisits - 0) / (1000000 - 100)) * 100}%, rgba(255,255,255,0.2) ${((monthlyVisits - 0) / (1000000 - 100)) * 100}%, rgba(255,255,255,0.2) 100%)`
+                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${((monthlyVisits - 0) / (500000 - 100)) * 100}%, rgba(255,255,255,0.2) ${((monthlyVisits - 0) / (500000 - 100)) * 100}%, rgba(255,255,255,0.2) 100%)`
               }}
             />
             <div className="flex justify-between text-[10px] sm:text-xs text-red-100 mt-2">
               <span>0</span>
-              <span className="hidden sm:inline">250.000</span>
-              <span>500.000</span>
-              <span className="hidden sm:inline">750.000</span>
-              <span>1.000.000+</span>
+              <span className="hidden sm:inline">100.000</span>
+              <span>250.000</span>
+              <span className="hidden sm:inline">400.000</span>
+              <span>500.000+</span>
             </div>
           </div>
         </div>
@@ -150,7 +149,7 @@ export function PlanCalculator() {
 
         <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-red-100">
           <p>
-             </span> Em média, 1 em cada 4 visitantes usa o try-on virtual.
+            Em média, 1 em cada 4 visitantes usa o try-on virtual.
             Ajuste o valor acima de acordo com seu tráfego real.
           </p>
         </div>
