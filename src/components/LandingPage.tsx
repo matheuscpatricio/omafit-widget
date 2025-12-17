@@ -634,9 +634,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                     </div>
                     <div className="flex flex-col items-center text-center opacity-75">
                       <div className="w-24 h-24 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
-                        <svg viewBox="0 0 256 247" className="w-full h-full" fill="#7F54B3">
-                          <path d="M23.693 15.764C10.564 15.764 0 26.328 0 39.457v167.67c0 13.13 10.564 23.693 23.693 23.693h208.614c13.13 0 23.693-10.564 23.693-23.693V39.457c0-13.13-10.564-23.693-23.693-23.693H23.693zm171.05 24.35c10.293 0 19.14 3.45 26.54 10.35 7.4 6.9 11.1 15.363 11.1 25.39 0 10.027-3.7 18.49-11.1 25.39-7.4 6.9-16.247 10.35-26.54 10.35-10.293 0-19.14-3.45-26.54-10.35-7.4-6.9-11.1-15.363-11.1-25.39 0-10.027 3.7-18.49 11.1-25.39 7.4-6.9 16.247-10.35 26.54-10.35zM66.19 49.16h48.616l-36.52 99.832h-23.15L24.807 90.29c-1.434-5.508-2.684-7.506-7.046-9.83-7.15-3.803-18.898-7.373-29.24-9.594l.702-3.406h50.52c6.438 0 12.228 4.287 13.706 11.71l12.502 66.414L102.08 49.16zm54.76 0h45.47l-28.406 99.832h-45.47L120.95 49.16zM195.103 66.31c-4.87 0-8.81 2.012-11.816 6.037-3.006 4.024-4.51 9.325-4.51 15.902 0 6.577 1.504 11.878 4.51 15.902 3.006 4.024 6.946 6.037 11.816 6.037s8.81-2.013 11.816-6.037c3.006-4.024 4.51-9.325 4.51-15.902 0-6.577-1.504-11.878-4.51-15.902-3.006-4.025-6.946-6.037-11.816-6.037zm-17.207 53.52c-5.36 9.532-12.95 14.297-22.78 14.297-6.155 0-11.07-1.905-14.745-5.716-3.676-3.81-5.514-8.93-5.514-15.36 0-10.133 3.622-18.478 10.867-25.038 7.245-6.56 16.432-9.84 27.56-9.84 5.886 0 11.56.962 17.02 2.887l-6.75 25.65c-1.477 5.57-2.96 9.214-4.452 10.932-1.49 1.718-3.668 2.576-6.533 2.576-2.063 0-3.74-.646-5.032-1.938-1.293-1.293-1.94-3.05-1.94-5.272 0-1.636.377-3.592 1.13-5.87.754-2.276 2.01-6.36 3.77-12.253h-8.71c-1.742 6.103-2.935 10.21-3.58 12.32-.645 2.11-.968 4.05-.968 5.825 0 4.554 1.55 8.286 4.65 11.194 3.1 2.908 7.174 4.362 12.22 4.362 6.367 0 11.975-2.397 16.823-7.19 4.848-4.794 8.7-11.642 11.558-20.545l10.61-40.306h18.736l-3.123 11.876c4.554-4.7 8.738-8.123 12.554-10.27 3.815-2.146 8.068-3.218 12.76-3.218 5.993 0 10.75 1.99 14.27 5.97 3.52 3.98 5.28 9.36 5.28 16.145 0 9.743-3.28 18.42-9.84 26.033-6.56 7.613-14.693 11.42-24.397 11.42-4.766 0-8.725-1.1-11.876-3.302-3.15-2.2-5.67-5.65-7.555-10.35z"/>
-                        </svg>
+                        <img
+                          src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/WooCommerce-Symbol-1.png"
+                          alt="WooCommerce"
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">WooCommerce</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
@@ -659,11 +661,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       </div>
                     </div>
                     <div className="flex flex-col items-center text-center opacity-75">
-                      <div className="w-24 h-24 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
-                        <svg viewBox="0 0 200 200" className="w-full h-full">
-                          <circle cx="100" cy="100" r="90" fill="#6C5CE7"/>
-                          <text x="100" y="120" fontSize="80" fontWeight="bold" fill="white" textAnchor="middle">Y</text>
-                        </svg>
+                      <div className="w-32 h-24 sm:w-40 sm:h-32 mb-6 flex items-center justify-center">
+                        <img
+                          src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/1200x630wa.png"
+                          alt="Yampi"
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Yampi</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
