@@ -589,7 +589,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* CTA Section */}
       <section className="py-16 sm:py-20 bg-gradient-to-r from-[#810707] to-red-700">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="landing-title text-3xl sm:text-4xl font-bold text-white mb-6 animate-swipe-up">
+          <h2 className="landing-title text-3xl sm:text-3xl font-bold text-white mb-6 animate-swipe-up">
             Entre em contato e aplique o Omafit na sua marca
           </h2>
           <p className="text-lg sm:text-xl text-red-100 mb-8 animate-swipe-up-delay-1">
