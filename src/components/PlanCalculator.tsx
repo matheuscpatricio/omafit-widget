@@ -150,7 +150,7 @@ export function PlanCalculator() {
 
         <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-red-100">
           <p>
-             </span> Em média, 1 em cada 4 visitantes usa o try-on virtual.
+            </span> </span> Em média, 1 em cada 4 visitantes usa o try-on virtual.
             Ajuste o valor acima de acordo com seu tráfego real.
           </p>
         </div>
