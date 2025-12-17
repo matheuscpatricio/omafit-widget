@@ -138,7 +138,7 @@ export default function NeuralNetworkHero({
         <div className="text-center px-4">
           <h1
             ref={headerRef}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-2xl"
+            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-8 sm:mb-12 md:mb-16 drop-shadow-2xl"
             style={{ fontFamily: '"Elms Sans", sans-serif' }}
           >
             {title}
