@@ -218,19 +218,28 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
             <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
               <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                A venda é impulsionada por identidade, ao ver-se com a roupa, o cliente ativa o circuito da autoimagem
+                As pessoas acreditam no que conseguem visualizar.
+              </p>
+              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
+                - Donald Norman
               </p>
             </div>
 
             <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
               <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                Medo do cliente de se arrepender da compra é dissolvido após usar nossa calculadora
+                A incerteza é emocionalmente custosa.
+              </p>
+              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
+                - Daniel Kahneman
               </p>
             </div>
 
             <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
               <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                Fortalece o marketing orgânico, com clientes compartilhando o resultado do try on.
+                Marcas fortes reduzem a ansiedade na decisão.
+              </p>
+              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
+                - Marty Neumeier
               </p>
             </div>
           </div>
