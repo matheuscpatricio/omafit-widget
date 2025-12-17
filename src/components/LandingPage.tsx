@@ -87,7 +87,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % 3);
-    }, 4000);
+    }, 7000);
     return () => clearInterval(interval);
   }, []);
 
@@ -349,7 +349,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center px-4 max-w-4xl">
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-8 drop-shadow-2xl">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-8 drop-shadow-2xl" style={{ fontFamily: '"DM Sans", sans-serif' }}>
               precisão e inteligência
             </h2>
           </div>

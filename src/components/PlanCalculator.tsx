@@ -134,24 +134,12 @@ export function PlanCalculator() {
                 )}
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <button
-                  onClick={() => {
-                    const pricingSection = document.getElementById('pricing');
-                    if (pricingSection) {
-                      const offset = pricingSection.offsetTop + 800;
-                      window.scrollTo({ top: offset, behavior: 'smooth' });
-                    }
-                  }}
-                  className="flex-1 bg-[#810707] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-red-800 transition-all font-semibold text-sm sm:text-base"
-                >
-                  Ver Detalhes do Plano
-                </button>
+              <div className="flex justify-center">
                 <a
                   href="https://wa.me/5573991391471"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 bg-gray-100 text-gray-900 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-200 transition-all font-semibold text-center text-sm sm:text-base"
+                  className="bg-[#810707] text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg hover:bg-red-800 transition-all font-semibold text-center text-sm sm:text-base"
                 >
                   Falar com Especialista
                 </a>
