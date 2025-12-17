@@ -7,13 +7,42 @@ interface Plan {
   price: number;
   tryons: number;
   maxVisits: number;
+  description: string;
 }
 
 const plans: Plan[] = [
-  { id: 'basic', name: 'Basic', price: 25, tryons: 100, maxVisits: 30000 },
-  { id: 'growth', name: 'Growth', price: 100, tryons: 500, maxVisits: 100000 },
-  { id: 'pro', name: 'Pro', price: 180, tryons: 1000, maxVisits: 300000 },
-  { id: 'enterprise', name: 'Enterprise', price: 0, tryons: -1, maxVisits: Infinity }
+  {
+    id: 'basic',
+    name: 'Basic',
+    price: 25,
+    tryons: 100,
+    maxVisits: 30000,
+    description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.'
+  },
+  {
+    id: 'growth',
+    name: 'Growth',
+    price: 100,
+    tryons: 500,
+    maxVisits: 100000,
+    description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.'
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 180,
+    tryons: 1000,
+    maxVisits: 300000,
+    description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.'
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 0,
+    tryons: -1,
+    maxVisits: Infinity,
+    description: 'Solução completa e personalizada para grandes operações com necessidades específicas.'
+  }
 ];
 
 export function PlanCalculator() {
@@ -126,11 +155,8 @@ export function PlanCalculator() {
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-gray-600 mb-4">
-                Com base em {monthlyVisits.toLocaleString('pt-BR')} visitas mensais, estimamos que você precisará de aproximadamente {estimatedTryons.toLocaleString('pt-BR')} try-ons por mês.
-                {recommendedPlan.tryons !== -1 && estimatedTryons <= recommendedPlan.tryons && (
-                  <span className="text-green-600 font-semibold"> Este plano oferece margem de segurança perfeita para seu negócio!</span>
-                )}
+              <p className="text-xs sm:text-sm text-gray-700 mb-4">
+                {recommendedPlan.description}
               </p>
 
               <div className="flex justify-center">
