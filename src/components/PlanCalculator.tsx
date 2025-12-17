@@ -105,7 +105,7 @@ export function PlanCalculator() {
                   <p className="text-base sm:text-lg md:text-xl font-bold text-[#810707]">
                     {recommendedPlan.id === 'enterprise'
                       ? 'Customizado'
-                      : `R$ ${recommendedPlan.price.toLocaleString('pt-BR')}`}
+                      : `$${recommendedPlan.price.toLocaleString('en-US')}`}
                   </p>
                 </div>
                 <div>
@@ -121,7 +121,7 @@ export function PlanCalculator() {
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
                     {recommendedPlan.id === 'enterprise'
                       ? 'A negociar'
-                      : `R$ ${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}`}
+                      : `$${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}`}
                   </p>
                 </div>
               </div>
