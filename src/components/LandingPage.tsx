@@ -26,6 +26,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const videoDesktopRef = useRef<HTMLVideoElement>(null);
   const videoMobileRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     const lenis = new Lenis();
@@ -102,6 +104,24 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const handleSelectPlan = (priceId: string) => {
     setShowPricingModal(false);
     onGetStarted(priceId);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current - touchEndX.current > 50) {
+      setCurrentSlide((prev) => (prev < 2 ? prev + 1 : prev));
+    }
+
+    if (touchStartX.current - touchEndX.current < -50) {
+      setCurrentSlide((prev) => (prev > 0 ? prev - 1 : prev));
+    }
   };
 
   const toggleVideoPlayback = () => {
@@ -339,7 +359,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Features Carousel */}
       <section className="py-20 bg-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative min-h-[32rem] md:h-96 pb-16 md:pb-0">
+          <div
+            className="relative min-h-[32rem] md:h-96 pb-16 md:pb-0"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div
               className="flex transition-transform duration-700 ease-in-out h-full"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}

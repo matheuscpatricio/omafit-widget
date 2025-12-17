@@ -39,33 +39,9 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
             <motion.div
               key={index}
               style={{ scale }}
-              className={`absolute top-0 flex h-full w-full items-center justify-center ${
-                index === 1
-                  ? 'md:[&>div]:!-top-[30vh] md:[&>div]:!left-[5vw] md:[&>div]:!h-[30vh] md:[&>div]:!w-[35vw] [&>div]:!-top-[15vh] [&>div]:!left-[10vw] [&>div]:!h-[20vh] [&>div]:!w-[40vw]'
-                  : ''
-              } ${
-                index === 2
-                  ? 'md:[&>div]:!-top-[10vh] md:[&>div]:!-left-[25vw] md:[&>div]:!h-[45vh] md:[&>div]:!w-[20vw] [&>div]:!-top-[5vh] [&>div]:!-left-[15vw] [&>div]:!h-[30vh] [&>div]:!w-[25vw]'
-                  : ''
-              } ${
-                index === 3
-                  ? 'md:[&>div]:!left-[27.5vw] md:[&>div]:!h-[25vh] md:[&>div]:!w-[25vw] [&>div]:!left-[35vw] [&>div]:!h-[20vh] [&>div]:!w-[30vw]'
-                  : ''
-              } ${
-                index === 4
-                  ? 'md:[&>div]:!top-[27.5vh] md:[&>div]:!left-[5vw] md:[&>div]:!h-[25vh] md:[&>div]:!w-[20vw] [&>div]:!top-[20vh] [&>div]:!left-[10vw] [&>div]:!h-[18vh] [&>div]:!w-[25vw]'
-                  : ''
-              } ${
-                index === 5
-                  ? 'md:[&>div]:!top-[27.5vh] md:[&>div]:!-left-[22.5vw] md:[&>div]:!h-[25vh] md:[&>div]:!w-[30vw] [&>div]:!top-[20vh] [&>div]:!-left-[12vw] [&>div]:!h-[18vh] [&>div]:!w-[35vw]'
-                  : ''
-              } ${
-                index === 6
-                  ? 'md:[&>div]:!top-[22.5vh] md:[&>div]:!left-[25vw] md:[&>div]:!h-[15vh] md:[&>div]:!w-[15vw] [&>div]:!top-[15vh] [&>div]:!left-[30vw] [&>div]:!h-[12vh] [&>div]:!w-[18vw]'
-                  : ''
-              } `}
+              className={`absolute top-0 flex h-full w-full items-center justify-center ${index === 1 ? '[&>div]:!-top-[30vh] [&>div]:!left-[5vw] [&>div]:!h-[30vh] [&>div]:!w-[35vw]' : ''} ${index === 2 ? '[&>div]:!-top-[10vh] [&>div]:!-left-[25vw] [&>div]:!h-[45vh] [&>div]:!w-[20vw]' : ''} ${index === 3 ? '[&>div]:!left-[27.5vw] [&>div]:!h-[25vh] [&>div]:!w-[25vw]' : ''} ${index === 4 ? '[&>div]:!top-[27.5vh] [&>div]:!left-[5vw] [&>div]:!h-[25vh] [&>div]:!w-[20vw]' : ''} ${index === 5 ? '[&>div]:!top-[27.5vh] [&>div]:!-left-[22.5vw] [&>div]:!h-[25vh] [&>div]:!w-[30vw]' : ''} ${index === 6 ? '[&>div]:!top-[22.5vh] [&>div]:!left-[25vw] [&>div]:!h-[15vh] [&>div]:!w-[15vw]' : ''} `}
             >
-              <div className="relative h-[40vh] w-[80vw] md:h-[25vh] md:w-[25vw] rounded-2xl overflow-hidden shadow-2xl">
+              <div className="relative h-[25vh] w-[25vw] rounded-2xl overflow-hidden shadow-2xl">
                 {isCentralItem && videoUrl ? (
                   <video
                     src={videoUrl}
