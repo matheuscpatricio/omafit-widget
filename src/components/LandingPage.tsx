@@ -20,17 +20,17 @@ function ZoomParallaxText() {
   const opacity2 = useTransform(scrollYProgress, [0.3, 0.45, 0.65, 0.75], [0, 1, 1, 0]);
 
   return (
-    <div ref={targetRef} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="text-center px-4 max-w-4xl mr-[5%] md:mr-[10%]">
+    <div ref={targetRef} className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+      <div className="w-full px-4 max-w-7xl">
         <motion.h2
           style={{ opacity: opacity1, fontFamily: '"DM Sans", sans-serif' }}
-          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-2xl"
+          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-2xl text-left"
         >
           precisão e inteligência
         </motion.h2>
         <motion.h3
           style={{ opacity: opacity2, fontFamily: '"DM Sans", sans-serif' }}
-          className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-2xl mt-2 md:mt-4 ml-[5%] md:ml-[8%]"
+          className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-2xl mt-2 md:mt-4 text-right"
         >
           que fortalece sua{' '}
           <span
