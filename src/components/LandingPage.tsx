@@ -21,7 +21,7 @@ function ZoomParallaxText() {
 
   return (
     <div ref={targetRef} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="text-center px-4 max-w-4xl ml-[5%] md:ml-[10%]">
+      <div className="text-center px-4 max-w-4xl mr-[5%] md:mr-[10%]">
         <motion.h2
           style={{ opacity: opacity1, fontFamily: '"DM Sans", sans-serif' }}
           className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-2xl"
