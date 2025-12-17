@@ -375,7 +375,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Precisão na medição',
             },
             {
-              src: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fa4f067-a1fe-4160-ae4f-f0478ca8afb5.png',
               alt: 'Analytics avançado',
             },
             {
