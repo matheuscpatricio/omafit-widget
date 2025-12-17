@@ -489,7 +489,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Descubra seu plano
+              O plano para sua marca
             </h2>
             <p className="text-lg sm:text-xl text-gray-600">
               Escolha o plano ideal para o tamanho do seu negócio
