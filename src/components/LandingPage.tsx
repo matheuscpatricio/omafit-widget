@@ -73,6 +73,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const lastScrollY = useRef<number>(0);
 
   useEffect(() => {
     const lenis = new Lenis();
@@ -86,8 +87,23 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      const isScrollingUp = currentScrollY < lastScrollY.current;
+
       setScrollY(currentScrollY);
-      setShowHeader(currentScrollY > window.innerHeight * 0.8);
+
+      // Mostra o header com fundo branco apenas ao rolar para cima
+      if (currentScrollY < 100) {
+        // No topo da página - header transparente
+        setShowHeader(false);
+      } else if (isScrollingUp) {
+        // Rolando para cima - mostra header com fundo branco
+        setShowHeader(true);
+      } else if (!isScrollingUp) {
+        // Rolando para baixo - esconde header
+        setShowHeader(false);
+      }
+
+      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -197,23 +213,25 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header - Always visible, transparent initially, white on scroll */}
+      {/* Header - Visible at top or when scrolling up */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        showHeader
-          ? 'bg-white shadow-lg'
-          : 'bg-transparent'
+        scrollY < 100
+          ? 'bg-transparent translate-y-0'
+          : showHeader
+          ? 'bg-white shadow-lg translate-y-0'
+          : 'bg-transparent -translate-y-full'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className={`text-2xl font-bold transition-colors ${showHeader ? 'text-gray-900' : 'text-white'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+              <span className={`text-2xl font-bold transition-colors ${scrollY < 100 || !showHeader ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
             </div>
 
             <div className="flex items-center gap-8">
               <nav className="hidden md:flex space-x-8">
-                <a href="#features" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Recursos</a>
-                <a href="#benefits" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Benefícios</a>
-                <a href="#pricing" className={`transition-colors ${showHeader ? 'text-gray-600 hover:text-gray-900' : 'text-white hover:text-gray-200'}`}>Planos</a>
+                <a href="#features" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Recursos</a>
+                <a href="#benefits" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Benefícios</a>
+                <a href="#pricing" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Planos</a>
               </nav>
               <a
                 href="mailto:contato@omafit.co"
