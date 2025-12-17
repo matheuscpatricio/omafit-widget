@@ -395,7 +395,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Medidas precisas',
             },
             {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/90492492-3d11-491b-b130-dae4e5a4339a.jpeg',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/f6eed9b9-aa98-4845-84ef-cc8fcd1650fc.jpeg',
               alt: 'Relatórios detalhados',
             },
           ]}
