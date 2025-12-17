@@ -383,7 +383,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Dados em tempo real',
             },
             {
-              src: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
               alt: 'Moda e tecnologia',
             },
             {
