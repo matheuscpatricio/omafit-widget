@@ -461,7 +461,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               Plataformas
             </h2>
             <p className="text-lg sm:text-xl text-gray-600">
-              Integre facilmente com as principais plataformas de e-commerce
+              Clique e integre facilmente com as principais plataformas de e-commerce
             </p>
           </div>
 
