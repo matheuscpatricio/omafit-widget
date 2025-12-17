@@ -74,6 +74,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const lastScrollY = useRef<number>(0);
+  const [currentPlatformSlide, setCurrentPlatformSlide] = useState(0);
+  const platformTouchStartX = useRef<number>(0);
+  const platformTouchEndX = useRef<number>(0);
 
   useEffect(() => {
     const lenis = new Lenis();
@@ -152,6 +155,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentPlatformSlide((prev) => (prev + 1) % 4);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleOpenPricingModal = async () => {
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -182,6 +192,24 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
     if (touchStartX.current - touchEndX.current < -50) {
       setCurrentSlide((prev) => (prev > 0 ? prev - 1 : prev));
+    }
+  };
+
+  const handlePlatformTouchStart = (e: React.TouchEvent) => {
+    platformTouchStartX.current = e.touches[0].clientX;
+  };
+
+  const handlePlatformTouchMove = (e: React.TouchEvent) => {
+    platformTouchEndX.current = e.touches[0].clientX;
+  };
+
+  const handlePlatformTouchEnd = () => {
+    if (platformTouchStartX.current - platformTouchEndX.current > 50) {
+      setCurrentPlatformSlide((prev) => (prev < 3 ? prev + 1 : prev));
+    }
+
+    if (platformTouchStartX.current - platformTouchEndX.current < -50) {
+      setCurrentPlatformSlide((prev) => (prev > 0 ? prev - 1 : prev));
     }
   };
 
@@ -519,7 +547,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Platforms Section */}
+      {/* Platforms Section - Carousel */}
       <section className="py-16 sm:py-20 bg-gray-50" data-animate="platforms">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -531,56 +559,160 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 sm:gap-8 max-w-4xl mx-auto">
-            {/* Shopify */}
-            <a
-              href="https://apps.shopify.com/omafit"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707]"
+          <div className="relative max-w-4xl mx-auto">
+            <div
+              className="overflow-hidden"
+              onTouchStart={handlePlatformTouchStart}
+              onTouchMove={handlePlatformTouchMove}
+              onTouchEnd={handlePlatformTouchEnd}
             >
-              <div className="flex flex-col items-center text-center">
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mb-3 sm:mb-6 flex items-center justify-center">
-                  <svg viewBox="0 0 448 512" className="w-full h-full" fill="#95BF47">
-                    <path d="M388.32,104.1a4.66,4.66,0,0,0-4.4-4c-2,0-37.23-.8-37.23-.8s-21.61-20.82-29.62-28.83V503.2L442.76,472S388.72,106.5,388.32,104.1ZM288.65,70.47a116.67,116.67,0,0,0-7.21-17.61C271,32.85,255.42,22,237,22a15,15,0,0,0-4,.4c-.4-.8-1.2-1.2-1.6-2C223.4,11.63,213,7.63,200.58,8c-24,.8-48,18-67.25,48.83-13.61,21.62-24,48.84-26.82,70.06-27.62,8.4-46.83,14.41-47.23,14.81-14,4.4-14.41,4.8-16,18-1.2,10-38,291.82-38,291.82L307.86,504V65.67a41.66,41.66,0,0,0-4.4.4S297.86,67.67,288.65,70.47ZM233.41,87.69c-16,4.8-33.63,10.4-50.84,15.61,4.8-18.82,14.41-37.63,25.62-50,4.4-4.4,10.41-9.61,17.21-12.81C232.21,54.86,233.81,74.48,233.41,87.69ZM200.58,24.44A27.49,27.49,0,0,1,215,28c-6.4,3.2-12.81,8.41-18.81,14.41-15.21,16.42-26.82,42-31.62,66.45-14.42,4.41-28.83,8.81-42,12.81C131.33,83.28,163.75,25.24,200.58,24.44ZM154.15,244.61c1.6,25.61,69.25,31.22,73.25,91.66,2.8,47.64-25.22,80.06-65.65,82.47-48.83,3.2-75.65-25.62-75.65-25.62l10.4-44s26.82,20.42,48.44,18.82c14-.8,19.22-12.41,18.81-20.42-2-33.62-57.24-31.62-60.84-86.86-3.2-46.44,27.22-93.27,94.47-97.68,26-1.6,39.23,4.81,39.23,4.81L221.4,225.39s-17.21-8-37.63-6.4C154.15,221,153.75,239.8,154.15,244.61ZM249.42,82.88c0-12-1.6-29.22-7.21-43.63,18.42,3.6,27.22,24,31.23,36.43Q262.63,78.68,249.42,82.88Z"/>
-                  </svg>
+              <div
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${currentPlatformSlide * 100}%)` }}
+              >
+                {/* Slide 1 - Shopify */}
+                <div className="min-w-full flex justify-center px-4">
+                  <a
+                    href="https://apps.shopify.com/omafit"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md"
+                  >
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
+                        <svg viewBox="0 0 448 512" className="w-full h-full" fill="#95BF47">
+                          <path d="M388.32,104.1a4.66,4.66,0,0,0-4.4-4c-2,0-37.23-.8-37.23-.8s-21.61-20.82-29.62-28.83V503.2L442.76,472S388.72,106.5,388.32,104.1ZM288.65,70.47a116.67,116.67,0,0,0-7.21-17.61C271,32.85,255.42,22,237,22a15,15,0,0,0-4,.4c-.4-.8-1.2-1.2-1.6-2C223.4,11.63,213,7.63,200.58,8c-24,.8-48,18-67.25,48.83-13.61,21.62-24,48.84-26.82,70.06-27.62,8.4-46.83,14.41-47.23,14.81-14,4.4-14.41,4.8-16,18-1.2,10-38,291.82-38,291.82L307.86,504V65.67a41.66,41.66,0,0,0-4.4.4S297.86,67.67,288.65,70.47ZM233.41,87.69c-16,4.8-33.63,10.4-50.84,15.61,4.8-18.82,14.41-37.63,25.62-50,4.4-4.4,10.41-9.61,17.21-12.81C232.21,54.86,233.81,74.48,233.41,87.69ZM200.58,24.44A27.49,27.49,0,0,1,215,28c-6.4,3.2-12.81,8.41-18.81,14.41-15.21,16.42-26.82,42-31.62,66.45-14.42,4.41-28.83,8.81-42,12.81C131.33,83.28,163.75,25.24,200.58,24.44ZM154.15,244.61c1.6,25.61,69.25,31.22,73.25,91.66,2.8,47.64-25.22,80.06-65.65,82.47-48.83,3.2-75.65-25.62-75.65-25.62l10.4-44s26.82,20.42,48.44,18.82c14-.8,19.22-12.41,18.81-20.42-2-33.62-57.24-31.62-60.84-86.86-3.2-46.44,27.22-93.27,94.47-97.68,26-1.6,39.23,4.81,39.23,4.81L221.4,225.39s-17.21-8-37.63-6.4C154.15,221,153.75,239.8,154.15,244.61ZM249.42,82.88c0-12-1.6-29.22-7.21-43.63,18.42,3.6,27.22,24,31.23,36.43Q262.63,78.68,249.42,82.88Z"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shopify</h3>
+                      <p className="text-base sm:text-lg text-gray-600 mb-4">
+                        Integração nativa e fácil configuração em poucos cliques
+                      </p>
+                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
+                        <Check className="w-5 h-5 text-green-500" />
+                        <span>Configuração em 5 minutos</span>
+                      </div>
+                    </div>
+                  </a>
                 </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Shopify</h3>
-                <p className="text-xs sm:text-base text-gray-600 mb-2 sm:mb-4 hidden sm:block">
-                  Integração nativa e fácil configuração em poucos cliques
-                </p>
-                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500">
-                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                  <span>Configuração em 5 minutos</span>
-                </div>
-              </div>
-            </a>
 
-            {/* Nuvemshop */}
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] relative overflow-hidden">
-              {/* Em Breve Badge */}
-              <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-bold shadow-lg">
-                  Em Breve
+                {/* Slide 2 - Nuvemshop */}
+                <div className="min-w-full flex justify-center px-4">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                        Em Breve
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center text-center opacity-75">
+                      <div className="w-32 h-24 sm:w-40 sm:h-32 mb-6 flex items-center justify-center">
+                        <img
+                          src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/vagasbyintera_nuvemshop-tiendanube-og.png"
+                          alt="Nuvemshop"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Nuvemshop</h3>
+                      <p className="text-base sm:text-lg text-gray-600 mb-4">
+                        Perfeita integração com a maior plataforma da América Latina
+                      </p>
+                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
+                        <Check className="w-5 h-5 text-gray-400" />
+                        <span>Suporte em português</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slide 3 - WooCommerce */}
+                <div className="min-w-full flex justify-center px-4">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                        Em Breve
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center text-center opacity-75">
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
+                        <svg viewBox="0 0 256 247" className="w-full h-full" fill="#7F54B3">
+                          <path d="M23.693 15.764C10.564 15.764 0 26.328 0 39.457v167.67c0 13.13 10.564 23.693 23.693 23.693h208.614c13.13 0 23.693-10.564 23.693-23.693V39.457c0-13.13-10.564-23.693-23.693-23.693H23.693zm171.05 24.35c10.293 0 19.14 3.45 26.54 10.35 7.4 6.9 11.1 15.363 11.1 25.39 0 10.027-3.7 18.49-11.1 25.39-7.4 6.9-16.247 10.35-26.54 10.35-10.293 0-19.14-3.45-26.54-10.35-7.4-6.9-11.1-15.363-11.1-25.39 0-10.027 3.7-18.49 11.1-25.39 7.4-6.9 16.247-10.35 26.54-10.35zM66.19 49.16h48.616l-36.52 99.832h-23.15L24.807 90.29c-1.434-5.508-2.684-7.506-7.046-9.83-7.15-3.803-18.898-7.373-29.24-9.594l.702-3.406h50.52c6.438 0 12.228 4.287 13.706 11.71l12.502 66.414L102.08 49.16zm54.76 0h45.47l-28.406 99.832h-45.47L120.95 49.16zM195.103 66.31c-4.87 0-8.81 2.012-11.816 6.037-3.006 4.024-4.51 9.325-4.51 15.902 0 6.577 1.504 11.878 4.51 15.902 3.006 4.024 6.946 6.037 11.816 6.037s8.81-2.013 11.816-6.037c3.006-4.024 4.51-9.325 4.51-15.902 0-6.577-1.504-11.878-4.51-15.902-3.006-4.025-6.946-6.037-11.816-6.037zm-17.207 53.52c-5.36 9.532-12.95 14.297-22.78 14.297-6.155 0-11.07-1.905-14.745-5.716-3.676-3.81-5.514-8.93-5.514-15.36 0-10.133 3.622-18.478 10.867-25.038 7.245-6.56 16.432-9.84 27.56-9.84 5.886 0 11.56.962 17.02 2.887l-6.75 25.65c-1.477 5.57-2.96 9.214-4.452 10.932-1.49 1.718-3.668 2.576-6.533 2.576-2.063 0-3.74-.646-5.032-1.938-1.293-1.293-1.94-3.05-1.94-5.272 0-1.636.377-3.592 1.13-5.87.754-2.276 2.01-6.36 3.77-12.253h-8.71c-1.742 6.103-2.935 10.21-3.58 12.32-.645 2.11-.968 4.05-.968 5.825 0 4.554 1.55 8.286 4.65 11.194 3.1 2.908 7.174 4.362 12.22 4.362 6.367 0 11.975-2.397 16.823-7.19 4.848-4.794 8.7-11.642 11.558-20.545l10.61-40.306h18.736l-3.123 11.876c4.554-4.7 8.738-8.123 12.554-10.27 3.815-2.146 8.068-3.218 12.76-3.218 5.993 0 10.75 1.99 14.27 5.97 3.52 3.98 5.28 9.36 5.28 16.145 0 9.743-3.28 18.42-9.84 26.033-6.56 7.613-14.693 11.42-24.397 11.42-4.766 0-8.725-1.1-11.876-3.302-3.15-2.2-5.67-5.65-7.555-10.35z"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">WooCommerce</h3>
+                      <p className="text-base sm:text-lg text-gray-600 mb-4">
+                        Integração perfeita com a plataforma WordPress de e-commerce
+                      </p>
+                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
+                        <Check className="w-5 h-5 text-gray-400" />
+                        <span>Plugin WordPress</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slide 4 - Yampi */}
+                <div className="min-w-full flex justify-center px-4">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                        Em Breve
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center text-center opacity-75">
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
+                        <svg viewBox="0 0 200 200" className="w-full h-full">
+                          <circle cx="100" cy="100" r="90" fill="#6C5CE7"/>
+                          <text x="100" y="120" fontSize="80" fontWeight="bold" fill="white" textAnchor="middle">Y</text>
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Yampi</h3>
+                      <p className="text-base sm:text-lg text-gray-600 mb-4">
+                        Plataforma completa de e-commerce brasileira com todas as ferramentas
+                      </p>
+                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
+                        <Check className="w-5 h-5 text-gray-400" />
+                        <span>Plataforma nacional</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-col items-center text-center opacity-75">
-                <div className="w-20 h-16 sm:w-32 sm:h-24 mb-3 sm:mb-6 flex items-center justify-center">
-                  <img
-                    src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/vagasbyintera_nuvemshop-tiendanube-og.png"
-                    alt="Nuvemshop"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Nuvemshop</h3>
-                <p className="text-xs sm:text-base text-gray-600 mb-2 sm:mb-4 hidden sm:block">
-                  Perfeita integração com a maior plataforma da América Latina
-                </p>
-                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500">
-                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
-                  <span>Suporte em português</span>
-                </div>
-              </div>
+            </div>
+
+            {/* Navigation Buttons */}
+            <button
+              onClick={() => setCurrentPlatformSlide((prev) => (prev > 0 ? prev - 1 : 3))}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all z-10"
+              aria-label="Plataforma anterior"
+            >
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCurrentPlatformSlide((prev) => (prev < 3 ? prev + 1 : 0))}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all z-10"
+              aria-label="Próxima plataforma"
+            >
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            {/* Indicators */}
+            <div className="flex justify-center gap-2 mt-8">
+              {[0, 1, 2, 3].map((index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPlatformSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    currentPlatformSlide === index
+                      ? 'bg-[#810707] w-8'
+                      : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Ir para plataforma ${index + 1}`}
+                />
+              ))}
             </div>
           </div>
         </div>
