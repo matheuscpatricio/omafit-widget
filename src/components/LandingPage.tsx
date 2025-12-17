@@ -387,7 +387,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Moda e tecnologia',
             },
             {
-              src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=800&fit=crop&crop=entropy&auto=format&q=80',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
               alt: 'Dashboard intuitivo',
             },
             {
