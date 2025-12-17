@@ -375,11 +375,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Precisão na medição',
             },
             {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fa4f067-a1fe-4160-ae4f-f0478ca8afb5.png',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
               alt: 'Analytics avançado',
             },
             {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/790e602d-8e3e-492e-b6b5-89c917c449d2.png',
               alt: 'Dados em tempo real',
             },
             {
