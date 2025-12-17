@@ -391,7 +391,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               alt: 'Dashboard intuitivo',
             },
             {
-              src: 'https://images.unsplash.com/photo-1558769132-92e717d613cd?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/eee28427-629f-4b81-bcff-0b6204b61e27.png',
               alt: 'Medidas precisas',
             },
             {
