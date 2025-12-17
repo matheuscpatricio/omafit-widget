@@ -356,9 +356,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             }}
           >
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-              Sua marca, agora com uma experiência{' '}
+              Proporcione uma experiência única aos seus{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#810707] to-red-700">
-                tech-drive
+                clientes
               </span>
             </h3>
           </div>
