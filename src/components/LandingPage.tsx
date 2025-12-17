@@ -663,7 +663,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                     <div className="flex flex-col items-center text-center opacity-75">
                       <div className="w-32 h-24 sm:w-40 sm:h-32 mb-6 flex items-center justify-center">
                         <img
-                          src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/1200x630wa.png"
+                          src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/unnamed.webp"
                           alt="Yampi"
                           className="w-full h-full object-contain"
                         />
