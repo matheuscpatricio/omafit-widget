@@ -371,7 +371,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/video_1760123751873.mp4"
           images={[
             {
-              src: 'https://images.unsplash.com/photo-1558769132-cb1aea1f8e67?w=1280&h=720&fit=crop&crop=entropy&auto=format&q=80',
+              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
               alt: 'Precisão na medição',
             },
             {
