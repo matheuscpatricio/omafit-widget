@@ -294,6 +294,7 @@ const handleSubmit = async () => {
     });
 
     const payload = {
+      shop_domain: shopDomain,
       model_image: modelImageDataUrl,
       garment_image: selectedProductImage || product.garment_image,
       product_name: product.name,
