@@ -2,6 +2,7 @@
 (function () {
   // Configuração global (será preenchida pela API)
   let OMAFIT_CONFIG = null;
+  let SHOP_DOMAIN = '';
 
   // Carregar fontes do Google Fonts
   const fontsToLoad = [
@@ -208,6 +209,9 @@
         shopDomain = window.Shopify.shop;
       }
 
+      // Salvar shopDomain globalmente
+      SHOP_DOMAIN = shopDomain;
+
       // Construir URL da API
       const apiUrl = 'https://lhkgnirolvbmomeduoaj.supabase.co/functions/v1/omafit-config';
       let queryParams = new URLSearchParams();
@@ -228,6 +232,7 @@
 
       const config = await response.json();
       console.log('✅ Configuração do Omafit carregada:', config);
+      console.log('🏪 Shop Domain:', SHOP_DOMAIN);
       return config;
     } catch (error) {
       console.error('❌ Erro ao buscar configuração:', error);
@@ -305,6 +310,7 @@
       '&productId=' + encodeURIComponent(productInfo.productId || 'unknown') +
       '&productName=' + encodeURIComponent(productInfo.productName || 'Produto') +
       '&publicId=' + encodeURIComponent(OMAFIT_CONFIG.publicId) +
+      '&shopDomain=' + encodeURIComponent(SHOP_DOMAIN) +
       '&config=' + encodeURIComponent(JSON.stringify(config));
 
     iframe.src = widgetUrl;

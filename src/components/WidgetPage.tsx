@@ -107,8 +107,6 @@ export function WidgetPage() {
           storeLogo={storeLogo}
           primaryColor={primaryColor}
           fontFamily={fontFamily}
-          fontWeight={fontWeight}
-          fontStyle={fontStyle}
           publicId={publicId}
           shopDomain={shopDomain}
         />
