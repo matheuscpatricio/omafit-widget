@@ -694,65 +694,66 @@ const handleSubmit = async () => {
           <div className="space-y-4 animate-fade-in">
             {/* Mobile Layout */}
             <div className="md:hidden space-y-4">
-              {availableImages.length > 1 && (
-                <div className="mb-4">
-                  <div className="text-center mb-3">
-                    <h4 className="text-lg font-semibold text-gray-800">
-                      Imagem do Produto
-                    </h4>
+              {/* Sempre mostrar imagem do produto no mobile */}
+              <div className="mb-4">
+                <div className="text-center mb-3">
+                  <h4 className="text-lg font-semibold text-gray-800">
+                    Imagem do Produto
+                  </h4>
+                  {availableImages.length > 1 && (
                     <p className="text-sm text-gray-500">
                       (escolha uma imagem frontal do produto)
                     </p>
-                  </div>
-
-                  <div className="relative">
-                    <div
-                      className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden"
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                    >
-                      <img
-                        src={selectedProductImage}
-                        alt="Produto"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
-                    {availableImages.length > 1 && (
-                      <>
-                        <button
-                          onClick={prevImage}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
-                        >
-                          <ArrowLeft className="w-5 h-5" />
-                        </button>
-
-                        <button
-                          onClick={nextImage}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
-                        >
-                          <ArrowRight className="w-5 h-5" />
-                        </button>
-
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                          {availableImages.map((_, index) => (
-                            <button
-                              key={index}
-                              onClick={() => setCurrentImageIndex(index)}
-                              className={`w-2 h-2 rounded-full transition-all ${
-                                index === currentImageIndex
-                                  ? 'bg-primary w-6'
-                                  : 'bg-white/70 hover:bg-white'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  )}
                 </div>
-              )}
+
+                <div className="relative">
+                  <div
+                    className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    <img
+                      src={selectedProductImage}
+                      alt="Produto"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {availableImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      >
+                        <ArrowLeft className="w-5 h-5" />
+                      </button>
+
+                      <button
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                      </button>
+
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {availableImages.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              index === currentImageIndex
+                                ? 'bg-primary w-6'
+                                : 'bg-white/70 hover:bg-white'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
 
               <div className="text-center mb-3">
                 <h3 className="text-2xl font-semibold text-primary mb-2">
