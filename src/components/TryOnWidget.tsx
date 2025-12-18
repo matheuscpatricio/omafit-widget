@@ -14,9 +14,20 @@ interface TryOnWidgetProps {
   fontFamily?: string;
   publicId?: string;
   productImages?: string[];
+  shopDomain?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [] }: TryOnWidgetProps) {
+interface SizeChartEntry {
+  size: string;
+  peito?: string;
+  chest?: string;
+  cintura?: string;
+  waist?: string;
+  quadril?: string;
+  hip?: string;
+}
+
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '' }: TryOnWidgetProps) {
 
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
@@ -33,7 +44,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sizeData, setSizeData] = useState<SizeCalculatorData | null>(null);
   const [calculatedSize, setCalculatedSize] = useState<string | null>(null);
-  const [sizeChart, setSizeChart] = useState<any[]>([]);
+  const [recommendedSize, setRecommendedSize] = useState<string | null>(null);
+  const [sizeChart, setSizeChart] = useState<SizeChartEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -51,6 +63,37 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  // Buscar configurações do widget ao carregar
+  useEffect(() => {
+    const fetchWidgetConfig = async () => {
+      if (!shopDomain) {
+        console.log('⚠️ Não há shopDomain para buscar configurações');
+        return;
+      }
+
+      try {
+        const { data: configs, error } = await supabase
+          .from('widget_configurations')
+          .select('link_text, store_logo, primary_color, widget_title, widget_subtitle')
+          .eq('shop_domain', shopDomain)
+          .limit(1);
+
+        if (error) {
+          console.error('❌ Erro ao buscar configurações do widget:', error);
+          return;
+        }
+
+        if (configs && configs.length > 0) {
+          console.log('✅ Configurações do widget carregadas:', configs[0]);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar configurações:', error);
+      }
+    };
+
+    fetchWidgetConfig();
+  }, [shopDomain]);
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
@@ -74,6 +117,52 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
   }, [currentImageIndex, availableImages]);
 
+  // Calcular tamanho recomendado baseado nas medidas do usuário
+  const calculateRecommendedSize = (measurements: SizeCalculatorData, chart: SizeChartEntry[]): string | null => {
+    if (!chart || chart.length === 0) {
+      console.warn('⚠️ Nenhuma tabela de medidas disponível');
+      return null;
+    }
+
+    const { height, bodyTypeIndex, fitIndex } = measurements;
+
+    // Normalizar índices para multiplicadores (0.9, 1.0, 1.1)
+    const bodyType = 0.9 + (bodyTypeIndex * 0.1);
+    const fit = 0.95 + (fitIndex * 0.05);
+
+    // Calcular medidas base do usuário
+    const baseChest = height * 0.45 * bodyType * fit;
+    const baseWaist = height * 0.35 * bodyType * fit;
+    const baseHip = height * 0.50 * bodyType * fit;
+
+    console.log('📏 Medidas calculadas:', { baseChest, baseWaist, baseHip, bodyType, fit });
+
+    let bestSize = null;
+    let minDistance = Infinity;
+
+    // Comparar com cada tamanho da tabela
+    chart.forEach((sizeData) => {
+      const chest = parseFloat(sizeData.peito || sizeData.chest || '0');
+      const waist = parseFloat(sizeData.cintura || sizeData.waist || '0');
+      const hip = parseFloat(sizeData.quadril || sizeData.hip || '0');
+
+      // Calcular distância euclidiana
+      const distance = Math.sqrt(
+        Math.pow(baseChest - chest, 2) +
+        Math.pow(baseWaist - waist, 2) +
+        Math.pow(baseHip - hip, 2)
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        bestSize = sizeData.size;
+      }
+    });
+
+    console.log('✅ Tamanho recomendado:', bestSize);
+    return bestSize;
+  };
+
   useEffect(() => {
     const loadSizeChart = async () => {
       if (!sizeData?.gender) {
@@ -81,65 +170,69 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         return;
       }
 
-      if (!publicId) {
-        console.log('⚠️ Não há publicId para buscar size chart');
+      if (!shopDomain) {
+        console.log('⚠️ Não há shopDomain para buscar size chart');
         return;
       }
 
-      console.log('📊 Carregando size chart para gender:', sizeData.gender, 'publicId:', publicId);
+      console.log('📊 Carregando size chart para gender:', sizeData.gender, 'shopDomain:', shopDomain);
 
       try {
-        const { data: userId, error: rpcError } = await supabase
-          .rpc('get_widget_user_id', { p_public_id: publicId });
+        // Buscar tabela de medidas via shopDomain
+        const { data: charts, error } = await supabase
+          .from('size_charts')
+          .select('sizes')
+          .eq('shop_domain', shopDomain)
+          .eq('gender', sizeData.gender);
 
-        if (rpcError || !userId) {
-          console.log('❌ Widget key não encontrada para publicId:', publicId, rpcError);
+        if (error) {
+          console.error('❌ Erro ao buscar size chart:', error);
           return;
         }
 
-        console.log('👤 User ID do widget:', userId);
+        let sizeChartData = null;
 
-        let { data: charts } = await supabase
-          .from('size_charts')
-          .select('id')
-          .eq('gender', sizeData.gender)
-          .eq('user_id', userId)
-          .limit(1)
-          .maybeSingle();
-
-        if (!charts) {
+        if (charts && charts.length > 0 && charts[0].sizes) {
+          sizeChartData = charts[0].sizes;
+          console.log('✅ Size chart encontrado para', sizeData.gender);
+        } else {
+          // Fallback para unisex
           console.log('📊 Chart específico não encontrado, tentando unisex...');
-          const { data: unisexChart } = await supabase
+          const { data: unisexCharts } = await supabase
             .from('size_charts')
-            .select('id')
-            .eq('gender', 'unisex')
-            .eq('user_id', userId)
-            .limit(1)
-            .maybeSingle();
+            .select('sizes')
+            .eq('shop_domain', shopDomain)
+            .eq('gender', 'unisex');
 
-          charts = unisexChart;
-          if (charts) {
+          if (unisexCharts && unisexCharts.length > 0 && unisexCharts[0].sizes) {
+            sizeChartData = unisexCharts[0].sizes;
             console.log('✅ Usando size chart unisex como fallback');
           }
         }
 
-        console.log('📊 Charts encontrados:', charts);
+        if (sizeChartData) {
+          setSizeChart(sizeChartData);
+          console.log('✅ Size chart definido com', sizeChartData.length, 'tamanhos');
 
-        if (charts) {
-          const { data: entries } = await supabase
-            .from('size_chart_entries')
-            .select('*')
-            .eq('size_chart_id', charts.id)
-            .order('order');
+          // Calcular tamanho recomendado
+          const recommended = calculateRecommendedSize(sizeData, sizeChartData);
+          setRecommendedSize(recommended);
 
-          console.log('📊 Entries encontradas:', entries?.length);
-
-          if (entries) {
-            setSizeChart(entries);
-            console.log('✅ Size chart definido com', entries.length, 'entries');
+          // Enviar mensagem para o parent window
+          if (recommended) {
+            window.parent.postMessage({
+              type: 'sizeCalculatorComplete',
+              measurements: {
+                height: sizeData.height,
+                bodyType: 0.9 + (sizeData.bodyTypeIndex * 0.1),
+                fit: 0.95 + (sizeData.fitIndex * 0.05),
+                gender: sizeData.gender
+              },
+              recommendedSize: recommended
+            }, '*');
           }
         } else {
-          console.log('❌ Nenhum chart encontrado (nem específico nem unisex) para user_id:', userId);
+          console.log('❌ Nenhum chart encontrado (nem específico nem unisex) para shopDomain:', shopDomain);
         }
       } catch (error) {
         console.error('❌ Error loading size chart:', error);
@@ -147,7 +240,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, publicId]);
+  }, [sizeData?.gender, shopDomain]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -204,7 +297,7 @@ const handleSubmit = async () => {
         weight: sizeData.weight,
         body_type_index: sizeData.bodyTypeIndex,
         fit_preference_index: sizeData.fitIndex,
-        recommended_size: calculatedSize
+        recommended_size: recommendedSize || calculatedSize
       } : null
     };
 
@@ -851,6 +944,19 @@ const handleSubmit = async () => {
                 </div>
               </div>
             </div>
+
+            {recommendedSize && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 md:p-5">
+                <div className="flex items-center justify-center gap-3">
+                  <Ruler className="w-6 h-6 text-green-600" />
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-1">Tamanho recomendado para você:</p>
+                    <p className="text-2xl md:text-3xl font-bold text-green-700">{recommendedSize}</p>
+                  </div>
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button

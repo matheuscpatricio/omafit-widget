@@ -13,6 +13,7 @@ export function WidgetPage() {
   const [fontWeight, setFontWeight] = useState<string>('');
   const [fontStyle, setFontStyle] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
+  const [shopDomain, setShopDomain] = useState<string>('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -22,6 +23,7 @@ export function WidgetPage() {
     const name = params.get('productName');
     const configParam = params.get('config');
     const pubId = params.get('publicId');
+    const shop = params.get('shopDomain');
 
     if (image) {
       setProductImage(image);
@@ -48,6 +50,10 @@ export function WidgetPage() {
 
     if (pubId) {
       setPublicId(pubId);
+    }
+
+    if (shop) {
+      setShopDomain(shop);
     }
 
     if (configParam) {
@@ -104,6 +110,7 @@ export function WidgetPage() {
           fontWeight={fontWeight}
           fontStyle={fontStyle}
           publicId={publicId}
+          shopDomain={shopDomain}
         />
       </div>
     </div>
