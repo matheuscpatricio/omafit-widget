@@ -29,6 +29,8 @@ interface SizeChartEntry {
 
 export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '' }: TryOnWidgetProps) {
 
+  console.log('🎯 TryOnWidget montado com publicId:', publicId);
+
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
     const hex = color.replace('#', '');
@@ -306,6 +308,14 @@ const handleSubmit = async () => {
         recommended_size: recommendedSize || calculatedSize
       } : null
     };
+
+    console.log('📤 Enviando payload:', {
+      ...payload,
+      model_image: 'base64...',
+      garment_image: payload.garment_image.substring(0, 50) + '...'
+    });
+    console.log('🔑 publicId:', publicId);
+    console.log('📦 product:', product);
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
       method: 'POST',
