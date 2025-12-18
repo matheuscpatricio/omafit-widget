@@ -363,6 +363,30 @@
       if (loadingContainer.parentNode) {
         loadingContainer.parentNode.removeChild(loadingContainer);
       }
+
+      // Enviar configurações via postMessage após o iframe carregar
+      setTimeout(function() {
+        if (iframe.contentWindow) {
+          // Enviar logo
+          if (OMAFIT_CONFIG.storeLogo) {
+            iframe.contentWindow.postMessage({
+              type: 'omafit-store-logo',
+              logo: OMAFIT_CONFIG.storeLogo
+            }, '*');
+          }
+
+          // Enviar configuração completa
+          iframe.contentWindow.postMessage({
+            type: 'omafit-config-update',
+            fontFamily: OMAFIT_CONFIG.fontFamily,
+            primaryColor: OMAFIT_CONFIG.colors.primary,
+            storeName: OMAFIT_CONFIG.storeName,
+            storeLogo: OMAFIT_CONFIG.storeLogo
+          }, '*');
+
+          console.log('📤 Configurações enviadas via postMessage');
+        }
+      }, 500);
     });
 
     iframe.addEventListener('error', function () {
