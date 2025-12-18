@@ -62,7 +62,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   useEffect(() => {
     setIsVisible(true);
-  }, []);
+    console.log('🖼️ TryOnWidget - Props recebidas:', {
+      storeLogo,
+      storeName,
+      primaryColor,
+      fontFamily
+    });
+  }, [storeLogo, storeName, primaryColor, fontFamily]);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -558,19 +564,30 @@ const handleSubmit = async () => {
       <div className="bg-white border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center justify-center relative">
           {storeLogo ? (
+            <>
+              {console.log('🔍 Renderizando COM logo:', storeLogo)}
             <img
               src={storeLogo}
               alt={storeName}
               className="h-12 sm:h-16 w-auto object-contain"
               style={{ maxWidth: '300px' }}
+              onLoad={() => console.log('✅ Logo carregado com sucesso:', storeLogo)}
+              onError={(e) => {
+                console.error('❌ Erro ao carregar logo:', storeLogo);
+                console.error('❌ Erro detalhado:', e);
+              }}
             />
+            </>
           ) : (
+            <>
+              {console.log('🔍 Renderizando SEM logo - usando fallback')}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor }}>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <h2 className="text-base sm:text-lg font-semibold text-gray-900">{storeName}</h2>
             </div>
+            </>
           )}
           {step !== 'info' && step !== 'processing' && step !== 'result' && (
             <button
