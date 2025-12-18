@@ -82,6 +82,34 @@ export function WidgetPage() {
         console.error('Error parsing config:', error);
       }
     }
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log('📨 Mensagem recebida:', event.data.type);
+
+      if (event.data.type === 'omafit-store-logo') {
+        console.log('🖼️ Logo recebido via postMessage');
+        setStoreLogo(event.data.logo);
+      }
+
+      if (event.data.type === 'omafit-config-update') {
+        console.log('⚙️ Config atualizado via postMessage');
+        if (event.data.fontFamily) {
+          setFontFamily(event.data.fontFamily);
+        }
+        if (event.data.primaryColor) {
+          setPrimaryColor(event.data.primaryColor);
+        }
+        if (event.data.storeName) {
+          setStoreName(event.data.storeName);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   if (!productImage) {
