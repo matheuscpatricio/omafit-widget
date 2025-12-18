@@ -103,19 +103,33 @@ Deno.serve(async (req: Request) => {
       console.log('✅ Garment image uploaded:', garmentImageUrl);
     }
 
+    console.log('🔍 Buscando widget com public_id:', public_id);
+
     const { data: widgetKeyData, error: widgetKeyError } = await supabaseClient
       .from('widget_keys')
       .select('id, user_id, status, usage_count, shop_domain')
       .eq('public_id', public_id)
       .maybeSingle();
 
+    console.log('📊 Resultado da busca:', { widgetKeyData, widgetKeyError });
+
     if (widgetKeyError) {
+      console.error('❌ Erro ao buscar widget:', widgetKeyError);
       throw new Error('Error validating widget');
     }
 
     if (!widgetKeyData) {
+      console.error('❌ Widget não encontrado. public_id:', public_id);
+      // Listar todos os widgets para debug
+      const { data: allWidgets } = await supabaseClient
+        .from('widget_keys')
+        .select('public_id, status')
+        .limit(5);
+      console.log('📋 Widgets disponíveis:', allWidgets);
       throw new Error('Invalid widget. Please check your widget code or generate a new one from your Omafit dashboard.');
     }
+
+    console.log('✅ Widget encontrado:', widgetKeyData);
 
     if (widgetKeyData.status !== 'active') {
       throw new Error('This widget has been deactivated. Please contact the store owner or generate a new widget.');
