@@ -102,6 +102,9 @@ export function WidgetPage() {
         if (event.data.storeName) {
           setStoreName(event.data.storeName);
         }
+        if (event.data.storeLogo) {
+          setStoreLogo(event.data.storeLogo);
+        }
       }
     };
 
