@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
         .from('api_config')
         .select('key_value')
         .eq('user_id', widgetKeyData.user_id)
-        .in('key_name', ['fal_api_key', 'fashn_api_key'])
+        .eq('key_name', 'fal_api_key')
         .maybeSingle();
 
       falApiKey = userApiConfigs?.key_value;
