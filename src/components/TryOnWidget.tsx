@@ -1032,8 +1032,11 @@ const handleSubmit = async () => {
 
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center mb-4">
-                    <p className="text-lg text-gray-700 mb-1">
-                      Seu tamanho recomendado: <span className="text-2xl font-bold" style={{ color: primaryColor }}>{calculatedSize || recommendedSize}</span>
+                    <p className="text-base text-gray-600 mb-2">
+                      Seu tamanho recomendado:
+                    </p>
+                    <p className="text-6xl font-bold" style={{ color: primaryColor }}>
+                      {calculatedSize || recommendedSize}
                     </p>
                   </div>
                 )}
@@ -1074,8 +1077,11 @@ const handleSubmit = async () => {
               <div className="md:w-1/2 flex flex-col justify-center space-y-4">
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center">
-                    <p className="text-lg text-gray-700">
-                      Seu tamanho recomendado: <span className="text-2xl font-bold" style={{ color: primaryColor }}>{calculatedSize || recommendedSize}</span>
+                    <p className="text-lg text-gray-600 mb-2">
+                      Seu tamanho recomendado:
+                    </p>
+                    <p className="text-7xl font-bold" style={{ color: primaryColor }}>
+                      {calculatedSize || recommendedSize}
                     </p>
                   </div>
                 )}
