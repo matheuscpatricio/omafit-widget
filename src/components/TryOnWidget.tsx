@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, CheckCircle, Info, ShoppingCart, Ruler } from 'lucide-react';
+import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -974,19 +974,6 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            {recommendedSize && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 md:p-5">
-                <div className="flex items-center justify-center gap-3">
-                  <Ruler className="w-6 h-6 text-green-600" />
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Tamanho recomendado para você:</p>
-                    <p className="text-2xl md:text-3xl font-bold text-green-700">{recommendedSize}</p>
-                  </div>
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            )}
-
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('photo')}
@@ -1043,16 +1030,10 @@ const handleSubmit = async () => {
                   />
                 </div>
 
-                {calculatedSize && (
+                {(calculatedSize || recommendedSize) && (
                   <div className="text-center mb-4">
-                    <p className="text-base text-gray-700 mb-2">
-                      Seu tamanho ideal:
-                    </p>
-                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor }}>
-                      {calculatedSize}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Com base na sua altura, peso e tipo físico
+                    <p className="text-lg text-gray-700 mb-1">
+                      Seu tamanho recomendado: <span className="text-2xl font-bold" style={{ color: primaryColor }}>{calculatedSize || recommendedSize}</span>
                     </p>
                   </div>
                 )}
@@ -1091,16 +1072,10 @@ const handleSubmit = async () => {
 
               {/* Right Side: Info and Actions */}
               <div className="md:w-1/2 flex flex-col justify-center space-y-4">
-                {calculatedSize && (
+                {(calculatedSize || recommendedSize) && (
                   <div className="text-center">
-                    <p className="text-base text-gray-700 mb-2">
-                      Seu tamanho ideal:
-                    </p>
-                    <p className="text-5xl font-bold mb-2" style={{ color: primaryColor }}>
-                      {calculatedSize}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Com base na sua altura, peso e tipo físico
+                    <p className="text-lg text-gray-700">
+                      Seu tamanho recomendado: <span className="text-2xl font-bold" style={{ color: primaryColor }}>{calculatedSize || recommendedSize}</span>
                     </p>
                   </div>
                 )}
