@@ -4,7 +4,7 @@ import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
-import NeuralNetworkHero from './ui/neural-network-hero';
+import ASMRStaticBackground from './ui/asmr-background';
 import { ZoomParallax } from './ui/zoom-parallax';
 import Lenis from '@studio-freight/lenis';
 import { motion, useScroll, useTransform } from 'framer-motion';
@@ -272,12 +272,20 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       </header>
 
-      {/* Hero Section - Neural Network Background */}
-      <NeuralNetworkHero
-        title="Encante seus clientes com uma"
-        titleItalic="experiência envolvente"
-        description="When techno meets fashion."
-      />
+      {/* Hero Section - ASMR Background */}
+      <section className="relative h-screen">
+        <ASMRStaticBackground>
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6">
+              Encante seus clientes com uma{' '}
+              <span className="italic" style={{ fontFamily: '"Jost", sans-serif' }}>experiência envolvente</span>
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-white/80 max-w-3xl">
+              When techno meets fashion.
+            </p>
+          </div>
+        </ASMRStaticBackground>
+      </section>
 
       {/* Stats Section */}
       <section className="py-12 sm:py-16 bg-white" data-animate="stats">
