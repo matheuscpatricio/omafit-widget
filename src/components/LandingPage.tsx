@@ -275,12 +275,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Hero Section - ASMR Background */}
       <section className="relative h-screen">
         <ASMRStaticBackground>
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6">
-              Encante seus clientes com uma{' '}
-              <span className="italic" style={{ fontFamily: '"Jost", sans-serif' }}>experiência envolvente</span>
+          <div className="flex flex-col items-center justify-center h-full text-center px-4 pointer-events-none">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+              Encante seus clientes com uma
+              <br />
+              <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
             </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white/80 max-w-3xl">
+            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
               When techno meets fashion.
             </p>
           </div>
