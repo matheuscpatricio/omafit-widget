@@ -8,16 +8,18 @@ interface Plan {
   tryons: number;
   maxVisits: number;
   description: string;
+  additionalImagePrice: number | null;
 }
 
 const plans: Plan[] = [
   {
-    id: 'basic',
-    name: 'Basic',
+    id: 'starter',
+    name: 'Starter',
     price: 25,
     tryons: 100,
     maxVisits: 30000,
-    description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.'
+    description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
+    additionalImagePrice: 0.18
   },
   {
     id: 'growth',
@@ -25,7 +27,8 @@ const plans: Plan[] = [
     price: 100,
     tryons: 500,
     maxVisits: 100000,
-    description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.'
+    description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
+    additionalImagePrice: 0.16
   },
   {
     id: 'pro',
@@ -33,7 +36,8 @@ const plans: Plan[] = [
     price: 180,
     tryons: 1000,
     maxVisits: 300000,
-    description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.'
+    description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
+    additionalImagePrice: 0.14
   },
   {
     id: 'enterprise',
@@ -41,7 +45,8 @@ const plans: Plan[] = [
     price: 0,
     tryons: -1,
     maxVisits: Infinity,
-    description: 'Solução completa e personalizada para grandes operações com necessidades específicas.'
+    description: 'Solução completa e personalizada para grandes operações com necessidades específicas.',
+    additionalImagePrice: null
   }
 ];
 
@@ -128,7 +133,7 @@ export function PlanCalculator() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Preço mensal</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-[#810707]">
@@ -145,12 +150,20 @@ export function PlanCalculator() {
                       : `${recommendedPlan.tryons.toLocaleString('pt-BR')}/mês`}
                   </p>
                 </div>
-                <div className="col-span-2 sm:col-span-1">
+                <div>
                   <p className="text-xs sm:text-sm text-gray-600">Custo por imagem</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
                     {recommendedPlan.id === 'enterprise'
                       ? 'A negociar'
                       : `$${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-600">Imagens adicionais</p>
+                  <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
+                    {recommendedPlan.additionalImagePrice === null
+                      ? 'A negociar'
+                      : `$${recommendedPlan.additionalImagePrice.toFixed(2)}`}
                   </p>
                 </div>
               </div>
