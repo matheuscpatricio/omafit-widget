@@ -3,7 +3,6 @@ import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Inf
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
-import ASMRStaticBackground from './ui/asmr-background';
 
 interface TryOnWidgetProps {
   garmentImage: string;
@@ -542,10 +541,10 @@ const handleSubmit = async () => {
   // Verificar se o produto foi carregado
   if (!product) {
     return (
-      <div className="w-full h-full bg-white flex items-center justify-center">
+      <div className="w-full h-full bg-white flex items-center justify-center rounded-2xl">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: primaryColor }}></div>
-          <p className="text-white/80">Carregando produto...</p>
+          <p className="text-gray-700">Carregando produto...</p>
         </div>
       </div>
     );
@@ -571,10 +570,9 @@ const handleSubmit = async () => {
         .hover\\:border-primary:hover { border-color: ${primaryColor} !important; }
         .focus\\:ring-primary:focus { --tw-ring-color: ${primaryColor} !important; }
       `}</style>
-      <ASMRStaticBackground className={`rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-      <div className="w-full h-full overflow-hidden flex flex-col">
+      <div className={`w-full h-full overflow-hidden flex flex-col bg-white rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-md border-b border-white/20 p-3 rounded-t-2xl flex-shrink-0">
+      <div className="bg-gray-50 border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center justify-center relative">
           {storeLogo ? (
             <>
@@ -598,14 +596,14 @@ const handleSubmit = async () => {
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor }}>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h2 className="text-base sm:text-lg font-semibold text-white">{storeName}</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{storeName}</h2>
             </div>
             </>
           )}
           {step !== 'info' && step !== 'processing' && step !== 'result' && (
             <button
               onClick={goBack}
-              className="absolute left-0 text-white/70 hover:text-white p-1 rounded-full hover:bg-white/20 transition-all duration-300 ease-in-out"
+              className="absolute left-0 text-gray-600 hover:text-gray-900 p-1 rounded-full hover:bg-gray-200 transition-all duration-300 ease-in-out"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -617,7 +615,7 @@ const handleSubmit = async () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
         {step === 'info' && (
-          <div className="md:w-2/5 bg-white/5 backdrop-blur-sm p-4 md:p-6 flex items-center justify-center">
+          <div className="md:w-2/5 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
                 src={displayImage}
@@ -644,7 +642,7 @@ const handleSubmit = async () => {
               <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 Sua experiência visual
               </h3>
-              <p className="text-white/80 text-base md:text-lg mb-2 md:mb-3">
+              <p className="text-gray-700 text-base md:text-lg mb-2 md:mb-3">
                 Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
@@ -666,7 +664,7 @@ const handleSubmit = async () => {
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Calculadora de tamanho</h4>
-                  <p className="text-sm md:text-base text-white/80">Informe suas medidas para descobrir o tamanho ideal</p>
+                  <p className="text-sm md:text-base text-gray-600">Informe suas medidas para descobrir o tamanho ideal</p>
                 </div>
               </div>
 
@@ -676,7 +674,7 @@ const handleSubmit = async () => {
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Envie sua foto</h4>
-                  <p className="text-sm md:text-base text-white/80">Corpo inteiro, de frente, sem obstáculos</p>
+                  <p className="text-sm md:text-base text-gray-600">Corpo inteiro, de frente, sem obstáculos</p>
                 </div>
               </div>
 
@@ -686,7 +684,7 @@ const handleSubmit = async () => {
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Veja o resultado</h4>
-                  <p className="text-sm md:text-base text-white/80">IA mostra o produto em você + tamanho ideal</p>
+                  <p className="text-sm md:text-base text-gray-600">IA mostra o produto em você + tamanho ideal</p>
                 </div>
               </div>
             </div>
@@ -699,7 +697,7 @@ const handleSubmit = async () => {
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
-            <p className="text-xs md:text-sm text-center text-white/60 mt-3">
+            <p className="text-xs md:text-sm text-center text-gray-500 mt-3">
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
           </div>
@@ -727,11 +725,11 @@ const handleSubmit = async () => {
               {/* Sempre mostrar imagem do produto no mobile */}
               <div className="mb-4">
                 <div className="text-center mb-3">
-                  <h4 className="text-lg font-semibold text-white">
+                  <h4 className="text-lg font-semibold text-gray-900">
                     Imagem do Produto
                   </h4>
                   {availableImages.length > 1 && (
-                    <p className="text-sm text-white/60">
+                    <p className="text-sm text-gray-600">
                       (escolha uma imagem frontal do produto)
                     </p>
                   )}
@@ -739,7 +737,7 @@ const handleSubmit = async () => {
 
                 <div className="relative">
                   <div
-                    className="aspect-[2/3] bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden"
+                    className="aspect-[2/3] bg-gray-50 border border-gray-200 rounded-lg overflow-hidden"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
@@ -789,7 +787,7 @@ const handleSubmit = async () => {
                 <h3 className="text-2xl font-semibold text-primary mb-2">
                   Sua foto
                 </h3>
-                <p className="text-white/80 text-sm">
+                <p className="text-gray-700 text-sm">
                   Para melhores resultados, siga as instruções
                 </p>
               </div>
@@ -815,8 +813,8 @@ const handleSubmit = async () => {
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
               >
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-white/80 mb-2 text-base">Clique para enviar sua foto</p>
-                <p className="text-sm text-white/60">
+                <p className="text-gray-700 mb-2 text-base">Clique para enviar sua foto</p>
+                <p className="text-sm text-gray-500">
                   JPG, PNG ou WEBP (máx. 5MB)
                 </p>
                 <input
@@ -834,17 +832,17 @@ const handleSubmit = async () => {
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
                 <div className="text-center mb-3">
-                  <h4 className="text-xl font-semibold text-white">
+                  <h4 className="text-xl font-semibold text-gray-900">
                     Imagem do Produto
                   </h4>
-                  <p className="text-sm text-white/60">
+                  <p className="text-sm text-gray-600">
                     (escolha uma imagem frontal do produto)
                   </p>
                 </div>
 
                 {availableImages.length > 1 ? (
                   <div className="relative">
-                    <div className="aspect-[2/3] bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden">
+                    <div className="aspect-[2/3] bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
                       <img
                         src={selectedProductImage}
                         alt="Produto"
@@ -881,7 +879,7 @@ const handleSubmit = async () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="aspect-[2/3] bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden">
+                  <div className="aspect-[2/3] bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
                     <img
                       src={selectedProductImage}
                       alt="Produto"
@@ -897,7 +895,7 @@ const handleSubmit = async () => {
                   <h3 className="text-2xl font-semibold text-primary mb-1">
                     Sua foto
                   </h3>
-                  <p className="text-white/80 text-sm">
+                  <p className="text-gray-700 text-sm">
                     Para melhores resultados, siga as instruções
                   </p>
                 </div>
@@ -923,8 +921,8 @@ const handleSubmit = async () => {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
                 >
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-white/80 mb-1 text-base">Clique para enviar sua foto</p>
-                  <p className="text-sm text-white/60">
+                  <p className="text-gray-700 mb-1 text-base">Clique para enviar sua foto</p>
+                  <p className="text-sm text-gray-500">
                     JPG, PNG ou WEBP (máx. 5MB)
                   </p>
                   <input
@@ -947,13 +945,13 @@ const handleSubmit = async () => {
               <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2">
                 Confirmar dados
               </h3>
-              <p className="text-white/80 text-sm md:text-base">
+              <p className="text-gray-700 text-sm md:text-base">
                 Verifique se está tudo correto antes de processar
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-5">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Produto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
@@ -964,7 +962,7 @@ const handleSubmit = async () => {
                 </div>
               </div>
 
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-5">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
                 <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Sua foto:</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
@@ -979,7 +977,7 @@ const handleSubmit = async () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('photo')}
-                className="flex-1 bg-white/10 backdrop-blur-sm text-white border border-white/20 py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-white/20 transition-all duration-300 ease-in-out"
+                className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                               >
                 Alterar
               </button>
@@ -1002,7 +1000,7 @@ const handleSubmit = async () => {
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>
-            <p className="text-white/80 mb-4 text-sm md:text-base">
+            <p className="text-gray-700 mb-4 text-sm md:text-base">
               Estamos criando seu try-on virtual. Isso pode levar até 1 minuto.
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
@@ -1034,7 +1032,7 @@ const handleSubmit = async () => {
 
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center mb-4">
-                    <p className="text-base text-white/80 mb-2">
+                    <p className="text-base text-gray-700 mb-2">
                       Seu tamanho recomendado:
                     </p>
                     <p className="text-6xl font-bold" style={{ color: primaryColor }}>
@@ -1043,7 +1041,7 @@ const handleSubmit = async () => {
                   </div>
                 )}
 
-                <p className="text-sm text-white/90 mb-4">
+                <p className="text-sm text-gray-700 mb-4">
                    Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
@@ -1051,7 +1049,7 @@ const handleSubmit = async () => {
 
               <button
                 onClick={resetWidget}
-                className="w-full bg-white/10 backdrop-blur-sm text-white border border-white/20 py-3 text-base rounded-lg hover:bg-white/20 transition-all duration-300 ease-in-out"
+                className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
               >
                 Novo Try-On
               </button>
@@ -1079,7 +1077,7 @@ const handleSubmit = async () => {
               <div className="md:w-1/2 flex flex-col justify-center space-y-4">
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center">
-                    <p className="text-lg text-white/80 mb-2">
+                    <p className="text-lg text-gray-700 mb-2">
                       Seu tamanho recomendado:
                     </p>
                     <p className="text-7xl font-bold" style={{ color: primaryColor }}>
@@ -1088,14 +1086,14 @@ const handleSubmit = async () => {
                   </div>
                 )}
 
-                <p className="text-base text-white/90">
+                <p className="text-base text-gray-700">
                   Você ficou excepcional! Esse look realmente combina muito contigo!
                   Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
                 </p>
 
                 <button
                   onClick={resetWidget}
-                  className="w-full bg-white/10 backdrop-blur-sm text-white border border-white/20 py-3 text-base rounded-lg hover:bg-white/20 transition-all duration-300 ease-in-out"
+                  className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                 >
                   Novo Try-On
                 </button>
@@ -1106,7 +1104,6 @@ const handleSubmit = async () => {
         </div>
       </div>
     </div>
-    </ASMRStaticBackground>
     </>
   );
 }
