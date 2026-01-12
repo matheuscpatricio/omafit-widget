@@ -24,6 +24,14 @@ export function WidgetPage() {
     const configParam = params.get('config');
     const pubId = params.get('publicId');
     const shop = params.get('shopDomain');
+    const logoParam = params.get('storeLogo');
+
+    console.log('🔍 Parâmetros da URL:', {
+      storeLogo: logoParam,
+      config: configParam?.substring(0, 100),
+      shop,
+      publicId: pubId
+    });
 
     if (image) {
       setProductImage(image);
@@ -56,6 +64,12 @@ export function WidgetPage() {
       setShopDomain(shop);
     }
 
+    // Prioridade 1: parâmetro direto storeLogo
+    if (logoParam && logoParam.trim() !== '') {
+      console.log('✅ Logo encontrado nos parâmetros diretos:', logoParam);
+      setStoreLogo(logoParam);
+    }
+
     if (configParam) {
       try {
         const config = JSON.parse(decodeURIComponent(configParam));
@@ -64,11 +78,12 @@ export function WidgetPage() {
         if (config.storeName) {
           setStoreName(config.storeName);
         }
-        if (config.storeLogo) {
-          console.log('✅ Definindo storeLogo:', config.storeLogo);
+        // Prioridade 2: logo do config (só se não foi definido pelo parâmetro direto)
+        if (config.storeLogo && config.storeLogo.trim() !== '' && (!logoParam || logoParam.trim() === '')) {
+          console.log('✅ Definindo storeLogo do config:', config.storeLogo);
           setStoreLogo(config.storeLogo);
-        } else {
-          console.log('⚠️ storeLogo está vazio ou undefined no config');
+        } else if (!config.storeLogo && (!logoParam || logoParam.trim() === '')) {
+          console.log('⚠️ storeLogo está vazio ou undefined no config e nos parâmetros');
         }
         if (config.primaryColor) {
           setPrimaryColor(config.primaryColor);

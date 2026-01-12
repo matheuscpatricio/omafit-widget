@@ -300,12 +300,13 @@
     const config = {
       storeName: OMAFIT_CONFIG.storeName || 'Omafit',
       primaryColor: OMAFIT_CONFIG.colors.primary,
-      storeLogo: OMAFIT_CONFIG.storeLogo,
+      storeLogo: OMAFIT_CONFIG.storeLogo || '',
       fontFamily: OMAFIT_CONFIG.fontFamily
     };
 
     console.log('🔧 Config montado para iframe:', config);
     console.log('🖼️ Logo que será passado:', config.storeLogo);
+    console.log('📦 OMAFIT_CONFIG completo:', OMAFIT_CONFIG);
 
     const widgetUrl =
       'https://omafit.netlify.app/widget' +
@@ -315,6 +316,7 @@
       '&productName=' + encodeURIComponent(productInfo.productName || 'Produto') +
       '&publicId=' + encodeURIComponent(OMAFIT_CONFIG.publicId) +
       '&shopDomain=' + encodeURIComponent(SHOP_DOMAIN) +
+      '&storeLogo=' + encodeURIComponent(OMAFIT_CONFIG.storeLogo || '') +
       '&config=' + encodeURIComponent(JSON.stringify(config));
 
     console.log('🔗 URL do widget:', widgetUrl);
