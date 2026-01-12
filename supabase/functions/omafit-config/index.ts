@@ -19,6 +19,8 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const shop = url.searchParams.get('shop');
 
+    console.log('🏪 Shop recebido:', shop);
+
     if (!shop) {
       throw new Error('shop domain é obrigatório');
     }
@@ -27,6 +29,8 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+
+    console.log('📊 Buscando configuração para:', shop);
 
     let query = supabaseClient
       .from('widget_configurations')
@@ -39,16 +43,22 @@ Deno.serve(async (req: Request) => {
       throw new Error('shop domain é obrigatório para widget_configurations');
     }
 
+    // Pegar a configuração mais recente caso haja múltiplas
+    query = query.order('created_at', { ascending: false }).limit(1);
+
     const { data, error } = await query.maybeSingle();
 
     if (error) {
-      throw new Error('Erro ao buscar configuração do widget');
+      console.error('❌ Erro na query:', error);
+      throw new Error('Erro ao buscar configuração do widget: ' + error.message);
     }
 
     if (!data) {
+      console.log('⚠️ Nenhum dado encontrado para shop:', shop);
       throw new Error('Widget não encontrado ou inativo');
     }
 
+    console.log('✅ Dados encontrados:', data);
     console.log('🖼️ Logo encontrado no banco:', data.store_logo);
 
     const storeLogo = data.store_logo || '';
@@ -68,7 +78,7 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log('🖼️ Logo a ser retornado:', storeLogo);
-    console.log('📤 Configuração sendo retornada:', JSON.stringify(config));
+    console.log('📤 Configuração completa:', JSON.stringify(config));
 
     return new Response(
       JSON.stringify(config),
@@ -80,7 +90,7 @@ Deno.serve(async (req: Request) => {
       },
     );
   } catch (error: any) {
-    console.error('Error in omafit-config:', error);
+    console.error('❌ Error in omafit-config:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
