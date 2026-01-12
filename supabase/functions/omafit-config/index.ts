@@ -49,6 +49,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('Widget não encontrado ou inativo');
     }
 
+    console.log('🖼️ Logo encontrado no banco:', data.store_logo);
+
     const config = {
       publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
@@ -62,6 +64,8 @@ Deno.serve(async (req: Request) => {
         overlay: (data.primary_color || '#810707') + 'CC'
       }
     };
+
+    console.log('📤 Configuração sendo retornada:', JSON.stringify(config));
 
     return new Response(
       JSON.stringify(config),

@@ -574,12 +574,13 @@ const handleSubmit = async () => {
       {/* Header */}
       <div className="bg-gray-50 border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center justify-center relative">
-          {storeLogo ? (
+          {console.log('🖼️ TryOnWidget - storeLogo recebido:', storeLogo, 'tipo:', typeof storeLogo, 'length:', storeLogo?.length)}
+          {storeLogo && storeLogo.trim() !== '' ? (
             <>
-              {console.log('🔍 Renderizando COM logo:', storeLogo)}
+              {console.log('✅ Renderizando logo:', storeLogo)}
             <img
               src={storeLogo}
-              alt={storeName}
+              alt={storeName || 'Logo da loja'}
               className="h-12 sm:h-16 w-auto object-contain"
               style={{ maxWidth: '300px' }}
               onLoad={() => console.log('✅ Logo carregado com sucesso:', storeLogo)}
@@ -591,7 +592,7 @@ const handleSubmit = async () => {
             </>
           ) : (
             <>
-              {console.log('🔍 Renderizando SEM logo - usando fallback')}
+              {console.log('⚠️ Logo vazio ou inválido - usando fallback')}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor }}>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />

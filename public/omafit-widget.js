@@ -232,6 +232,7 @@
 
       const config = await response.json();
       console.log('✅ Configuração do Omafit carregada:', config);
+      console.log('🖼️ Logo recebido da API:', config.storeLogo);
       console.log('🏪 Shop Domain:', SHOP_DOMAIN);
       return config;
     } catch (error) {
@@ -303,6 +304,9 @@
       fontFamily: OMAFIT_CONFIG.fontFamily
     };
 
+    console.log('🔧 Config montado para iframe:', config);
+    console.log('🖼️ Logo que será passado:', config.storeLogo);
+
     const widgetUrl =
       'https://omafit.netlify.app/widget' +
       '?productImage=' + encodeURIComponent(productImage) +
@@ -312,6 +316,8 @@
       '&publicId=' + encodeURIComponent(OMAFIT_CONFIG.publicId) +
       '&shopDomain=' + encodeURIComponent(SHOP_DOMAIN) +
       '&config=' + encodeURIComponent(JSON.stringify(config));
+
+    console.log('🔗 URL do widget:', widgetUrl);
 
     iframe.src = widgetUrl;
     iframe.allow = 'camera; microphone; fullscreen';

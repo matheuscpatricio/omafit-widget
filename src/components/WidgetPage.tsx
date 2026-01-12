@@ -60,11 +60,15 @@ export function WidgetPage() {
       try {
         const config = JSON.parse(decodeURIComponent(configParam));
         console.log('📦 Config recebido no widget:', config);
+        console.log('🖼️ Logo no config:', config.storeLogo, 'tipo:', typeof config.storeLogo);
         if (config.storeName) {
           setStoreName(config.storeName);
         }
         if (config.storeLogo) {
+          console.log('✅ Definindo storeLogo:', config.storeLogo);
           setStoreLogo(config.storeLogo);
+        } else {
+          console.log('⚠️ storeLogo está vazio ou undefined no config');
         }
         if (config.primaryColor) {
           setPrimaryColor(config.primaryColor);
@@ -87,12 +91,12 @@ export function WidgetPage() {
       console.log('📨 Mensagem recebida:', event.data.type);
 
       if (event.data.type === 'omafit-store-logo') {
-        console.log('🖼️ Logo recebido via postMessage');
+        console.log('🖼️ Logo recebido via postMessage:', event.data.logo);
         setStoreLogo(event.data.logo);
       }
 
       if (event.data.type === 'omafit-config-update') {
-        console.log('⚙️ Config atualizado via postMessage');
+        console.log('⚙️ Config atualizado via postMessage:', event.data);
         if (event.data.fontFamily) {
           setFontFamily(event.data.fontFamily);
         }
@@ -103,6 +107,7 @@ export function WidgetPage() {
           setStoreName(event.data.storeName);
         }
         if (event.data.storeLogo) {
+          console.log('✅ Atualizando storeLogo via postMessage:', event.data.storeLogo);
           setStoreLogo(event.data.storeLogo);
         }
       }
@@ -125,6 +130,8 @@ export function WidgetPage() {
       </div>
     );
   }
+
+  console.log('🎨 WidgetPage - Renderizando com storeLogo:', storeLogo);
 
   return (
     <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>
