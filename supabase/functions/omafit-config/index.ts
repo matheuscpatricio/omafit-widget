@@ -17,11 +17,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
-    const publicId = url.searchParams.get('public_id');
     const shop = url.searchParams.get('shop');
 
-    if (!publicId && !shop) {
-      throw new Error('public_id ou shop é obrigatório');
+    if (!shop) {
+      throw new Error('shop domain é obrigatório');
     }
 
     const supabaseClient = createClient(
@@ -30,14 +29,14 @@ Deno.serve(async (req: Request) => {
     );
 
     let query = supabaseClient
-      .from('widget_keys')
-      .select('public_id, link_text, store_name, store_logo, font_family, primary_color, link_color, popup_color, background_color, text_color, overlay_color')
-      .eq('status', 'active');
+      .from('widget_configurations')
+      .select('shop_domain, link_text, store_logo, primary_color, widget_enabled')
+      .eq('widget_enabled', true);
 
-    if (publicId) {
-      query = query.eq('public_id', publicId);
-    } else if (shop) {
-      query = query.eq('domain', shop);
+    if (shop) {
+      query = query.eq('shop_domain', shop);
+    } else {
+      throw new Error('shop domain é obrigatório para widget_configurations');
     }
 
     const { data, error } = await query.maybeSingle();
@@ -51,16 +50,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const config = {
-      publicId: data.public_id,
+      publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
-      storeName: data.store_name || '',
+      storeName: '',
       storeLogo: data.store_logo || '',
-      fontFamily: data.font_family || 'Outfit, sans-serif',
+      fontFamily: 'Outfit, sans-serif',
       colors: {
-        primary: data.primary_color || data.link_color || '#810707',
-        background: data.background_color || '#ffffff',
-        text: data.text_color || data.link_color || '#810707',
-        overlay: data.overlay_color || '#810707CC'
+        primary: data.primary_color || '#810707',
+        background: '#ffffff',
+        text: data.primary_color || '#810707',
+        overlay: (data.primary_color || '#810707') + 'CC'
       }
     };
 
