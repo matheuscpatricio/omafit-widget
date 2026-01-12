@@ -83,7 +83,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       try {
         const { data: configs, error } = await supabase
           .from('widget_configurations')
-          .select('link_text, store_logo, primary_color, widget_title, widget_subtitle')
+          .select('link_text, store_logo, primary_color, title, subtitle')
           .eq('shop_domain', shopDomain)
           .limit(1);
 
