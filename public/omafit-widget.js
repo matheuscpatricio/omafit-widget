@@ -224,10 +224,12 @@
         throw new Error('Nem public_id nem shop domain foram fornecidos');
       }
 
+      console.log('📡 Fazendo fetch para:', apiUrl + '?' + queryParams.toString());
       const response = await fetch(apiUrl + '?' + queryParams.toString());
 
+      console.log('📡 Response status:', response.status);
       if (!response.ok) {
-        throw new Error('Erro ao buscar configuração do widget');
+        throw new Error('Erro ao buscar configuração do widget - Status: ' + response.status);
       }
 
       const config = await response.json();
@@ -237,6 +239,7 @@
       return config;
     } catch (error) {
       console.error('❌ Erro ao buscar configuração:', error);
+      console.error('❌ Retornando configuração padrão SEM LOGO');
       // Retornar configuração padrão em caso de erro
       return {
         publicId: 'wgt_pub_default',
@@ -256,6 +259,10 @@
 
   // Função que abre o modal do Omafit
   window.openOmafitModal = async function () {
+    console.log('🔍 openOmafitModal chamado');
+    console.log('🔍 OMAFIT_CONFIG:', OMAFIT_CONFIG);
+    console.log('🔍 storeLogo atual:', OMAFIT_CONFIG ? OMAFIT_CONFIG.storeLogo : 'CONFIG NULL');
+
     if (!OMAFIT_CONFIG) {
       console.error('Omafit: configuração não carregada');
       return;
@@ -308,6 +315,10 @@
     console.log('🖼️ Logo que será passado:', config.storeLogo);
     console.log('📦 OMAFIT_CONFIG completo:', OMAFIT_CONFIG);
 
+    console.log('🔧 Antes de montar URL:');
+    console.log('  - OMAFIT_CONFIG.storeLogo:', OMAFIT_CONFIG.storeLogo);
+    console.log('  - config.storeLogo:', config.storeLogo);
+
     const widgetUrl =
       'https://omafit.netlify.app/widget' +
       '?productImage=' + encodeURIComponent(productImage) +
@@ -320,6 +331,7 @@
       '&config=' + encodeURIComponent(JSON.stringify(config));
 
     console.log('🔗 URL do widget:', widgetUrl);
+    console.log('🔗 storeLogo na URL:', OMAFIT_CONFIG.storeLogo || 'VAZIO');
 
     iframe.src = widgetUrl;
     iframe.allow = 'camera; microphone; fullscreen';
@@ -633,10 +645,19 @@
     document.head.appendChild(style);
   }
 
+  // Flag para evitar inicialização múltipla
+  let isInitialized = false;
+
   // Inicializar assim que a página e configuração estiverem prontas
   async function initOmafit() {
+    if (isInitialized) {
+      console.log('⚠️ Omafit já foi inicializado, pulando...');
+      return;
+    }
+
     try {
       console.log('🚀 Inicializando Omafit...');
+      isInitialized = true;
 
       // Buscar configuração via API
       OMAFIT_CONFIG = await fetchOmafitConfig();
