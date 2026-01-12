@@ -51,11 +51,13 @@ Deno.serve(async (req: Request) => {
 
     console.log('🖼️ Logo encontrado no banco:', data.store_logo);
 
+    const storeLogo = data.store_logo || '';
+
     const config = {
       publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
       storeName: '',
-      storeLogo: data.store_logo || '',
+      storeLogo: storeLogo,
       fontFamily: 'Outfit, sans-serif',
       colors: {
         primary: data.primary_color || '#810707',
@@ -65,6 +67,7 @@ Deno.serve(async (req: Request) => {
       }
     };
 
+    console.log('🖼️ Logo a ser retornado:', storeLogo);
     console.log('📤 Configuração sendo retornada:', JSON.stringify(config));
 
     return new Response(
