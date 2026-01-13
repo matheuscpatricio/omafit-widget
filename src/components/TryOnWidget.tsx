@@ -39,7 +39,6 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     const b = Math.max(0, parseInt(hex.substr(4, 2), 16) - amount);
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   };
-  const hoverColor = darkenColor(primaryColor);
 
   const [product, setProduct] = useState<any>(null);
   const [modelImage, setModelImage] = useState<File | null>(null);
@@ -62,6 +61,14 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
+  // Estados locais para configurações que podem ser atualizadas
+  const [localStoreLogo, setLocalStoreLogo] = useState<string>(storeLogo || '');
+  const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
+  const [localStoreName, setLocalStoreName] = useState<string>(storeName);
+
+  // Calcular cor hover baseada na cor primária local
+  const hoverColor = darkenColor(localPrimaryColor);
+
   useEffect(() => {
     setIsVisible(true);
     console.log('🖼️ TryOnWidget - Props recebidas:', {
@@ -71,6 +78,27 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       fontFamily
     });
   }, [storeLogo, storeName, primaryColor, fontFamily]);
+
+  // Atualizar estados locais quando as props mudarem
+  useEffect(() => {
+    console.log('🔄 useEffect storeLogo disparado:', storeLogo);
+    if (storeLogo && storeLogo.trim() !== '') {
+      console.log('✅ Atualizando localStoreLogo das props:', storeLogo);
+      setLocalStoreLogo(storeLogo);
+    }
+  }, [storeLogo]);
+
+  useEffect(() => {
+    if (primaryColor) {
+      setLocalPrimaryColor(primaryColor);
+    }
+  }, [primaryColor]);
+
+  useEffect(() => {
+    if (storeName) {
+      setLocalStoreName(storeName);
+    }
+  }, [storeName]);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -94,6 +122,16 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
         if (configs && configs.length > 0) {
           console.log('✅ Configurações do widget carregadas:', configs[0]);
+          const config = configs[0];
+
+          // Atualizar estados locais com as configurações do banco
+          if (config.store_logo && config.store_logo.trim() !== '') {
+            console.log('✅ Atualizando localStoreLogo do banco:', config.store_logo);
+            setLocalStoreLogo(config.store_logo);
+          }
+          if (config.primary_color) {
+            setLocalPrimaryColor(config.primary_color);
+          }
         }
       } catch (error) {
         console.error('❌ Erro ao buscar configurações:', error);
@@ -563,29 +601,29 @@ const handleSubmit = async () => {
           font-family: '${fontFamily}', sans-serif !important;
         }
 
-        .bg-primary { background-color: ${primaryColor} !important; }
-        .text-primary { color: ${primaryColor} !important; }
-        .border-primary { border-color: ${primaryColor} !important; }
+        .bg-primary { background-color: ${localPrimaryColor} !important; }
+        .text-primary { color: ${localPrimaryColor} !important; }
+        .border-primary { border-color: ${localPrimaryColor} !important; }
         .hover\\:bg-primary-dark:hover { background-color: ${hoverColor} !important; }
-        .hover\\:border-primary:hover { border-color: ${primaryColor} !important; }
-        .focus\\:ring-primary:focus { --tw-ring-color: ${primaryColor} !important; }
+        .hover\\:border-primary:hover { border-color: ${localPrimaryColor} !important; }
+        .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
       `}</style>
       <div className={`w-full h-full overflow-hidden flex flex-col bg-white rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
       {/* Header */}
       <div className="bg-gray-50 border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center justify-center relative">
-          {console.log('🖼️ TryOnWidget - storeLogo recebido:', storeLogo, 'tipo:', typeof storeLogo, 'length:', storeLogo?.length)}
-          {storeLogo && storeLogo.trim() !== '' ? (
+          {console.log('🖼️ TryOnWidget - localStoreLogo:', localStoreLogo, 'tipo:', typeof localStoreLogo, 'length:', localStoreLogo?.length)}
+          {localStoreLogo && localStoreLogo.trim() !== '' ? (
             <>
-              {console.log('✅ Renderizando logo:', storeLogo)}
+              {console.log('✅ Renderizando logo:', localStoreLogo)}
             <img
-              src={storeLogo}
-              alt={storeName || 'Logo da loja'}
+              src={localStoreLogo}
+              alt={localStoreName || 'Logo da loja'}
               className="h-12 sm:h-16 w-auto object-contain"
               style={{ maxWidth: '300px' }}
-              onLoad={() => console.log('✅ Logo carregado com sucesso:', storeLogo)}
+              onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
               onError={(e) => {
-                console.error('❌ Erro ao carregar logo:', storeLogo);
+                console.error('❌ Erro ao carregar logo:', localStoreLogo);
                 console.error('❌ Erro detalhado:', e);
               }}
             />
@@ -594,10 +632,10 @@ const handleSubmit = async () => {
             <>
               {console.log('⚠️ Logo vazio ou inválido - usando fallback')}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor }}>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: localPrimaryColor }}>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{storeName}</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{localStoreName}</h2>
             </div>
             </>
           )}
