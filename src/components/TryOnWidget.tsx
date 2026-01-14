@@ -709,8 +709,8 @@ const handleSubmit = async () => {
                 <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
                 </div>
-                <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg">Calculadora de tamanho</h4>
+                <div className="flex-1">
+                  <h4 className="font-medium text-primary text-base md:text-lg whitespace-nowrap">Calculadora de tamanho</h4>
                   <p className="text-sm md:hidden text-gray-600">Informe suas medidas para descobrir o tamanho ideal</p>
                 </div>
               </div>
@@ -719,8 +719,8 @@ const handleSubmit = async () => {
                 <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   2
                 </div>
-                <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg">Envie sua foto</h4>
+                <div className="flex-1">
+                  <h4 className="font-medium text-primary text-base md:text-lg whitespace-nowrap">Envie sua foto</h4>
                   <p className="text-sm md:hidden text-gray-600">Corpo inteiro, de frente, sem obstáculos</p>
                 </div>
               </div>
@@ -729,8 +729,8 @@ const handleSubmit = async () => {
                 <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   3
                 </div>
-                <div>
-                  <h4 className="font-medium text-primary text-base md:text-lg">Veja o resultado</h4>
+                <div className="flex-1">
+                  <h4 className="font-medium text-primary text-base md:text-lg whitespace-nowrap">Veja o resultado</h4>
                   <p className="text-sm md:hidden text-gray-600">IA mostra o produto em você + tamanho ideal</p>
                 </div>
               </div>
