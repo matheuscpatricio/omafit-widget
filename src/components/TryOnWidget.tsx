@@ -673,7 +673,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-2 md:px-6 md:py-4 ${step === 'info' ? 'overflow-y-auto md:overflow-y-hidden' : 'overflow-y-auto'} transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-2 md:px-6 md:py-4 ${step === 'info' ? 'overflow-y-auto md:overflow-y-hidden' : 'flex flex-col'} transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-500/10 backdrop-blur-sm border border-red-400/30 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -751,7 +751,7 @@ const handleSubmit = async () => {
 
         {/* Step 2: Size Calculator */}
         {step === 'calculator' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in h-full flex flex-col">
           <SizeCalculator
             onComplete={(data) => {
               setSizeData(data);
