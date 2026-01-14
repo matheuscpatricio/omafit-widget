@@ -683,19 +683,19 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-3 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
+          <div className="space-y-3 md:space-y-2.5 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
             <div className="text-center">
-              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
+              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-1.5" style={{ color: primaryColor }}>
                 Sua experiência visual
               </h3>
-              <p className="text-gray-700 text-base md:text-lg mb-2 md:mb-3">
+              <p className="text-gray-700 text-base md:text-lg mb-2 md:mb-2">
                 Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-3">
               <div className="text-center">
-                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
+                <h4 className="font-medium text-blue-800 mb-2 md:mb-1.5 text-base md:text-lg">Como funciona?</h4>
                 <p className="text-sm md:text-base text-blue-700">
                   Nossa tecnologia aplica digitalmente este produto em uma foto sua,
                   mostrando como ele ficaria no seu corpo de forma realista.
@@ -703,7 +703,7 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            <div className="space-y-2 md:space-y-3">
+            <div className="space-y-2 md:space-y-2">
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
@@ -737,13 +737,13 @@ const handleSubmit = async () => {
 
             <button
               onClick={() => setStep('calculator')}
-              className="w-full bg-primary text-white py-3 md:py-3.5 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
+              className="w-full bg-primary text-white py-3 md:py-3 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
                           >
               Começar Agora
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
-            <p className="text-xs md:text-sm text-center text-gray-500 mt-3">
+            <p className="text-xs md:text-sm text-center text-gray-500 mt-3 md:mt-2">
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
           </div>
