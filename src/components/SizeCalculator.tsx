@@ -128,7 +128,16 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               value={height}
               onChange={(e) => setHeight(e.target.value)}
               placeholder="Ex: 170"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
+              style={{ outline: 'none' }}
+              onFocus={(e) => {
+                e.target.style.borderColor = primaryColor;
+                e.target.style.boxShadow = `0 0 0 2px ${primaryColor}33`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db';
+                e.target.style.boxShadow = 'none';
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg transition-all"
             />
           </div>
 
@@ -142,7 +151,16 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               placeholder="Ex: 70"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent"
+              style={{ outline: 'none' }}
+              onFocus={(e) => {
+                e.target.style.borderColor = primaryColor;
+                e.target.style.boxShadow = `0 0 0 2px ${primaryColor}33`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db';
+                e.target.style.boxShadow = 'none';
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg transition-all"
             />
           </div>
 
