@@ -3,6 +3,7 @@ import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Inf
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
+import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 
 interface TryOnWidgetProps {
   garmentImage: string;
@@ -31,6 +32,14 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   console.log('🎯 TryOnWidget montado com publicId:', publicId);
 
+  // Detectar idioma
+  const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
+  const t = (key: WidgetTranslationKey): string => {
+    return widgetTranslations[currentLanguage][key] || widgetTranslations['en'][key] || key;
+  };
+
+  console.log('🌍 Idioma detectado no widget:', currentLanguage);
+
   // Gerar cor hover (mais escura)
   const darkenColor = (color: string, amount: number = 20): string => {
     const hex = color.replace('#', '');
@@ -55,7 +64,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [predictionId, setPredictionId] = useState<string | null>(null);
-  const [processingMessage, setProcessingMessage] = useState('Gerando sua prévia...');
+  const [processingMessage, setProcessingMessage] = useState(t('generating'));
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef<number>(0);
@@ -292,12 +301,12 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
   if (file) {
     if (file.size > 5 * 1024 * 1024) {
-      setError('A imagem deve ter no máximo 5MB');
+      setError(t('maxFileSize'));
       return;
     }
 
     if (!file.type.startsWith('image/')) {
-      setError('Por favor, selecione apenas arquivos de imagem');
+      setError(t('onlyImages'));
       return;
     }
 
@@ -314,14 +323,14 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
 const handleSubmit = async () => {
   if (!modelImage || !product) {
-    setError('Por favor, selecione um produto e faça upload da sua foto');
+    setError(t('selectProductAndPhoto'));
     return;
   }
 
   setLoading(true);
   setStep('processing');
   setError('');
-  setProcessingMessage('Enviando imagens...');
+  setProcessingMessage(t('sendingImages'));
 
   try {
     const modelImageDataUrl = await new Promise<string>((resolve, reject) => {
@@ -367,21 +376,21 @@ const handleSubmit = async () => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Erro no processamento da imagem');
+      throw new Error(errorData.error || t('processingError'));
     }
 
     const result = await response.json();
 
     if (result.success && result.fal_request_id) {
       setPredictionId(result.fal_request_id);
-      setProcessingMessage('Gerando sua prévia...');
+      setProcessingMessage(t('generating'));
       startPolling(result.fal_request_id);
     } else {
-      throw new Error(result.error || 'Erro no processamento');
+      throw new Error(result.error || t('processingError'));
     }
   } catch (error: any) {
     console.error('Erro no try-on:', error);
-    setError(error.message || 'Erro no processamento da imagem');
+    setError(error.message || t('processingError'));
     setStep('confirm');
     setLoading(false);
   }
@@ -396,7 +405,7 @@ const handleSubmit = async () => {
 
       if (pollCount > maxPolls) {
         clearInterval(pollInterval);
-        setError('Tempo de processamento excedido. Por favor, tente novamente.');
+        setError(t('processingTimeout'));
         setStep('confirm');
         setLoading(false);
         return;
@@ -421,7 +430,7 @@ const handleSubmit = async () => {
 
             if (errorData.status === 'error' || errorData.status === 'failed') {
               clearInterval(pollInterval);
-              setError(errorData.error || 'Falha no processamento da imagem. Tente novamente.');
+              setError(errorData.error || t('processingFailed'));
               setStep('confirm');
               setLoading(false);
               return;
@@ -437,7 +446,7 @@ const handleSubmit = async () => {
 
           if (statusResponse.status >= 500) {
             clearInterval(pollInterval);
-            setError('Erro no servidor. Por favor, tente novamente.');
+            setError(t('serverError'));
             setStep('confirm');
             setLoading(false);
             return;
@@ -482,27 +491,27 @@ const handleSubmit = async () => {
           }
         } else if (statusData.status === 'failed' || statusData.status === 'error') {
           clearInterval(pollInterval);
-          const errorMsg = statusData.error || 'Falha no processamento da imagem. Por favor, verifique se a imagem está clara e tente novamente.';
+          const errorMsg = statusData.error || t('checkImageClear');
           setError(errorMsg);
           setStep('confirm');
           setLoading(false);
         } else if (statusData.status === 'not_found') {
           clearInterval(pollInterval);
-          setError('Sessão expirada. Por favor, tente novamente.');
+          setError(t('sessionExpired'));
           setStep('confirm');
           setLoading(false);
         } else {
           const messages = [
-            'Analisando sua foto...',
-            'Scanneando seu corpo...',
-            'Aplicando o produto...',
-            'Refinando detalhes...',
-            'Gerando sua prévia...'
+            t('analyzingPhoto'),
+            t('scanningBody'),
+            t('applyingProduct'),
+            t('refiningDetails'),
+            t('generating')
           ];
 
           let messageIndex;
           if (pollCount >= 8) {
-            setProcessingMessage('Finalizando resultado...');
+            setProcessingMessage(t('finalizingResult'));
           } else {
             messageIndex = Math.min(pollCount - 1, messages.length - 1);
             setProcessingMessage(messages[messageIndex]);
@@ -511,7 +520,7 @@ const handleSubmit = async () => {
       } catch (error) {
         console.error('❌ Polling error:', error);
         clearInterval(pollInterval);
-        setError('Erro na verificação do status. Tente novamente.');
+        setError(t('statusCheckError'));
         setStep('confirm');
         setLoading(false);
       }
@@ -521,7 +530,7 @@ const handleSubmit = async () => {
     setTimeout(() => {
       clearInterval(pollInterval);
       if (loading) {
-        setError('Tempo limite excedido. Tente novamente.');
+        setError(t('timeoutExceeded'));
         setStep('confirm');
         setLoading(false);
       }
@@ -589,7 +598,7 @@ const handleSubmit = async () => {
       <div className="w-full h-full bg-white flex items-center justify-center rounded-2xl">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: primaryColor }}></div>
-          <p className="text-gray-700">Carregando produto...</p>
+          <p className="text-gray-700">{t('loadingProduct')}</p>
         </div>
       </div>
     );
@@ -676,19 +685,18 @@ const handleSubmit = async () => {
           <div className="space-y-4 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
             <div className="text-center">
               <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
-                Sua experiência visual
+                {t('visualExperience')}
               </h3>
               <p className="text-gray-700 text-base md:text-lg">
-                Veja seu tamanho ideal e como esta peça fica no seu corpo.
+                {t('visualExperienceDesc')}
               </p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
               <div className="text-center">
-                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
+                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">{t('howItWorks')}</h4>
                 <p className="text-sm md:text-base text-blue-700">
-                  Nossa tecnologia aplica digitalmente este produto em uma foto sua,
-                  mostrando como ele ficaria no seu corpo de forma realista.
+                  {t('howItWorksDesc')}
                 </p>
               </div>
             </div>
@@ -697,12 +705,12 @@ const handleSubmit = async () => {
               onClick={() => setStep('calculator')}
               className="w-full bg-primary text-white py-3.5 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
                           >
-              Começar Agora
+              {t('startNow')}
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
             <p className="text-xs md:text-sm text-center text-gray-500">
-               Suas fotos são processadas de forma segura e não são compartilhadas.
+              {t('privacyNote')}
             </p>
           </div>
         )}
@@ -730,11 +738,11 @@ const handleSubmit = async () => {
               <div className="mb-4">
                 <div className="text-center mb-3">
                   <h4 className="text-lg font-semibold text-gray-900">
-                    Imagem do Produto
+                    {t('productImage')}
                   </h4>
                   {availableImages.length > 1 && (
                     <p className="text-sm text-gray-600">
-                      (escolha uma imagem frontal do produto)
+                      {t('chooseImageNote')}
                     </p>
                   )}
                 </div>
@@ -789,10 +797,10 @@ const handleSubmit = async () => {
 
               <div className="text-center mb-3">
                 <h3 className="text-2xl font-semibold text-primary mb-2">
-                  Sua foto
+                  {t('yourPhoto')}
                 </h3>
                 <p className="text-gray-700 text-sm">
-                  Para melhores resultados, siga as instruções
+                  {t('betterResults')}
                 </p>
               </div>
 
@@ -800,13 +808,13 @@ const handleSubmit = async () => {
                 <div className="flex items-start gap-3">
                   <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <h4 className="font-medium text-blue-800 mb-2 text-sm">Instruções para sua foto:</h4>
+                    <h4 className="font-medium text-blue-800 mb-2 text-sm">{t('photoInstructions')}</h4>
                     <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
-                      <li>• <strong>De frente</strong> - olhando para a câmera</li>
-                      <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
-                      <li>• <strong>Boa iluminação</strong> - ambiente bem iluminado</li>
-                      <li>• <strong>Fundo neutro</strong> - preferencialmente liso</li>
+                      <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
+                      <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
+                      <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
+                      <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
+                      <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
                     </ul>
                   </div>
                 </div>
@@ -817,9 +825,9 @@ const handleSubmit = async () => {
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
               >
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-700 mb-2 text-base">Clique para enviar sua foto</p>
+                <p className="text-gray-700 mb-2 text-base">{t('clickToUpload')}</p>
                 <p className="text-sm text-gray-500">
-                  JPG, PNG ou WEBP (máx. 5MB)
+                  {t('imageFormats')}
                 </p>
                 <input
                   ref={fileInputRef}
@@ -837,7 +845,7 @@ const handleSubmit = async () => {
               <div className="md:w-1/2">
                 <div className="text-center mb-3">
                   <h4 className="text-xl font-semibold text-gray-900">
-                    Imagem do Produto
+                    {t('productImage')}
                   </h4>
                   <p className="text-sm text-gray-600">
                     (escolha uma imagem frontal do produto)
@@ -897,10 +905,10 @@ const handleSubmit = async () => {
               <div className="md:w-1/2 flex flex-col justify-center">
                 <div className="text-center mb-3">
                   <h3 className="text-2xl font-semibold text-primary mb-1">
-                    Sua foto
+                    {t('yourPhoto')}
                   </h3>
                   <p className="text-gray-700 text-sm">
-                    Para melhores resultados, siga as instruções
+                    {t('betterResults')}
                   </p>
                 </div>
 
@@ -908,13 +916,13 @@ const handleSubmit = async () => {
                   <div className="flex items-start gap-2">
                     <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-medium text-blue-800 mb-1 text-sm">Instruções para sua foto:</h4>
+                      <h4 className="font-medium text-blue-800 mb-1 text-sm">{t('photoInstructions')}</h4>
                       <ul className="text-sm text-blue-700 space-y-0.5">
-                        <li>• <strong>Corpo inteiro</strong> - da cabeça aos pés</li>
-                        <li>• <strong>De frente</strong> - olhando para a câmera</li>
-                        <li>• <strong>Sem obstáculos</strong> - nada tampando o corpo</li>
-                        <li>• <strong>Boa iluminação</strong> - ambiente bem iluminado</li>
-                        <li>• <strong>Fundo neutro</strong> - preferencialmente liso</li>
+                        <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
+                        <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
+                        <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
+                        <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
+                        <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
                       </ul>
                     </div>
                   </div>
@@ -925,9 +933,9 @@ const handleSubmit = async () => {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
                 >
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-700 mb-1 text-base">Clique para enviar sua foto</p>
+                  <p className="text-gray-700 mb-1 text-base">{t('clickToUpload')}</p>
                   <p className="text-sm text-gray-500">
-                    JPG, PNG ou WEBP (máx. 5MB)
+                    {t('imageFormats')}
                   </p>
                   <input
                     ref={fileInputRef}
@@ -947,16 +955,16 @@ const handleSubmit = async () => {
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
             <div className="text-center mb-3 md:mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2">
-                Confirmar dados
+                {t('confirmData')}
               </h3>
               <p className="text-gray-700 text-sm md:text-base">
-                Verifique se está tudo correto antes de processar
+                {t('verifyBeforeProcess')}
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Produto:</h4>
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">{t('product')}</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={selectedProductImage}
@@ -967,7 +975,7 @@ const handleSubmit = async () => {
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">Sua foto:</h4>
+                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">{t('yourPhotoLabel')}</h4>
                 <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={imagePreview}
@@ -983,7 +991,7 @@ const handleSubmit = async () => {
                 onClick={() => setStep('photo')}
                 className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                               >
-                Alterar
+                {t('change')}
               </button>
               <button
                 onClick={handleSubmit}
@@ -991,7 +999,7 @@ const handleSubmit = async () => {
                 className="flex-1 bg-primary text-white py-3 md:py-3.5 text-base md:text-lg rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50"
                               >
                 <Sparkles className="w-5 h-5" />
-                Processar
+                {t('process')}
               </button>
             </div>
           </div>
@@ -1005,11 +1013,11 @@ const handleSubmit = async () => {
               {processingMessage}
             </h3>
             <p className="text-gray-700 mb-4 text-sm md:text-base">
-              Estamos criando seu try-on virtual. Isso pode levar até 1 minuto.
+              {t('creatingTryOn')}
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
               <p className="text-yellow-800 text-sm md:text-base">
-                 Tempo estimado: 20-40 segundos
+                {t('estimatedTime')}
               </p>
             </div>
           </div>
@@ -1023,7 +1031,7 @@ const handleSubmit = async () => {
               <div className="text-center">
                 <div className="flex items-center justify-center mb-4">
                   <h3 className="text-2xl font-semibold text-primary">
-                    Sua prévia:
+                    {t('yourPreview')}
                   </h3>
                 </div>
                 <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-4 flex items-center justify-center">
@@ -1037,7 +1045,7 @@ const handleSubmit = async () => {
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center mb-4">
                     <p className="text-base text-gray-700 mb-2">
-                      Seu tamanho recomendado:
+                      {t('recommendedSize')}
                     </p>
                     <p className="text-6xl font-bold" style={{ color: primaryColor }}>
                       {calculatedSize || recommendedSize}
@@ -1046,8 +1054,7 @@ const handleSubmit = async () => {
                 )}
 
                 <p className="text-sm text-gray-700 mb-4">
-                   Você ficou excepcional! Esse look realmente combina muito contigo!
-                  Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
+                  {t('congratsMessage')}
                 </p>
               </div>
 
@@ -1055,7 +1062,7 @@ const handleSubmit = async () => {
                 onClick={resetWidget}
                 className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
               >
-                Novo Try-On
+                {t('newTryOn')}
               </button>
             </div>
 
@@ -1065,7 +1072,7 @@ const handleSubmit = async () => {
               <div className="md:w-1/2">
                 <div className="mb-3">
                   <h3 className="text-2xl font-semibold text-primary">
-                    Sua prévia:
+                    {t('yourPreview')}
                   </h3>
                 </div>
                 <div className="w-full aspect-[3/4] rounded-lg overflow-hidden flex items-center justify-center">
@@ -1082,7 +1089,7 @@ const handleSubmit = async () => {
                 {(calculatedSize || recommendedSize) && (
                   <div className="text-center">
                     <p className="text-lg text-gray-700 mb-2">
-                      Seu tamanho recomendado:
+                      {t('recommendedSize')}
                     </p>
                     <p className="text-7xl font-bold" style={{ color: primaryColor }}>
                       {calculatedSize || recommendedSize}
@@ -1091,15 +1098,14 @@ const handleSubmit = async () => {
                 )}
 
                 <p className="text-base text-gray-700">
-                  Você ficou excepcional! Esse look realmente combina muito contigo!
-                  Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.
+                  {t('congratsMessage')}
                 </p>
 
                 <button
                   onClick={resetWidget}
                   className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-base rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
                 >
-                  Novo Try-On
+                  {t('newTryOn')}
                 </button>
               </div>
             </div>
