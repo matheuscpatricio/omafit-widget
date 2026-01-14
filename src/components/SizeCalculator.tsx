@@ -175,7 +175,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                   key={index}
                   onClick={() => setBodyTypeIndex(index)}
                   style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
-                  className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative aspect-[3/4] md:h-32 md:aspect-auto rounded-lg overflow-hidden border-2 transition-all ${
                     bodyTypeIndex === index
                       ? ''
                       : 'border-gray-200 hover:border-gray-300'
