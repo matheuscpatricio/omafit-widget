@@ -661,7 +661,7 @@ const handleSubmit = async () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
         {step === 'info' && (
-          <div className="md:w-2/5 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
+          <div className="md:w-1/2 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
                 src={displayImage}
@@ -673,7 +673,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-2 md:px-2 md:py-2 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-2 md:px-2 md:py-2 ${step === 'info' ? 'overflow-y-auto md:overflow-y-hidden' : 'overflow-y-auto'} transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-500/10 backdrop-blur-sm border border-red-400/30 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -683,7 +683,7 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-3 md:space-y-4 animate-fade-in">
+          <div className="space-y-3 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
             <div className="text-center">
               <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 Sua experiência visual
