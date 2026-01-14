@@ -189,7 +189,9 @@ export function TryOnWidgetNew() {
         } else {
           const messages = [
             'Analisando sua foto...',
+            'Scanneando seu corpo...',
             'Aplicando o produto...',
+            'Refinando detalhes...',
             'Gerando sua prévia...',
             'Finalizando resultado...'
           ];
