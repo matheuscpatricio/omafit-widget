@@ -79,11 +79,11 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 min-h-0">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Calculadora de Tamanho</h2>
 
-        <div className="space-y-5 pb-4">
+        <div className="space-y-5 pb-8">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Gênero</label>
             <div className="grid grid-cols-2 gap-2">
