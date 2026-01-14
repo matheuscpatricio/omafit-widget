@@ -79,11 +79,11 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 min-h-0">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Calculadora de Tamanho</h2>
 
-        <div className="space-y-5 pb-8">
+        <div className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Gênero</label>
             <div className="grid grid-cols-2 gap-2">
@@ -175,7 +175,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                   key={index}
                   onClick={() => setBodyTypeIndex(index)}
                   style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
-                  className={`relative aspect-[3/4] md:h-32 md:aspect-auto rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
                     bodyTypeIndex === index
                       ? ''
                       : 'border-gray-200 hover:border-gray-300'
@@ -215,10 +215,10 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
         </div>
       </div>
 
-      <div className="border-t border-gray-200 p-4 flex gap-2 flex-shrink-0">
+      <div className="border-t border-gray-200 p-4 flex gap-2">
         <button
           onClick={onBack}
-          className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+          className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
         >
           Voltar
         </button>
@@ -226,7 +226,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
           onClick={handleSubmit}
           disabled={!height || !weight || bodyTypeIndex === null}
           style={!height || !weight || bodyTypeIndex === null ? {} : { backgroundColor: primaryColor }}
-          className="flex-1 py-3 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
+          className="flex-1 py-2 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
         >
           Continuar
         </button>

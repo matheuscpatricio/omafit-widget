@@ -150,7 +150,7 @@ export function WidgetPage() {
 
   return (
     <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>
-      <div className="w-full sm:max-w-5xl max-h-[90vh] overflow-hidden">
+      <div className="w-full sm:max-w-2xl max-h-[85vh] overflow-auto">
         <TryOnWidget
           garmentImage={productImage}
           productImages={productImages}
