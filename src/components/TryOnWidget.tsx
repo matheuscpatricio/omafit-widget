@@ -661,19 +661,19 @@ const handleSubmit = async () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
         {step === 'info' && (
-          <div className="md:w-2/5 bg-gray-50 p-4 md:p-6 flex items-center justify-center">
+          <div className="md:w-2/5 bg-gray-50 p-4 md:p-10 flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
                 src={displayImage}
                 alt={product.name}
-                className="max-w-full max-h-full object-contain rounded-xl"
+                className="max-w-full max-h-[85vh] object-contain rounded-xl"
               />
             </div>
           </div>
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-2 md:px-2 md:py-2 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-2 md:px-10 md:py-6 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-500/10 backdrop-blur-sm border border-red-400/30 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -683,19 +683,19 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-3 md:space-y-4 animate-fade-in">
+          <div className="space-y-3 md:space-y-3 animate-fade-in md:max-w-5xl md:mx-auto">
             <div className="text-center">
-              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
+              <h3 className="text-2xl md:text-3xl font-semibold mb-1" style={{ color: primaryColor }}>
                 Sua experiência visual
               </h3>
-              <p className="text-gray-700 text-base md:text-lg mb-2 md:mb-3">
+              <p className="text-gray-700 text-base md:text-lg mb-2">
                 Veja seu tamanho ideal e como esta peça fica no seu corpo.
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-3">
               <div className="text-center">
-                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">Como funciona?</h4>
+                <h4 className="font-medium text-blue-800 mb-1 text-base md:text-lg">Como funciona?</h4>
                 <p className="text-sm md:text-base text-blue-700">
                   Nossa tecnologia aplica digitalmente este produto em uma foto sua,
                   mostrando como ele ficaria no seu corpo de forma realista.
@@ -703,47 +703,48 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            <div className="space-y-2 md:space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+            {/* Grid de 3 colunas no desktop */}
+            <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-3 md:gap-4">
+              <div className="flex md:flex-col items-start md:items-center gap-3 md:gap-2 md:text-center md:p-4 md:bg-gray-50 md:rounded-lg">
+                <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   1
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Calculadora de tamanho</h4>
-                  <p className="text-sm md:text-base text-gray-600">Informe suas medidas para descobrir o tamanho ideal</p>
+                  <p className="text-sm md:text-sm text-gray-600">Informe suas medidas para descobrir o tamanho ideal</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+              <div className="flex md:flex-col items-start md:items-center gap-3 md:gap-2 md:text-center md:p-4 md:bg-gray-50 md:rounded-lg">
+                <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   2
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Envie sua foto</h4>
-                  <p className="text-sm md:text-base text-gray-600">Corpo inteiro, de frente, sem obstáculos</p>
+                  <p className="text-sm md:text-sm text-gray-600">Corpo inteiro, de frente, sem obstáculos</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 md:w-8 md:h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+              <div className="flex md:flex-col items-start md:items-center gap-3 md:gap-2 md:text-center md:p-4 md:bg-gray-50 md:rounded-lg">
+                <div className="w-7 h-7 md:w-10 md:h-10 bg-primary text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
                   3
                 </div>
                 <div>
                   <h4 className="font-medium text-primary text-base md:text-lg">Veja o resultado</h4>
-                  <p className="text-sm md:text-base text-gray-600">IA mostra o produto em você + tamanho ideal</p>
+                  <p className="text-sm md:text-sm text-gray-600">IA mostra o produto em você + tamanho ideal</p>
                 </div>
               </div>
             </div>
 
             <button
               onClick={() => setStep('calculator')}
-              className="w-full bg-primary text-white py-3 md:py-3.5 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg"
+              className="w-full bg-primary text-white py-3 md:py-3.5 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-base md:text-lg md:mt-4"
                           >
               Começar Agora
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
 
-            <p className="text-xs md:text-sm text-center text-gray-500 mt-3">
+            <p className="text-xs md:text-sm text-center text-gray-500 mt-2">
                Suas fotos são processadas de forma segura e não são compartilhadas.
             </p>
           </div>
