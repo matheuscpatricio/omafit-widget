@@ -497,11 +497,16 @@ const handleSubmit = async () => {
             'Scanneando seu corpo...',
             'Aplicando o produto...',
             'Refinando detalhes...',
-            'Gerando sua prévia...',
-            'Finalizando resultado...'
+            'Gerando sua prévia...'
           ];
-          const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-          setProcessingMessage(randomMessage);
+
+          let messageIndex;
+          if (pollCount >= 8) {
+            setProcessingMessage('Finalizando resultado...');
+          } else {
+            messageIndex = Math.min(pollCount - 1, messages.length - 1);
+            setProcessingMessage(messages[messageIndex]);
+          }
         }
       } catch (error) {
         console.error('❌ Polling error:', error);
