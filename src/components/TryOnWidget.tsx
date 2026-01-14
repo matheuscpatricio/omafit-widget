@@ -626,8 +626,8 @@ const handleSubmit = async () => {
             <img
               src={localStoreLogo}
               alt={localStoreName || 'Logo da loja'}
-              className="h-12 sm:h-16 w-auto object-contain"
-              style={{ maxWidth: '300px' }}
+              className="h-12 sm:h-16 w-auto object-contain opacity-0 animate-fade-in"
+              style={{ maxWidth: '300px', animationDelay: '0.1s', animationFillMode: 'forwards' }}
               onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
               onError={(e) => {
                 console.error('❌ Erro ao carregar logo:', localStoreLogo);
@@ -635,17 +635,7 @@ const handleSubmit = async () => {
               }}
             />
             </>
-          ) : (
-            <>
-              {console.log('⚠️ Logo vazio ou inválido - usando fallback')}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: localPrimaryColor }}>
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">{localStoreName}</h2>
-            </div>
-            </>
-          )}
+          ) : null}
           {step !== 'info' && step !== 'processing' && step !== 'result' && (
             <button
               onClick={goBack}
