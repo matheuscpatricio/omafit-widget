@@ -3,6 +3,58 @@
   // Configuração global (será preenchida pela API)
   let OMAFIT_CONFIG = null;
   let SHOP_DOMAIN = '';
+  let CURRENT_LANGUAGE = 'en';
+
+  // Traduções i18n
+  const TRANSLATIONS = {
+    pt: {
+      tryOnLink: 'Experimentar virtualmente',
+      loading: 'Carregando try-on virtual...',
+      errorTitle: 'Erro ao carregar o widget',
+      errorMessage: 'Tente novamente mais tarde',
+      noImageAlert: 'Não foi possível detectar a imagem do produto nesta página.\nVerifique se você está em uma página de produto.'
+    },
+    es: {
+      tryOnLink: 'Probar virtualmente',
+      loading: 'Cargando prueba virtual...',
+      errorTitle: 'Error al cargar el widget',
+      errorMessage: 'Inténtalo de nuevo más tarde',
+      noImageAlert: 'No se pudo detectar la imagen del producto en esta página.\nVerifica que estés en una página de producto.'
+    },
+    en: {
+      tryOnLink: 'Try on virtually',
+      loading: 'Loading virtual try-on...',
+      errorTitle: 'Error loading widget',
+      errorMessage: 'Please try again later',
+      noImageAlert: 'Could not detect the product image on this page.\nPlease make sure you are on a product page.'
+    }
+  };
+
+  // Detectar idioma do navegador
+  function detectLanguage() {
+    const browserLang = navigator.language || navigator.userLanguage || 'en';
+    const langCode = browserLang.toLowerCase().split('-')[0];
+
+    // Português para países de língua portuguesa
+    if (langCode === 'pt') {
+      return 'pt';
+    }
+    // Espanhol para países de língua espanhola
+    if (langCode === 'es') {
+      return 'es';
+    }
+    // Inglês para o resto do mundo
+    return 'en';
+  }
+
+  // Obter tradução
+  function t(key) {
+    return TRANSLATIONS[CURRENT_LANGUAGE][key] || TRANSLATIONS['en'][key] || key;
+  }
+
+  // Inicializar idioma
+  CURRENT_LANGUAGE = detectLanguage();
+  console.log('🌍 Idioma detectado:', CURRENT_LANGUAGE);
 
   // Carregar fontes do Google Fonts
   const fontsToLoad = [
@@ -243,7 +295,7 @@
       // Retornar configuração padrão em caso de erro
       return {
         publicId: 'wgt_pub_default',
-        linkText: 'Experimentar virtualmente',
+        linkText: t('tryOnLink'),
         storeName: '',
         storeLogo: '',
         fontFamily: 'Outfit, sans-serif',
@@ -271,9 +323,7 @@
     const productImage = getProductImageFromPage();
 
     if (!productImage) {
-      alert(
-        'Não foi possível detectar a imagem do produto nesta página.\nVerifique se você está em uma página de produto.'
-      );
+      alert(t('noImageAlert'));
       return;
     }
 
@@ -364,7 +414,7 @@
       'font-family: ' + OMAFIT_CONFIG.fontFamily + ';' +
       'margin-top: 15px;' +
       'font-weight: 500;';
-    loadingText.textContent = 'Carregando try-on virtual...';
+    loadingText.textContent = t('loading');
 
     const spinner = document.createElement('div');
     spinner.style.cssText =
@@ -415,8 +465,8 @@
           '<div style="padding: 20px; text-align: center; background: white; border-radius: 12px; font-family: ' +
           OMAFIT_CONFIG.fontFamily +
           ';">' +
-          '<div style="font-size: 18px; margin-bottom: 10px;">⚠️ Erro ao carregar o widget</div>' +
-          '<div style="font-size: 14px; opacity: 0.8; margin-top: 10px;">Tente novamente mais tarde</div>' +
+          '<div style="font-size: 18px; margin-bottom: 10px;">⚠️ ' + t('errorTitle') + '</div>' +
+          '<div style="font-size: 14px; opacity: 0.8; margin-top: 10px;">' + t('errorMessage') + '</div>' +
           '</div>';
       }
     });
@@ -560,7 +610,7 @@
     const link = document.createElement('a');
     link.href = 'javascript:void(0);';
     link.className = 'omafit-try-on-link';
-    link.textContent = OMAFIT_CONFIG.linkText || 'Experimentar virtualmente';
+    link.textContent = OMAFIT_CONFIG.linkText || t('tryOnLink');
 
     // Estilos do link
     link.style.fontFamily = 'inherit';
