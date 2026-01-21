@@ -324,9 +324,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               src="https://www.youtube.com/embed/o6OHZzTjB9s?autoplay=1&mute=1&loop=1&playlist=o6OHZzTjB9s&controls=1&modestbranding=1&rel=0"
               allow="autoplay; encrypted-media"
               allowFullScreen
-              className="absolute inset-0 w-full h-full"
+              className="w-full h-full"
               style={{ border: 'none' }}
-            />
+            ></iframe>
           </div>
 
           <div
