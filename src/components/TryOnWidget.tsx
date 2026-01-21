@@ -823,7 +823,7 @@ const handleSubmit = async () => {
                     </ul>
                     <div className="bg-red-100 border-l-4 border-red-500 p-2 rounded mt-2">
                       <p className="text-xs text-red-800 font-semibold">
-                        ⚠️ Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
+                        Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
                       </p>
                     </div>
                   </div>
