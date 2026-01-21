@@ -319,13 +319,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Features Section */}
       <section id="features" className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl" style={{ aspectRatio: '16/9' }}>
+          <div className="w-full rounded-2xl overflow-hidden shadow-2xl">
             <iframe
-              src="https://www.youtube.com/embed/o6OHZzTjB9s?autoplay=1&mute=1&loop=1&playlist=o6OHZzTjB9s&controls=1&modestbranding=1&rel=0"
-              allow="autoplay; encrypted-media"
+              width="100%"
+              height="600"
+              src="https://www.youtube.com/embed/o6OHZzTjB9s"
               allowFullScreen
-              className="w-full h-full"
-              style={{ border: 'none' }}
             ></iframe>
           </div>
 
