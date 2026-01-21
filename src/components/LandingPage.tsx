@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Play, Pause, Mail, DollarSign, Package, Ruler, BarChart3 } from 'lucide-react';
+import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Mail, DollarSign, Package, Ruler, BarChart3 } from 'lucide-react';
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
@@ -65,12 +65,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
-  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
-  const [showVideoControls, setShowVideoControls] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const videoDesktopRef = useRef<HTMLVideoElement>(null);
-  const videoMobileRef = useRef<HTMLVideoElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const lastScrollY = useRef<number>(0);
@@ -213,31 +208,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     }
   };
 
-  const toggleVideoPlayback = () => {
-    const desktopVideo = videoDesktopRef.current;
-    const mobileVideo = videoMobileRef.current;
-
-    if (desktopVideo && mobileVideo) {
-      if (isVideoPlaying) {
-        desktopVideo.pause();
-        mobileVideo.pause();
-      } else {
-        desktopVideo.play();
-        mobileVideo.play();
-      }
-      setIsVideoPlaying(!isVideoPlaying);
-    }
-
-    setShowVideoControls(true);
-
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-
-    controlsTimeoutRef.current = setTimeout(() => {
-      setShowVideoControls(false);
-    }, 2000);
-  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -349,56 +319,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       {/* Features Section */}
       <section id="features" className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl group">
-            <video
-              ref={videoDesktopRef}
-              autoPlay
-              loop
-              playsInline
-              preload="metadata"
-              disablePictureInPicture
-              controlsList="nodownload nofullscreen noremoteplayback"
-              className="hidden md:block w-full h-full object-cover"
-            >
-              <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
-                type="video/mp4"
-              />
-            </video>
-
-            <video
-              ref={videoMobileRef}
-              autoPlay
-              loop
-              playsInline
-              preload="metadata"
-              disablePictureInPicture
-              controlsList="nodownload nofullscreen noremoteplayback"
-              className="md:hidden w-full h-full object-cover"
-            >
-              <source
-                src="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/fucionalidades.mp4"
-                type="video/mp4"
-              />
-            </video>
-
-            {/* Custom Play/Pause Button */}
-            <button
-              onClick={toggleVideoPlayback}
-              className="absolute inset-0 flex items-center justify-center transition-all group"
-            >
-              <div
-                className={`w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transform transition-all duration-300 ${
-                  showVideoControls ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-                } group-hover:scale-110`}
-              >
-                {isVideoPlaying ? (
-                  <Pause className="w-10 h-10 text-[#810707]" />
-                ) : (
-                  <Play className="w-10 h-10 text-[#810707] ml-1" />
-                )}
-              </div>
-            </button>
+          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl" style={{ aspectRatio: '16/9' }}>
+            <iframe
+              src="https://www.youtube.com/embed/o6OHZzTjB9s?autoplay=1&mute=1&loop=1&playlist=o6OHZzTjB9s&controls=1&modestbranding=1&rel=0"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full"
+              style={{ border: 'none' }}
+            />
           </div>
 
           <div
