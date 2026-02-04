@@ -294,7 +294,7 @@ Deno.serve(async (req: Request) => {
       model_image: modelImageUrl,
       garment_image: garmentImageUrl,
       category: "auto",
-      mode: "balanced",
+      mode: "quality",
       garment_photo_type: "auto",
       moderation_level: "none",
       num_samples: 1,
