@@ -291,24 +291,31 @@ Deno.serve(async (req: Request) => {
     }
 
     const falInput = {
-      person_image_url: modelImageUrl,
-      clothing_image_url: garmentImageUrl,
-      preserve_pose: true,
-         };
+      model_image: modelImageUrl,
+      garment_image: garmentImageUrl,
+      category: "auto",
+      mode: "balanced",
+      garment_photo_type: "auto",
+      moderation_level: "none",
+      num_samples: 1,
+      segmentation_free: true,
+      output_format: "png"
+    };
 
-    console.log('🚀 Submitting to fal.ai with input:', {
-      person_image_url: modelImageUrl.substring(0, 80) + '...',
-      clothing_image_url: garmentImageUrl.substring(0, 80) + '...',
-      preserve_pose: true
+    console.log('🚀 Submitting to fal.ai/fashn/tryon/v1.6 with input:', {
+      model_image: modelImageUrl.substring(0, 80) + '...',
+      garment_image: garmentImageUrl.substring(0, 80) + '...',
+      category: "auto",
+      mode: "balanced"
     });
 
     let request_id;
     try {
-      const submitResult = await fal.queue.submit("fal-ai/image-apps-v2/virtual-try-on", {
+      const submitResult = await fal.queue.submit("fal-ai/fashn/tryon/v1.6", {
         input: falInput
       });
       request_id = submitResult.request_id;
-      console.log('✅ Submitted to fal.ai, request_id:', request_id);
+      console.log('✅ Submitted to fal.ai/fashn/tryon/v1.6, request_id:', request_id);
     } catch (falError) {
       console.error('❌ Fal.ai submission error:', {
         message: falError.message,

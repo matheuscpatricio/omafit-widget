@@ -115,12 +115,12 @@ Deno.serve(async (req: Request) => {
     console.log('✅ FAL API key configured');
 
     try {
-      const statusResult = await fal.queue.status("fal-ai/image-apps-v2/virtual-try-on", {
+      const statusResult = await fal.queue.status("fal-ai/fashn/tryon/v1.6", {
         requestId: predictionId,
         logs: true
       });
 
-      console.log('📡 Fal.ai status response:', {
+      console.log('📡 Fal.ai/fashn status response:', {
         status: statusResult.status,
         hasOutput: !!(statusResult as any).output,
       });
@@ -129,12 +129,12 @@ Deno.serve(async (req: Request) => {
       let resultImage = null;
 
       if (statusResult.status === 'COMPLETED') {
-        console.log('🔄 Fetching full result from fal.ai...');
-        const result = await fal.queue.result("fal-ai/image-apps-v2/virtual-try-on", {
+        console.log('🔄 Fetching full result from fal.ai/fashn...');
+        const result = await fal.queue.result("fal-ai/fashn/tryon/v1.6", {
           requestId: predictionId
         });
 
-        console.log('📦 Full result from fal.ai:', {
+        console.log('📦 Full result from fal.ai/fashn:', {
           hasData: !!result.data,
           requestId: result.requestId,
           dataKeys: result.data ? Object.keys(result.data) : []
