@@ -41,7 +41,7 @@ export const widgetTranslations = {
     // Step 4: Processing
     generating: 'Gerando sua prévia...',
     creatingTryOn: 'Estamos criando seu try-on virtual.',
-    estimatedTime: 'Tempo estimado: 8-10 segundos',
+    estimatedTime: 'Tempo estimado: 15-25 segundos',
     analyzingPhoto: 'Analisando sua foto...',
     scanningBody: 'Scanneando seu corpo...',
     applyingProduct: 'Aplicando o produto...',
@@ -110,7 +110,7 @@ export const widgetTranslations = {
     // Step 4: Processing
     generating: 'Generando tu vista previa...',
     creatingTryOn: 'Estamos creando tu prueba virtual.',
-    estimatedTime: 'Tiempo estimado: 8-10 segundos',
+    estimatedTime: 'Tiempo estimado: 15-25 segundos',
     analyzingPhoto: 'Analizando tu foto...',
     scanningBody: 'Escaneando tu cuerpo...',
     applyingProduct: 'Aplicando el producto...',
@@ -179,7 +179,7 @@ export const widgetTranslations = {
     // Step 4: Processing
     generating: 'Generating your preview...',
     creatingTryOn: 'We are creating your virtual try-on.',
-    estimatedTime: 'Estimated time: 8-10 seconds',
+    estimatedTime: 'Estimated time: 15-25 seconds',
     analyzingPhoto: 'Analyzing your photo...',
     scanningBody: 'Scanning your body...',
     applyingProduct: 'Applying the product...',
