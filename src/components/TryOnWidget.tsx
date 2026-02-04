@@ -502,20 +502,13 @@ const handleSubmit = async () => {
           setLoading(false);
         } else {
           const messages = [
-            t('analyzingPhoto'),
+            t('sendingImages'),
             t('scanningBody'),
-            t('applyingProduct'),
-            t('refiningDetails'),
-            t('generating')
+            t('finalizingResult')
           ];
 
-          let messageIndex;
-          if (pollCount >= 8) {
-            setProcessingMessage(t('finalizingResult'));
-          } else {
-            messageIndex = Math.min(pollCount - 1, messages.length - 1);
-            setProcessingMessage(messages[messageIndex]);
-          }
+          const messageIndex = Math.min(pollCount - 1, messages.length - 1);
+          setProcessingMessage(messages[messageIndex]);
         }
       } catch (error) {
         console.error('❌ Polling error:', error);
