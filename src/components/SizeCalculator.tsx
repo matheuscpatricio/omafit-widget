@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { User, Ruler, Weight } from 'lucide-react';
 
 interface SizeCalculatorProps {
@@ -45,6 +45,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
   const [weight, setWeight] = useState<string>('');
   const [bodyTypeIndex, setBodyTypeIndex] = useState<number | null>(null);
   const [fitIndex, setFitIndex] = useState<number>(1);
+  const weightInputRef = useRef<HTMLInputElement>(null);
 
   const bodyTypes = gender === 'male' ? bodyTypesMale : bodyTypesFemale;
 
@@ -126,7 +127,13 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
             <input
               type="number"
               value={height}
-              onChange={(e) => setHeight(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setHeight(value);
+                if (value.length === 3) {
+                  weightInputRef.current?.focus();
+                }
+              }}
               placeholder="Ex: 170"
               style={{ outline: 'none' }}
               onFocus={(e) => {
@@ -147,6 +154,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               Peso (kg)
             </label>
             <input
+              ref={weightInputRef}
               type="number"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
