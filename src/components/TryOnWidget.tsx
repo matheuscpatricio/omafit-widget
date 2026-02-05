@@ -847,9 +847,11 @@ const handleSubmit = async () => {
                   <h4 className="text-xl font-semibold text-gray-900">
                     {t('productImage')}
                   </h4>
-                  <p className="text-base text-gray-600">
-                    (escolha uma imagem frontal do produto)
-                  </p>
+                  {availableImages.length > 1 && (
+                    <p className="text-base text-gray-600">
+                      (escolha uma imagem frontal do produto)
+                    </p>
+                  )}
                 </div>
 
                 {availableImages.length > 1 ? (
