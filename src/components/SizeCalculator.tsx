@@ -177,7 +177,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               <User className="w-4 h-4" />
               Qual corpo se parece mais com o seu?
             </label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
               {bodyTypes.map((type, index) => (
                 <button
                   key={index}
@@ -187,7 +187,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                     bodyTypeIndex === index
                       ? ''
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  } ${index >= 3 ? 'md:col-span-1' : ''} ${index === 3 ? 'col-start-1' : ''} ${index === 4 ? 'col-start-2' : ''}`}
                 >
                   <img
                     src={type.image}
