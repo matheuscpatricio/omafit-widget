@@ -187,7 +187,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                     bodyTypeIndex === index
                       ? ''
                       : 'border-gray-200 hover:border-gray-300'
-                  } ${index >= 3 ? 'md:col-span-1' : ''} ${index === 3 ? 'col-start-1' : ''} ${index === 4 ? 'col-start-2' : ''}`}
+                  } ${index >= 3 ? 'md:col-span-1' : ''} ${index === 3 ? 'col-start-2 md:col-start-auto' : ''} ${index === 4 ? 'col-start-3 md:col-start-auto' : ''}`}
                 >
                   <img
                     src={type.image}
