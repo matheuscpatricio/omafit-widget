@@ -177,25 +177,52 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               <User className="w-4 h-4" />
               Qual corpo se parece mais com o seu?
             </label>
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-              {bodyTypes.map((type, index) => (
-                <button
-                  key={index}
-                  onClick={() => setBodyTypeIndex(index)}
-                  style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
-                  className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                    bodyTypeIndex === index
-                      ? ''
-                      : 'border-gray-200 hover:border-gray-300'
-                  } ${index >= 3 ? 'md:col-span-1' : ''} ${index === 3 ? 'col-start-2 md:col-start-auto' : ''} ${index === 4 ? 'col-start-3 md:col-start-auto' : ''}`}
-                >
-                  <img
-                    src={type.image}
-                    alt={type.label}
-                    className="w-full h-full object-cover object-top"
-                  />
-                </button>
-              ))}
+            <div className="flex flex-col gap-2">
+              {/* Primeira linha com 3 imagens */}
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                {bodyTypes.slice(0, 3).map((type, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setBodyTypeIndex(index)}
+                    style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                      bodyTypeIndex === index
+                        ? ''
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={type.image}
+                      alt={type.label}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </button>
+                ))}
+              </div>
+              {/* Segunda linha com 2 imagens centralizadas entre as lacunas */}
+              <div className="flex justify-center gap-2 md:hidden" style={{ marginLeft: 'calc((100% / 3 + 0.5rem) / 2)', marginRight: 'calc((100% / 3 + 0.5rem) / 2)' }}>
+                {bodyTypes.slice(3, 5).map((type, index) => (
+                  <button
+                    key={index + 3}
+                    onClick={() => setBodyTypeIndex(index + 3)}
+                    style={{
+                      width: 'calc(50% - 0.25rem)',
+                      ...(bodyTypeIndex === index + 3 ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {})
+                    }}
+                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                      bodyTypeIndex === index + 3
+                        ? ''
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={type.image}
+                      alt={type.label}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
