@@ -52,7 +52,7 @@ export const widgetTranslations = {
     // Step 5: Result
     yourPreview: 'Sua prévia:',
     recommendedSize: 'Seu tamanho recomendado:',
-    congratsMessage: 'Você ficou excepcional! Esse look realmente combina muito contigo! Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.',
+    congratsMessage: 'Com base nos seus dados e análise corporal te indicamos este tamanho. Agora seu próximo passo é adicionar ao carrinho e finalizar seu pedido.',
     newTryOn: 'Novo Try-On',
 
     // Errors
@@ -121,7 +121,7 @@ export const widgetTranslations = {
     // Step 5: Result
     yourPreview: 'Tu vista previa:',
     recommendedSize: 'Tu talla recomendada:',
-    congratsMessage: '¡Te ves excepcional! ¡Este look realmente te queda muy bien! Ahora tu próximo paso es agregar al carrito y finalizar tu pedido.',
+    congratsMessage: 'Con base en tus datos y análisis corporal te recomendamos esta talla. Ahora tu próximo paso es agregar al carrito y finalizar tu pedido.',
     newTryOn: 'Nueva Prueba',
 
     // Errors
@@ -190,7 +190,7 @@ export const widgetTranslations = {
     // Step 5: Result
     yourPreview: 'Your preview:',
     recommendedSize: 'Your recommended size:',
-    congratsMessage: 'You look exceptional! This look really suits you! Now your next step is to add to cart and complete your order.',
+    congratsMessage: 'Based on your data and body analysis, we recommend this size. Now your next step is to add to cart and complete your order.',
     newTryOn: 'New Try-On',
 
     // Errors
