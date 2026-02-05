@@ -178,8 +178,8 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
               Qual corpo se parece mais com o seu?
             </label>
             <div className="flex flex-col gap-2">
-              {/* Primeira linha com 3 imagens */}
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+              {/* Mobile: Primeira linha com 3 imagens */}
+              <div className="grid grid-cols-3 gap-2 md:hidden">
                 {bodyTypes.slice(0, 3).map((type, index) => (
                   <button
                     key={index}
@@ -199,7 +199,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                   </button>
                 ))}
               </div>
-              {/* Segunda linha com 2 imagens centralizadas entre as lacunas */}
+              {/* Mobile: Segunda linha com 2 imagens centralizadas entre as lacunas */}
               <div className="flex justify-center gap-2 md:hidden" style={{ marginLeft: 'calc((100% / 3 + 0.5rem) / 2)', marginRight: 'calc((100% / 3 + 0.5rem) / 2)' }}>
                 {bodyTypes.slice(3, 5).map((type, index) => (
                   <button
@@ -211,6 +211,27 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
                     }}
                     className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
                       bodyTypeIndex === index + 3
+                        ? ''
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={type.image}
+                      alt={type.label}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </button>
+                ))}
+              </div>
+              {/* Desktop: Todas as 5 imagens em uma linha */}
+              <div className="hidden md:grid grid-cols-5 gap-2">
+                {bodyTypes.map((type, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setBodyTypeIndex(index)}
+                    style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                      bodyTypeIndex === index
                         ? ''
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
