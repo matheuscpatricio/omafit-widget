@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -797,28 +797,25 @@ const handleSubmit = async () => {
                 </p>
               </div>
 
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-4 mb-3 shadow-md">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0 animate-pulse" />
-                  <div>
-                    <h4 className="font-bold text-amber-900 mb-2 text-base flex items-center gap-2">
-                      {t('photoInstructions')}
-                      <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-semibold">
-                        IMPORTANTE
-                      </span>
-                    </h4>
-                    <ul className="text-base text-amber-900 space-y-1.5 mb-3">
-                      <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
-                      <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
-                      <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
-                      <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
-                      <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
-                    </ul>
-                    <div className="bg-red-100 border-l-4 border-red-500 p-2 rounded mt-2">
-                      <p className="text-sm text-red-800 font-semibold">
-                        Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
-                      </p>
-                    </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md">
+                <div>
+                  <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
+                    {t('photoInstructions')}
+                    <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
+                      IMPORTANTE
+                    </span>
+                  </h4>
+                  <ul className="text-base text-blue-900 space-y-1.5 mb-3">
+                    <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
+                    <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
+                    <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
+                    <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
+                    <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
+                  </ul>
+                  <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
+                    <p className="text-sm text-blue-900 font-semibold">
+                      Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
+                    </p>
                   </div>
                 </div>
               </div>
@@ -915,28 +912,25 @@ const handleSubmit = async () => {
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 rounded-lg p-3 mb-3 shadow-md">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0 animate-pulse" />
-                    <div>
-                      <h4 className="font-bold text-amber-900 mb-1.5 text-sm flex items-center gap-2">
-                        {t('photoInstructions')}
-                        <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-semibold">
-                          IMPORTANTE
-                        </span>
-                      </h4>
-                      <ul className="text-sm text-amber-900 space-y-0.5 mb-2">
-                        <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
-                        <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
-                        <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
-                        <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
-                        <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
-                      </ul>
-                      <div className="bg-red-100 border-l-4 border-red-500 p-2 rounded mt-2">
-                        <p className="text-sm text-red-800 font-semibold">
-                           Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
-                        </p>
-                      </div>
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-3 mb-3 shadow-md">
+                  <div>
+                    <h4 className="font-bold text-blue-900 mb-1.5 text-sm flex items-center gap-2">
+                      {t('photoInstructions')}
+                      <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
+                        IMPORTANTE
+                      </span>
+                    </h4>
+                    <ul className="text-sm text-blue-900 space-y-0.5 mb-2">
+                      <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
+                      <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
+                      <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
+                      <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
+                      <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
+                    </ul>
+                    <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
+                      <p className="text-sm text-blue-900 font-semibold">
+                         Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
+                      </p>
                     </div>
                   </div>
                 </div>
