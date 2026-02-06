@@ -248,24 +248,54 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
               Ajuste desejado
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {fitOptions.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => setFitIndex(index)}
-                  style={fitIndex === index ? { backgroundColor: primaryColor } : {}}
-                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    fitIndex === index
-                      ? 'text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="px-2">
+              {/* Slider Container */}
+              <div className="relative">
+                {/* Linha do slider */}
+                <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 rounded-full -translate-y-1/2" />
+
+                {/* Barra de progresso */}
+                <div
+                  className="absolute top-1/2 left-0 h-1 rounded-full -translate-y-1/2 transition-all duration-300"
+                  style={{
+                    backgroundColor: primaryColor,
+                    width: `${fitIndex * 50}%`
+                  }}
+                />
+
+                {/* Pontos clicáveis */}
+                <div className="relative flex justify-between items-center">
+                  {fitOptions.map((option, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setFitIndex(index)}
+                      className="flex flex-col items-center gap-2 z-10"
+                      type="button"
+                    >
+                      {/* Círculo do ponto */}
+                      <div
+                        className={`w-6 h-6 rounded-full border-4 transition-all duration-300 ${
+                          fitIndex === index
+                            ? 'border-white shadow-lg scale-110'
+                            : 'border-gray-300 bg-white hover:scale-105'
+                        }`}
+                        style={fitIndex === index ? { backgroundColor: primaryColor } : {}}
+                      />
+                      {/* Label */}
+                      <span
+                        className={`text-sm font-medium transition-colors ${
+                          fitIndex === index ? 'text-gray-900' : 'text-gray-500'
+                        }`}
+                      >
+                        {option.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
