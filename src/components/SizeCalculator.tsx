@@ -249,7 +249,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }:
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">
-              Ajuste desejado
+              Ajuste desejado da roupa
             </label>
             <div className="px-2">
               {/* Slider Container */}
