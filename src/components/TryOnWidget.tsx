@@ -202,12 +202,34 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       return null;
     }
 
-    const { height, bodyTypeIndex, fitIndex, gender } = measurements;
+    const { height, weight, bodyTypeIndex, fitIndex, gender } = measurements;
     console.log('📊 Dados do usuário:');
     console.log('   - Altura:', height, 'cm');
+    console.log('   - Peso:', weight, 'kg');
     console.log('   - Body Type Index:', bodyTypeIndex);
     console.log('   - Fit Index:', fitIndex);
     console.log('   - Gender:', gender);
+
+    // Calcular IMC (Índice de Massa Corporal)
+    const heightInMeters = height / 100;
+    const bmi = weight / (heightInMeters * heightInMeters);
+    console.log('   - IMC calculado:', bmi.toFixed(1));
+
+    // Multiplicador baseado no IMC (ajusta as medidas com base no peso real)
+    // IMC 18.5 (abaixo do peso) → 0.92
+    // IMC 22 (normal) → 1.00
+    // IMC 25 (sobrepeso leve) → 1.08
+    // IMC 30 (obeso) → 1.20
+    let bmiMultiplier;
+    if (bmi < 18.5) {
+      bmiMultiplier = 0.88 + ((bmi - 16) * 0.04); // 0.88-0.98 para IMC 16-18.5
+    } else if (bmi < 25) {
+      bmiMultiplier = 0.98 + ((bmi - 18.5) * 0.015); // 0.98-1.08 para IMC 18.5-25
+    } else if (bmi < 30) {
+      bmiMultiplier = 1.08 + ((bmi - 25) * 0.024); // 1.08-1.20 para IMC 25-30
+    } else {
+      bmiMultiplier = 1.20 + ((bmi - 30) * 0.015); // 1.20+ para IMC 30+
+    }
 
     // Multiplicadores baseados nos índices do SizeCalculator
     // bodyTypeIndex: 0=Ectomorfo(0.90), 1=Atlético(0.95), 2=Médio(1.00), 3=Mesomorfo(1.10), 4=Endomorfo(1.20)
@@ -220,6 +242,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     const fit = fitFactors[fitIndex] || 1.00;
 
     console.log('📊 Multiplicadores calculados:');
+    console.log('   - IMC Multiplier:', bmiMultiplier.toFixed(3));
     console.log('   - Body Type Multiplier:', bodyType);
     console.log('   - Fit Multiplier:', fit);
 
@@ -239,14 +262,15 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
 
     // Calcular medidas base do usuário com proporções realistas
-    const baseChest = height * chestRatio * bodyType * fit;
-    const baseWaist = height * waistRatio * bodyType * fit;
-    const baseHip = height * hipRatio * bodyType * fit;
+    // Combinando: altura × proporção × IMC × bodyType × fit
+    const baseChest = height * chestRatio * bmiMultiplier * bodyType * fit;
+    const baseWaist = height * waistRatio * bmiMultiplier * bodyType * fit;
+    const baseHip = height * hipRatio * bmiMultiplier * bodyType * fit;
 
     console.log('📏 Medidas estimadas do usuário (em cm):');
-    console.log('   - Peito/Busto:', baseChest.toFixed(1), `(altura ${height} × ${chestRatio})`);
-    console.log('   - Cintura:', baseWaist.toFixed(1), `(altura ${height} × ${waistRatio})`);
-    console.log('   - Quadril:', baseHip.toFixed(1), `(altura ${height} × ${hipRatio})`);
+    console.log('   - Peito/Busto:', baseChest.toFixed(1), `(${height}cm × ${chestRatio} × IMC ${bmiMultiplier.toFixed(2)} × tipo ${bodyType} × fit ${fit})`);
+    console.log('   - Cintura:', baseWaist.toFixed(1), `(${height}cm × ${waistRatio} × IMC ${bmiMultiplier.toFixed(2)} × tipo ${bodyType} × fit ${fit})`);
+    console.log('   - Quadril:', baseHip.toFixed(1), `(${height}cm × ${hipRatio} × IMC ${bmiMultiplier.toFixed(2)} × tipo ${bodyType} × fit ${fit})`);
 
     let bestSize = null;
     let minDistance = Infinity;
