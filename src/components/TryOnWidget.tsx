@@ -30,6 +30,8 @@ interface SizeChartEntry {
   waist?: string;
   quadril?: string;
   hip?: string;
+  comprimento?: string;
+  length?: string;
 }
 
 export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex' }: TryOnWidgetProps) {
@@ -235,16 +237,36 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       const chest = parseFloat(sizeData.peito || sizeData.chest || '0');
       const waist = parseFloat(sizeData.cintura || sizeData.waist || '0');
       const hip = parseFloat(sizeData.quadril || sizeData.hip || '0');
+      const length = parseFloat(sizeData.comprimento || sizeData.length || '0');
 
-      // Calcular distância euclidiana
-      const distance = Math.sqrt(
-        Math.pow(baseChest - chest, 2) +
-        Math.pow(baseWaist - waist, 2) +
-        Math.pow(baseHip - hip, 2)
-      );
+      // Construir array de diferenças apenas para campos que existem (não zero)
+      const differences: number[] = [];
+
+      if (chest > 0) {
+        differences.push(Math.pow(baseChest - chest, 2));
+      }
+      if (waist > 0) {
+        differences.push(Math.pow(baseWaist - waist, 2));
+      }
+      if (hip > 0) {
+        differences.push(Math.pow(baseHip - hip, 2));
+      }
+      // Se tiver comprimento mas não quadril, usar comprimento
+      if (length > 0 && hip === 0) {
+        differences.push(Math.pow(baseHip - length, 2)); // usar comprimento como proxy
+      }
+
+      // Se não há nenhuma medida válida, pular este tamanho
+      if (differences.length === 0) {
+        console.warn(`   ${index + 1}. ⚠️ Tamanho ${sizeData.size}: sem medidas válidas, pulando`);
+        return;
+      }
+
+      // Calcular distância euclidiana apenas com as medidas disponíveis
+      const distance = Math.sqrt(differences.reduce((sum, diff) => sum + diff, 0));
 
       console.log(`   ${index + 1}. Tamanho ${sizeData.size}:`);
-      console.log(`      - Peito: ${chest}, Cintura: ${waist}, Quadril: ${hip}`);
+      console.log(`      - Peito: ${chest}, Cintura: ${waist}, Quadril: ${hip}, Comprimento: ${length}`);
       console.log(`      - Distância: ${distance.toFixed(2)}`);
 
       if (distance < minDistance) {
@@ -392,16 +414,27 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
               }
 
               console.log(`   - ${entry.size_name}:`, measurements);
+              console.log(`     Campos detectados: ${Object.keys(measurements).join(', ')}`);
 
-              return {
+              const mappedEntry = {
                 size: entry.size_name,
-                peito: measurements.bust?.toString() || measurements.chest?.toString(),
-                chest: measurements.bust?.toString() || measurements.chest?.toString(),
-                cintura: measurements.waist?.toString(),
-                waist: measurements.waist?.toString(),
-                quadril: measurements.hips?.toString() || measurements.hip?.toString(),
-                hip: measurements.hips?.toString() || measurements.hip?.toString()
+                // Tentar todas as variações possíveis de peito/busto
+                peito: measurements.peito?.toString() || measurements.bust?.toString() || measurements.chest?.toString(),
+                chest: measurements.peito?.toString() || measurements.bust?.toString() || measurements.chest?.toString(),
+                // Tentar todas as variações de cintura
+                cintura: measurements.cintura?.toString() || measurements.waist?.toString(),
+                waist: measurements.cintura?.toString() || measurements.waist?.toString(),
+                // Tentar todas as variações de quadril
+                quadril: measurements.quadril?.toString() || measurements.hips?.toString() || measurements.hip?.toString(),
+                hip: measurements.quadril?.toString() || measurements.hips?.toString() || measurements.hip?.toString(),
+                // Adicionar comprimento caso exista
+                comprimento: measurements.comprimento?.toString() || measurements.length?.toString(),
+                length: measurements.comprimento?.toString() || measurements.length?.toString()
               };
+
+              console.log(`     Mapeado para: peito=${mappedEntry.peito}, cintura=${mappedEntry.cintura}, quadril=${mappedEntry.quadril}, comprimento=${mappedEntry.comprimento}`);
+
+              return mappedEntry;
             });
 
             console.log('✅ SIZE_CHART_DATA construído com', sizeChartData.length, 'tamanhos');

@@ -23,6 +23,16 @@ const DEFAULT_BMI_REFERENCE_TABLE = {
     { bmi: 30, value: 102 },
     { bmi: 32, value: 106 }
   ],
+  'Peito': [
+    { bmi: 18.5, value: 78 },
+    { bmi: 20, value: 82 },
+    { bmi: 22, value: 86 },
+    { bmi: 24, value: 90 },
+    { bmi: 26, value: 94 },
+    { bmi: 28, value: 98 },
+    { bmi: 30, value: 102 },
+    { bmi: 32, value: 106 }
+  ],
   'Cintura': [
     { bmi: 18.5, value: 58 },
     { bmi: 20, value: 62 },
@@ -107,10 +117,30 @@ function interpolateMeasurement(bmi: number, measurementName: string): number {
 function getMeasurementValue(entry: SizeChartEntry, key: string, index: number): number {
   if (entry.measurements) {
     const measurementKey = `medida${index + 1}`;
-    return entry.measurements[measurementKey] || 0;
+    const value = entry.measurements[measurementKey];
+    if (value !== undefined && value !== null) return value;
+
+    // Tentar com nome da medida diretamente (em minúsculas)
+    const directKey = key.toLowerCase();
+    const directValue = entry.measurements[directKey];
+    if (directValue !== undefined && directValue !== null) return directValue;
+
+    // Tentar variações em inglês e português
+    if (key === 'Busto' || key === 'Peito') {
+      return entry.measurements.bust || entry.measurements.chest || entry.measurements.busto || entry.measurements.peito || 0;
+    }
+    if (key === 'Cintura' || key === 'Waist') {
+      return entry.measurements.waist || entry.measurements.cintura || 0;
+    }
+    if (key === 'Quadril' || key === 'Hip') {
+      return entry.measurements.hips || entry.measurements.hip || entry.measurements.quadril || 0;
+    }
+    if (key === 'Comprimento' || key === 'Length') {
+      return entry.measurements.comprimento || entry.measurements.length || 0;
+    }
   }
 
-  if (key === 'Busto' && entry.bust !== undefined) return entry.bust;
+  if ((key === 'Busto' || key === 'Peito') && entry.bust !== undefined) return entry.bust;
   if (key === 'Cintura' && entry.waist !== undefined) return entry.waist;
   if (key === 'Quadril' && entry.hips !== undefined) return entry.hips;
 
