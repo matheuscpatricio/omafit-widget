@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
 
     let sizeChartQuery = supabaseClient
       .from('size_charts')
-      .select('*');
+      .select('id, collection_id, gender, measurement_names');
 
     if (collectionId) {
       sizeChartQuery = sizeChartQuery
@@ -88,9 +88,23 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('📏 Size chart encontrado:', sizeChart ? 'Sim' : 'Não');
+
+    let sizeChartEntries = null;
     if (sizeChart) {
       console.log('📏 Collection ID:', sizeChart.collection_id);
       console.log('📏 Gender:', sizeChart.gender);
+      console.log('📏 Measurement Names:', sizeChart.measurement_names);
+
+      const { data: entries, error: entriesError } = await supabaseClient
+        .from('size_chart_entries')
+        .select('*')
+        .eq('size_chart_id', sizeChart.id)
+        .order('order', { ascending: true });
+
+      if (!entriesError && entries) {
+        sizeChartEntries = entries;
+        console.log('📏 Entries encontradas:', entries.length);
+      }
     }
 
     const config = {
@@ -105,11 +119,12 @@ Deno.serve(async (req: Request) => {
         text: data.primary_color || '#810707',
         overlay: (data.primary_color || '#810707') + 'CC'
       },
-      sizeChart: sizeChart ? {
+      sizeChart: sizeChart && sizeChartEntries ? {
         id: sizeChart.id,
         collectionId: sizeChart.collection_id,
         gender: sizeChart.gender,
-        measurements: sizeChart.measurements
+        measurementNames: sizeChart.measurement_names || ['Busto', 'Cintura', 'Quadril'],
+        entries: sizeChartEntries
       } : null
     };
 

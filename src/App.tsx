@@ -7,7 +7,7 @@ import { AdvancedAnalytics } from './components/AdvancedAnalytics';
 import { ShopifyConfigPage } from './components/ShopifyConfigPage';
 import { WidgetGeneratorPage } from './components/WidgetGeneratorPage';
 import { AccountSettingsPage } from './components/AccountSettingsPage';
-import { SizeChartManager } from './components/SizeChartManager';
+import { SizeChartManagerNew } from './components/SizeChartManagerNew';
 import { WidgetPage } from './components/WidgetPage';
 import { AuthForm } from './components/AuthForm';
 import { FeedbackPage } from './components/FeedbackPage';
@@ -147,7 +147,7 @@ function App() {
           path="/size-chart"
           element={
             <ProtectedRoute>
-              <Layout onNavigate={(path: string) => {}}><SizeChartManager /></Layout>
+              <Layout onNavigate={(path: string) => {}}><SizeChartManagerNew /></Layout>
             </ProtectedRoute>
           }
         />

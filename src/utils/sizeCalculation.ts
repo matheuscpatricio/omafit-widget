@@ -1,66 +1,120 @@
 interface SizeChartEntry {
   size_name: string;
-  bust: number;
-  waist: number;
-  hips: number;
+  bust?: number;
+  waist?: number;
+  hips?: number;
+  measurements?: { [key: string]: number };
+  measurement_labels?: string[];
   order: number;
 }
 
 interface BodyMeasurements {
-  bust: number;
-  waist: number;
-  hips: number;
+  [key: string]: number;
 }
 
-const BMI_REFERENCE_TABLE = [
-  { bmi: 18.5, bust: 78, waist: 58, hips: 84 },
-  { bmi: 20, bust: 82, waist: 62, hips: 88 },
-  { bmi: 22, bust: 86, waist: 66, hips: 92 },
-  { bmi: 24, bust: 90, waist: 70, hips: 96 },
-  { bmi: 26, bust: 94, waist: 74, hips: 100 },
-  { bmi: 28, bust: 98, waist: 78, hips: 104 },
-  { bmi: 30, bust: 102, waist: 82, hips: 108 },
-  { bmi: 32, bust: 106, waist: 86, hips: 112 }
-];
+const DEFAULT_BMI_REFERENCE_TABLE = {
+  'Busto': [
+    { bmi: 18.5, value: 78 },
+    { bmi: 20, value: 82 },
+    { bmi: 22, value: 86 },
+    { bmi: 24, value: 90 },
+    { bmi: 26, value: 94 },
+    { bmi: 28, value: 98 },
+    { bmi: 30, value: 102 },
+    { bmi: 32, value: 106 }
+  ],
+  'Cintura': [
+    { bmi: 18.5, value: 58 },
+    { bmi: 20, value: 62 },
+    { bmi: 22, value: 66 },
+    { bmi: 24, value: 70 },
+    { bmi: 26, value: 74 },
+    { bmi: 28, value: 78 },
+    { bmi: 30, value: 82 },
+    { bmi: 32, value: 86 }
+  ],
+  'Quadril': [
+    { bmi: 18.5, value: 84 },
+    { bmi: 20, value: 88 },
+    { bmi: 22, value: 92 },
+    { bmi: 24, value: 96 },
+    { bmi: 26, value: 100 },
+    { bmi: 28, value: 104 },
+    { bmi: 30, value: 108 },
+    { bmi: 32, value: 112 }
+  ],
+  'Comprimento': [
+    { bmi: 18.5, value: 65 },
+    { bmi: 20, value: 67 },
+    { bmi: 22, value: 69 },
+    { bmi: 24, value: 71 },
+    { bmi: 26, value: 73 },
+    { bmi: 28, value: 75 },
+    { bmi: 30, value: 77 },
+    { bmi: 32, value: 79 }
+  ],
+  'Tornozelo': [
+    { bmi: 18.5, value: 21 },
+    { bmi: 20, value: 22 },
+    { bmi: 22, value: 23 },
+    { bmi: 24, value: 24 },
+    { bmi: 26, value: 25 },
+    { bmi: 28, value: 26 },
+    { bmi: 30, value: 27 },
+    { bmi: 32, value: 28 }
+  ],
+  'Ombro': [
+    { bmi: 18.5, value: 38 },
+    { bmi: 20, value: 40 },
+    { bmi: 22, value: 42 },
+    { bmi: 24, value: 44 },
+    { bmi: 26, value: 46 },
+    { bmi: 28, value: 48 },
+    { bmi: 30, value: 50 },
+    { bmi: 32, value: 52 }
+  ]
+};
 
-function interpolateMeasurements(bmi: number): BodyMeasurements {
-  if (bmi <= BMI_REFERENCE_TABLE[0].bmi) {
-    return {
-      bust: BMI_REFERENCE_TABLE[0].bust,
-      waist: BMI_REFERENCE_TABLE[0].waist,
-      hips: BMI_REFERENCE_TABLE[0].hips
-    };
+function interpolateMeasurement(bmi: number, measurementName: string): number {
+  const referenceTable = DEFAULT_BMI_REFERENCE_TABLE[measurementName as keyof typeof DEFAULT_BMI_REFERENCE_TABLE];
+
+  if (!referenceTable) {
+    return 0;
   }
 
-  const lastEntry = BMI_REFERENCE_TABLE[BMI_REFERENCE_TABLE.length - 1];
+  if (bmi <= referenceTable[0].bmi) {
+    return referenceTable[0].value;
+  }
+
+  const lastEntry = referenceTable[referenceTable.length - 1];
   if (bmi >= lastEntry.bmi) {
-    return {
-      bust: lastEntry.bust,
-      waist: lastEntry.waist,
-      hips: lastEntry.hips
-    };
+    return lastEntry.value;
   }
 
-  for (let i = 0; i < BMI_REFERENCE_TABLE.length - 1; i++) {
-    const lower = BMI_REFERENCE_TABLE[i];
-    const upper = BMI_REFERENCE_TABLE[i + 1];
+  for (let i = 0; i < referenceTable.length - 1; i++) {
+    const lower = referenceTable[i];
+    const upper = referenceTable[i + 1];
 
     if (bmi >= lower.bmi && bmi <= upper.bmi) {
       const ratio = (bmi - lower.bmi) / (upper.bmi - lower.bmi);
-
-      return {
-        bust: lower.bust + (upper.bust - lower.bust) * ratio,
-        waist: lower.waist + (upper.waist - lower.waist) * ratio,
-        hips: lower.hips + (upper.hips - lower.hips) * ratio
-      };
+      return lower.value + (upper.value - lower.value) * ratio;
     }
   }
 
-  return {
-    bust: BMI_REFERENCE_TABLE[0].bust,
-    waist: BMI_REFERENCE_TABLE[0].waist,
-    hips: BMI_REFERENCE_TABLE[0].hips
-  };
+  return referenceTable[0].value;
+}
+
+function getMeasurementValue(entry: SizeChartEntry, key: string, index: number): number {
+  if (entry.measurements) {
+    const measurementKey = `medida${index + 1}`;
+    return entry.measurements[measurementKey] || 0;
+  }
+
+  if (key === 'Busto' && entry.bust !== undefined) return entry.bust;
+  if (key === 'Cintura' && entry.waist !== undefined) return entry.waist;
+  if (key === 'Quadril' && entry.hips !== undefined) return entry.hips;
+
+  return 0;
 }
 
 export function calculateIdealSize(
@@ -68,7 +122,8 @@ export function calculateIdealSize(
   weight: number,
   bodyTypeFactor: number,
   fitFactor: number,
-  sizeChart: SizeChartEntry[]
+  sizeChart: SizeChartEntry[],
+  measurementNames?: string[]
 ): { size: string; measurements: BodyMeasurements } | null {
   if (!sizeChart || sizeChart.length === 0) {
     return null;
@@ -76,21 +131,36 @@ export function calculateIdealSize(
 
   const heightInMeters = height / 100;
   const bmi = weight / (heightInMeters * heightInMeters);
-
   const adjustedBMI = bmi * bodyTypeFactor;
-
   const finalBMI = adjustedBMI * fitFactor;
 
-  const estimatedMeasurements = interpolateMeasurements(finalBMI);
+  let measurements: string[];
+
+  if (measurementNames && measurementNames.length === 3) {
+    measurements = measurementNames;
+  } else if (sizeChart[0]?.measurement_labels && sizeChart[0].measurement_labels.length === 3) {
+    measurements = sizeChart[0].measurement_labels;
+  } else {
+    measurements = ['Busto', 'Cintura', 'Quadril'];
+  }
+
+  const estimatedMeasurements: BodyMeasurements = {};
+  measurements.forEach((name) => {
+    estimatedMeasurements[name] = interpolateMeasurement(finalBMI, name);
+  });
 
   let bestMatch: { size: string; difference: number } | null = null;
 
   for (const entry of sizeChart) {
-    const bustDiff = Math.abs(entry.bust - estimatedMeasurements.bust);
-    const waistDiff = Math.abs(entry.waist - estimatedMeasurements.waist);
-    const hipsDiff = Math.abs(entry.hips - estimatedMeasurements.hips);
+    let totalDiff = 0;
 
-    const averageDifference = (bustDiff + waistDiff + hipsDiff) / 3;
+    measurements.forEach((name, index) => {
+      const entryValue = getMeasurementValue(entry, name, index);
+      const estimatedValue = estimatedMeasurements[name];
+      totalDiff += Math.abs(entryValue - estimatedValue);
+    });
+
+    const averageDifference = totalDiff / 3;
 
     if (!bestMatch || averageDifference < bestMatch.difference) {
       bestMatch = {
