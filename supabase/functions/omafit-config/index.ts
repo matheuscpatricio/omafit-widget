@@ -67,15 +67,22 @@ Deno.serve(async (req: Request) => {
 
     const storeLogo = data.store_logo || '';
 
+    console.log('🔍 ===== INICIANDO BUSCA DE SIZE CHART =====');
+    console.log('🔍 Parâmetros de busca:');
+    console.log('   - Collection ID:', collectionId || 'null (tabela global)');
+    console.log('   - Gender:', gender);
+
     let sizeChartQuery = supabaseClient
       .from('size_charts')
       .select('id, collection_id, gender, measurement_names');
 
     if (collectionId) {
+      console.log('🔍 Modo: BUSCA POR COLEÇÃO ESPECÍFICA');
       sizeChartQuery = sizeChartQuery
         .eq('collection_id', collectionId)
         .eq('gender', gender);
     } else {
+      console.log('🔍 Modo: BUSCA POR TABELA GLOBAL');
       sizeChartQuery = sizeChartQuery
         .is('collection_id', null)
         .eq('gender', gender);
@@ -84,28 +91,42 @@ Deno.serve(async (req: Request) => {
     const { data: sizeChart, error: sizeChartError } = await sizeChartQuery.maybeSingle();
 
     if (sizeChartError) {
-      console.error('⚠️ Erro ao buscar size chart:', sizeChartError);
+      console.error('❌ Erro ao buscar size chart:', sizeChartError);
     }
 
-    console.log('📏 Size chart encontrado:', sizeChart ? 'Sim' : 'Não');
+    console.log('📏 Resultado da busca:', sizeChart ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO');
 
     let sizeChartEntries = null;
     if (sizeChart) {
-      console.log('📏 Collection ID:', sizeChart.collection_id);
-      console.log('📏 Gender:', sizeChart.gender);
-      console.log('📏 Measurement Names:', sizeChart.measurement_names);
+      console.log('📊 Detalhes da size chart encontrada:');
+      console.log('   - ID:', sizeChart.id);
+      console.log('   - Collection ID:', sizeChart.collection_id || 'null (global)');
+      console.log('   - Gender:', sizeChart.gender);
+      console.log('   - Measurement Names:', sizeChart.measurement_names);
 
+      console.log('🔍 Buscando entradas da tabela...');
       const { data: entries, error: entriesError } = await supabaseClient
         .from('size_chart_entries')
         .select('*')
         .eq('size_chart_id', sizeChart.id)
         .order('order', { ascending: true });
 
-      if (!entriesError && entries) {
+      if (entriesError) {
+        console.error('❌ Erro ao buscar entries:', entriesError);
+      } else if (entries) {
         sizeChartEntries = entries;
-        console.log('📏 Entries encontradas:', entries.length);
+        console.log('✅ Entries encontradas:', entries.length);
+        entries.forEach((entry, index) => {
+          console.log(`   ${index + 1}. ${entry.size_name}:`, entry.measurements || { bust: entry.bust, waist: entry.waist, hips: entry.hips });
+        });
       }
+    } else {
+      console.log('⚠️ ATENÇÃO: Nenhuma size chart encontrada com os critérios:');
+      console.log('   - Collection ID:', collectionId || 'null');
+      console.log('   - Gender:', gender);
     }
+
+    console.log('🔍 ===== FIM DA BUSCA DE SIZE CHART =====');
 
     const config = {
       publicId: shop || data.shop_domain,

@@ -280,6 +280,12 @@
         throw new Error('Nem public_id nem shop domain foram fornecidos');
       }
 
+      console.log('🔍 ===== PARÂMETROS DO WIDGET =====');
+      console.log('   - Shop Domain:', shopDomain);
+      console.log('   - Public ID:', publicId || 'não fornecido');
+      console.log('   - Collection ID:', collectionId || 'não fornecido (tabela global)');
+      console.log('   - Gender:', gender);
+
       if (collectionId) {
         queryParams.append('collection_id', collectionId);
       }
@@ -288,18 +294,38 @@
         queryParams.append('gender', gender);
       }
 
-      console.log('📡 Fazendo fetch para:', apiUrl + '?' + queryParams.toString());
-      const response = await fetch(apiUrl + '?' + queryParams.toString());
+      const finalUrl = apiUrl + '?' + queryParams.toString();
+      console.log('📡 URL completa:', finalUrl);
+      console.log('🔍 ===== FAZENDO REQUEST =====');
+
+      const response = await fetch(finalUrl);
 
       console.log('📡 Response status:', response.status);
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro na resposta:', errorText);
         throw new Error('Erro ao buscar configuração do widget - Status: ' + response.status);
       }
 
       const config = await response.json();
-      console.log('✅ Configuração do Omafit carregada:', config);
-      console.log('🖼️ Logo recebido da API:', config.storeLogo);
-      console.log('🏪 Shop Domain:', SHOP_DOMAIN);
+      console.log('✅ ===== CONFIGURAÇÃO RECEBIDA =====');
+      console.log('   - Store Name:', config.storeName);
+      console.log('   - Link Text:', config.linkText);
+      console.log('   - Store Logo:', config.storeLogo ? 'Sim' : 'Não');
+      console.log('   - Primary Color:', config.colors?.primary);
+
+      if (config.sizeChart) {
+        console.log('   - Size Chart: ✅ ENCONTRADO');
+        console.log('     • ID:', config.sizeChart.id);
+        console.log('     • Collection ID:', config.sizeChart.collectionId || 'null (global)');
+        console.log('     • Gender:', config.sizeChart.gender);
+        console.log('     • Measurement Names:', config.sizeChart.measurementNames);
+        console.log('     • Entries:', config.sizeChart.entries?.length || 0);
+      } else {
+        console.log('   - Size Chart: ❌ NÃO ENCONTRADO');
+      }
+
+      console.log('🏪 Shop Domain salvo:', SHOP_DOMAIN);
       return config;
     } catch (error) {
       console.error('❌ Erro ao buscar configuração:', error);
