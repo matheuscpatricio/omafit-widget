@@ -15,6 +15,7 @@ export function WidgetPage() {
   const [publicId, setPublicId] = useState<string>('');
   const [shopDomain, setShopDomain] = useState<string>('');
   const [collectionId, setCollectionId] = useState<string>('');
+  const [collectionHandle, setCollectionHandle] = useState<string>('');
   const [gender, setGender] = useState<string>('unisex');
 
   useEffect(() => {
@@ -28,13 +29,15 @@ export function WidgetPage() {
     const shop = params.get('shopDomain');
     const logoParam = params.get('storeLogo');
     const collectionIdParam = params.get('collectionId');
+    const collectionHandleParam = params.get('collectionHandle');
     const genderParam = params.get('gender');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - storeLogo:', logoParam);
     console.log('   - shop:', shop);
     console.log('   - publicId:', pubId);
-    console.log('   - collectionId:', collectionIdParam || 'não fornecido (tabela global)');
+    console.log('   - collectionId:', collectionIdParam || 'não fornecido');
+    console.log('   - collectionHandle:', collectionHandleParam || 'não fornecido (tabela global)');
     console.log('   - gender:', genderParam || 'não fornecido');
     console.log('   - config length:', configParam?.length || 0);
 
@@ -72,6 +75,11 @@ export function WidgetPage() {
     if (collectionIdParam) {
       console.log('✅ Collection ID definido:', collectionIdParam);
       setCollectionId(collectionIdParam);
+    }
+
+    if (collectionHandleParam) {
+      console.log('✅ Collection Handle definido:', collectionHandleParam);
+      setCollectionHandle(collectionHandleParam);
     }
 
     if (genderParam) {
@@ -125,6 +133,13 @@ export function WidgetPage() {
         setStoreLogo(event.data.logo);
       }
 
+      if (event.data.type === 'omafit-collection-handle') {
+        console.log('📦 Collection Handle recebido via postMessage:', event.data.collectionHandle);
+        if (event.data.collectionHandle) {
+          setCollectionHandle(event.data.collectionHandle);
+        }
+      }
+
       if (event.data.type === 'omafit-config-update') {
         console.log('⚙️ Config atualizado via postMessage:', event.data);
         if (event.data.fontFamily) {
@@ -139,6 +154,14 @@ export function WidgetPage() {
         if (event.data.storeLogo) {
           console.log('✅ Atualizando storeLogo via postMessage:', event.data.storeLogo);
           setStoreLogo(event.data.storeLogo);
+        }
+        if (event.data.collectionHandle !== undefined) {
+          console.log('📦 Collection Handle do config:', event.data.collectionHandle || 'vazio (tabela global)');
+          setCollectionHandle(event.data.collectionHandle || '');
+        }
+        if (event.data.shopDomain) {
+          console.log('🏪 Shop Domain do config:', event.data.shopDomain);
+          setShopDomain(event.data.shopDomain);
         }
       }
     };
@@ -178,6 +201,7 @@ export function WidgetPage() {
           publicId={publicId}
           shopDomain={shopDomain}
           collectionId={collectionId}
+          collectionHandle={collectionHandle}
           gender={gender}
         />
       </div>

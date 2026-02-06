@@ -251,12 +251,14 @@
       let shopDomain = '';
       let publicId = '';
       let collectionId = '';
+      let collectionHandle = '';
       let gender = '';
 
       if (rootElement) {
         shopDomain = rootElement.dataset.shopDomain || '';
         publicId = rootElement.dataset.publicId || '';
         collectionId = rootElement.dataset.collectionId || '';
+        collectionHandle = rootElement.dataset.collectionHandle || '';
         gender = rootElement.dataset.gender || 'unisex';
       }
 
@@ -283,11 +285,16 @@
       console.log('🔍 ===== PARÂMETROS DO WIDGET =====');
       console.log('   - Shop Domain:', shopDomain);
       console.log('   - Public ID:', publicId || 'não fornecido');
-      console.log('   - Collection ID:', collectionId || 'não fornecido (tabela global)');
+      console.log('   - Collection ID (UUID):', collectionId || 'não fornecido');
+      console.log('   - Collection Handle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
       console.log('   - Gender:', gender);
 
       if (collectionId) {
         queryParams.append('collection_id', collectionId);
+      }
+
+      if (collectionHandle) {
+        queryParams.append('collection_handle', collectionHandle);
       }
 
       if (gender) {
@@ -407,14 +414,17 @@
     console.log('  - OMAFIT_CONFIG.storeLogo:', OMAFIT_CONFIG.storeLogo);
     console.log('  - config.storeLogo:', config.storeLogo);
 
-    // Extrair collectionId e gender do sizeChart se disponível
+    // Extrair collectionId, collectionHandle e gender do sizeChart se disponível
     let collectionId = '';
+    let collectionHandle = '';
     let gender = 'unisex';
     if (OMAFIT_CONFIG.sizeChart) {
       collectionId = OMAFIT_CONFIG.sizeChart.collectionId || '';
+      collectionHandle = OMAFIT_CONFIG.sizeChart.collectionHandle || '';
       gender = OMAFIT_CONFIG.sizeChart.gender || 'unisex';
       console.log('📊 Size Chart detectado na config:');
-      console.log('   - Collection ID:', collectionId || 'null (global)');
+      console.log('   - Collection ID (UUID):', collectionId || 'null');
+      console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (global)');
       console.log('   - Gender:', gender);
     }
 
@@ -427,6 +437,7 @@
       '&publicId=' + encodeURIComponent(OMAFIT_CONFIG.publicId) +
       '&shopDomain=' + encodeURIComponent(SHOP_DOMAIN) +
       '&collectionId=' + encodeURIComponent(collectionId) +
+      '&collectionHandle=' + encodeURIComponent(collectionHandle) +
       '&gender=' + encodeURIComponent(gender) +
       '&storeLogo=' + encodeURIComponent(OMAFIT_CONFIG.storeLogo || '') +
       '&config=' + encodeURIComponent(JSON.stringify(config));

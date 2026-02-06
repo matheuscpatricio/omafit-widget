@@ -19,10 +19,12 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const shop = url.searchParams.get('shop');
     const collectionId = url.searchParams.get('collection_id');
+    const collectionHandle = url.searchParams.get('collection_handle');
     const gender = url.searchParams.get('gender') || 'unisex';
 
     console.log('🏪 Shop recebido:', shop);
-    console.log('📦 Collection ID:', collectionId);
+    console.log('📦 Collection ID (UUID):', collectionId || 'não fornecido');
+    console.log('📦 Collection Handle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
     console.log('👤 Gender:', gender);
 
     if (!shop) {
@@ -69,21 +71,47 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 ===== INICIANDO BUSCA DE SIZE CHART =====');
     console.log('🔍 Parâmetros de busca:');
-    console.log('   - Collection ID:', collectionId || 'null (tabela global)');
+    console.log('   - Collection ID (UUID):', collectionId || 'não fornecido');
+    console.log('   - Collection Handle (Shopify):', collectionHandle || 'não fornecido');
     console.log('   - Gender:', gender);
 
     let sizeChartQuery = supabaseClient
       .from('size_charts')
-      .select('id, collection_id, gender, measurement_names');
+      .select('id, collection_id, collection_handle, gender, measurement_names');
 
-    if (collectionId) {
-      console.log('🔍 Modo: BUSCA POR COLEÇÃO ESPECÍFICA');
+    // Prioridade 1: collection_handle (vindo do Shopify)
+    if (collectionHandle) {
+      console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
+      console.log('   WHERE shop_domain =', shop);
+      console.log('   AND collection_handle =', collectionHandle);
+      console.log('   AND gender =', gender);
+
+      sizeChartQuery = sizeChartQuery
+        .eq('shop_domain', shop)
+        .eq('collection_handle', collectionHandle)
+        .eq('gender', gender);
+    }
+    // Prioridade 2: collection_id (UUID interno)
+    else if (collectionId) {
+      console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
+      console.log('   WHERE collection_id =', collectionId);
+      console.log('   AND gender =', gender);
+
       sizeChartQuery = sizeChartQuery
         .eq('collection_id', collectionId)
         .eq('gender', gender);
-    } else {
-      console.log('🔍 Modo: BUSCA POR TABELA GLOBAL');
+    }
+    // Prioridade 3: Tabela global (sem coleção)
+    else {
+      console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
+      console.log('   WHERE shop_domain =', shop);
+      console.log('   AND collection_handle IS NULL');
+      console.log('   AND collection_id IS NULL');
+      console.log('   AND gender =', gender);
+
       sizeChartQuery = sizeChartQuery
+        .eq('shop_domain', shop)
+        .is('collection_handle', null)
         .is('collection_id', null)
         .eq('gender', gender);
     }
@@ -100,7 +128,8 @@ Deno.serve(async (req: Request) => {
     if (sizeChart) {
       console.log('📊 Detalhes da size chart encontrada:');
       console.log('   - ID:', sizeChart.id);
-      console.log('   - Collection ID:', sizeChart.collection_id || 'null (global)');
+      console.log('   - Collection ID (UUID):', sizeChart.collection_id || 'null');
+      console.log('   - Collection Handle (Shopify):', sizeChart.collection_handle || 'null (global)');
       console.log('   - Gender:', sizeChart.gender);
       console.log('   - Measurement Names:', sizeChart.measurement_names);
 
@@ -122,7 +151,8 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log('⚠️ ATENÇÃO: Nenhuma size chart encontrada com os critérios:');
-      console.log('   - Collection ID:', collectionId || 'null');
+      console.log('   - Collection ID (UUID):', collectionId || 'null');
+      console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
       console.log('   - Gender:', gender);
     }
 
@@ -143,6 +173,7 @@ Deno.serve(async (req: Request) => {
       sizeChart: sizeChart && sizeChartEntries ? {
         id: sizeChart.id,
         collectionId: sizeChart.collection_id,
+        collectionHandle: sizeChart.collection_handle,
         gender: sizeChart.gender,
         measurementNames: sizeChart.measurement_names || ['Busto', 'Cintura', 'Quadril'],
         entries: sizeChartEntries

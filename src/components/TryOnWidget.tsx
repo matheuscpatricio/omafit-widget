@@ -17,6 +17,7 @@ interface TryOnWidgetProps {
   productImages?: string[];
   shopDomain?: string;
   collectionId?: string;
+  collectionHandle?: string;
   gender?: string;
 }
 
@@ -30,7 +31,7 @@ interface SizeChartEntry {
   hip?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', gender = 'unisex' }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex' }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -42,7 +43,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - storeLogo:', storeLogo ? 'Sim' : 'Não');
   console.log('   - primaryColor:', primaryColor);
   console.log('   - productImages:', productImages?.length || 0);
-  console.log('   - 📦 collectionId:', collectionId || 'não fornecido (tabela global)');
+  console.log('   - 📦 collectionId (UUID):', collectionId || 'não fornecido');
+  console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
   console.log('   - 👤 gender:', gender);
 
   // Detectar idioma
@@ -277,7 +279,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       console.log('   - Gender do usuário:', sizeData.gender);
       console.log('   - Gender das props:', gender);
       console.log('   - Shop Domain:', shopDomain);
-      console.log('   - Collection ID:', collectionId || 'null (tabela global)');
+      console.log('   - Collection ID (UUID interno):', collectionId || 'null');
+      console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
       console.log('   - Product ID:', productId);
 
       // Decidir qual gender usar: props tem prioridade sobre sizeData
@@ -289,11 +292,24 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         console.log('🔍 ===== BUSCANDO SIZE_CHART =====');
         let sizeChartQuery = supabase
           .from('size_charts')
-          .select('id, collection_id, gender, shop_domain');
+          .select('id, collection_id, collection_handle, gender, shop_domain');
 
-        // Se tem collection_id, buscar por coleção específica
-        if (collectionId && collectionId.trim() !== '') {
-          console.log('🔍 Modo: BUSCA POR COLEÇÃO ESPECÍFICA');
+        // Prioridade 1: collection_handle (vindo do Shopify)
+        if (collectionHandle && collectionHandle.trim() !== '') {
+          console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
+          console.log('   SELECT * FROM size_charts');
+          console.log('   WHERE shop_domain =', shopDomain);
+          console.log('   AND collection_handle =', collectionHandle);
+          console.log('   AND gender =', searchGender);
+
+          sizeChartQuery = sizeChartQuery
+            .eq('shop_domain', shopDomain)
+            .eq('collection_handle', collectionHandle)
+            .eq('gender', searchGender);
+        }
+        // Prioridade 2: collection_id (UUID interno)
+        else if (collectionId && collectionId.trim() !== '') {
+          console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
           console.log('   SELECT * FROM size_charts');
           console.log('   WHERE collection_id =', collectionId);
           console.log('   AND gender =', searchGender);
@@ -301,16 +317,19 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           sizeChartQuery = sizeChartQuery
             .eq('collection_id', collectionId)
             .eq('gender', searchGender);
-        } else {
-          // Senão, buscar por tabela global (collection_id is null)
-          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL');
+        }
+        // Prioridade 3: Tabela global (sem collection)
+        else {
+          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
           console.log('   SELECT * FROM size_charts');
           console.log('   WHERE shop_domain =', shopDomain);
+          console.log('   AND collection_handle IS NULL');
           console.log('   AND collection_id IS NULL');
           console.log('   AND gender =', searchGender);
 
           sizeChartQuery = sizeChartQuery
             .eq('shop_domain', shopDomain)
+            .is('collection_handle', null)
             .is('collection_id', null)
             .eq('gender', searchGender);
         }
@@ -394,9 +413,22 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
           let fallbackQuery = supabase
             .from('size_charts')
-            .select('id, collection_id, gender, shop_domain');
+            .select('id, collection_id, collection_handle, gender, shop_domain');
 
-          if (collectionId && collectionId.trim() !== '') {
+          // Prioridade 1: collection_handle (vindo do Shopify)
+          if (collectionHandle && collectionHandle.trim() !== '') {
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE shop_domain =', shopDomain);
+            console.log('   AND collection_handle =', collectionHandle);
+            console.log('   AND gender = unisex');
+
+            fallbackQuery = fallbackQuery
+              .eq('shop_domain', shopDomain)
+              .eq('collection_handle', collectionHandle)
+              .eq('gender', 'unisex');
+          }
+          // Prioridade 2: collection_id (UUID interno)
+          else if (collectionId && collectionId.trim() !== '') {
             console.log('   SELECT * FROM size_charts');
             console.log('   WHERE collection_id =', collectionId);
             console.log('   AND gender = unisex');
@@ -404,14 +436,18 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
             fallbackQuery = fallbackQuery
               .eq('collection_id', collectionId)
               .eq('gender', 'unisex');
-          } else {
+          }
+          // Prioridade 3: Tabela global
+          else {
             console.log('   SELECT * FROM size_charts');
             console.log('   WHERE shop_domain =', shopDomain);
+            console.log('   AND collection_handle IS NULL');
             console.log('   AND collection_id IS NULL');
             console.log('   AND gender = unisex');
 
             fallbackQuery = fallbackQuery
               .eq('shop_domain', shopDomain)
+              .is('collection_handle', null)
               .is('collection_id', null)
               .eq('gender', 'unisex');
           }
@@ -482,7 +518,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         } else {
           console.log('❌ PROBLEMA: Nenhum chart encontrado!');
           console.log('   - Shop Domain:', shopDomain);
-          console.log('   - Collection ID:', collectionId || 'null');
+          console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
+          console.log('   - Collection ID (UUID):', collectionId || 'null');
           console.log('   - Gender:', searchGender);
           console.log('   - Tentou unisex: Sim');
           console.log('   ⚠️ AÇÃO: Verifique se a tabela existe no banco com esses critérios');
@@ -495,7 +532,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, shopDomain, collectionId, gender]);
+  }, [sizeData?.gender, shopDomain, collectionId, collectionHandle, gender]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
