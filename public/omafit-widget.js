@@ -250,10 +250,14 @@
       const rootElement = document.getElementById('omafit-widget-root');
       let shopDomain = '';
       let publicId = '';
+      let collectionId = '';
+      let gender = '';
 
       if (rootElement) {
         shopDomain = rootElement.dataset.shopDomain || '';
         publicId = rootElement.dataset.publicId || '';
+        collectionId = rootElement.dataset.collectionId || '';
+        gender = rootElement.dataset.gender || 'unisex';
       }
 
       // Tentar detectar shop domain do Shopify
@@ -274,6 +278,14 @@
         queryParams.append('shop', shopDomain);
       } else {
         throw new Error('Nem public_id nem shop domain foram fornecidos');
+      }
+
+      if (collectionId) {
+        queryParams.append('collection_id', collectionId);
+      }
+
+      if (gender) {
+        queryParams.append('gender', gender);
       }
 
       console.log('📡 Fazendo fetch para:', apiUrl + '?' + queryParams.toString());

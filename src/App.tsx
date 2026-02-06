@@ -11,6 +11,7 @@ import { SizeChartManager } from './components/SizeChartManager';
 import { WidgetPage } from './components/WidgetPage';
 import { AuthForm } from './components/AuthForm';
 import { FeedbackPage } from './components/FeedbackPage';
+import CollectionsPage from './components/CollectionsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
@@ -147,6 +148,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Layout onNavigate={(path: string) => {}}><SizeChartManager /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/collections"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><CollectionsPage /></Layout>
             </ProtectedRoute>
           }
         />

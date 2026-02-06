@@ -18,8 +18,12 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const shop = url.searchParams.get('shop');
+    const collectionId = url.searchParams.get('collection_id');
+    const gender = url.searchParams.get('gender') || 'unisex';
 
     console.log('🏪 Shop recebido:', shop);
+    console.log('📦 Collection ID:', collectionId);
+    console.log('👤 Gender:', gender);
 
     if (!shop) {
       throw new Error('shop domain é obrigatório');
@@ -63,6 +67,32 @@ Deno.serve(async (req: Request) => {
 
     const storeLogo = data.store_logo || '';
 
+    let sizeChartQuery = supabaseClient
+      .from('size_charts')
+      .select('*');
+
+    if (collectionId) {
+      sizeChartQuery = sizeChartQuery
+        .eq('collection_id', collectionId)
+        .eq('gender', gender);
+    } else {
+      sizeChartQuery = sizeChartQuery
+        .is('collection_id', null)
+        .eq('gender', gender);
+    }
+
+    const { data: sizeChart, error: sizeChartError } = await sizeChartQuery.maybeSingle();
+
+    if (sizeChartError) {
+      console.error('⚠️ Erro ao buscar size chart:', sizeChartError);
+    }
+
+    console.log('📏 Size chart encontrado:', sizeChart ? 'Sim' : 'Não');
+    if (sizeChart) {
+      console.log('📏 Collection ID:', sizeChart.collection_id);
+      console.log('📏 Gender:', sizeChart.gender);
+    }
+
     const config = {
       publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
@@ -74,7 +104,13 @@ Deno.serve(async (req: Request) => {
         background: '#ffffff',
         text: data.primary_color || '#810707',
         overlay: (data.primary_color || '#810707') + 'CC'
-      }
+      },
+      sizeChart: sizeChart ? {
+        id: sizeChart.id,
+        collectionId: sizeChart.collection_id,
+        gender: sizeChart.gender,
+        measurements: sizeChart.measurements
+      } : null
     };
 
     console.log('🖼️ Logo a ser retornado:', storeLogo);

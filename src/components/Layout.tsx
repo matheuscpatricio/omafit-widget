@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Settings, Code, Store, Zap, TrendingUp, Menu, X, LogOut, ChevronLeft, ChevronRight, CreditCard, Ruler, MessageSquare } from 'lucide-react';
+import { BarChart3, Settings, Code, Store, Zap, TrendingUp, Menu, X, LogOut, ChevronLeft, ChevronRight, CreditCard, Ruler, MessageSquare, Grid } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,6 +24,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
     { id: 'analytics', label: 'Analytics Avançado', icon: TrendingUp, path: '/analytics' },
     { id: 'cadastro-loja', label: 'Cadastro de Loja', icon: Store, path: '/cadastro-loja' },
     { id: 'widget-generator', label: 'Gerador de Widget', icon: Code, path: '/widget-generator' },
+    { id: 'collections', label: 'Coleções', icon: Grid, path: '/collections' },
     { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler, path: '/size-chart' },
     { id: 'feedback', label: 'Sugestões e Melhorias', icon: MessageSquare, path: '/feedback' },
     { id: 'account', label: 'Configurações da Conta', icon: CreditCard, path: '/account' },
@@ -142,6 +143,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
                currentPath === '/analytics' ? 'Analytics Avançado' :
                currentPath === '/cadastro-loja' ? 'Cadastro de Loja' :
                currentPath === '/widget-generator' ? 'Gerador de Widget' :
+               currentPath === '/collections' ? 'Coleções' :
                currentPath === '/size-chart' ? 'Tabela de Medidas' :
                currentPath === '/feedback' ? 'Sugestões e Melhorias' :
                currentPath === '/account' ? 'Configurações da Conta' : 'Omafit Admin'}
