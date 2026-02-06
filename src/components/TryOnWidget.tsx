@@ -209,23 +209,44 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('   - Fit Index:', fitIndex);
     console.log('   - Gender:', gender);
 
-    // Normalizar índices para multiplicadores (0.9, 1.0, 1.1)
-    const bodyType = 0.9 + (bodyTypeIndex * 0.1);
-    const fit = 0.95 + (fitIndex * 0.05);
+    // Multiplicadores baseados nos índices do SizeCalculator
+    // bodyTypeIndex: 0=Ectomorfo(0.90), 1=Atlético(0.95), 2=Médio(1.00), 3=Mesomorfo(1.10), 4=Endomorfo(1.20)
+    // fitIndex: 0=Justa(1.06), 1=Na medida(1.00), 2=Solta(0.94)
+
+    const bodyTypeFactors = [0.90, 0.95, 1.00, 1.10, 1.20];
+    const fitFactors = [1.06, 1.00, 0.94];
+
+    const bodyType = bodyTypeFactors[bodyTypeIndex] || 1.00;
+    const fit = fitFactors[fitIndex] || 1.00;
 
     console.log('📊 Multiplicadores calculados:');
     console.log('   - Body Type Multiplier:', bodyType);
     console.log('   - Fit Multiplier:', fit);
 
-    // Calcular medidas base do usuário
-    const baseChest = height * 0.45 * bodyType * fit;
-    const baseWaist = height * 0.35 * bodyType * fit;
-    const baseHip = height * 0.50 * bodyType * fit;
+    // Proporções antropométricas realistas baseadas em estudos
+    let chestRatio, waistRatio, hipRatio;
+
+    if (gender === 'male') {
+      // Homens: proporções médias
+      chestRatio = 0.55; // ~55% da altura
+      waistRatio = 0.49; // ~49% da altura
+      hipRatio = 0.54;   // ~54% da altura
+    } else {
+      // Mulheres: proporções médias
+      chestRatio = 0.53; // ~53% da altura (busto)
+      waistRatio = 0.43; // ~43% da altura
+      hipRatio = 0.57;   // ~57% da altura (quadril maior)
+    }
+
+    // Calcular medidas base do usuário com proporções realistas
+    const baseChest = height * chestRatio * bodyType * fit;
+    const baseWaist = height * waistRatio * bodyType * fit;
+    const baseHip = height * hipRatio * bodyType * fit;
 
     console.log('📏 Medidas estimadas do usuário (em cm):');
-    console.log('   - Peito/Busto:', baseChest.toFixed(1));
-    console.log('   - Cintura:', baseWaist.toFixed(1));
-    console.log('   - Quadril:', baseHip.toFixed(1));
+    console.log('   - Peito/Busto:', baseChest.toFixed(1), `(altura ${height} × ${chestRatio})`);
+    console.log('   - Cintura:', baseWaist.toFixed(1), `(altura ${height} × ${waistRatio})`);
+    console.log('   - Quadril:', baseHip.toFixed(1), `(altura ${height} × ${hipRatio})`);
 
     let bestSize = null;
     let minDistance = Infinity;
@@ -241,19 +262,26 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
       // Construir array de diferenças apenas para campos que existem (não zero)
       const differences: number[] = [];
+      let measurementsUsed: string[] = [];
 
       if (chest > 0) {
         differences.push(Math.pow(baseChest - chest, 2));
+        measurementsUsed.push('peito');
       }
       if (waist > 0) {
         differences.push(Math.pow(baseWaist - waist, 2));
+        measurementsUsed.push('cintura');
       }
       if (hip > 0) {
         differences.push(Math.pow(baseHip - hip, 2));
+        measurementsUsed.push('quadril');
       }
-      // Se tiver comprimento mas não quadril, usar comprimento
+      // Comprimento: usar como medida independente (não como proxy de quadril)
+      // Tipicamente comprimento de torso é ~30-35% da altura
       if (length > 0 && hip === 0) {
-        differences.push(Math.pow(baseHip - length, 2)); // usar comprimento como proxy
+        const expectedLength = height * 0.40; // ~40% da altura para comprimento de peça
+        differences.push(Math.pow(expectedLength - length, 2));
+        measurementsUsed.push('comprimento');
       }
 
       // Se não há nenhuma medida válida, pular este tamanho
@@ -267,6 +295,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
       console.log(`   ${index + 1}. Tamanho ${sizeData.size}:`);
       console.log(`      - Peito: ${chest}, Cintura: ${waist}, Quadril: ${hip}, Comprimento: ${length}`);
+      console.log(`      - Medidas usadas no cálculo: ${measurementsUsed.join(', ')}`);
       console.log(`      - Distância: ${distance.toFixed(2)}`);
 
       if (distance < minDistance) {
