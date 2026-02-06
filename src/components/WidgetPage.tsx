@@ -14,6 +14,8 @@ export function WidgetPage() {
   const [fontStyle, setFontStyle] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
   const [shopDomain, setShopDomain] = useState<string>('');
+  const [collectionId, setCollectionId] = useState<string>('');
+  const [gender, setGender] = useState<string>('unisex');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -25,13 +27,16 @@ export function WidgetPage() {
     const pubId = params.get('publicId');
     const shop = params.get('shopDomain');
     const logoParam = params.get('storeLogo');
+    const collectionIdParam = params.get('collectionId');
+    const genderParam = params.get('gender');
 
-    console.log('🔍 Parâmetros da URL:', {
-      storeLogo: logoParam,
-      config: configParam?.substring(0, 100),
-      shop,
-      publicId: pubId
-    });
+    console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
+    console.log('   - storeLogo:', logoParam);
+    console.log('   - shop:', shop);
+    console.log('   - publicId:', pubId);
+    console.log('   - collectionId:', collectionIdParam || 'não fornecido (tabela global)');
+    console.log('   - gender:', genderParam || 'não fornecido');
+    console.log('   - config length:', configParam?.length || 0);
 
     if (image) {
       setProductImage(image);
@@ -62,6 +67,16 @@ export function WidgetPage() {
 
     if (shop) {
       setShopDomain(shop);
+    }
+
+    if (collectionIdParam) {
+      console.log('✅ Collection ID definido:', collectionIdParam);
+      setCollectionId(collectionIdParam);
+    }
+
+    if (genderParam) {
+      console.log('✅ Gender definido:', genderParam);
+      setGender(genderParam);
     }
 
     // Prioridade 1: parâmetro direto storeLogo
@@ -162,6 +177,8 @@ export function WidgetPage() {
           fontFamily={fontFamily}
           publicId={publicId}
           shopDomain={shopDomain}
+          collectionId={collectionId}
+          gender={gender}
         />
       </div>
     </div>

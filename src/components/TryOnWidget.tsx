@@ -16,6 +16,8 @@ interface TryOnWidgetProps {
   publicId?: string;
   productImages?: string[];
   shopDomain?: string;
+  collectionId?: string;
+  gender?: string;
 }
 
 interface SizeChartEntry {
@@ -28,7 +30,7 @@ interface SizeChartEntry {
   hip?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '' }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', gender = 'unisex' }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -40,7 +42,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - storeLogo:', storeLogo ? 'Sim' : 'Não');
   console.log('   - primaryColor:', primaryColor);
   console.log('   - productImages:', productImages?.length || 0);
-  console.log('⚠️ IMPORTANTE: TryOnWidget NÃO recebe collection_id nas props!');
+  console.log('   - 📦 collectionId:', collectionId || 'não fornecido (tabela global)');
+  console.log('   - 👤 gender:', gender);
 
   // Detectar idioma
   const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
@@ -271,72 +274,191 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       }
 
       console.log('📊 Parâmetros de busca no TryOnWidget:');
-      console.log('   - Gender:', sizeData.gender);
+      console.log('   - Gender do usuário:', sizeData.gender);
+      console.log('   - Gender das props:', gender);
       console.log('   - Shop Domain:', shopDomain);
+      console.log('   - Collection ID:', collectionId || 'null (tabela global)');
       console.log('   - Product ID:', productId);
-      console.log('   - ⚠️ ATENÇÃO: NÃO estamos usando collection_id nesta busca!');
+
+      // Decidir qual gender usar: props tem prioridade sobre sizeData
+      const searchGender = gender || sizeData.gender;
+      console.log('   - 🎯 Gender final para busca:', searchGender);
 
       try {
-        // Buscar tabela de medidas via shopDomain
-        console.log('🔍 Executando query no Supabase:');
-        console.log('   SELECT sizes FROM size_charts');
-        console.log('   WHERE shop_domain =', shopDomain);
-        console.log('   AND gender =', sizeData.gender);
-
-        const { data: charts, error } = await supabase
+        // Buscar a size_chart primeiro
+        console.log('🔍 ===== BUSCANDO SIZE_CHART =====');
+        let sizeChartQuery = supabase
           .from('size_charts')
-          .select('sizes')
-          .eq('shop_domain', shopDomain)
-          .eq('gender', sizeData.gender);
+          .select('id, collection_id, gender, shop_domain');
 
-        if (error) {
-          console.error('❌ Erro ao buscar size chart:', error);
+        // Se tem collection_id, buscar por coleção específica
+        if (collectionId && collectionId.trim() !== '') {
+          console.log('🔍 Modo: BUSCA POR COLEÇÃO ESPECÍFICA');
+          console.log('   SELECT * FROM size_charts');
+          console.log('   WHERE collection_id =', collectionId);
+          console.log('   AND gender =', searchGender);
+
+          sizeChartQuery = sizeChartQuery
+            .eq('collection_id', collectionId)
+            .eq('gender', searchGender);
+        } else {
+          // Senão, buscar por tabela global (collection_id is null)
+          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL');
+          console.log('   SELECT * FROM size_charts');
+          console.log('   WHERE shop_domain =', shopDomain);
+          console.log('   AND collection_id IS NULL');
+          console.log('   AND gender =', searchGender);
+
+          sizeChartQuery = sizeChartQuery
+            .eq('shop_domain', shopDomain)
+            .is('collection_id', null)
+            .eq('gender', searchGender);
+        }
+
+        const { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
+
+        if (chartError) {
+          console.error('❌ Erro ao buscar size_chart:', chartError);
           return;
         }
 
-        console.log('📊 Resultado da query:');
-        console.log('   - Número de charts encontrados:', charts?.length || 0);
-        if (charts && charts.length > 0) {
-          charts.forEach((chart, idx) => {
-            console.log(`   - Chart ${idx + 1}:`, chart);
-          });
+        console.log('📊 Resultado da busca de size_chart:');
+        if (sizeChartRecord) {
+          console.log('✅ SIZE_CHART ENCONTRADO:');
+          console.log('   - ID:', sizeChartRecord.id);
+          console.log('   - Collection ID:', sizeChartRecord.collection_id || 'null (global)');
+          console.log('   - Gender:', sizeChartRecord.gender);
+          console.log('   - Shop Domain:', sizeChartRecord.shop_domain);
+        } else {
+          console.log('❌ SIZE_CHART NÃO ENCONTRADO');
         }
 
         let sizeChartData = null;
 
-        if (charts && charts.length > 0 && charts[0].sizes) {
-          sizeChartData = charts[0].sizes;
-          console.log('✅ Size chart ESPECÍFICO encontrado');
-          console.log('   - Gender:', sizeData.gender);
-          console.log('   - Número de tamanhos:', sizeChartData.length);
-        } else {
-          // Fallback para unisex
-          console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
-          console.log('🔍 Executando query fallback:');
-          console.log('   SELECT sizes FROM size_charts');
-          console.log('   WHERE shop_domain =', shopDomain);
-          console.log('   AND gender = unisex');
+        if (sizeChartRecord) {
+          // Buscar as entries da tabela
+          console.log('🔍 ===== BUSCANDO SIZE_CHART_ENTRIES =====');
+          console.log('   SELECT * FROM size_chart_entries');
+          console.log('   WHERE size_chart_id =', sizeChartRecord.id);
 
-          const { data: unisexCharts } = await supabase
-            .from('size_charts')
-            .select('sizes')
-            .eq('shop_domain', shopDomain)
-            .eq('gender', 'unisex');
+          const { data: entries, error: entriesError } = await supabase
+            .from('size_chart_entries')
+            .select('size_name, measurements, bust, waist, hips, order')
+            .eq('size_chart_id', sizeChartRecord.id)
+            .order('order', { ascending: true });
 
-          console.log('📊 Resultado da query fallback:');
-          console.log('   - Número de charts unisex:', unisexCharts?.length || 0);
+          if (entriesError) {
+            console.error('❌ Erro ao buscar entries:', entriesError);
+            return;
+          }
 
-          if (unisexCharts && unisexCharts.length > 0 && unisexCharts[0].sizes) {
-            sizeChartData = unisexCharts[0].sizes;
-            console.log('✅ Usando size chart UNISEX como fallback');
-            console.log('   - Número de tamanhos:', sizeChartData.length);
+          console.log('📊 Resultado da busca de entries:');
+          console.log('   - Número de entries:', entries?.length || 0);
+
+          if (entries && entries.length > 0) {
+            // Converter entries para o formato esperado pelo componente
+            sizeChartData = entries.map((entry: any) => {
+              // Tentar usar measurements primeiro, senão usar bust/waist/hips individuais
+              let measurements = entry.measurements || {};
+
+              // Se não tem measurements, construir do bust/waist/hips
+              if (Object.keys(measurements).length === 0) {
+                measurements = {
+                  bust: entry.bust,
+                  waist: entry.waist,
+                  hips: entry.hips
+                };
+              }
+
+              console.log(`   - ${entry.size_name}:`, measurements);
+
+              return {
+                size: entry.size_name,
+                peito: measurements.bust?.toString() || measurements.chest?.toString(),
+                chest: measurements.bust?.toString() || measurements.chest?.toString(),
+                cintura: measurements.waist?.toString(),
+                waist: measurements.waist?.toString(),
+                quadril: measurements.hips?.toString() || measurements.hip?.toString(),
+                hip: measurements.hips?.toString() || measurements.hip?.toString()
+              };
+            });
+
+            console.log('✅ SIZE_CHART_DATA construído com', sizeChartData.length, 'tamanhos');
           }
         }
 
-        if (sizeChartData) {
+        // Fallback para unisex se não encontrou
+        if (!sizeChartData || sizeChartData.length === 0) {
+          console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
+          console.log('🔍 Executando query fallback:');
+
+          let fallbackQuery = supabase
+            .from('size_charts')
+            .select('id, collection_id, gender, shop_domain');
+
+          if (collectionId && collectionId.trim() !== '') {
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE collection_id =', collectionId);
+            console.log('   AND gender = unisex');
+
+            fallbackQuery = fallbackQuery
+              .eq('collection_id', collectionId)
+              .eq('gender', 'unisex');
+          } else {
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE shop_domain =', shopDomain);
+            console.log('   AND collection_id IS NULL');
+            console.log('   AND gender = unisex');
+
+            fallbackQuery = fallbackQuery
+              .eq('shop_domain', shopDomain)
+              .is('collection_id', null)
+              .eq('gender', 'unisex');
+          }
+
+          const { data: unisexChart } = await fallbackQuery.maybeSingle();
+
+          if (unisexChart) {
+            console.log('✅ Chart UNISEX encontrado, buscando entries...');
+
+            const { data: unisexEntries } = await supabase
+              .from('size_chart_entries')
+              .select('size_name, measurements, bust, waist, hips, order')
+              .eq('size_chart_id', unisexChart.id)
+              .order('order', { ascending: true });
+
+            if (unisexEntries && unisexEntries.length > 0) {
+              sizeChartData = unisexEntries.map((entry: any) => {
+                let measurements = entry.measurements || {};
+                if (Object.keys(measurements).length === 0) {
+                  measurements = {
+                    bust: entry.bust,
+                    waist: entry.waist,
+                    hips: entry.hips
+                  };
+                }
+
+                return {
+                  size: entry.size_name,
+                  peito: measurements.bust?.toString() || measurements.chest?.toString(),
+                  chest: measurements.bust?.toString() || measurements.chest?.toString(),
+                  cintura: measurements.waist?.toString(),
+                  waist: measurements.waist?.toString(),
+                  quadril: measurements.hips?.toString() || measurements.hip?.toString(),
+                  hip: measurements.hips?.toString() || measurements.hip?.toString()
+                };
+              });
+
+              console.log('✅ Usando size chart UNISEX como fallback');
+              console.log('   - Número de tamanhos:', sizeChartData.length);
+            }
+          }
+        }
+
+        if (sizeChartData && sizeChartData.length > 0) {
           setSizeChart(sizeChartData);
           console.log('✅ setSizeChart() chamado com sucesso');
-          console.log('   - Tamanhos disponíveis:', sizeChartData.map((s: any) => s.size || s.size_name).join(', '));
+          console.log('   - Tamanhos disponíveis:', sizeChartData.map((s: any) => s.size).join(', '));
 
           // Calcular tamanho recomendado
           const recommended = calculateRecommendedSize(sizeData, sizeChartData);
@@ -359,10 +481,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           }
         } else {
           console.log('❌ PROBLEMA: Nenhum chart encontrado!');
-          console.log('   - Shop Domain buscado:', shopDomain);
-          console.log('   - Gender buscado:', sizeData.gender);
-          console.log('   - Também tentou unisex: Sim');
-          console.log('   ⚠️ POSSÍVEL CAUSA: Tabela não existe no banco OU deveria usar collection_id');
+          console.log('   - Shop Domain:', shopDomain);
+          console.log('   - Collection ID:', collectionId || 'null');
+          console.log('   - Gender:', searchGender);
+          console.log('   - Tentou unisex: Sim');
+          console.log('   ⚠️ AÇÃO: Verifique se a tabela existe no banco com esses critérios');
         }
       } catch (error) {
         console.error('❌ ERRO CRÍTICO ao carregar size chart:', error);
@@ -372,7 +495,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, shopDomain]);
+  }, [sizeData?.gender, shopDomain, collectionId, gender]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
