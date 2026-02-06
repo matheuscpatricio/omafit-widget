@@ -17,6 +17,7 @@ export function WidgetPage() {
   const [collectionId, setCollectionId] = useState<string>('');
   const [collectionHandle, setCollectionHandle] = useState<string>('');
   const [gender, setGender] = useState<string>('unisex');
+  const [defaultGender, setDefaultGender] = useState<string>('unisex');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -31,6 +32,7 @@ export function WidgetPage() {
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
     const genderParam = params.get('gender');
+    const defaultGenderParam = params.get('defaultGender');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - storeLogo:', logoParam);
@@ -39,6 +41,7 @@ export function WidgetPage() {
     console.log('   - collectionId:', collectionIdParam || 'não fornecido');
     console.log('   - collectionHandle:', collectionHandleParam || 'não fornecido (tabela global)');
     console.log('   - gender:', genderParam || 'não fornecido');
+    console.log('   - defaultGender:', defaultGenderParam || 'não fornecido');
     console.log('   - config length:', configParam?.length || 0);
 
     if (image) {
@@ -85,6 +88,11 @@ export function WidgetPage() {
     if (genderParam) {
       console.log('✅ Gender definido:', genderParam);
       setGender(genderParam);
+    }
+
+    if (defaultGenderParam) {
+      console.log('✅ Default Gender definido:', defaultGenderParam);
+      setDefaultGender(defaultGenderParam);
     }
 
     // Prioridade 1: parâmetro direto storeLogo
@@ -140,6 +148,22 @@ export function WidgetPage() {
         }
       }
 
+      if (event.data.type === 'omafit-context') {
+        console.log('🌐 Contexto recebido via postMessage:', event.data);
+        if (event.data.defaultGender) {
+          console.log('✅ Default Gender do contexto:', event.data.defaultGender);
+          setDefaultGender(event.data.defaultGender);
+        }
+        if (event.data.collectionHandle !== undefined) {
+          console.log('📦 Collection Handle do contexto:', event.data.collectionHandle || 'vazio (tabela global)');
+          setCollectionHandle(event.data.collectionHandle || '');
+        }
+        if (event.data.shopDomain) {
+          console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
+          setShopDomain(event.data.shopDomain);
+        }
+      }
+
       if (event.data.type === 'omafit-config-update') {
         console.log('⚙️ Config atualizado via postMessage:', event.data);
         if (event.data.fontFamily) {
@@ -162,6 +186,10 @@ export function WidgetPage() {
         if (event.data.shopDomain) {
           console.log('🏪 Shop Domain do config:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
+        }
+        if (event.data.defaultGender) {
+          console.log('👤 Default Gender do config:', event.data.defaultGender);
+          setDefaultGender(event.data.defaultGender);
         }
       }
     };
@@ -203,6 +231,7 @@ export function WidgetPage() {
           collectionId={collectionId}
           collectionHandle={collectionHandle}
           gender={gender}
+          defaultGender={defaultGender}
         />
       </div>
     </div>

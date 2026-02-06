@@ -19,6 +19,7 @@ interface TryOnWidgetProps {
   collectionId?: string;
   collectionHandle?: string;
   gender?: string;
+  defaultGender?: string;
 }
 
 interface SizeChartEntry {
@@ -31,7 +32,7 @@ interface SizeChartEntry {
   hip?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex' }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex' }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -45,7 +46,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - productImages:', productImages?.length || 0);
   console.log('   - 📦 collectionId (UUID):', collectionId || 'não fornecido');
   console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
-  console.log('   - 👤 gender:', gender);
+  console.log('   - 👤 gender (deprecated):', gender);
+  console.log('   - 👤 defaultGender (sugestão inicial):', defaultGender);
 
   // Detectar idioma
   const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
@@ -276,16 +278,16 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       }
 
       console.log('📊 Parâmetros de busca no TryOnWidget:');
-      console.log('   - Gender do usuário:', sizeData.gender);
-      console.log('   - Gender das props:', gender);
+      console.log('   - Gender escolhido pelo usuário (sizeData):', sizeData.gender);
+      console.log('   - Default Gender (props, não usado na busca):', defaultGender);
       console.log('   - Shop Domain:', shopDomain);
       console.log('   - Collection ID (UUID interno):', collectionId || 'null');
       console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
       console.log('   - Product ID:', productId);
 
-      // Decidir qual gender usar: props tem prioridade sobre sizeData
-      const searchGender = gender || sizeData.gender;
-      console.log('   - 🎯 Gender final para busca:', searchGender);
+      // SEMPRE usar o gender escolhido pelo usuário no widget
+      const searchGender = sizeData.gender;
+      console.log('   - 🎯 Gender FINAL para busca (sempre do usuário):', searchGender);
 
       try {
         // Buscar a size_chart primeiro
@@ -532,7 +534,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, shopDomain, collectionId, collectionHandle, gender]);
+  }, [sizeData?.gender, shopDomain, collectionId, collectionHandle]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -975,6 +977,7 @@ const handleSubmit = async () => {
             }}
             onBack={() => setStep('info')}
             primaryColor={primaryColor}
+            defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
           />
           </div>
         )}

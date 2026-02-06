@@ -5,6 +5,7 @@ interface SizeCalculatorProps {
   onComplete: (data: SizeCalculatorData) => void;
   onBack: () => void;
   primaryColor?: string;
+  defaultGender?: 'male' | 'female' | 'unisex';
 }
 
 export interface SizeCalculatorData {
@@ -39,8 +40,10 @@ const fitOptions = [
   { label: 'Solta', factor: 0.94 }
 ];
 
-export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707' }: SizeCalculatorProps) {
-  const [gender, setGender] = useState<'male' | 'female'>('female');
+export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female' }: SizeCalculatorProps) {
+  // Usar defaultGender como valor inicial, convertendo 'unisex' para 'female'
+  const initialGender = (defaultGender === 'unisex' ? 'female' : defaultGender) as 'male' | 'female';
+  const [gender, setGender] = useState<'male' | 'female'>(initialGender);
   const [height, setHeight] = useState<string>('');
   const [weight, setWeight] = useState<string>('');
   const [bodyTypeIndex, setBodyTypeIndex] = useState<number | null>(null);
