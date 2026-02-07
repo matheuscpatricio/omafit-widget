@@ -212,10 +212,10 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     // Multiplicadores baseados nos índices do SizeCalculator
     // bodyTypeIndex: 0=Ectomorfo(0.90), 1=Atlético(0.95), 2=Médio(1.00), 3=Mesomorfo(1.10), 4=Endomorfo(1.20)
-    // fitIndex: 0=Justa(1.06), 1=Na medida(1.00), 2=Solta(0.94)
+    // fitIndex: 0=Justa(0.94), 1=Na medida(1.00), 2=Solta(1.06)
 
     const bodyTypeFactors = [0.90, 0.95, 1.00, 1.10, 1.20];
-    const fitFactors = [1.06, 1.00, 0.94];
+    const fitFactors = [0.94, 1.00, 1.06];
 
     const bodyType = bodyTypeFactors[bodyTypeIndex] || 1.00;
     const fit = fitFactors[fitIndex] || 1.00;
