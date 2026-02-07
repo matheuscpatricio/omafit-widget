@@ -35,9 +35,9 @@ const bodyTypesFemale = [
 ];
 
 const fitOptions = [
-  { label: 'Justa', factor: 1.06 },
+  { label: 'Justa', factor: 0.94 },
   { label: 'Na medida', factor: 1.00 },
-  { label: 'Solta', factor: 0.94 }
+  { label: 'Solta', factor: 1.06 }
 ];
 
 export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female' }: SizeCalculatorProps) {
