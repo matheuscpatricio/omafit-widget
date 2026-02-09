@@ -1415,6 +1415,13 @@ const handleSubmit = async () => {
                 </p>
               </div>
 
+              {(() => {
+                console.log('🎁 [RESULTADO 1] Verificando produto complementar:');
+                console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
+                console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
+                console.log('   - Vai mostrar frase?', !!(recommendedProductName && recommendedProductUrl));
+                return null;
+              })()}
               {recommendedProductName && recommendedProductUrl && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-gray-700 text-center">
@@ -1477,6 +1484,13 @@ const handleSubmit = async () => {
                   {t('congratsMessage')}
                 </p>
 
+                {(() => {
+                  console.log('🎁 [RESULTADO 2] Verificando produto complementar:');
+                  console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
+                  console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
+                  console.log('   - Vai mostrar frase?', !!(recommendedProductName && recommendedProductUrl));
+                  return null;
+                })()}
                 {recommendedProductName && recommendedProductUrl && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <p className="text-base text-gray-700 text-center">

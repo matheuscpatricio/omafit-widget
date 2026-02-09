@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste Simples - Produto Complementar</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .test-info {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .test-info h2 {
+      margin-top: 0;
+      color: #856404;
+    }
+    .test-info pre {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .product-card {
+      background: white;
+      padding: 30px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+    }
+    .product-image {
+      width: 100%;
+      max-width: 300px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-info">
+    <h2>🧪 Teste Simples do Produto Complementar</h2>
+    <p><strong>Configuração:</strong></p>
+    <pre>Produto Principal: Blusa Vermelha
+Produto Complementar: Calça Jeans Premium
+URL: https://sua-loja.com/products/calca-jeans</pre>
+    <p><strong>Instruções:</strong></p>
+    <ol>
+      <li>Abra o Console do navegador (F12)</li>
+      <li>Clique em "Experimentar virtualmente"</li>
+      <li>Verifique os logs:
+        <ul>
+          <li>🎁 Produto complementar lido do data attribute</li>
+          <li>🎁 Produto complementar sendo enviado na URL</li>
+          <li>📤 Enviando produto complementar via postMessage</li>
+          <li>✅ Produto complementar recebido</li>
+          <li>🎁 [RESULTADO] Verificando produto complementar</li>
+        </ul>
+      </li>
+      <li>Faça o upload de uma foto</li>
+      <li>Na tela de resultado, procure pela frase: <em>"Uma ótima escolha para acompanhar seu pedido seria..."</em></li>
+    </ol>
+  </div>
+
+  <div class="product-card">
+    <img
+      class="product-image"
+      src="https://images.pexels.com/photos/1536619/pexels-photo-1536619.jpeg"
+      alt="Blusa Vermelha"
+    >
+    <h1>Blusa Vermelha Elegante</h1>
+    <p>R$ 149,90</p>
+
+    <!-- DIV DO WIDGET COM DATA ATTRIBUTES -->
+    <div
+      id="omafit-widget-root"
+      data-shop-domain="teste.myshopify.com"
+      data-public-id="wgt_fd9480c6f4a1bb9a"
+      data-product-id="blusa-001"
+      data-product-name="Blusa Vermelha Elegante"
+      data-product-handle="blusa-vermelha"
+      data-recommended-product-name="Calça Jeans Premium"
+      data-recommended-product-url="https://sua-loja.com/products/calca-jeans"
+    >
+      <!-- Widget será inserido aqui -->
+    </div>
+  </div>
+
+  <!-- CONFIGURAÇÃO DO WIDGET -->
+  <script>
+    window.OMAFIT_CONFIG = {
+      publicId: 'wgt_fd9480c6f4a1bb9a',
+      apiUrl: 'http://localhost:5173',
+      shopDomain: 'teste.myshopify.com',
+      storeName: 'Loja de Teste',
+      storeLogo: '',
+      colors: {
+        primary: '#e53935',
+        secondary: '#ffffff'
+      },
+      fontFamily: 'Arial, sans-serif'
+    };
+
+    console.log('%c='.repeat(60), 'color: blue; font-weight: bold;');
+    console.log('%c🧪 TESTE DO PRODUTO COMPLEMENTAR INICIADO', 'color: blue; font-weight: bold; font-size: 16px;');
+    console.log('%c='.repeat(60), 'color: blue; font-weight: bold;');
+    console.log('');
+    console.log('📦 Produto Principal:', 'Blusa Vermelha Elegante');
+    console.log('🎁 Produto Complementar:', 'Calça Jeans Premium');
+    console.log('🔗 URL do Complementar:', 'https://sua-loja.com/products/calca-jeans');
+    console.log('');
+    console.log('%cSiga as instruções acima e acompanhe os logs!', 'color: green; font-weight: bold;');
+    console.log('%c='.repeat(60), 'color: blue; font-weight: bold;');
+  </script>
+
+  <!-- SCRIPT DO WIDGET -->
+  <script src="./omafit-widget.js"></script>
+</body>
+</html>
