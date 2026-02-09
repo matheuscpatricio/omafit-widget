@@ -433,6 +433,18 @@
       console.log('   - Gender:', gender);
     }
 
+    // Preparar complementaryProductUrl como JSON
+    let complementaryProductUrl = '';
+    if (productInfo.recommendedProductName && productInfo.recommendedProductUrl) {
+      const complementaryProduct = {
+        title: productInfo.recommendedProductName,
+        url: productInfo.recommendedProductUrl,
+        handle: productInfo.productHandle || '',
+        collectionTitle: ''
+      };
+      complementaryProductUrl = encodeURIComponent(JSON.stringify(complementaryProduct));
+    }
+
     const widgetUrl =
       'https://omafit.netlify.app/widget' +
       '?productImage=' + encodeURIComponent(productImage) +
@@ -445,8 +457,7 @@
       '&collectionHandle=' + encodeURIComponent(collectionHandle) +
       '&gender=' + encodeURIComponent(gender) +
       '&storeLogo=' + encodeURIComponent(OMAFIT_CONFIG.storeLogo || '') +
-      '&recommendedProductName=' + encodeURIComponent(productInfo.recommendedProductName || '') +
-      '&recommendedProductUrl=' + encodeURIComponent(productInfo.recommendedProductUrl || '') +
+      '&complementaryProductUrl=' + complementaryProductUrl +
       '&config=' + encodeURIComponent(JSON.stringify(config));
 
     console.log('🔗 URL do widget:', widgetUrl);
@@ -514,16 +525,29 @@
             }, '*');
           }
 
+          // Preparar complementaryProduct se disponível
+          let complementaryProduct = null;
+          if (productInfo.recommendedProductName && productInfo.recommendedProductUrl) {
+            complementaryProduct = {
+              title: productInfo.recommendedProductName,
+              url: productInfo.recommendedProductUrl
+            };
+          }
+
           // Enviar configuração completa
           iframe.contentWindow.postMessage({
             type: 'omafit-config-update',
             fontFamily: OMAFIT_CONFIG.fontFamily,
             primaryColor: OMAFIT_CONFIG.colors.primary,
             storeName: OMAFIT_CONFIG.storeName,
-            storeLogo: OMAFIT_CONFIG.storeLogo
+            storeLogo: OMAFIT_CONFIG.storeLogo,
+            complementaryProduct: complementaryProduct
           }, '*');
 
           console.log('📤 Configurações enviadas via postMessage');
+          if (complementaryProduct) {
+            console.log('🎁 Produto complementar incluído:', complementaryProduct);
+          }
         }
       }, 500);
     });

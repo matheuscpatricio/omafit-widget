@@ -37,6 +37,7 @@ export function WidgetPage() {
     const defaultGenderParam = params.get('defaultGender');
     const recommendedProductNameParam = params.get('recommendedProductName');
     const recommendedProductUrlParam = params.get('recommendedProductUrl');
+    const complementaryProductParam = params.get('complementaryProductUrl');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - storeLogo:', logoParam);
@@ -99,12 +100,27 @@ export function WidgetPage() {
       setDefaultGender(defaultGenderParam);
     }
 
-    if (recommendedProductNameParam) {
-      setRecommendedProductName(decodeURIComponent(recommendedProductNameParam));
-    }
+    // Prioridade para complementaryProductUrl (formato novo via PostMessage)
+    if (complementaryProductParam) {
+      try {
+        const complementaryProduct = JSON.parse(decodeURIComponent(complementaryProductParam));
+        if (complementaryProduct.title && complementaryProduct.url) {
+          console.log('✅ Produto complementar recebido:', complementaryProduct);
+          setRecommendedProductName(complementaryProduct.title);
+          setRecommendedProductUrl(complementaryProduct.url);
+        }
+      } catch (error) {
+        console.error('Erro ao parsear complementaryProductUrl:', error);
+      }
+    } else {
+      // Fallback para formato antigo
+      if (recommendedProductNameParam) {
+        setRecommendedProductName(decodeURIComponent(recommendedProductNameParam));
+      }
 
-    if (recommendedProductUrlParam) {
-      setRecommendedProductUrl(decodeURIComponent(recommendedProductUrlParam));
+      if (recommendedProductUrlParam) {
+        setRecommendedProductUrl(decodeURIComponent(recommendedProductUrlParam));
+      }
     }
 
     // Prioridade 1: parâmetro direto storeLogo
@@ -174,6 +190,13 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
+        if (event.data.complementaryProduct) {
+          console.log('🎁 Produto complementar do contexto:', event.data.complementaryProduct);
+          if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
+            setRecommendedProductName(event.data.complementaryProduct.title);
+            setRecommendedProductUrl(event.data.complementaryProduct.url);
+          }
+        }
       }
 
       if (event.data.type === 'omafit-config-update') {
@@ -202,6 +225,13 @@ export function WidgetPage() {
         if (event.data.defaultGender) {
           console.log('👤 Default Gender do config:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
+        }
+        if (event.data.complementaryProduct) {
+          console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
+          if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
+            setRecommendedProductName(event.data.complementaryProduct.title);
+            setRecommendedProductUrl(event.data.complementaryProduct.url);
+          }
         }
       }
     };
