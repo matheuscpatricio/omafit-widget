@@ -203,12 +203,17 @@
     let productId = '';
     let productName = '';
     let productHandle = '';
+    let recommendedProductName = '';
+    let recommendedProductUrl = '';
 
     // Pegar do elemento omafit-widget-root primeiro (prioridade)
     const rootElement = document.getElementById('omafit-widget-root');
+
     if (rootElement) {
       productId = rootElement.dataset.productId || '';
       productHandle = rootElement.dataset.productHandle || '';
+      recommendedProductName = rootElement.dataset.recommendedProductName || '';
+      recommendedProductUrl = rootElement.dataset.recommendedProductUrl || '';
     }
 
     // Se não tiver, tentar window.meta.product
@@ -241,7 +246,7 @@
       }
     }
 
-    return { productId, productName, productHandle };
+    return { productId, productName, productHandle, recommendedProductName, recommendedProductUrl };
   }
 
   // Buscar configuração do Omafit via API
@@ -440,6 +445,8 @@
       '&collectionHandle=' + encodeURIComponent(collectionHandle) +
       '&gender=' + encodeURIComponent(gender) +
       '&storeLogo=' + encodeURIComponent(OMAFIT_CONFIG.storeLogo || '') +
+      '&recommendedProductName=' + encodeURIComponent(productInfo.recommendedProductName || '') +
+      '&recommendedProductUrl=' + encodeURIComponent(productInfo.recommendedProductUrl || '') +
       '&config=' + encodeURIComponent(JSON.stringify(config));
 
     console.log('🔗 URL do widget:', widgetUrl);

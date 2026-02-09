@@ -20,6 +20,8 @@ interface TryOnWidgetProps {
   collectionHandle?: string;
   gender?: string;
   defaultGender?: string;
+  recommendedProductName?: string;
+  recommendedProductUrl?: string;
 }
 
 interface SizeChartEntry {
@@ -34,7 +36,7 @@ interface SizeChartEntry {
   length?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex' }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -1411,6 +1413,25 @@ const handleSubmit = async () => {
                 </p>
               </div>
 
+              {recommendedProductName && recommendedProductUrl && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-gray-700 text-center">
+                    Uma ótima escolha para acompanhar seu pedido seria{' '}
+                    <strong>{recommendedProductName}</strong>,{' '}
+                    <a
+                      href={recommendedProductUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline hover:opacity-70 transition-opacity"
+                      style={{ color: primaryColor }}
+                    >
+                      clique aqui
+                    </a>{' '}
+                    e confira.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={resetWidget}
                 className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
@@ -1453,6 +1474,25 @@ const handleSubmit = async () => {
                 <p className="text-lg text-gray-700">
                   {t('congratsMessage')}
                 </p>
+
+                {recommendedProductName && recommendedProductUrl && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-base text-gray-700 text-center">
+                      Uma ótima escolha para acompanhar seu pedido seria{' '}
+                      <strong>{recommendedProductName}</strong>,{' '}
+                      <a
+                        href={recommendedProductUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold underline hover:opacity-70 transition-opacity"
+                        style={{ color: primaryColor }}
+                      >
+                        clique aqui
+                      </a>{' '}
+                      e confira.
+                    </p>
+                  </div>
+                )}
 
                 <button
                   onClick={resetWidget}

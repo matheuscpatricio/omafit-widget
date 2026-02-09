@@ -18,6 +18,8 @@ export function WidgetPage() {
   const [collectionHandle, setCollectionHandle] = useState<string>('');
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
+  const [recommendedProductName, setRecommendedProductName] = useState<string>('');
+  const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -33,6 +35,8 @@ export function WidgetPage() {
     const collectionHandleParam = params.get('collectionHandle');
     const genderParam = params.get('gender');
     const defaultGenderParam = params.get('defaultGender');
+    const recommendedProductNameParam = params.get('recommendedProductName');
+    const recommendedProductUrlParam = params.get('recommendedProductUrl');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - storeLogo:', logoParam);
@@ -93,6 +97,14 @@ export function WidgetPage() {
     if (defaultGenderParam) {
       console.log('✅ Default Gender definido:', defaultGenderParam);
       setDefaultGender(defaultGenderParam);
+    }
+
+    if (recommendedProductNameParam) {
+      setRecommendedProductName(decodeURIComponent(recommendedProductNameParam));
+    }
+
+    if (recommendedProductUrlParam) {
+      setRecommendedProductUrl(decodeURIComponent(recommendedProductUrlParam));
     }
 
     // Prioridade 1: parâmetro direto storeLogo
@@ -232,6 +244,8 @@ export function WidgetPage() {
           collectionHandle={collectionHandle}
           gender={gender}
           defaultGender={defaultGender}
+          recommendedProductName={recommendedProductName}
+          recommendedProductUrl={recommendedProductUrl}
         />
       </div>
     </div>
