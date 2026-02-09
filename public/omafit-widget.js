@@ -540,10 +540,6 @@
               url: productInfo.recommendedProductUrl
             };
             console.log('📤 Enviando produto complementar via postMessage:', complementaryProduct);
-          } else {
-            console.log('⚠️ Produto complementar NÃO disponível para enviar via postMessage');
-            console.log('   - recommendedProductName:', productInfo.recommendedProductName || 'VAZIO');
-            console.log('   - recommendedProductUrl:', productInfo.recommendedProductUrl || 'VAZIO');
           }
 
           // Enviar configuração completa

@@ -6,16 +6,37 @@ Este documento explica como funciona o sistema de produto complementar e como de
 
 ## 🔄 Fluxo de Dados
 
+O produto complementar é enviado de **3 formas simultâneas**:
+
+1. **Query Parameter** `complementaryProductUrl` na URL do Netlify
+2. **PostMessage** `omafit-context` com o objeto completo do produto
+3. **PostMessage** `omafit-config-update` em todas as atualizações de configuração
+
+### Estrutura do Objeto
+
+```javascript
+{
+  title: "Nome do Produto",           // Obrigatório
+  handle: "handle-do-produto",        // Opcional
+  url: "https://loja.com/products/...", // Obrigatório
+  collectionTitle: "Nome da Coleção"  // Opcional
+}
+```
+
+### Fluxo Detalhado
+
 ```
 1. HTML da Página (data attributes)
    ↓
-2. omafit-widget.js (lê data attributes)
+2. omafit-widget.js (lê data attributes e cria objeto)
    ↓
-3. URL do iframe (complementaryProductUrl)
+3a. URL do iframe (complementaryProductUrl como JSON)
+3b. PostMessage omafit-context (complementaryProduct)
+3c. PostMessage omafit-config-update (complementaryProduct)
    ↓
-4. WidgetPage.tsx (parse da URL)
+4. WidgetPage.tsx (recebe das 3 formas e extrai title + url)
    ↓
-5. TryOnWidget.tsx (renderiza a frase)
+5. TryOnWidget.tsx (renderiza a frase com title + url)
 ```
 
 ## 📝 Configuração no HTML

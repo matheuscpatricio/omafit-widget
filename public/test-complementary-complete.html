@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste Completo - Produto Complementar (3 Formas)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-info {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .test-info h1 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+    .info-box {
+      background: rgba(255,255,255,0.2);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      backdrop-filter: blur(10px);
+    }
+    .info-box h3 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+      padding-bottom: 10px;
+    }
+    .info-box pre {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .info-box ol {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    .info-box li {
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+    .product-card {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    .product-image {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .expected-result {
+      background: #d4edda;
+      border: 2px solid #28a745;
+      color: #155724;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .expected-result strong {
+      font-size: 16px;
+    }
+    code {
+      background: rgba(0,0,0,0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-info">
+    <h1>🧪 Teste Completo do Produto Complementar</h1>
+    <p style="font-size: 16px; margin: 10px 0;">
+      Este teste demonstra o envio do produto complementar usando <strong>3 formas simultâneas</strong>
+    </p>
+
+    <div class="info-box">
+      <h3>📦 Estrutura do Objeto Complementar</h3>
+      <pre>{
+  title: "Calça Jeans Premium",
+  handle: "calca-jeans-premium",
+  url: "https://sua-loja.com/products/calca-jeans-premium",
+  collectionTitle: "Roupas Femininas"
+}</pre>
+    </div>
+
+    <div class="info-box">
+      <h3>🔄 3 Formas de Envio</h3>
+      <ol>
+        <li><strong>Query Parameter:</strong> <code>complementaryProductUrl</code> (JSON na URL do iframe)</li>
+        <li><strong>PostMessage:</strong> <code>omafit-context</code> (contexto inicial do produto)</li>
+        <li><strong>PostMessage:</strong> <code>omafit-config-update</code> (atualizações de configuração)</li>
+      </ol>
+    </div>
+
+    <div class="info-box">
+      <h3>✅ Como Testar</h3>
+      <ol>
+        <li>Abra o <strong>Console do navegador</strong> (pressione F12)</li>
+        <li>Clique no botão "Experimentar virtualmente" abaixo</li>
+        <li>Verifique no console os logs:
+          <ul>
+            <li>🎁 Produto complementar sendo enviado via URL</li>
+            <li>📤 Enviando produto complementar via postMessage</li>
+            <li>✅ Produto complementar recebido (3 vezes)</li>
+          </ul>
+        </li>
+        <li>Faça o upload de uma foto sua</li>
+        <li>Aguarde o processamento</li>
+        <li>Na tela de resultado, você DEVE ver a frase abaixo</li>
+      </ol>
+    </div>
+
+    <div class="expected-result">
+      <strong>✨ Resultado Esperado na Tela Final:</strong><br><br>
+      <em>"Uma ótima escolha para acompanhar seu pedido seria <strong>Calça Jeans Premium</strong>,
+      <a href="#" style="color: #e53935; text-decoration: underline;">clique aqui</a> e confira."</em>
+    </div>
+  </div>
+
+  <div class="product-card">
+    <img
+      class="product-image"
+      src="https://images.pexels.com/photos/1536619/pexels-photo-1536619.jpeg"
+      alt="Blusa Vermelha Elegante"
+    >
+    <h1 style="color: #333; margin-bottom: 10px;">Blusa Vermelha Elegante</h1>
+    <p style="font-size: 24px; color: #e53935; font-weight: bold; margin-bottom: 20px;">R$ 149,90</p>
+    <p style="color: #666; margin-bottom: 30px; line-height: 1.6;">
+      Blusa elegante em tecido premium, perfeita para diversas ocasiões.
+      Combine com a nossa <strong>Calça Jeans Premium</strong> para um look completo!
+    </p>
+
+    <!-- DIV DO WIDGET COM DATA ATTRIBUTES COMPLETOS -->
+    <div
+      id="omafit-widget-root"
+      data-shop-domain="teste.myshopify.com"
+      data-public-id="wgt_fd9480c6f4a1bb9a"
+      data-product-id="blusa-elegante-001"
+      data-product-name="Blusa Vermelha Elegante"
+      data-product-handle="blusa-vermelha-elegante"
+      data-recommended-product-name="Calça Jeans Premium"
+      data-recommended-product-url="https://sua-loja.com/products/calca-jeans-premium"
+    >
+      <!-- Widget será inserido aqui -->
+    </div>
+  </div>
+
+  <!-- CONFIGURAÇÃO DO WIDGET -->
+  <script>
+    window.OMAFIT_CONFIG = {
+      publicId: 'wgt_fd9480c6f4a1bb9a',
+      apiUrl: 'http://localhost:5173',
+      shopDomain: 'teste.myshopify.com',
+      storeName: 'Boutique Fashion',
+      storeLogo: '',
+      colors: {
+        primary: '#e53935',
+        secondary: '#ffffff'
+      },
+      fontFamily: 'Arial, sans-serif'
+    };
+
+    // Console styling
+    const styles = {
+      title: 'color: #667eea; font-weight: bold; font-size: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);',
+      section: 'color: #764ba2; font-weight: bold; font-size: 16px;',
+      success: 'color: #28a745; font-weight: bold;',
+      info: 'color: #17a2b8;',
+      divider: 'color: #667eea; font-weight: bold;'
+    };
+
+    console.log('%c' + '='.repeat(70), styles.divider);
+    console.log('%c🧪 TESTE COMPLETO DO PRODUTO COMPLEMENTAR', styles.title);
+    console.log('%c' + '='.repeat(70), styles.divider);
+    console.log('');
+    console.log('%c📦 PRODUTO PRINCIPAL', styles.section);
+    console.log('%c   Nome: Blusa Vermelha Elegante', styles.info);
+    console.log('%c   ID: blusa-elegante-001', styles.info);
+    console.log('');
+    console.log('%c🎁 PRODUTO COMPLEMENTAR', styles.section);
+    console.log('%c   Nome: Calça Jeans Premium', styles.info);
+    console.log('%c   Handle: calca-jeans-premium', styles.info);
+    console.log('%c   URL: https://sua-loja.com/products/calca-jeans-premium', styles.info);
+    console.log('');
+    console.log('%c🔄 FORMAS DE ENVIO', styles.section);
+    console.log('%c   1. Query Parameter (complementaryProductUrl)', styles.info);
+    console.log('%c   2. PostMessage (omafit-context)', styles.info);
+    console.log('%c   3. PostMessage (omafit-config-update)', styles.info);
+    console.log('');
+    console.log('%c✅ Aguarde os logs de confirmação...', styles.success);
+    console.log('%c' + '='.repeat(70), styles.divider);
+    console.log('');
+  </script>
+
+  <!-- SCRIPT DO WIDGET -->
+  <script src="./omafit-widget.js"></script>
+</body>
+</html>
