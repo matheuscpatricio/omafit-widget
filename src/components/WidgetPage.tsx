@@ -47,6 +47,9 @@ export function WidgetPage() {
     console.log('   - collectionHandle:', collectionHandleParam || 'não fornecido (tabela global)');
     console.log('   - gender:', genderParam || 'não fornecido');
     console.log('   - defaultGender:', defaultGenderParam || 'não fornecido');
+    console.log('   - 🎁 complementaryProductUrl:', complementaryProductParam || 'não fornecido');
+    console.log('   - 🎁 recommendedProductName:', recommendedProductNameParam || 'não fornecido');
+    console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrlParam || 'não fornecido');
     console.log('   - config length:', configParam?.length || 0);
 
     if (image) {
@@ -115,11 +118,15 @@ export function WidgetPage() {
     } else {
       // Fallback para formato antigo
       if (recommendedProductNameParam) {
-        setRecommendedProductName(decodeURIComponent(recommendedProductNameParam));
+        const decodedName = decodeURIComponent(recommendedProductNameParam);
+        console.log('✅ Produto recomendado definido (formato antigo):', decodedName);
+        setRecommendedProductName(decodedName);
       }
 
       if (recommendedProductUrlParam) {
-        setRecommendedProductUrl(decodeURIComponent(recommendedProductUrlParam));
+        const decodedUrl = decodeURIComponent(recommendedProductUrlParam);
+        console.log('✅ URL do produto recomendado definida (formato antigo):', decodedUrl);
+        setRecommendedProductUrl(decodedUrl);
       }
     }
 
@@ -193,6 +200,9 @@ export function WidgetPage() {
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do contexto:', event.data.complementaryProduct);
           if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
+            console.log('✅ Definindo produto complementar via omafit-context:');
+            console.log('   - Nome:', event.data.complementaryProduct.title);
+            console.log('   - URL:', event.data.complementaryProduct.url);
             setRecommendedProductName(event.data.complementaryProduct.title);
             setRecommendedProductUrl(event.data.complementaryProduct.url);
           }
@@ -229,6 +239,9 @@ export function WidgetPage() {
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
           if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
+            console.log('✅ Definindo produto complementar via omafit-config-update:');
+            console.log('   - Nome:', event.data.complementaryProduct.title);
+            console.log('   - URL:', event.data.complementaryProduct.url);
             setRecommendedProductName(event.data.complementaryProduct.title);
             setRecommendedProductUrl(event.data.complementaryProduct.url);
           }
@@ -255,6 +268,9 @@ export function WidgetPage() {
   }
 
   console.log('🎨 WidgetPage - Renderizando com storeLogo:', storeLogo);
+  console.log('🎁 WidgetPage - Produto Complementar que será passado para TryOnWidget:');
+  console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
+  console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
 
   return (
     <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>

@@ -214,6 +214,10 @@
       productHandle = rootElement.dataset.productHandle || '';
       recommendedProductName = rootElement.dataset.recommendedProductName || '';
       recommendedProductUrl = rootElement.dataset.recommendedProductUrl || '';
+
+      console.log('🎁 Produto complementar lido do data attribute:');
+      console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
+      console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
     }
 
     // Se não tiver, tentar window.meta.product
@@ -443,6 +447,9 @@
         collectionTitle: ''
       };
       complementaryProductUrl = encodeURIComponent(JSON.stringify(complementaryProduct));
+      console.log('🎁 Produto complementar sendo enviado na URL:', complementaryProduct);
+    } else {
+      console.log('⚠️ Nenhum produto complementar para enviar');
     }
 
     const widgetUrl =

@@ -52,6 +52,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
   console.log('   - 👤 gender (deprecated):', gender);
   console.log('   - 👤 defaultGender (sugestão inicial):', defaultGender);
+  console.log('   - 🎁 recommendedProductName:', recommendedProductName || 'não fornecido');
+  console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrl || 'não fornecido');
 
   // Detectar idioma
   const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
