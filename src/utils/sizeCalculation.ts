@@ -14,74 +14,74 @@ interface BodyMeasurements {
 
 const DEFAULT_BMI_REFERENCE_TABLE = {
   'Busto': [
-    { bmi: 18.5, value: 78 },
-    { bmi: 20, value: 82 },
-    { bmi: 22, value: 86 },
-    { bmi: 24, value: 90 },
-    { bmi: 26, value: 94 },
-    { bmi: 28, value: 98 },
-    { bmi: 30, value: 102 },
-    { bmi: 32, value: 106 }
+    { bmi: 18.5, value: 80 },
+    { bmi: 20, value: 84 },
+    { bmi: 22, value: 88 },
+    { bmi: 24, value: 92 },
+    { bmi: 26, value: 96 },
+    { bmi: 28, value: 100 },
+    { bmi: 30, value: 104 },
+    { bmi: 32, value: 108 }
   ],
   'Peito': [
-    { bmi: 18.5, value: 78 },
-    { bmi: 20, value: 82 },
-    { bmi: 22, value: 86 },
-    { bmi: 24, value: 90 },
-    { bmi: 26, value: 94 },
-    { bmi: 28, value: 98 },
-    { bmi: 30, value: 102 },
-    { bmi: 32, value: 106 }
+    { bmi: 18.5, value: 85 },
+    { bmi: 20, value: 89 },
+    { bmi: 22, value: 93 },
+    { bmi: 24, value: 97 },
+    { bmi: 26, value: 101 },
+    { bmi: 28, value: 105 },
+    { bmi: 30, value: 109 },
+    { bmi: 32, value: 113 }
   ],
   'Cintura': [
-    { bmi: 18.5, value: 58 },
-    { bmi: 20, value: 62 },
-    { bmi: 22, value: 66 },
-    { bmi: 24, value: 70 },
-    { bmi: 26, value: 74 },
-    { bmi: 28, value: 78 },
-    { bmi: 30, value: 82 },
-    { bmi: 32, value: 86 }
+    { bmi: 18.5, value: 62 },
+    { bmi: 20, value: 66 },
+    { bmi: 22, value: 70 },
+    { bmi: 24, value: 74 },
+    { bmi: 26, value: 78 },
+    { bmi: 28, value: 82 },
+    { bmi: 30, value: 86 },
+    { bmi: 32, value: 90 }
   ],
   'Quadril': [
-    { bmi: 18.5, value: 84 },
-    { bmi: 20, value: 88 },
-    { bmi: 22, value: 92 },
-    { bmi: 24, value: 96 },
-    { bmi: 26, value: 100 },
-    { bmi: 28, value: 104 },
-    { bmi: 30, value: 108 },
-    { bmi: 32, value: 112 }
+    { bmi: 18.5, value: 86 },
+    { bmi: 20, value: 90 },
+    { bmi: 22, value: 94 },
+    { bmi: 24, value: 98 },
+    { bmi: 26, value: 102 },
+    { bmi: 28, value: 106 },
+    { bmi: 30, value: 110 },
+    { bmi: 32, value: 114 }
   ],
   'Comprimento': [
-    { bmi: 18.5, value: 65 },
-    { bmi: 20, value: 67 },
-    { bmi: 22, value: 69 },
-    { bmi: 24, value: 71 },
-    { bmi: 26, value: 73 },
-    { bmi: 28, value: 75 },
-    { bmi: 30, value: 77 },
-    { bmi: 32, value: 79 }
+    { bmi: 18.5, value: 60 },
+    { bmi: 20, value: 62 },
+    { bmi: 22, value: 64 },
+    { bmi: 24, value: 66 },
+    { bmi: 26, value: 68 },
+    { bmi: 28, value: 70 },
+    { bmi: 30, value: 72 },
+    { bmi: 32, value: 74 }
   ],
   'Tornozelo': [
-    { bmi: 18.5, value: 21 },
-    { bmi: 20, value: 22 },
-    { bmi: 22, value: 23 },
-    { bmi: 24, value: 24 },
-    { bmi: 26, value: 25 },
-    { bmi: 28, value: 26 },
-    { bmi: 30, value: 27 },
-    { bmi: 32, value: 28 }
+    { bmi: 18.5, value: 19 },
+    { bmi: 20, value: 20 },
+    { bmi: 22, value: 21 },
+    { bmi: 24, value: 22 },
+    { bmi: 26, value: 23 },
+    { bmi: 28, value: 24 },
+    { bmi: 30, value: 25 },
+    { bmi: 32, value: 26 }
   ],
   'Ombro': [
-    { bmi: 18.5, value: 38 },
-    { bmi: 20, value: 40 },
-    { bmi: 22, value: 42 },
-    { bmi: 24, value: 44 },
-    { bmi: 26, value: 46 },
-    { bmi: 28, value: 48 },
-    { bmi: 30, value: 50 },
-    { bmi: 32, value: 52 }
+    { bmi: 18.5, value: 36 },
+    { bmi: 20, value: 38 },
+    { bmi: 22, value: 40 },
+    { bmi: 24, value: 42 },
+    { bmi: 26, value: 44 },
+    { bmi: 28, value: 46 },
+    { bmi: 30, value: 48 },
+    { bmi: 32, value: 50 }
   ]
 };
 
