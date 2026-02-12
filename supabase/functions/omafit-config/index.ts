@@ -21,11 +21,13 @@ Deno.serve(async (req: Request) => {
     const collectionId = url.searchParams.get('collection_id');
     const collectionHandle = url.searchParams.get('collection_handle');
     const gender = url.searchParams.get('gender') || 'unisex';
+    const garmentType = url.searchParams.get('garment_type'); // 'upper', 'lower', or 'full'
 
     console.log('🏪 Shop recebido:', shop);
     console.log('📦 Collection ID (UUID):', collectionId || 'não fornecido');
     console.log('📦 Collection Handle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
     console.log('👤 Gender:', gender);
+    console.log('👕 Garment Type:', garmentType || 'não especificado (usar padrão da collection)');
 
     if (!shop) {
       throw new Error('shop domain é obrigatório');
@@ -158,6 +160,37 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 ===== FIM DA BUSCA DE SIZE CHART =====');
 
+    // Buscar measurement weights
+    let measurementWeights = null;
+
+    // Prioridade 1: Se garment_type foi passado pelo widget, usar os pesos padrão desse tipo
+    if (garmentType && ['upper', 'lower', 'full'].includes(garmentType)) {
+      console.log('⚖️ Usando garment_type do widget:', garmentType);
+      const defaultWeights = {
+        'upper': { Busto: 2.0, Peito: 2.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 },
+        'lower': { Busto: 1.0, Peito: 1.0, Cintura: 2.0, Quadril: 2.0, Comprimento: 1.0, Tornozelo: 1.0 },
+        'full': { Busto: 1.0, Peito: 1.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 }
+      };
+      measurementWeights = defaultWeights[garmentType as 'upper' | 'lower' | 'full'];
+      console.log('✅ Pesos aplicados:', measurementWeights);
+    }
+    // Prioridade 2: Se não foi passado garment_type, usar da coleção (se houver)
+    else if (sizeChart?.collection_id) {
+      console.log('⚖️ Buscando measurement weights da collection_id:', sizeChart.collection_id);
+      const { data: collectionData } = await supabaseClient
+        .from('collection_measurement_weights')
+        .select('effective_weights')
+        .eq('id', sizeChart.collection_id)
+        .maybeSingle();
+
+      if (collectionData?.effective_weights) {
+        measurementWeights = collectionData.effective_weights;
+        console.log('✅ Measurement weights da coleção encontrados:', measurementWeights);
+      } else {
+        console.log('⚠️ Nenhum measurement weight configurado para esta coleção');
+      }
+    }
+
     const config = {
       publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
@@ -176,6 +209,7 @@ Deno.serve(async (req: Request) => {
         collectionHandle: sizeChart.collection_handle,
         gender: sizeChart.gender,
         measurementNames: sizeChart.measurement_names || ['Busto', 'Cintura', 'Quadril'],
+        measurementWeights: measurementWeights,
         entries: sizeChartEntries
       } : null
     };
