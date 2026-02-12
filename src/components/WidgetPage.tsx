@@ -264,7 +264,7 @@ export function WidgetPage() {
           console.log('👕 Collection Type do config:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
         }
-        if (event.data.collectionElasticity && ['low', 'medium', 'high'].includes(event.data.collectionElasticity)) {
+        if (event.data.collectionElasticity && ['structured', 'light', 'flexible', 'high'].includes(event.data.collectionElasticity)) {
           console.log('🧵 Collection Elasticity do config:', event.data.collectionElasticity);
           setCollectionElasticity(event.data.collectionElasticity);
         }
