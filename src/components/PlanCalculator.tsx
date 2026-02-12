@@ -15,38 +15,29 @@ const plans: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 25,
-    tryons: 100,
-    maxVisits: 30000,
+    price: 49,
+    tryons: 250,
+    maxVisits: 60000,
     description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
-    additionalImagePrice: 0.18
+    additionalImagePrice: 0.15
   },
   {
     id: 'growth',
     name: 'Growth',
-    price: 100,
-    tryons: 500,
-    maxVisits: 100000,
+    price: 149,
+    tryons: 1000,
+    maxVisits: 250000,
     description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
-    additionalImagePrice: 0.16
+    additionalImagePrice: 0.12
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 180,
-    tryons: 1000,
-    maxVisits: 300000,
+    price: 349,
+    tryons: 3000,
+    maxVisits: 750000,
     description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
-    additionalImagePrice: 0.14
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 0,
-    tryons: -1,
-    maxVisits: Infinity,
-    description: 'Solução completa e personalizada para grandes operações com necessidades específicas.',
-    additionalImagePrice: null
+    additionalImagePrice: 0.10
   }
 ];
 
@@ -99,21 +90,21 @@ export function PlanCalculator() {
             <input
               type="range"
               min="0"
-              max="500000"
+              max="800000"
               step="1000"
               value={monthlyVisits}
               onChange={handleSliderChange}
               className="w-full h-2 sm:h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${((monthlyVisits - 0) / (500000 - 100)) * 100}%, rgba(255,255,255,0.2) ${((monthlyVisits - 0) / (500000 - 100)) * 100}%, rgba(255,255,255,0.2) 100%)`
+                background: `linear-gradient(to right, #ffffff 0%, #ffffff ${((monthlyVisits - 0) / (800000 - 100)) * 100}%, rgba(255,255,255,0.2) ${((monthlyVisits - 0) / (800000 - 100)) * 100}%, rgba(255,255,255,0.2) 100%)`
               }}
             />
             <div className="flex justify-between text-[10px] sm:text-xs text-red-100 mt-2">
               <span>0</span>
-              <span className="hidden sm:inline">100.000</span>
-              <span>250.000</span>
-              <span className="hidden sm:inline">400.000</span>
-              <span>500.000+</span>
+              <span className="hidden sm:inline">200.000</span>
+              <span>400.000</span>
+              <span className="hidden sm:inline">600.000</span>
+              <span>800.000+</span>
             </div>
           </div>
         </div>
@@ -137,33 +128,25 @@ export function PlanCalculator() {
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Preço mensal</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-[#810707]">
-                    {recommendedPlan.id === 'enterprise'
-                      ? 'Customizado'
-                      : `$${recommendedPlan.price.toLocaleString('en-US')}`}
+                    ${recommendedPlan.price.toLocaleString('en-US')}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Imagens incluídas</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {recommendedPlan.tryons === -1
-                      ? 'Ilimitado'
-                      : `${recommendedPlan.tryons.toLocaleString('pt-BR')}/mês`}
+                    {recommendedPlan.tryons.toLocaleString('pt-BR')}/mês
                   </p>
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Custo por imagem</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {recommendedPlan.id === 'enterprise'
-                      ? 'A negociar'
-                      : `$${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}`}
+                    ${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Imagens adicionais</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {recommendedPlan.additionalImagePrice === null
-                      ? 'A negociar'
-                      : `$${recommendedPlan.additionalImagePrice.toFixed(2)}`}
+                    ${recommendedPlan.additionalImagePrice?.toFixed(2)}
                   </p>
                 </div>
               </div>
