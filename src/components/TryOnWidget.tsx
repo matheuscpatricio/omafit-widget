@@ -311,18 +311,37 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     let baseChest, baseWaist, baseHip, baseShoulder;
 
     if (hasRealMeasurements) {
-      // ✅ USAR MEDIDAS REAIS DETECTADAS PELO MEDIAPIPE
-      baseChest = realChest * fit; // Aplicar apenas preferência de fit
-      baseWaist = realWaist * fit;
-      baseHip = realHip * fit;
-      baseShoulder = realShoulder || (height * 0.25);
+      // ✅ HÍBRIDO: MEDIDAS REAIS DO MEDIAPIPE + AJUSTES DO PERFIL DO USUÁRIO
+      // Começamos com as medidas REAIS e aplicamos os ajustes inteligentes
 
-      console.log('🎯 Usando MEDIDAS REAIS (MediaPipe):');
-      console.log('   - Peito REAL:', baseChest.toFixed(1), 'cm');
-      console.log('   - Cintura REAL:', baseWaist.toFixed(1), 'cm');
-      console.log('   - Quadril REAL:', baseHip.toFixed(1), 'cm');
-      console.log('   - Ombro:', baseShoulder.toFixed(1), 'cm');
-      console.log('   - Fit aplicado:', fit);
+      console.log('🎯 MODO HÍBRIDO: MediaPipe + Perfil do Usuário');
+      console.log('📸 Medidas BRUTAS do MediaPipe:');
+      console.log('   - Peito bruto:', realChest.toFixed(1), 'cm');
+      console.log('   - Cintura bruta:', realWaist.toFixed(1), 'cm');
+      console.log('   - Quadril bruto:', realHip.toFixed(1), 'cm');
+
+      // Aplicar fatores do perfil do manequim nas medidas REAIS
+      // Isso permite que o tipo corporal ajuste as proporções detectadas
+      const chestWithBodyType = realChest * selectedBodyType.chestFactor;
+      const waistWithBodyType = realWaist * selectedBodyType.waistFactor;
+      const hipWithBodyType = realHip * selectedBodyType.hipFactor;
+
+      console.log('🎭 Após aplicar perfil do manequim (' + selectedBodyType.description + '):');
+      console.log('   - Peito:', chestWithBodyType.toFixed(1), 'cm', `(fator: ${selectedBodyType.chestFactor})`);
+      console.log('   - Cintura:', waistWithBodyType.toFixed(1), 'cm', `(fator: ${selectedBodyType.waistFactor})`);
+      console.log('   - Quadril:', hipWithBodyType.toFixed(1), 'cm', `(fator: ${selectedBodyType.hipFactor})`);
+
+      // Aplicar ajuste de IMC (refinamento baseado em peso real vs esperado)
+      baseChest = chestWithBodyType * bmiAdjustment * fit;
+      baseWaist = waistWithBodyType * bmiAdjustment * fit;
+      baseHip = hipWithBodyType * bmiAdjustment * fit;
+      baseShoulder = (realShoulder || (height * 0.25)) * selectedBodyType.shoulderFactor * fit;
+
+      console.log('⚖️ Após ajuste de IMC (', ((bmiAdjustment - 1) * 100).toFixed(1) + '%) + Fit (', ['Justa', 'Na medida', 'Solta'][fitIndex] + '):');
+      console.log('   - Peito FINAL:', baseChest.toFixed(1), 'cm');
+      console.log('   - Cintura FINAL:', baseWaist.toFixed(1), 'cm');
+      console.log('   - Quadril FINAL:', baseHip.toFixed(1), 'cm');
+      console.log('   - Ombro FINAL:', baseShoulder.toFixed(1), 'cm');
     } else {
       // Fallback: Calcular medidas aplicando:
       // 1. Altura × proporção base (gênero)
@@ -334,7 +353,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       baseHip = height * baseHipRatio * selectedBodyType.hipFactor * fit * bmiAdjustment;
       baseShoulder = height * 0.25 * selectedBodyType.shoulderFactor * fit;
 
-      console.log('📏 Medidas ESTIMADAS (altura + IMC):');
+      console.log('📏 MODO ESTIMATIVA (sem MediaPipe):');
       console.log('   - Peito estimado:', baseChest.toFixed(1), 'cm');
       console.log('   - Cintura estimada:', baseWaist.toFixed(1), 'cm');
       console.log('   - Quadril estimado:', baseHip.toFixed(1), 'cm');
