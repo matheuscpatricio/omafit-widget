@@ -81,6 +81,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [calculatedSize, setCalculatedSize] = useState<string | null>(null);
   const [recommendedSize, setRecommendedSize] = useState<string | null>(null);
   const [sizeChart, setSizeChart] = useState<SizeChartEntry[]>([]);
+  const [measurementWeights, setMeasurementWeights] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
