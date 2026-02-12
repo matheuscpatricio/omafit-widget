@@ -161,8 +161,6 @@ export function calculateIdealSize(
 
   const heightInMeters = height / 100;
   const bmi = weight / (heightInMeters * heightInMeters);
-  const adjustedBMI = bmi * bodyTypeFactor;
-  const finalBMI = adjustedBMI * fitFactor;
 
   let measurements: string[];
 
@@ -176,7 +174,8 @@ export function calculateIdealSize(
 
   const estimatedMeasurements: BodyMeasurements = {};
   measurements.forEach((name) => {
-    estimatedMeasurements[name] = interpolateMeasurement(finalBMI, name);
+    const baseMeasurement = interpolateMeasurement(bmi, name);
+    estimatedMeasurements[name] = baseMeasurement * bodyTypeFactor * fitFactor;
   });
 
   let bestMatch: { size: string; difference: number } | null = null;
