@@ -16,7 +16,7 @@ const plans: Plan[] = [
     id: 'starter',
     name: 'Starter',
     price: 30,
-    tryons: 250,
+    tryons: 100,
     maxVisits: 60000,
     description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
     additionalImagePrice: 0.18
@@ -25,7 +25,7 @@ const plans: Plan[] = [
     id: 'growth',
     name: 'Growth',
     price: 120,
-    tryons: 1000,
+    tryons: 500,
     maxVisits: 250000,
     description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
     additionalImagePrice: 0.16
@@ -34,7 +34,7 @@ const plans: Plan[] = [
     id: 'pro',
     name: 'Pro',
     price: 220,
-    tryons: 3000,
+    tryons: 1000,
     maxVisits: 750000,
     description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
     additionalImagePrice: 0.14
