@@ -21,7 +21,7 @@ interface TryOnWidgetProps {
   gender?: string;
   defaultGender?: string;
   collectionType?: 'upper' | 'lower' | 'full';
-  collectionElasticity?: 'structured' | 'light' | 'flexible' | 'high';
+  collectionElasticity?: 'structured' | 'light_flex' | 'flexible' | 'high_elasticity';
   recommendedProductName?: string;
   recommendedProductUrl?: string;
 }
@@ -105,7 +105,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
   const [localStoreName, setLocalStoreName] = useState<string>(storeName);
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
-  const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light' | 'flexible' | 'high' | undefined>(collectionElasticity);
+  const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);

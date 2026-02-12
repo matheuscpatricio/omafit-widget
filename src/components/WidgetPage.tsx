@@ -19,7 +19,7 @@ export function WidgetPage() {
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [collectionType, setCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(undefined);
-  const [collectionElasticity, setCollectionElasticity] = useState<'structured' | 'light' | 'flexible' | 'high' | undefined>(undefined);
+  const [collectionElasticity, setCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
 
@@ -114,9 +114,9 @@ export function WidgetPage() {
       setCollectionType(collectionTypeParam as 'upper' | 'lower' | 'full');
     }
 
-    if (collectionElasticityParam && ['structured', 'light', 'flexible', 'high'].includes(collectionElasticityParam)) {
+    if (collectionElasticityParam && ['structured', 'light_flex', 'flexible', 'high_elasticity'].includes(collectionElasticityParam)) {
       console.log('✅ Collection Elasticity definido:', collectionElasticityParam);
-      setCollectionElasticity(collectionElasticityParam as 'structured' | 'light' | 'flexible' | 'high');
+      setCollectionElasticity(collectionElasticityParam as 'structured' | 'light_flex' | 'flexible' | 'high_elasticity');
     }
 
     // Prioridade para complementaryProductUrl (formato novo via PostMessage)
@@ -217,7 +217,7 @@ export function WidgetPage() {
           console.log('👕 Collection Type do contexto:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
         }
-        if (event.data.collectionElasticity && ['structured', 'light', 'flexible', 'high'].includes(event.data.collectionElasticity)) {
+        if (event.data.collectionElasticity && ['structured', 'light_flex', 'flexible', 'high_elasticity'].includes(event.data.collectionElasticity)) {
           console.log('🧵 Collection Elasticity do contexto:', event.data.collectionElasticity);
           setCollectionElasticity(event.data.collectionElasticity);
         }
@@ -264,7 +264,7 @@ export function WidgetPage() {
           console.log('👕 Collection Type do config:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
         }
-        if (event.data.collectionElasticity && ['structured', 'light', 'flexible', 'high'].includes(event.data.collectionElasticity)) {
+        if (event.data.collectionElasticity && ['structured', 'light_flex', 'flexible', 'high_elasticity'].includes(event.data.collectionElasticity)) {
           console.log('🧵 Collection Elasticity do config:', event.data.collectionElasticity);
           setCollectionElasticity(event.data.collectionElasticity);
         }
