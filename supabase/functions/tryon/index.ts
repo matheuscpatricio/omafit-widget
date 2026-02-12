@@ -329,16 +329,23 @@ Deno.serve(async (req: Request) => {
           console.log('🤖 Iniciando MediaPipe Pose Landmarker...');
 
           try {
+            // Extrair altura do usuário se disponível
+            const userHeight = user_measurements?.height;
+
             // Extrair medidas corporais reais da imagem usando MediaPipe
-            const bodyMeasurements = await extractBodyMeasurements(modelImageUrl);
+            // Passa a altura do usuário para calibrar as proporções
+            const bodyMeasurements = await extractBodyMeasurements(modelImageUrl, userHeight);
 
             if (bodyMeasurements) {
               console.log('✅ MediaPipe extraiu medidas:', {
                 altura: bodyMeasurements.bodyHeight + 'cm',
+                ombros: bodyMeasurements.shoulderWidth + 'cm',
                 peito: bodyMeasurements.chestCircumference + 'cm',
                 cintura: bodyMeasurements.waistCircumference + 'cm',
                 quadril: bodyMeasurements.hipCircumference + 'cm',
-                confidence: (bodyMeasurements.confidence * 100) + '%'
+                braço: bodyMeasurements.armLength + 'cm',
+                perna: bodyMeasurements.legLength + 'cm',
+                confidence: (bodyMeasurements.confidence * 100).toFixed(0) + '%'
               });
 
               // Combinar com dados do usuário se disponível
