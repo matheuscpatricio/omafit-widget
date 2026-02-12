@@ -248,53 +248,55 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       if (realShoulder) console.log('      Ombro:', realShoulder.toFixed(1), 'cm');
     }
 
-    // PERFIS DISTINTIVOS DOS MANEQUINS
-    // Cada manequim tem características MARCANTES e específicas
+    // ⚠️ PERFIS CORPORAIS: CORREÇÕES SUTIS, NÃO TRANSFORMAÇÕES
+    // MediaPipe já forneceu as medidas base.
+    // Estes fatores fazem AJUSTES INCREMENTAIS LEVES (±3% a ±7%)
+    // NUNCA use fatores > 1.07 ou < 0.93
     const bodyTypeProfiles = {
-      // MANEQUIM 1: Balanceado - busto, quadril e cintura proporcionais
+      // MANEQUIM 1: Balanceado
       mannequin1: {
-        chestFactor: 1.00,    // Busto proporcional
-        waistFactor: 1.00,    // Cintura proporcional
-        hipFactor: 1.00,      // Quadril proporcional
-        shoulderFactor: 1.00, // Ombros proporcionais
+        chestFactor: 1.00,    // Sem ajuste
+        waistFactor: 1.00,    // Sem ajuste
+        hipFactor: 1.00,      // Sem ajuste
+        shoulderFactor: 1.00, // Sem ajuste
         expectedBMI: 22,
-        description: 'Balanceado - todas proporções iguais'
+        description: 'Balanceado'
       },
-      // MANEQUIM 2: Busto um pouco mais largo
+      // MANEQUIM 2: Busto levemente mais desenvolvido
       mannequin2: {
-        chestFactor: 1.08,    // Busto 8% mais largo (característica principal)
-        waistFactor: 1.00,    // Cintura normal
-        hipFactor: 1.00,      // Quadril normal
-        shoulderFactor: 1.06, // Ombros levemente mais largos
+        chestFactor: 1.04,    // +4% no busto
+        waistFactor: 1.00,    // Normal
+        hipFactor: 1.00,      // Normal
+        shoulderFactor: 1.03, // +3% nos ombros
         expectedBMI: 23,
         description: 'Busto desenvolvido'
       },
-      // MANEQUIM 3: Busto E cintura largos
+      // MANEQUIM 3: Tronco superior mais largo
       mannequin3: {
-        chestFactor: 1.10,    // Busto 10% mais largo
-        waistFactor: 1.12,    // Cintura 12% mais larga (característica principal junto com busto)
-        hipFactor: 1.06,      // Quadril levemente maior
-        shoulderFactor: 1.08, // Ombros proporcionais ao tronco
+        chestFactor: 1.05,    // +5% no busto
+        waistFactor: 1.04,    // +4% na cintura
+        hipFactor: 1.02,      // +2% no quadril
+        shoulderFactor: 1.04, // +4% nos ombros
         expectedBMI: 25,
-        description: 'Tronco largo (busto + cintura)'
+        description: 'Tronco superior largo'
       },
-      // MANEQUIM 4: Busto MUITO largo
+      // MANEQUIM 4: Busto mais desenvolvido
       mannequin4: {
-        chestFactor: 1.20,    // Busto 20% mais largo (CARACTERÍSTICA DOMINANTE)
-        waistFactor: 1.06,    // Cintura levemente maior
-        hipFactor: 1.04,      // Quadril levemente maior
-        shoulderFactor: 1.16, // Ombros muito largos (proporcional ao busto grande)
+        chestFactor: 1.06,    // +6% no busto
+        waistFactor: 1.02,    // +2% na cintura
+        hipFactor: 1.01,      // +1% no quadril
+        shoulderFactor: 1.05, // +5% nos ombros
         expectedBMI: 26,
-        description: 'Busto muito desenvolvido/largo'
+        description: 'Busto bem desenvolvido'
       },
-      // MANEQUIM 5: Cintura MUITO larga
+      // MANEQUIM 5: Corpo mais arredondado
       mannequin5: {
-        chestFactor: 1.08,    // Busto levemente maior
-        waistFactor: 1.28,    // Cintura 28% mais larga (CARACTERÍSTICA DOMINANTE)
-        hipFactor: 1.22,      // Quadril largo (corpo arredondado)
-        shoulderFactor: 1.06, // Ombros levemente maiores
+        chestFactor: 1.03,    // +3% no busto
+        waistFactor: 1.07,    // +7% na cintura
+        hipFactor: 1.06,      // +6% no quadril
+        shoulderFactor: 1.02, // +2% nos ombros
         expectedBMI: 29,
-        description: 'Cintura muito larga + corpo arredondado'
+        description: 'Corpo arredondado'
       }
     };
 
@@ -390,8 +392,31 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     console.log('\n━━━━ 🔹 BLOCO 3: CONFIGURAÇÃO DO PRODUTO ━━━━');
     const hasWeights = measurementWeights && Object.keys(measurementWeights).length > 0;
-    console.log('📊 Pesos de medidas:', hasWeights ? measurementWeights : 'Pesos iguais');
+    console.log('📊 Pesos brutos:', hasWeights ? measurementWeights : 'Pesos iguais');
     console.log('👔 Tabela de tamanhos:', chart.length, 'tamanhos disponíveis');
+
+    // ⚠️ NORMALIZAR PESOS: Garantir estabilidade matemática
+    // Pesos devem somar 1.0 para manter consistência entre produtos
+    let normalizedWeights: Record<string, number> = {};
+
+    if (hasWeights) {
+      const weightSum = Object.values(measurementWeights).reduce((sum, w) => sum + w, 0);
+
+      if (weightSum > 0) {
+        // Normalizar: cada peso dividido pela soma
+        Object.keys(measurementWeights).forEach(key => {
+          normalizedWeights[key] = measurementWeights[key] / weightSum;
+        });
+
+        console.log('✅ Pesos normalizados (soma = 1.0):');
+        Object.entries(normalizedWeights).forEach(([key, value]) => {
+          console.log(`   ${key}: ${value.toFixed(3)} (${(value * 100).toFixed(1)}%)`);
+        });
+      } else {
+        console.warn('⚠️ Soma de pesos = 0, usando pesos iguais');
+        normalizedWeights = {};
+      }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔹 BLOCO 4 — CÁLCULO DE COMPATIBILIDADE
@@ -422,43 +447,43 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       const measurementsUsed: string[] = [];
 
       if (chest > 0) {
-        const weight = hasWeights ? (measurementWeights['Peito'] || measurementWeights['Busto'] || 1.0) : 1.0;
+        const weight = hasWeights ? (normalizedWeights['Peito'] || normalizedWeights['Busto'] || 1.0) : 1.0;
         const bodyMeasurement = bodyChest * fitMultiplier;
         const diff = Math.pow(bodyMeasurement - chest, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, peso: ${weight})`);
+        measurementsUsed.push(`peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, peso: ${weight.toFixed(3)})`);
       }
 
       if (waist > 0) {
-        const weight = hasWeights ? (measurementWeights['Cintura'] || 1.0) : 1.0;
+        const weight = hasWeights ? (normalizedWeights['Cintura'] || 1.0) : 1.0;
         const bodyMeasurement = bodyWaist * fitMultiplier;
         const diff = Math.pow(bodyMeasurement - waist, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, peso: ${weight})`);
+        measurementsUsed.push(`cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, peso: ${weight.toFixed(3)})`);
       }
 
       if (hip > 0) {
-        const weight = hasWeights ? (measurementWeights['Quadril'] || 1.0) : 1.0;
+        const weight = hasWeights ? (normalizedWeights['Quadril'] || 1.0) : 1.0;
         const bodyMeasurement = bodyHip * fitMultiplier;
         const diff = Math.pow(bodyMeasurement - hip, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, peso: ${weight})`);
+        measurementsUsed.push(`quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, peso: ${weight.toFixed(3)})`);
       }
 
       if (shoulder > 0) {
-        const weight = hasWeights ? (measurementWeights['Ombro'] || 1.0) : 1.0;
+        const weight = hasWeights ? (normalizedWeights['Ombro'] || 1.0) : 1.0;
         const bodyMeasurement = bodyShoulder * fitMultiplier;
         const diff = Math.pow(bodyMeasurement - shoulder, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, peso: ${weight})`);
+        measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, peso: ${weight.toFixed(3)})`);
       }
 
       if (length > 0 && hip === 0) {
         const expectedLength = height * 0.40;
-        const weight = hasWeights ? (measurementWeights['Comprimento'] || 1.0) : 1.0;
+        const weight = hasWeights ? (normalizedWeights['Comprimento'] || 1.0) : 1.0;
         const diff = Math.pow(expectedLength - length, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`comprimento (esperado: ${expectedLength.toFixed(1)}, peça: ${length}, peso: ${weight})`);
+        measurementsUsed.push(`comprimento (esperado: ${expectedLength.toFixed(1)}, peça: ${length}, peso: ${weight.toFixed(3)})`);
       }
 
       if (weightedDifferences.length === 0) {
