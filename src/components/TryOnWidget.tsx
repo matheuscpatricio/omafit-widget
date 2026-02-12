@@ -199,7 +199,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   }, [currentImageIndex, availableImages]);
 
   // Calcular tamanho recomendado baseado nas medidas do usuário
-  const calculateRecommendedSize = (measurements: SizeCalculatorData, chart: SizeChartEntry[]): string | null => {
+  const calculateRecommendedSize = (measurements: SizeCalculatorData | any, chart: SizeChartEntry[]): string | null => {
     console.log('📏 ===== CALCULANDO TAMANHO RECOMENDADO =====');
 
     if (!chart || chart.length === 0) {
@@ -209,7 +209,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       return null;
     }
 
-    const { height, weight, bodyTypeIndex, fitIndex, gender } = measurements;
+    const { height, weight, bodyTypeIndex, fitIndex, gender, chest: realChest, waist: realWaist, hip: realHip, shoulder: realShoulder } = measurements;
     console.log('📊 Dados do usuário:');
     console.log('   - Altura:', height, 'cm');
     console.log('   - Peso:', weight, 'kg');
@@ -305,21 +305,41 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       baseHipRatio = 0.55;   // ~55% da altura
     }
 
-    // Calcular medidas do usuário aplicando:
-    // 1. Altura × proporção base (gênero)
-    // 2. Fator ESPECÍFICO do manequim para cada medida
-    // 3. Preferência de fit
-    // 4. Ajuste fino de IMC
-    const baseChest = height * baseChestRatio * selectedBodyType.chestFactor * fit * bmiAdjustment;
-    const baseWaist = height * baseWaistRatio * selectedBodyType.waistFactor * fit * bmiAdjustment;
-    const baseHip = height * baseHipRatio * selectedBodyType.hipFactor * fit * bmiAdjustment;
-    const baseShoulder = height * 0.25 * selectedBodyType.shoulderFactor * fit;
+    // Verificar se temos medidas REAIS do MediaPipe
+    const hasRealMeasurements = realChest && realWaist && realHip;
 
-    console.log('📏 Medidas estimadas do usuário (em cm):');
-    console.log('   - Peito/Busto:', baseChest.toFixed(1), 'cm');
-    console.log('   - Cintura:', baseWaist.toFixed(1), 'cm');
-    console.log('   - Quadril:', baseHip.toFixed(1), 'cm');
-    console.log('   - Ombro:', baseShoulder.toFixed(1), 'cm');
+    let baseChest, baseWaist, baseHip, baseShoulder;
+
+    if (hasRealMeasurements) {
+      // ✅ USAR MEDIDAS REAIS DETECTADAS PELO MEDIAPIPE
+      baseChest = realChest * fit; // Aplicar apenas preferência de fit
+      baseWaist = realWaist * fit;
+      baseHip = realHip * fit;
+      baseShoulder = realShoulder || (height * 0.25);
+
+      console.log('🎯 Usando MEDIDAS REAIS (MediaPipe):');
+      console.log('   - Peito REAL:', baseChest.toFixed(1), 'cm');
+      console.log('   - Cintura REAL:', baseWaist.toFixed(1), 'cm');
+      console.log('   - Quadril REAL:', baseHip.toFixed(1), 'cm');
+      console.log('   - Ombro:', baseShoulder.toFixed(1), 'cm');
+      console.log('   - Fit aplicado:', fit);
+    } else {
+      // Fallback: Calcular medidas aplicando:
+      // 1. Altura × proporção base (gênero)
+      // 2. Fator ESPECÍFICO do manequim para cada medida
+      // 3. Preferência de fit
+      // 4. Ajuste fino de IMC
+      baseChest = height * baseChestRatio * selectedBodyType.chestFactor * fit * bmiAdjustment;
+      baseWaist = height * baseWaistRatio * selectedBodyType.waistFactor * fit * bmiAdjustment;
+      baseHip = height * baseHipRatio * selectedBodyType.hipFactor * fit * bmiAdjustment;
+      baseShoulder = height * 0.25 * selectedBodyType.shoulderFactor * fit;
+
+      console.log('📏 Medidas ESTIMADAS (altura + IMC):');
+      console.log('   - Peito estimado:', baseChest.toFixed(1), 'cm');
+      console.log('   - Cintura estimada:', baseWaist.toFixed(1), 'cm');
+      console.log('   - Quadril estimado:', baseHip.toFixed(1), 'cm');
+      console.log('   - Ombro estimado:', baseShoulder.toFixed(1), 'cm');
+    }
 
     // Usar measurement weights se disponíveis (definidos pelo collectionType)
     const hasWeights = measurementWeights && Object.keys(measurementWeights).length > 0;
@@ -788,6 +808,30 @@ const handleSubmit = async () => {
     if (result.success && result.fal_request_id) {
       setPredictionId(result.fal_request_id);
       setProcessingMessage(t('generating'));
+
+      // Se temos medidas do MediaPipe, calcular tamanho recomendado com elas
+      if (result.body_measurements && sizeChart.length > 0) {
+        console.log('📏 Recalculando tamanho com medidas REAIS do MediaPipe:', result.body_measurements);
+
+        const realMeasurements = {
+          height: result.body_measurements.bodyHeight,
+          weight: sizeData?.weight || 70,
+          bodyTypeIndex: sizeData?.bodyTypeIndex || 0,
+          fitIndex: sizeData?.fitIndex || 0,
+          gender: sizeData?.gender || 'unisex',
+          // Medidas REAIS detectadas
+          chest: result.body_measurements.chestCircumference,
+          waist: result.body_measurements.waistCircumference,
+          hip: result.body_measurements.hipCircumference,
+          shoulder: result.body_measurements.shoulderWidth
+        };
+
+        const newRecommendedSize = calculateRecommendedSize(realMeasurements as any, sizeChart);
+        console.log('✅ Novo tamanho recomendado (MediaPipe):', newRecommendedSize);
+        setRecommendedSize(newRecommendedSize);
+        setCalculatedSize(newRecommendedSize);
+      }
+
       startPolling(result.fal_request_id);
     } else {
       throw new Error(result.error || t('processingError'));

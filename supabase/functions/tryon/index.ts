@@ -496,7 +496,8 @@ Deno.serve(async (req: Request) => {
         success: true,
         prediction_id: session.id,
         fal_request_id: request_id,
-        credits_remaining: subscription.images_limit === -1 ? 'unlimited' : subscription.images_limit - subscription.images_used - 1
+        credits_remaining: subscription.images_limit === -1 ? 'unlimited' : subscription.images_limit - subscription.images_used - 1,
+        body_measurements: mediapipeMeasurements || null
       }),
       {
         headers: {
