@@ -21,7 +21,7 @@ interface TryOnWidgetProps {
   gender?: string;
   defaultGender?: string;
   collectionType?: 'upper' | 'lower' | 'full';
-  collectionElasticity?: 'low' | 'medium' | 'high';
+  collectionElasticity?: 'structured' | 'light' | 'flexible' | 'high';
   recommendedProductName?: string;
   recommendedProductUrl?: string;
 }
@@ -103,7 +103,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
   const [localStoreName, setLocalStoreName] = useState<string>(storeName);
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
-  const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'low' | 'medium' | 'high' | undefined>(collectionElasticity);
+  const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light' | 'flexible' | 'high' | undefined>(collectionElasticity);
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
@@ -488,6 +488,42 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // 🔹 BLOCO 3.1 — ELASTICIDADE DO TECIDO
+    // ═══════════════════════════════════════════════════════════════════
+    // Elasticidade define TOLERÂNCIA de erro aceitável, não modifica o corpo!
+
+    console.log('\n━━━━ 🔹 BLOCO 3.1: ELASTICIDADE DO TECIDO ━━━━');
+
+    // Mapeamento de elasticidade → tolerância em cm
+    const ELASTICITY_TOLERANCE: Record<string, number> = {
+      structured: 1.5,  // Tecidos rígidos (jeans, couro) - baixa tolerância
+      light: 2.5,       // Tecidos leves (algodão) - tolerância média
+      flexible: 4.0,    // Tecidos semi-elásticos (viscose, modal) - alta tolerância
+      high: 6.0         // Tecidos muito elásticos (malha, lycra) - tolerância muito alta
+    };
+
+    // Perfis avançados por medida (opcional - para refinamento futuro)
+    const ELASTICITY_PROFILE: Record<string, Record<string, number>> = {
+      structured: { chest: 1.5, waist: 1.5, hip: 1.5, shoulder: 1.0 },
+      light: { chest: 2.5, waist: 2.0, hip: 2.5, shoulder: 1.5 },
+      flexible: { chest: 4.0, waist: 3.5, hip: 4.0, shoulder: 2.5 },
+      high: { chest: 6.0, waist: 5.0, hip: 6.0, shoulder: 4.0 }
+    };
+
+    const elasticityLevel = localCollectionElasticity || 'light'; // fallback: light
+    const baseTolerance = ELASTICITY_TOLERANCE[elasticityLevel] || 2.5;
+    const toleranceProfile = ELASTICITY_PROFILE[elasticityLevel] || ELASTICITY_PROFILE['light'];
+
+    console.log('📦 Elasticidade selecionada:', elasticityLevel);
+    console.log('📏 Tolerância base:', baseTolerance, 'cm');
+    console.log('📐 Perfil de tolerância por medida:');
+    console.log('   Peito:', toleranceProfile.chest, 'cm');
+    console.log('   Cintura:', toleranceProfile.waist, 'cm');
+    console.log('   Quadril:', toleranceProfile.hip, 'cm');
+    console.log('   Ombro:', toleranceProfile.shoulder, 'cm');
+    console.log('⚠️ Elasticidade NÃO altera corpo, apenas tolerância de erro!\n');
+
+    // ═══════════════════════════════════════════════════════════════════
     // 🔹 BLOCO 4 — CÁLCULO DE COMPATIBILIDADE
     // ═══════════════════════════════════════════════════════════════════
     // Aqui aplicamos FIT na DECISÃO, não no corpo!
@@ -496,35 +532,10 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     // Preferência de fit aplicada na COMPARAÇÃO
     const fitFactors = [0.94, 1.00, 1.06]; // Justa, Na medida, Solta
-    let fitMultiplier = fitFactors[fitIndex] || 1.00;
+    const fitMultiplier = fitFactors[fitIndex] || 1.00;
     const fitNames = ['Justa', 'Na medida', 'Solta'];
 
-    // ═══════════════════════════════════════════════════════════════════
-    // 🧵 ELASTICIDADE: Ajustar fit baseado na elasticidade da roupa
-    // ═══════════════════════════════════════════════════════════════════
-    // - LOW: Tecido rígido (ex: jeans, couro) → Precisa mais folga
-    // - MEDIUM: Tecido normal (ex: algodão) → Sem ajuste
-    // - HIGH: Tecido elástico (ex: malha, elastano) → Pode ficar mais justo
-    const elasticityFactors = {
-      low: 0.97,    // -3% (mais folga para tecidos rígidos)
-      medium: 1.00, // sem ajuste
-      high: 1.03    // +3% (mais justo para tecidos elásticos)
-    };
-
-    const elasticityFactor = localCollectionElasticity
-      ? elasticityFactors[localCollectionElasticity]
-      : 1.00;
-
-    // Aplicar elasticidade ao fit
-    fitMultiplier = fitMultiplier * elasticityFactor;
-
-    console.log('👔 Preferência de fit:', fitNames[fitIndex], `(base: ${fitFactors[fitIndex]})`);
-    if (localCollectionElasticity) {
-      console.log('🧵 Elasticidade:', localCollectionElasticity, `(fator: ${elasticityFactor})`);
-      console.log('🎯 Fit final (fit × elasticidade):', fitMultiplier.toFixed(3));
-    } else {
-      console.log('🎯 Fit final:', fitMultiplier.toFixed(3));
-    }
+    console.log('👔 Preferência de fit:', fitNames[fitIndex], `(${fitMultiplier})`);
     console.log('⚠️ Fit aplicado na COMPARAÇÃO, não no corpo!\n');
 
     // Array para armazenar todos os scores
@@ -544,33 +555,45 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       if (chest > 0) {
         const weight = hasWeights ? (normalizedWeights['Peito'] || normalizedWeights['Busto'] || 1.0) : 1.0;
         const bodyMeasurement = bodyChest * fitMultiplier;
-        const diff = Math.pow(bodyMeasurement - chest, 2) * weight;
+        const rawDiff = Math.abs(bodyMeasurement - chest);
+        const tolerance = toleranceProfile.chest;
+        const normalizedError = rawDiff / tolerance;
+        const diff = Math.pow(normalizedError, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, peso: ${weight.toFixed(3)})`);
+        measurementsUsed.push(`peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)})`);
       }
 
       if (waist > 0) {
         const weight = hasWeights ? (normalizedWeights['Cintura'] || 1.0) : 1.0;
         const bodyMeasurement = bodyWaist * fitMultiplier;
-        const diff = Math.pow(bodyMeasurement - waist, 2) * weight;
+        const rawDiff = Math.abs(bodyMeasurement - waist);
+        const tolerance = toleranceProfile.waist;
+        const normalizedError = rawDiff / tolerance;
+        const diff = Math.pow(normalizedError, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, peso: ${weight.toFixed(3)})`);
+        measurementsUsed.push(`cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)})`);
       }
 
       if (hip > 0) {
         const weight = hasWeights ? (normalizedWeights['Quadril'] || 1.0) : 1.0;
         const bodyMeasurement = bodyHip * fitMultiplier;
-        const diff = Math.pow(bodyMeasurement - hip, 2) * weight;
+        const rawDiff = Math.abs(bodyMeasurement - hip);
+        const tolerance = toleranceProfile.hip;
+        const normalizedError = rawDiff / tolerance;
+        const diff = Math.pow(normalizedError, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, peso: ${weight.toFixed(3)})`);
+        measurementsUsed.push(`quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)})`);
       }
 
       if (shoulder > 0) {
         const weight = hasWeights ? (normalizedWeights['Ombro'] || 1.0) : 1.0;
         const bodyMeasurement = bodyShoulder * fitMultiplier;
-        const diff = Math.pow(bodyMeasurement - shoulder, 2) * weight;
+        const rawDiff = Math.abs(bodyMeasurement - shoulder);
+        const tolerance = toleranceProfile.shoulder;
+        const normalizedError = rawDiff / tolerance;
+        const diff = Math.pow(normalizedError, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, peso: ${weight.toFixed(3)})`);
+        measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)})`);
       }
 
       if (length > 0 && hip === 0) {
