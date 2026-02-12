@@ -292,7 +292,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   //    → Detecta scores próximos e usa fit como desempate
   // ═══════════════════════════════════════════════════════════════════
 
-  const calculateRecommendedSize = (measurements: SizeCalculatorData | any, chart: SizeChartEntry[]): string | null => {
+  const calculateRecommendedSize = (measurements: SizeCalculatorData | any, chart: SizeChartEntry[]): { size: string; measurements: any } | null => {
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🎯 INICIANDO CÁLCULO DE RECOMENDAÇÃO DE TAMANHO');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
@@ -731,12 +731,28 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           // Fit justa: escolher o menor
           console.log('   → Escolhendo tamanho menor (fit justa):', smallerSize.size);
           console.log('\n✅ RECOMENDAÇÃO FINAL:', smallerSize.size);
-          return smallerSize.size;
+          return {
+            size: smallerSize.size,
+            measurements: {
+              chest: bodyChest,
+              waist: bodyWaist,
+              hip: bodyHip,
+              shoulder: bodyShoulder
+            }
+          };
         } else if (fitIndex === 2) {
           // Fit solta: escolher o maior
           console.log('   → Escolhendo tamanho maior (fit solta):', largerSize.size);
           console.log('\n✅ RECOMENDAÇÃO FINAL:', largerSize.size);
-          return largerSize.size;
+          return {
+            size: largerSize.size,
+            measurements: {
+              chest: bodyChest,
+              waist: bodyWaist,
+              hip: bodyHip,
+              shoulder: bodyShoulder
+            }
+          };
         }
       } else {
         console.log('✅ Diferença significativa - mantendo melhor match');
@@ -845,7 +861,16 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('\n✅ RECOMENDAÇÃO FINAL:', bestMatch.size);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-    return bestMatch.size;
+    // Retornar no mesmo formato que calculateIdealSize para consistência
+    return {
+      size: bestMatch.size,
+      measurements: {
+        chest: bodyChest,
+        waist: bodyWaist,
+        hip: bodyHip,
+        shoulder: bodyShoulder
+      }
+    };
   };
 
   useEffect(() => {
@@ -1109,9 +1134,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           console.log('   - Tamanhos disponíveis:', sizeChartData.map((s: any) => s.size).join(', '));
 
           // Calcular tamanho recomendado
-          const recommended = calculateRecommendedSize(sizeData, sizeChartData);
-          console.log('📏 Tamanho recomendado calculado:', recommended);
-          setRecommendedSize(recommended);
+          const recommendedResult = calculateRecommendedSize(sizeData, sizeChartData);
+          console.log('📏 Resultado do cálculo inicial:', recommendedResult);
+          if (recommendedResult) {
+            setRecommendedSize(recommendedResult.size);
+            console.log('📏 Tamanho recomendado:', recommendedResult.size);
+          }
 
           // Enviar mensagem para o parent window
           if (recommended) {
@@ -1251,10 +1279,15 @@ const handleSubmit = async () => {
           shoulder: result.body_measurements.shoulderWidth
         };
 
-        const newRecommendedSize = calculateRecommendedSize(realMeasurements as any, sizeChart);
-        console.log('✅ Novo tamanho recomendado (MediaPipe):', newRecommendedSize);
-        setRecommendedSize(newRecommendedSize);
-        setCalculatedSize(newRecommendedSize);
+        const sizeResult = calculateRecommendedSize(realMeasurements as any, sizeChart);
+        console.log('✅ Resultado do cálculo (MediaPipe):', sizeResult);
+        if (sizeResult) {
+          setRecommendedSize(sizeResult.size);
+          setCalculatedSize(sizeResult.size);
+          console.log('✅ Novo tamanho recomendado (MediaPipe):', sizeResult.size);
+        } else {
+          console.log('❌ calculateRecommendedSize retornou null');
+        }
       }
 
       startPolling(result.fal_request_id);
