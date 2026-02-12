@@ -513,12 +513,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     // Penalidade assimétrica: peça menor que corpo é PIOR que peça maior
-    // Quanto mais rígido o tecido, maior a penalidade por ser apertado
+    // Calibração física realista: tecidos rígidos penalizam MUITO mais quando apertados
+    // Malhas toleram melhor porque se adaptam ao corpo
     const ASYMMETRIC_PENALTY: Record<string, number> = {
-      structured: 1.5,  // +50% penalidade se peça for menor (muito crítico)
-      light: 1.3,       // +30% penalidade se peça for menor
-      flexible: 1.15,   // +15% penalidade se peça for menor
-      high: 1.05        // +5% penalidade (tecido elástico compensa)
+      structured: 1.7,  // +70% penalidade (jeans, couro - crítico quando aperta)
+      light: 1.4,       // +40% penalidade (algodão - desconforto moderado)
+      flexible: 1.2,    // +20% penalidade (viscose - adapta parcialmente)
+      high: 1.05        // +5% penalidade (malha, lycra - tecido compensa)
     };
 
     const elasticityLevel = localCollectionElasticity || 'light'; // fallback: light
@@ -688,10 +689,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       // Zona limítrofe RELATIVA: 20% de diferença
       // Importante: usar diferença relativa ao invés de absoluta
       // Score 0.5 vs 0.7 é muito diferente de 4.5 vs 4.7
-      const relativeDifference = scoreDifference / bestMatch.score;
+      // PISO de 0.5 evita distorção quando score é extremamente baixo
+      const scoreFloor = Math.max(bestMatch.score, 0.5);
+      const relativeDifference = scoreDifference / scoreFloor;
       const relativeThreshold = 0.20; // 20% de diferença
 
       console.log('📊 Diferença absoluta:', scoreDifference.toFixed(2));
+      console.log('📊 Score com piso:', scoreFloor.toFixed(2));
       console.log('📊 Diferença relativa:', (relativeDifference * 100).toFixed(1) + '%');
 
       if (relativeDifference < relativeThreshold) {
@@ -713,24 +717,88 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // 🔹 BLOCO 6 — CONFIANÇA DA RECOMENDAÇÃO
+    // 🔹 BLOCO 6 — CONFIANÇA DA RECOMENDAÇÃO (ENRIQUECIDA)
     // ═══════════════════════════════════════════════════════════════════
 
-    console.log('\n━━━━ 🔹 BLOCO 6: CONFIANÇA DA RECOMENDAÇÃO ━━━━');
+    console.log('\n━━━━ 🔹 BLOCO 6: CONFIANÇA DA RECOMENDAÇÃO (ENRIQUECIDA) ━━━━');
 
-    // Calcular nível de confiança baseado no score
-    // Score < 1.0 → Alta confiança (excelente match)
-    // Score 1.0 - 2.0 → Média confiança (bom match)
-    // Score > 2.0 → Baixa confiança (match aceitável)
+    // FATOR 1: Score absoluto (base)
+    let baseConfidence = 0;
+    if (bestMatch.score < 1.0) {
+      baseConfidence = 100;
+    } else if (bestMatch.score < 2.0) {
+      baseConfidence = 70;
+    } else if (bestMatch.score < 3.0) {
+      baseConfidence = 40;
+    } else {
+      baseConfidence = 20;
+    }
+
+    console.log('📊 Score do melhor match:', bestMatch.score.toFixed(2));
+    console.log('   → Confiança base:', baseConfidence + '%');
+
+    // FATOR 2: Dominância (distância para segundo melhor)
+    // Quanto maior a diferença, mais confiança
+    let dominanceBonus = 0;
+    if (secondBest) {
+      const scoreDiff = secondBest.score - bestMatch.score;
+      const scoreFloor = Math.max(bestMatch.score, 0.5);
+      const dominance = scoreDiff / scoreFloor;
+
+      console.log('🥈 Segundo melhor score:', secondBest.score.toFixed(2));
+      console.log('   → Diferença:', scoreDiff.toFixed(2));
+      console.log('   → Dominância relativa:', (dominance * 100).toFixed(1) + '%');
+
+      // Dominância forte (>30%) = +20 pontos
+      // Dominância moderada (15-30%) = +10 pontos
+      // Dominância fraca (<15%) = 0 pontos
+      if (dominance > 0.30) {
+        dominanceBonus = 20;
+        console.log('   → Dominância FORTE: +20 pontos');
+      } else if (dominance > 0.15) {
+        dominanceBonus = 10;
+        console.log('   → Dominância MODERADA: +10 pontos');
+      } else {
+        dominanceBonus = 0;
+        console.log('   → Dominância FRACA: sem bônus');
+      }
+    } else {
+      // Apenas 1 tamanho disponível = baixa confiança
+      dominanceBonus = -20;
+      console.log('   → Apenas 1 tamanho disponível: -20 pontos');
+    }
+
+    // FATOR 3: Elasticidade (contexto do tecido)
+    // Tecidos mais elásticos permitem maior margem de erro
+    let elasticityBonus = 0;
+    const ELASTICITY_CONFIDENCE_BONUS: Record<string, number> = {
+      structured: -10,  // Tecido rígido = menos tolerância = reduz confiança
+      light: 0,         // Tecido normal = neutro
+      flexible: 5,      // Semi-elástico = pequeno bônus
+      high: 10          // Muito elástico = bom bônus (compensa imperfeições)
+    };
+    elasticityBonus = ELASTICITY_CONFIDENCE_BONUS[elasticityLevel] || 0;
+    console.log('🧵 Elasticidade:', elasticityLevel);
+    console.log('   → Ajuste de confiança:', (elasticityBonus >= 0 ? '+' : '') + elasticityBonus + ' pontos');
+
+    // CONFIANÇA FINAL (0-100)
+    const finalConfidence = Math.max(0, Math.min(100, baseConfidence + dominanceBonus + elasticityBonus));
+
+    console.log('\n🎯 CONFIANÇA FINAL:', finalConfidence + '%');
+    console.log('   Base:', baseConfidence + '%');
+    console.log('   Dominância:', (dominanceBonus >= 0 ? '+' : '') + dominanceBonus + '%');
+    console.log('   Elasticidade:', (elasticityBonus >= 0 ? '+' : '') + elasticityBonus + '%');
+
+    // Classificação em 3 níveis
     let confidence: 'high' | 'medium' | 'low';
     let confidenceMessage: string;
     let confidenceEmoji: string;
 
-    if (bestMatch.score < 1.0) {
+    if (finalConfidence >= 75) {
       confidence = 'high';
       confidenceEmoji = '🟢';
       confidenceMessage = 'Alta compatibilidade com seu corpo';
-    } else if (bestMatch.score < 2.0) {
+    } else if (finalConfidence >= 50) {
       confidence = 'medium';
       confidenceEmoji = '🟡';
       confidenceMessage = 'Boa compatibilidade com seu corpo';
@@ -740,8 +808,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       confidenceMessage = 'Compatibilidade aceitável - pode haver pequenos ajustes';
     }
 
-    console.log(confidenceEmoji, 'Nível de confiança:', confidence.toUpperCase());
-    console.log('📊 Score do melhor match:', bestMatch.score.toFixed(2));
+    console.log(confidenceEmoji, 'Classificação:', confidence.toUpperCase());
     console.log('💬 Mensagem:', confidenceMessage);
 
     // Armazenar confiança nos estados
