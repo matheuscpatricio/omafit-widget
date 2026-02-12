@@ -18,6 +18,7 @@ export function WidgetPage() {
   const [collectionHandle, setCollectionHandle] = useState<string>('');
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
+  const [collectionType, setCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
 
@@ -35,6 +36,7 @@ export function WidgetPage() {
     const collectionHandleParam = params.get('collectionHandle');
     const genderParam = params.get('gender');
     const defaultGenderParam = params.get('defaultGender');
+    const collectionTypeParam = params.get('collectionType');
     const recommendedProductNameParam = params.get('recommendedProductName');
     const recommendedProductUrlParam = params.get('recommendedProductUrl');
     const complementaryProductParam = params.get('complementaryProductUrl');
@@ -47,6 +49,7 @@ export function WidgetPage() {
     console.log('   - collectionHandle:', collectionHandleParam || 'não fornecido (tabela global)');
     console.log('   - gender:', genderParam || 'não fornecido');
     console.log('   - defaultGender:', defaultGenderParam || 'não fornecido');
+    console.log('   - 👕 collectionType:', collectionTypeParam || 'não fornecido');
     console.log('   - 🎁 complementaryProductUrl:', complementaryProductParam || 'não fornecido');
     console.log('   - 🎁 recommendedProductName:', recommendedProductNameParam || 'não fornecido');
     console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrlParam || 'não fornecido');
@@ -101,6 +104,11 @@ export function WidgetPage() {
     if (defaultGenderParam) {
       console.log('✅ Default Gender definido:', defaultGenderParam);
       setDefaultGender(defaultGenderParam);
+    }
+
+    if (collectionTypeParam && ['upper', 'lower', 'full'].includes(collectionTypeParam)) {
+      console.log('✅ Collection Type definido:', collectionTypeParam);
+      setCollectionType(collectionTypeParam as 'upper' | 'lower' | 'full');
     }
 
     // Prioridade para complementaryProductUrl (formato novo via PostMessage)
@@ -197,6 +205,10 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
+        if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
+          console.log('👕 Collection Type do contexto:', event.data.collectionType);
+          setCollectionType(event.data.collectionType);
+        }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do contexto:', event.data.complementaryProduct);
           if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
@@ -235,6 +247,10 @@ export function WidgetPage() {
         if (event.data.defaultGender) {
           console.log('👤 Default Gender do config:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
+        }
+        if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
+          console.log('👕 Collection Type do config:', event.data.collectionType);
+          setCollectionType(event.data.collectionType);
         }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
@@ -290,6 +306,7 @@ export function WidgetPage() {
           collectionHandle={collectionHandle}
           gender={gender}
           defaultGender={defaultGender}
+          collectionType={collectionType}
           recommendedProductName={recommendedProductName}
           recommendedProductUrl={recommendedProductUrl}
         />

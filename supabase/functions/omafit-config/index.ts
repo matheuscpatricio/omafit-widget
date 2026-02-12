@@ -21,13 +21,13 @@ Deno.serve(async (req: Request) => {
     const collectionId = url.searchParams.get('collection_id');
     const collectionHandle = url.searchParams.get('collection_handle');
     const gender = url.searchParams.get('gender') || 'unisex';
-    const garmentType = url.searchParams.get('garment_type'); // 'upper', 'lower', or 'full'
+    const collectionType = url.searchParams.get('collection_type'); // 'upper', 'lower', or 'full'
 
     console.log('🏪 Shop recebido:', shop);
     console.log('📦 Collection ID (UUID):', collectionId || 'não fornecido');
     console.log('📦 Collection Handle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
     console.log('👤 Gender:', gender);
-    console.log('👕 Garment Type:', garmentType || 'não especificado (usar padrão da collection)');
+    console.log('👕 Collection Type:', collectionType || 'não especificado (usar padrão da collection)');
 
     if (!shop) {
       throw new Error('shop domain é obrigatório');
@@ -163,18 +163,18 @@ Deno.serve(async (req: Request) => {
     // Buscar measurement weights
     let measurementWeights = null;
 
-    // Prioridade 1: Se garment_type foi passado pelo widget, usar os pesos padrão desse tipo
-    if (garmentType && ['upper', 'lower', 'full'].includes(garmentType)) {
-      console.log('⚖️ Usando garment_type do widget:', garmentType);
+    // Prioridade 1: Se collection_type foi passado pelo widget, usar os pesos padrão desse tipo
+    if (collectionType && ['upper', 'lower', 'full'].includes(collectionType)) {
+      console.log('⚖️ Usando collection_type do widget:', collectionType);
       const defaultWeights = {
         'upper': { Busto: 2.0, Peito: 2.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 },
         'lower': { Busto: 1.0, Peito: 1.0, Cintura: 2.0, Quadril: 2.0, Comprimento: 1.0, Tornozelo: 1.0 },
         'full': { Busto: 1.0, Peito: 1.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 }
       };
-      measurementWeights = defaultWeights[garmentType as 'upper' | 'lower' | 'full'];
+      measurementWeights = defaultWeights[collectionType as 'upper' | 'lower' | 'full'];
       console.log('✅ Pesos aplicados:', measurementWeights);
     }
-    // Prioridade 2: Se não foi passado garment_type, usar da coleção (se houver)
+    // Prioridade 2: Se não foi passado collection_type, usar da coleção (se houver)
     else if (sizeChart?.collection_id) {
       console.log('⚖️ Buscando measurement weights da collection_id:', sizeChart.collection_id);
       const { data: collectionData } = await supabaseClient

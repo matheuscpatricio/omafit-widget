@@ -20,7 +20,7 @@ interface TryOnWidgetProps {
   collectionHandle?: string;
   gender?: string;
   defaultGender?: string;
-  garmentType?: 'upper' | 'lower' | 'full';
+  collectionType?: 'upper' | 'lower' | 'full';
   recommendedProductName?: string;
   recommendedProductUrl?: string;
 }
@@ -37,7 +37,7 @@ interface SizeChartEntry {
   length?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', garmentType, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -49,7 +49,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - storeLogo:', storeLogo ? 'Sim' : 'Não');
   console.log('   - primaryColor:', primaryColor);
   console.log('   - productImages:', productImages?.length || 0);
-  console.log('   - garmentType:', garmentType || 'não especificado');
+  console.log('   - 👕 collectionType:', collectionType || 'não especificado');
   console.log('   - 📦 collectionId (UUID):', collectionId || 'não fornecido');
   console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
   console.log('   - 👤 gender (deprecated):', gender);
@@ -435,17 +435,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
         let sizeChartData = null;
 
-        // Definir measurement weights baseado no garmentType
-        if (garmentType && ['upper', 'lower', 'full'].includes(garmentType)) {
-          console.log('⚖️ Usando garment_type da prop:', garmentType);
+        // Definir measurement weights baseado no collectionType
+        if (collectionType && ['upper', 'lower', 'full'].includes(collectionType)) {
+          console.log('⚖️ Usando collectionType da prop:', collectionType);
           const defaultWeights = {
             'upper': { Busto: 2.0, Peito: 2.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 },
             'lower': { Busto: 1.0, Peito: 1.0, Cintura: 2.0, Quadril: 2.0, Comprimento: 1.0, Tornozelo: 1.0 },
             'full': { Busto: 1.0, Peito: 1.0, Cintura: 1.0, Quadril: 1.0, Comprimento: 1.0, Ombro: 1.0 }
           };
-          const weights = defaultWeights[garmentType];
+          const weights = defaultWeights[collectionType];
           setMeasurementWeights(weights);
-          console.log('✅ Pesos aplicados pelo garmentType:', weights);
+          console.log('✅ Pesos aplicados pelo collectionType:', weights);
         }
 
         if (sizeChartRecord) {
