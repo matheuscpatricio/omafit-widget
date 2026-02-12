@@ -423,18 +423,24 @@
     console.log('  - OMAFIT_CONFIG.storeLogo:', OMAFIT_CONFIG.storeLogo);
     console.log('  - config.storeLogo:', config.storeLogo);
 
-    // Extrair collectionId, collectionHandle e gender do sizeChart se disponível
+    // Extrair collectionId, collectionHandle, gender, collectionType e collectionElasticity do sizeChart se disponível
     let collectionId = '';
     let collectionHandle = '';
     let gender = 'unisex';
+    let collectionType = '';
+    let collectionElasticity = '';
     if (OMAFIT_CONFIG.sizeChart) {
       collectionId = OMAFIT_CONFIG.sizeChart.collectionId || '';
       collectionHandle = OMAFIT_CONFIG.sizeChart.collectionHandle || '';
       gender = OMAFIT_CONFIG.sizeChart.gender || 'unisex';
+      collectionType = OMAFIT_CONFIG.sizeChart.garmentType || '';
+      collectionElasticity = OMAFIT_CONFIG.sizeChart.elasticity || '';
       console.log('📊 Size Chart detectado na config:');
       console.log('   - Collection ID (UUID):', collectionId || 'null');
       console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (global)');
       console.log('   - Gender:', gender);
+      console.log('   - 👕 Collection Type:', collectionType || 'não especificado');
+      console.log('   - 🧵 Elasticity:', collectionElasticity || 'não especificado');
     }
 
     // Preparar complementaryProductUrl como JSON
@@ -463,6 +469,8 @@
       '&collectionId=' + encodeURIComponent(collectionId) +
       '&collectionHandle=' + encodeURIComponent(collectionHandle) +
       '&gender=' + encodeURIComponent(gender) +
+      '&collectionType=' + encodeURIComponent(collectionType) +
+      '&collectionElasticity=' + encodeURIComponent(collectionElasticity) +
       '&storeLogo=' + encodeURIComponent(OMAFIT_CONFIG.storeLogo || '') +
       '&complementaryProductUrl=' + complementaryProductUrl +
       '&config=' + encodeURIComponent(JSON.stringify(config));
@@ -542,6 +550,15 @@
             console.log('📤 Enviando produto complementar via postMessage:', complementaryProduct);
           }
 
+          // Enviar contexto da coleção (handle + gender + type + elasticity)
+          iframe.contentWindow.postMessage({
+            type: 'omafit-context',
+            collectionHandle: collectionHandle,
+            defaultGender: gender,
+            collectionType: collectionType,
+            collectionElasticity: collectionElasticity
+          }, '*');
+
           // Enviar configuração completa
           iframe.contentWindow.postMessage({
             type: 'omafit-config-update',
@@ -549,6 +566,8 @@
             primaryColor: OMAFIT_CONFIG.colors.primary,
             storeName: OMAFIT_CONFIG.storeName,
             storeLogo: OMAFIT_CONFIG.storeLogo,
+            collectionType: collectionType,
+            collectionElasticity: collectionElasticity,
             complementaryProduct: complementaryProduct
           }, '*');
 

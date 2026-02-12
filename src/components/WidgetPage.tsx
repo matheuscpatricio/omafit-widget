@@ -19,6 +19,7 @@ export function WidgetPage() {
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [collectionType, setCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(undefined);
+  const [collectionElasticity, setCollectionElasticity] = useState<'low' | 'medium' | 'high' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
 
@@ -37,6 +38,7 @@ export function WidgetPage() {
     const genderParam = params.get('gender');
     const defaultGenderParam = params.get('defaultGender');
     const collectionTypeParam = params.get('collectionType');
+    const collectionElasticityParam = params.get('collectionElasticity');
     const recommendedProductNameParam = params.get('recommendedProductName');
     const recommendedProductUrlParam = params.get('recommendedProductUrl');
     const complementaryProductParam = params.get('complementaryProductUrl');
@@ -50,6 +52,7 @@ export function WidgetPage() {
     console.log('   - gender:', genderParam || 'não fornecido');
     console.log('   - defaultGender:', defaultGenderParam || 'não fornecido');
     console.log('   - 👕 collectionType:', collectionTypeParam || 'não fornecido');
+    console.log('   - 🧵 collectionElasticity:', collectionElasticityParam || 'não fornecido');
     console.log('   - 🎁 complementaryProductUrl:', complementaryProductParam || 'não fornecido');
     console.log('   - 🎁 recommendedProductName:', recommendedProductNameParam || 'não fornecido');
     console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrlParam || 'não fornecido');
@@ -109,6 +112,11 @@ export function WidgetPage() {
     if (collectionTypeParam && ['upper', 'lower', 'full'].includes(collectionTypeParam)) {
       console.log('✅ Collection Type definido:', collectionTypeParam);
       setCollectionType(collectionTypeParam as 'upper' | 'lower' | 'full');
+    }
+
+    if (collectionElasticityParam && ['low', 'medium', 'high'].includes(collectionElasticityParam)) {
+      console.log('✅ Collection Elasticity definido:', collectionElasticityParam);
+      setCollectionElasticity(collectionElasticityParam as 'low' | 'medium' | 'high');
     }
 
     // Prioridade para complementaryProductUrl (formato novo via PostMessage)
@@ -209,6 +217,10 @@ export function WidgetPage() {
           console.log('👕 Collection Type do contexto:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
         }
+        if (event.data.collectionElasticity && ['low', 'medium', 'high'].includes(event.data.collectionElasticity)) {
+          console.log('🧵 Collection Elasticity do contexto:', event.data.collectionElasticity);
+          setCollectionElasticity(event.data.collectionElasticity);
+        }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do contexto:', event.data.complementaryProduct);
           if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
@@ -251,6 +263,10 @@ export function WidgetPage() {
         if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
           console.log('👕 Collection Type do config:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
+        }
+        if (event.data.collectionElasticity && ['low', 'medium', 'high'].includes(event.data.collectionElasticity)) {
+          console.log('🧵 Collection Elasticity do config:', event.data.collectionElasticity);
+          setCollectionElasticity(event.data.collectionElasticity);
         }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
@@ -307,6 +323,7 @@ export function WidgetPage() {
           gender={gender}
           defaultGender={defaultGender}
           collectionType={collectionType}
+          collectionElasticity={collectionElasticity}
           recommendedProductName={recommendedProductName}
           recommendedProductUrl={recommendedProductUrl}
         />

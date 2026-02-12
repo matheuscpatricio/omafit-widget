@@ -21,6 +21,7 @@ interface TryOnWidgetProps {
   gender?: string;
   defaultGender?: string;
   collectionType?: 'upper' | 'lower' | 'full';
+  collectionElasticity?: 'low' | 'medium' | 'high';
   recommendedProductName?: string;
   recommendedProductUrl?: string;
 }
@@ -37,7 +38,7 @@ interface SizeChartEntry {
   length?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -50,6 +51,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - primaryColor:', primaryColor);
   console.log('   - productImages:', productImages?.length || 0);
   console.log('   - 👕 collectionType:', collectionType || 'não especificado');
+  console.log('   - 🧵 collectionElasticity:', collectionElasticity || 'não especificado');
   console.log('   - 📦 collectionId (UUID):', collectionId || 'não fornecido');
   console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
   console.log('   - 👤 gender (deprecated):', gender);
@@ -100,6 +102,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localStoreLogo, setLocalStoreLogo] = useState<string>(storeLogo || '');
   const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
   const [localStoreName, setLocalStoreName] = useState<string>(storeName);
+  const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
+  const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'low' | 'medium' | 'high' | undefined>(collectionElasticity);
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
@@ -134,6 +138,71 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       setLocalStoreName(storeName);
     }
   }, [storeName]);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
+  // ═══════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Contexto da coleção (handle + gender + type + elasticity)
+      if (event.data.type === 'omafit-context') {
+        console.log('📥 Recebido omafit-context:', event.data);
+
+        if (event.data.collectionType) {
+          console.log('✅ Atualizando collectionType:', event.data.collectionType);
+          setLocalCollectionType(event.data.collectionType);
+        }
+
+        if (event.data.collectionElasticity) {
+          console.log('✅ Atualizando collectionElasticity:', event.data.collectionElasticity);
+          setLocalCollectionElasticity(event.data.collectionElasticity);
+        }
+      }
+
+      // Configuração completa (também pode incluir type + elasticity)
+      if (event.data.type === 'omafit-config-update') {
+        console.log('📥 Recebido omafit-config-update:', event.data);
+
+        if (event.data.collectionType) {
+          console.log('✅ Atualizando collectionType:', event.data.collectionType);
+          setLocalCollectionType(event.data.collectionType);
+        }
+
+        if (event.data.collectionElasticity) {
+          console.log('✅ Atualizando collectionElasticity:', event.data.collectionElasticity);
+          setLocalCollectionElasticity(event.data.collectionElasticity);
+        }
+
+        if (event.data.fontFamily) {
+          console.log('✅ Atualizando fontFamily:', event.data.fontFamily);
+        }
+
+        if (event.data.primaryColor) {
+          console.log('✅ Atualizando primaryColor:', event.data.primaryColor);
+          setLocalPrimaryColor(event.data.primaryColor);
+        }
+
+        if (event.data.storeName) {
+          console.log('✅ Atualizando storeName:', event.data.storeName);
+          setLocalStoreName(event.data.storeName);
+        }
+      }
+
+      // Logo
+      if (event.data.type === 'omafit-store-logo') {
+        console.log('📥 Recebido logo via postMessage:', event.data.logo);
+        if (event.data.logo) {
+          setLocalStoreLogo(event.data.logo);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -427,9 +496,35 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     // Preferência de fit aplicada na COMPARAÇÃO
     const fitFactors = [0.94, 1.00, 1.06]; // Justa, Na medida, Solta
-    const fitMultiplier = fitFactors[fitIndex] || 1.00;
+    let fitMultiplier = fitFactors[fitIndex] || 1.00;
     const fitNames = ['Justa', 'Na medida', 'Solta'];
-    console.log('👔 Preferência de fit:', fitNames[fitIndex], `(${fitMultiplier})`);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🧵 ELASTICIDADE: Ajustar fit baseado na elasticidade da roupa
+    // ═══════════════════════════════════════════════════════════════════
+    // - LOW: Tecido rígido (ex: jeans, couro) → Precisa mais folga
+    // - MEDIUM: Tecido normal (ex: algodão) → Sem ajuste
+    // - HIGH: Tecido elástico (ex: malha, elastano) → Pode ficar mais justo
+    const elasticityFactors = {
+      low: 0.97,    // -3% (mais folga para tecidos rígidos)
+      medium: 1.00, // sem ajuste
+      high: 1.03    // +3% (mais justo para tecidos elásticos)
+    };
+
+    const elasticityFactor = localCollectionElasticity
+      ? elasticityFactors[localCollectionElasticity]
+      : 1.00;
+
+    // Aplicar elasticidade ao fit
+    fitMultiplier = fitMultiplier * elasticityFactor;
+
+    console.log('👔 Preferência de fit:', fitNames[fitIndex], `(base: ${fitFactors[fitIndex]})`);
+    if (localCollectionElasticity) {
+      console.log('🧵 Elasticidade:', localCollectionElasticity, `(fator: ${elasticityFactor})`);
+      console.log('🎯 Fit final (fit × elasticidade):', fitMultiplier.toFixed(3));
+    } else {
+      console.log('🎯 Fit final:', fitMultiplier.toFixed(3));
+    }
     console.log('⚠️ Fit aplicado na COMPARAÇÃO, não no corpo!\n');
 
     // Array para armazenar todos os scores
