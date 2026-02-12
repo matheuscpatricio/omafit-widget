@@ -206,16 +206,6 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
   }, []);
 
-  // Debug: Monitor quando entramos no step resultado
-  useEffect(() => {
-    if (step === 'result' && result) {
-      console.log('🎁 ===== ENTRANDO NO STEP RESULTADO =====');
-      console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
-      console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
-      console.log('   - Condição passa?:', !!(recommendedProductName && recommendedProductUrl));
-    }
-  }, [step, result, recommendedProductName, recommendedProductUrl]);
-
   // Buscar configurações do widget ao carregar
   useEffect(() => {
     const fetchWidgetConfig = async () => {
