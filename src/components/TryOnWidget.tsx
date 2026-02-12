@@ -2015,6 +2015,14 @@ const handleSubmit = async () => {
                 </p>
               </div>
 
+              {(() => {
+                console.log('🎁 STEP RESULTADO (Mobile) - Verificando produto complementar:');
+                console.log('   - recommendedProductName:', recommendedProductName);
+                console.log('   - recommendedProductUrl:', recommendedProductUrl);
+                console.log('   - Condição passa?:', !!(recommendedProductName && recommendedProductUrl));
+                return null;
+              })()}
+
               {recommendedProductName && recommendedProductUrl && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-gray-700 text-center">
@@ -2094,6 +2102,14 @@ const handleSubmit = async () => {
                 <p className="text-lg text-gray-700">
                   {t('congratsMessage')}
                 </p>
+
+                {(() => {
+                  console.log('🎁 STEP RESULTADO (Desktop) - Verificando produto complementar:');
+                  console.log('   - recommendedProductName:', recommendedProductName);
+                  console.log('   - recommendedProductUrl:', recommendedProductUrl);
+                  console.log('   - Condição passa?:', !!(recommendedProductName && recommendedProductUrl));
+                  return null;
+                })()}
 
                 {recommendedProductName && recommendedProductUrl && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">

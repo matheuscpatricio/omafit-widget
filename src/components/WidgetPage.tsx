@@ -125,11 +125,16 @@ export function WidgetPage() {
         const complementaryProduct = JSON.parse(decodeURIComponent(complementaryProductParam));
         if (complementaryProduct.title && complementaryProduct.url) {
           console.log('✅ Produto complementar recebido:', complementaryProduct);
+          console.log('   📝 Configurando estados:');
+          console.log('      - setRecommendedProductName:', complementaryProduct.title);
+          console.log('      - setRecommendedProductUrl:', complementaryProduct.url);
           setRecommendedProductName(complementaryProduct.title);
           setRecommendedProductUrl(complementaryProduct.url);
+        } else {
+          console.warn('⚠️ complementaryProduct inválido - faltam title ou url');
         }
       } catch (error) {
-        console.error('Erro ao parsear complementaryProductUrl:', error);
+        console.error('❌ Erro ao parsear complementaryProductUrl:', error);
       }
     } else {
       // Fallback para formato antigo
@@ -143,6 +148,10 @@ export function WidgetPage() {
         const decodedUrl = decodeURIComponent(recommendedProductUrlParam);
         console.log('✅ URL do produto recomendado definida (formato antigo):', decodedUrl);
         setRecommendedProductUrl(decodedUrl);
+      }
+
+      if (!recommendedProductNameParam && !recommendedProductUrlParam) {
+        console.log('ℹ️ Nenhum produto complementar foi fornecido na URL');
       }
     }
 
@@ -299,10 +308,14 @@ export function WidgetPage() {
     );
   }
 
-  console.log('🎨 WidgetPage - Renderizando com storeLogo:', storeLogo);
-  console.log('🎁 WidgetPage - Produto Complementar que será passado para TryOnWidget:');
-  console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
-  console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
+  // Log sempre que os valores mudarem
+  useEffect(() => {
+    console.log('🎁 WidgetPage - Estados do Produto Complementar ATUALIZADOS:');
+    console.log('   - recommendedProductName:', recommendedProductName || 'VAZIO');
+    console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
+  }, [recommendedProductName, recommendedProductUrl]);
+
+  console.log('🎨 WidgetPage - Renderizando...');
 
   return (
     <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>
