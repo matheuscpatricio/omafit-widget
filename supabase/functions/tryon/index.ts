@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fal } from "npm:@fal-ai/client";
+import { extractBodyMeasurements } from './mediapipe-helper.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -323,23 +324,45 @@ Deno.serve(async (req: Request) => {
           input: falInput
         }),
 
-        // 2️⃣ MediaPipe (2-3s) ⚡
+        // 2️⃣ MediaPipe Pose Landmarker (2-3s) ⚡
         (async () => {
-          if (!user_measurements) {
-            console.log('⏭️ Sem user_measurements, pulando MediaPipe');
-            return null;
-          }
+          console.log('🤖 Iniciando MediaPipe Pose Landmarker...');
 
-          console.log('🤖 Processando com MediaPipe...');
-          // Aqui vamos extrair as medidas corporais da imagem
-          // Por enquanto, vamos usar as medidas que já temos
-          return {
-            height: user_measurements.height,
-            weight: user_measurements.weight,
-            bodyTypeIndex: user_measurements.body_type_index,
-            fitIndex: user_measurements.fit_preference_index,
-            gender: user_measurements.gender
-          };
+          try {
+            // Extrair medidas corporais reais da imagem usando MediaPipe
+            const bodyMeasurements = await extractBodyMeasurements(modelImageUrl);
+
+            if (bodyMeasurements) {
+              console.log('✅ MediaPipe extraiu medidas:', {
+                altura: bodyMeasurements.bodyHeight + 'cm',
+                peito: bodyMeasurements.chestCircumference + 'cm',
+                cintura: bodyMeasurements.waistCircumference + 'cm',
+                quadril: bodyMeasurements.hipCircumference + 'cm',
+                confidence: (bodyMeasurements.confidence * 100) + '%'
+              });
+
+              // Combinar com dados do usuário se disponível
+              return {
+                ...bodyMeasurements,
+                userInput: user_measurements || null,
+                source: 'mediapipe'
+              };
+            }
+
+            console.log('⚠️ MediaPipe não detectou pose, usando dados do usuário');
+            return user_measurements ? {
+              source: 'user_input',
+              userInput: user_measurements
+            } : null;
+
+          } catch (error) {
+            console.error('❌ Erro no MediaPipe:', error);
+            // Fallback: usar dados do usuário se disponível
+            return user_measurements ? {
+              source: 'user_input_fallback',
+              userInput: user_measurements
+            } : null;
+          }
         })()
       ]);
 
