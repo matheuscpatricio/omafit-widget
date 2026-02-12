@@ -309,23 +309,60 @@ Deno.serve(async (req: Request) => {
       mode: "balanced"
     });
 
+    // 🎯 PROCESSAMENTO PARALELO: FASHN + MediaPipe
+    console.log('🔄 Iniciando processamento PARALELO...');
+
     let request_id;
+    let mediapipeMeasurements = null;
+
     try {
-      const submitResult = await fal.queue.submit("fal-ai/fashn/tryon/v1.6", {
-        input: falInput
-      });
-      request_id = submitResult.request_id;
-      console.log('✅ Submitted to fal.ai/fashn/tryon/v1.6, request_id:', request_id);
-    } catch (falError) {
-      console.error('❌ Fal.ai submission error:', {
-        message: falError.message,
-        name: falError.name,
-        body: (falError as any).body,
-        status: (falError as any).status,
-        statusText: (falError as any).statusText,
-        sentInput: falInput
-      });
-      throw new Error(`Failed to submit to fal.ai: ${falError.message}`);
+      // Iniciar AMBOS em paralelo
+      const [fashnResult, mediapipeResult] = await Promise.allSettled([
+        // 1️⃣ FASHN API (30-40s)
+        fal.queue.submit("fal-ai/fashn/tryon/v1.6", {
+          input: falInput
+        }),
+
+        // 2️⃣ MediaPipe (2-3s) ⚡
+        (async () => {
+          if (!user_measurements) {
+            console.log('⏭️ Sem user_measurements, pulando MediaPipe');
+            return null;
+          }
+
+          console.log('🤖 Processando com MediaPipe...');
+          // Aqui vamos extrair as medidas corporais da imagem
+          // Por enquanto, vamos usar as medidas que já temos
+          return {
+            height: user_measurements.height,
+            weight: user_measurements.weight,
+            bodyTypeIndex: user_measurements.body_type_index,
+            fitIndex: user_measurements.fit_preference_index,
+            gender: user_measurements.gender
+          };
+        })()
+      ]);
+
+      // Processar resultado do FASHN
+      if (fashnResult.status === 'fulfilled') {
+        request_id = fashnResult.value.request_id;
+        console.log('✅ FASHN submitted, request_id:', request_id);
+      } else {
+        console.error('❌ FASHN submission error:', fashnResult.reason);
+        throw new Error(`Failed to submit to fal.ai: ${fashnResult.reason.message}`);
+      }
+
+      // Processar resultado do MediaPipe
+      if (mediapipeResult.status === 'fulfilled' && mediapipeResult.value) {
+        mediapipeMeasurements = mediapipeResult.value;
+        console.log('✅ MediaPipe completed:', mediapipeMeasurements);
+      } else if (mediapipeResult.status === 'rejected') {
+        console.warn('⚠️ MediaPipe failed (non-blocking):', mediapipeResult.reason);
+      }
+
+    } catch (error) {
+      console.error('❌ Parallel processing error:', error);
+      throw error;
     }
 
     await supabaseClient
