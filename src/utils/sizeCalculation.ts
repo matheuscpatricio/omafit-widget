@@ -153,7 +153,8 @@ export function calculateIdealSize(
   bodyTypeFactor: number,
   fitFactor: number,
   sizeChart: SizeChartEntry[],
-  measurementNames?: string[]
+  measurementNames?: string[],
+  measurementWeights?: { [key: string]: number }
 ): { size: string; measurements: BodyMeasurements } | null {
   if (!sizeChart || sizeChart.length === 0) {
     return null;
@@ -172,6 +173,8 @@ export function calculateIdealSize(
     measurements = ['Busto', 'Cintura', 'Quadril'];
   }
 
+  console.log('⚖️ Measurement weights recebidos:', measurementWeights);
+
   const estimatedMeasurements: BodyMeasurements = {};
   measurements.forEach((name) => {
     const baseMeasurement = interpolateMeasurement(bmi, name);
@@ -181,22 +184,35 @@ export function calculateIdealSize(
   let bestMatch: { size: string; difference: number } | null = null;
 
   for (const entry of sizeChart) {
-    let totalDiff = 0;
+    let totalWeightedDiff = 0;
+    let totalWeights = 0;
 
     measurements.forEach((name, index) => {
       const entryValue = getMeasurementValue(entry, name, index);
       const estimatedValue = estimatedMeasurements[name];
-      totalDiff += Math.abs(entryValue - estimatedValue);
+      const diff = Math.abs(entryValue - estimatedValue);
+
+      const weight = measurementWeights?.[name] || 1.0;
+      totalWeightedDiff += diff * weight;
+      totalWeights += weight;
     });
 
-    const averageDifference = totalDiff / 3;
+    const weightedAverageDifference = totalWeightedDiff / totalWeights;
 
-    if (!bestMatch || averageDifference < bestMatch.difference) {
+    if (!bestMatch || weightedAverageDifference < bestMatch.difference) {
       bestMatch = {
         size: entry.size_name,
-        difference: averageDifference
+        difference: weightedAverageDifference
       };
     }
+  }
+
+  if (bestMatch) {
+    const usedWeights: { [key: string]: number } = {};
+    measurements.forEach((name) => {
+      usedWeights[name] = measurementWeights?.[name] || 1.0;
+    });
+    console.log('⚖️ Usadas:', measurements.map(m => `${m} (peso: ${usedWeights[m]})`).join(', '));
   }
 
   if (!bestMatch) {

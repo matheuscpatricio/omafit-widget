@@ -879,13 +879,16 @@ const handleSubmit = async () => {
             console.log('   - Gender:', sizeData.gender);
             console.log('   - Size Chart disponível:', sizeChart.length, 'tamanhos');
             console.log('   - Tamanhos:', sizeChart.map((s: any) => s.size || s.size_name).join(', '));
+            console.log('   - Measurement Weights:', measurementWeights);
 
             const sizeResult = calculateIdealSize(
               sizeData.height,
               sizeData.weight,
               sizeData.bodyType,
               sizeData.fit,
-              sizeChart
+              sizeChart,
+              undefined,
+              measurementWeights
             );
             console.log('📏 Resultado do calculateIdealSize:', sizeResult);
             if (sizeResult) {
