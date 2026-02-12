@@ -15,29 +15,29 @@ const plans: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 49,
+    price: 30,
     tryons: 250,
     maxVisits: 60000,
     description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
-    additionalImagePrice: 0.15
+    additionalImagePrice: 0.18
   },
   {
     id: 'growth',
     name: 'Growth',
-    price: 149,
+    price: 120,
     tryons: 1000,
     maxVisits: 250000,
     description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
-    additionalImagePrice: 0.12
+    additionalImagePrice: 0.16
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 349,
+    price: 220,
     tryons: 3000,
     maxVisits: 750000,
     description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
-    additionalImagePrice: 0.10
+    additionalImagePrice: 0.14
   }
 ];
 
