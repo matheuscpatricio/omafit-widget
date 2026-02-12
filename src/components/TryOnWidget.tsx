@@ -217,65 +217,113 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('   - Fit Index:', fitIndex);
     console.log('   - Gender:', gender);
 
-    // Multiplicadores baseados nos índices do SizeCalculator
-    // bodyTypeIndex: 0=Ectomorfo(0.90), 1=Atlético(0.95), 2=Médio(1.00), 3=Mesomorfo(1.10), 4=Endomorfo(1.20)
-    // fitIndex: 0=Justa(0.94), 1=Na medida(1.00), 2=Solta(1.06)
+    // PERFIS DISTINTIVOS DOS MANEQUINS
+    // Cada manequim tem características MARCANTES e específicas
+    const bodyTypeProfiles = {
+      // MANEQUIM 1: Balanceado - busto, quadril e cintura proporcionais
+      mannequin1: {
+        chestFactor: 1.00,    // Busto proporcional
+        waistFactor: 1.00,    // Cintura proporcional
+        hipFactor: 1.00,      // Quadril proporcional
+        shoulderFactor: 1.00, // Ombros proporcionais
+        expectedBMI: 22,
+        description: 'Balanceado - todas proporções iguais'
+      },
+      // MANEQUIM 2: Busto um pouco mais largo
+      mannequin2: {
+        chestFactor: 1.08,    // Busto 8% mais largo (característica principal)
+        waistFactor: 1.00,    // Cintura normal
+        hipFactor: 1.00,      // Quadril normal
+        shoulderFactor: 1.06, // Ombros levemente mais largos
+        expectedBMI: 23,
+        description: 'Busto desenvolvido'
+      },
+      // MANEQUIM 3: Busto E cintura largos
+      mannequin3: {
+        chestFactor: 1.10,    // Busto 10% mais largo
+        waistFactor: 1.12,    // Cintura 12% mais larga (característica principal junto com busto)
+        hipFactor: 1.06,      // Quadril levemente maior
+        shoulderFactor: 1.08, // Ombros proporcionais ao tronco
+        expectedBMI: 25,
+        description: 'Tronco largo (busto + cintura)'
+      },
+      // MANEQUIM 4: Busto MUITO largo
+      mannequin4: {
+        chestFactor: 1.20,    // Busto 20% mais largo (CARACTERÍSTICA DOMINANTE)
+        waistFactor: 1.06,    // Cintura levemente maior
+        hipFactor: 1.04,      // Quadril levemente maior
+        shoulderFactor: 1.16, // Ombros muito largos (proporcional ao busto grande)
+        expectedBMI: 26,
+        description: 'Busto muito desenvolvido/largo'
+      },
+      // MANEQUIM 5: Cintura MUITO larga
+      mannequin5: {
+        chestFactor: 1.08,    // Busto levemente maior
+        waistFactor: 1.28,    // Cintura 28% mais larga (CARACTERÍSTICA DOMINANTE)
+        hipFactor: 1.22,      // Quadril largo (corpo arredondado)
+        shoulderFactor: 1.06, // Ombros levemente maiores
+        expectedBMI: 29,
+        description: 'Cintura muito larga + corpo arredondado'
+      }
+    };
 
-    const bodyTypeFactors = [0.90, 0.95, 1.00, 1.10, 1.20];
-    const fitFactors = [0.94, 1.00, 1.06];
+    const bodyTypeNames = ['mannequin1', 'mannequin2', 'mannequin3', 'mannequin4', 'mannequin5'] as const;
+    const selectedBodyType = bodyTypeProfiles[bodyTypeNames[bodyTypeIndex]] || bodyTypeProfiles.mannequin1;
 
-    const bodyType = bodyTypeFactors[bodyTypeIndex] || 1.00;
-    const fit = fitFactors[fitIndex] || 1.00;
+    console.log('🎭 Perfil do manequim selecionado:', selectedBodyType.description);
+    console.log('   - Chest Factor:', selectedBodyType.chestFactor, `(${((selectedBodyType.chestFactor - 1) * 100).toFixed(0)}%)`);
+    console.log('   - Waist Factor:', selectedBodyType.waistFactor, `(${((selectedBodyType.waistFactor - 1) * 100).toFixed(0)}%)`);
+    console.log('   - Hip Factor:', selectedBodyType.hipFactor, `(${((selectedBodyType.hipFactor - 1) * 100).toFixed(0)}%)`);
+    console.log('   - Shoulder Factor:', selectedBodyType.shoulderFactor, `(${((selectedBodyType.shoulderFactor - 1) * 100).toFixed(0)}%)`);
 
-    // Calcular IMC (Índice de Massa Corporal) para ajuste fino
+    // Calcular IMC para ajuste fino
     const heightInMeters = height / 100;
     const bmi = weight / (heightInMeters * heightInMeters);
+    const bmiDifference = bmi - selectedBodyType.expectedBMI;
+    let bmiAdjustment = 1.00 + (bmiDifference * 0.015); // 1.5% por ponto de IMC
+    bmiAdjustment = Math.max(0.91, Math.min(1.09, bmiAdjustment));
+
     console.log('   - IMC calculado:', bmi.toFixed(1));
-
-    // Comparar IMC real com IMC esperado pelo bodyType selecionado
-    // Isso permite detectar quando peso/altura não batem com a seleção visual
-    const expectedBMI = [19, 22, 24, 26, 28][bodyTypeIndex]; // IMC típico por bodyType
-    const bmiDifference = bmi - expectedBMI;
-
-    // Ajuste SUTIL: cada 2 pontos de diferença no IMC = 3% de ajuste (máximo ±9%)
-    // Exemplo: Se escolheu "Atlético" (IMC esperado 22) mas tem IMC 25.4 (+3.4 pontos)
-    // Ajuste = +5.1%, não +20% como estava antes
-    let bmiAdjustment = 1.00 + (bmiDifference * 0.015);
-    bmiAdjustment = Math.max(0.91, Math.min(1.09, bmiAdjustment)); // Limita entre -9% e +9%
-
-    console.log('📊 Multiplicadores calculados:');
-    console.log('   - Body Type Multiplier:', bodyType);
-    console.log('   - Fit Multiplier:', fit);
-    console.log('   - IMC esperado para bodyType:', expectedBMI);
-    console.log('   - Diferença IMC:', bmiDifference.toFixed(1), 'pontos');
+    console.log('   - IMC esperado:', selectedBodyType.expectedBMI);
     console.log('   - Ajuste fino IMC:', ((bmiAdjustment - 1) * 100).toFixed(1) + '%');
 
-    // Proporções antropométricas realistas baseadas em estudos
-    // Valores mais conservadores para não superestimar medidas
-    let chestRatio, waistRatio, hipRatio;
+    // Fit preferences
+    const fitFactors = [0.94, 1.00, 1.06]; // Justa, Na medida, Solta
+    const fit = fitFactors[fitIndex] || 1.00;
+    console.log('   - Fit Multiplier:', fit, ['(Justa)', '(Na medida)', '(Solta)'][fitIndex]);
+
+    // Proporções antropométricas base por gênero
+    let baseChestRatio, baseWaistRatio, baseHipRatio;
 
     if (gender === 'male') {
-      // Homens: proporções médias (reduzidas para mais realismo)
-      chestRatio = 0.52; // ~52% da altura (peito)
-      waistRatio = 0.46; // ~46% da altura (cintura)
-      hipRatio = 0.52;   // ~52% da altura (quadril)
+      baseChestRatio = 0.52; // ~52% da altura
+      baseWaistRatio = 0.46; // ~46% da altura
+      baseHipRatio = 0.52;   // ~52% da altura
     } else {
-      // Mulheres: proporções médias
-      chestRatio = 0.50; // ~50% da altura (busto)
-      waistRatio = 0.40; // ~40% da altura (cintura)
-      hipRatio = 0.55;   // ~55% da altura (quadril maior)
+      baseChestRatio = 0.50; // ~50% da altura
+      baseWaistRatio = 0.40; // ~40% da altura
+      baseHipRatio = 0.55;   // ~55% da altura
     }
 
-    // Calcular medidas base do usuário com proporções realistas
-    // Combinando: altura × proporção × bodyType × fit × ajuste IMC (sutil)
-    const baseChest = height * chestRatio * bodyType * fit * bmiAdjustment;
-    const baseWaist = height * waistRatio * bodyType * fit * bmiAdjustment;
-    const baseHip = height * hipRatio * bodyType * fit * bmiAdjustment;
+    // Calcular medidas do usuário aplicando:
+    // 1. Altura × proporção base (gênero)
+    // 2. Fator ESPECÍFICO do manequim para cada medida
+    // 3. Preferência de fit
+    // 4. Ajuste fino de IMC
+    const baseChest = height * baseChestRatio * selectedBodyType.chestFactor * fit * bmiAdjustment;
+    const baseWaist = height * baseWaistRatio * selectedBodyType.waistFactor * fit * bmiAdjustment;
+    const baseHip = height * baseHipRatio * selectedBodyType.hipFactor * fit * bmiAdjustment;
+    const baseShoulder = height * 0.25 * selectedBodyType.shoulderFactor * fit;
 
     console.log('📏 Medidas estimadas do usuário (em cm):');
-    console.log('   - Peito/Busto:', baseChest.toFixed(1), `(${height}cm × ${chestRatio} × tipo ${bodyType} × fit ${fit} × IMC ${bmiAdjustment.toFixed(3)})`);
-    console.log('   - Cintura:', baseWaist.toFixed(1), `(${height}cm × ${waistRatio} × tipo ${bodyType} × fit ${fit} × IMC ${bmiAdjustment.toFixed(3)})`);
-    console.log('   - Quadril:', baseHip.toFixed(1), `(${height}cm × ${hipRatio} × tipo ${bodyType} × fit ${fit} × IMC ${bmiAdjustment.toFixed(3)})`);
+    console.log('   - Peito/Busto:', baseChest.toFixed(1), 'cm');
+    console.log('   - Cintura:', baseWaist.toFixed(1), 'cm');
+    console.log('   - Quadril:', baseHip.toFixed(1), 'cm');
+    console.log('   - Ombro:', baseShoulder.toFixed(1), 'cm');
+
+    // Usar measurement weights se disponíveis (definidos pelo collectionType)
+    const hasWeights = measurementWeights && Object.keys(measurementWeights).length > 0;
+    console.log('⚖️ Pesos de medidas:', hasWeights ? measurementWeights : 'Não definidos (usar pesos iguais)');
 
     let bestSize = null;
     let minDistance = Infinity;
@@ -284,48 +332,61 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     // Comparar com cada tamanho da tabela
     chart.forEach((sizeData, index) => {
-      const chest = parseFloat(sizeData.peito || sizeData.chest || '0');
+      const chest = parseFloat(sizeData.peito || sizeData.chest || sizeData.busto || '0');
       const waist = parseFloat(sizeData.cintura || sizeData.waist || '0');
       const hip = parseFloat(sizeData.quadril || sizeData.hip || '0');
+      const shoulder = parseFloat(sizeData.ombro || sizeData.shoulder || '0');
       const length = parseFloat(sizeData.comprimento || sizeData.length || '0');
 
-      // Construir array de diferenças apenas para campos que existem (não zero)
-      const differences: number[] = [];
+      // Construir diferenças ponderadas
+      const weightedDifferences: number[] = [];
       let measurementsUsed: string[] = [];
 
       if (chest > 0) {
-        differences.push(Math.pow(baseChest - chest, 2));
-        measurementsUsed.push('peito');
+        const weight = hasWeights ? (measurementWeights['Peito'] || measurementWeights['Busto'] || 1.0) : 1.0;
+        weightedDifferences.push(Math.pow(baseChest - chest, 2) * weight);
+        measurementsUsed.push(`peito (peso: ${weight})`);
       }
+
       if (waist > 0) {
-        differences.push(Math.pow(baseWaist - waist, 2));
-        measurementsUsed.push('cintura');
+        const weight = hasWeights ? (measurementWeights['Cintura'] || 1.0) : 1.0;
+        weightedDifferences.push(Math.pow(baseWaist - waist, 2) * weight);
+        measurementsUsed.push(`cintura (peso: ${weight})`);
       }
+
       if (hip > 0) {
-        differences.push(Math.pow(baseHip - hip, 2));
-        measurementsUsed.push('quadril');
+        const weight = hasWeights ? (measurementWeights['Quadril'] || 1.0) : 1.0;
+        weightedDifferences.push(Math.pow(baseHip - hip, 2) * weight);
+        measurementsUsed.push(`quadril (peso: ${weight})`);
       }
-      // Comprimento: usar como medida independente (não como proxy de quadril)
-      // Tipicamente comprimento de torso é ~30-35% da altura
+
+      if (shoulder > 0) {
+        const weight = hasWeights ? (measurementWeights['Ombro'] || 1.0) : 1.0;
+        weightedDifferences.push(Math.pow(baseShoulder - shoulder, 2) * weight);
+        measurementsUsed.push(`ombro (peso: ${weight})`);
+      }
+
+      // Comprimento: usar como medida independente
       if (length > 0 && hip === 0) {
-        const expectedLength = height * 0.40; // ~40% da altura para comprimento de peça
-        differences.push(Math.pow(expectedLength - length, 2));
-        measurementsUsed.push('comprimento');
+        const expectedLength = height * 0.40; // ~40% da altura
+        const weight = hasWeights ? (measurementWeights['Comprimento'] || 1.0) : 1.0;
+        weightedDifferences.push(Math.pow(expectedLength - length, 2) * weight);
+        measurementsUsed.push(`comprimento (peso: ${weight})`);
       }
 
       // Se não há nenhuma medida válida, pular este tamanho
-      if (differences.length === 0) {
+      if (weightedDifferences.length === 0) {
         console.warn(`   ${index + 1}. ⚠️ Tamanho ${sizeData.size}: sem medidas válidas, pulando`);
         return;
       }
 
-      // Calcular distância euclidiana apenas com as medidas disponíveis
-      const distance = Math.sqrt(differences.reduce((sum, diff) => sum + diff, 0));
+      // Calcular distância euclidiana ponderada
+      const distance = Math.sqrt(weightedDifferences.reduce((sum, diff) => sum + diff, 0));
 
       console.log(`   ${index + 1}. Tamanho ${sizeData.size}:`);
-      console.log(`      - Peito: ${chest}, Cintura: ${waist}, Quadril: ${hip}, Comprimento: ${length}`);
-      console.log(`      - Medidas usadas no cálculo: ${measurementsUsed.join(', ')}`);
-      console.log(`      - Distância: ${distance.toFixed(2)}`);
+      console.log(`      - Medidas: Peito=${chest}, Cintura=${waist}, Quadril=${hip}, Ombro=${shoulder}`);
+      console.log(`      - Usadas: ${measurementsUsed.join(', ')}`);
+      console.log(`      - Distância ponderada: ${distance.toFixed(2)}`);
 
       if (distance < minDistance) {
         minDistance = distance;

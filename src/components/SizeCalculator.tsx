@@ -19,19 +19,19 @@ export interface SizeCalculatorData {
 }
 
 const bodyTypesMale = [
-  { label: 'Ectomorfo', factor: 0.90, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg' },
-  { label: 'Atlético magro', factor: 0.95, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg' },
-  { label: 'Médio', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg' },
-  { label: 'Mesomorfo', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg' },
-  { label: 'Endomorfo', factor: 1.20, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg' }
+  { label: 'Balanceado', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg', description: 'Proporções uniformes' },
+  { label: 'Busto mais largo', factor: 1.08, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg', description: 'Busto desenvolvido' },
+  { label: 'Tronco largo', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg', description: 'Busto e cintura largos' },
+  { label: 'Busto muito largo', factor: 1.20, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg', description: 'Busto muito desenvolvido' },
+  { label: 'Cintura larga', factor: 1.28, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg', description: 'Cintura muito larga + corpo arredondado' }
 ];
 
 const bodyTypesFemale = [
-  { label: 'Muito magra', factor: 0.90, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg' },
-  { label: 'Magra', factor: 0.95, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg' },
-  { label: 'Média', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg' },
-  { label: 'Curvilínea', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg' },
-  { label: 'Plus', factor: 1.20, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg' }
+  { label: 'Balanceada', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg', description: 'Proporções uniformes' },
+  { label: 'Busto mais largo', factor: 1.08, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg', description: 'Busto desenvolvido' },
+  { label: 'Tronco largo', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg', description: 'Busto e cintura largos' },
+  { label: 'Busto muito largo', factor: 1.20, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg', description: 'Busto muito desenvolvido' },
+  { label: 'Cintura larga', factor: 1.28, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg', description: 'Cintura muito larga + corpo arredondado' }
 ];
 
 const fitOptions = [
