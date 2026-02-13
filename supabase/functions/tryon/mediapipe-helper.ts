@@ -87,25 +87,24 @@ function calculateBodyProfile(
   if (bmi < 20) bodyType = 'ectomorph';
   else if (bmi > 27) bodyType = 'endomorph';
 
-  // 🔹 FATOR DINÂMICO baseado em IMC
-  // IMC baixo (magro) → corpo menos profundo → fator menor
-  // IMC alto (volumoso) → corpo mais profundo → fator maior
-  let circumferenceFactor = 2.2; // baseline
+  // 🔹 FATOR ANTROPOMÉTRICO baseado em estudos reais
+  // Circunferência ≈ 1.7-1.9x a largura (depende do IMC)
+  let circumferenceFactor = 1.8; // baseline realista
 
   if (bmi < 18.5) {
-    circumferenceFactor = 2.0; // muito magro
+    circumferenceFactor = 1.7; // muito magro - corpo menos volumoso
   } else if (bmi < 22) {
-    circumferenceFactor = 2.1; // magro
+    circumferenceFactor = 1.75; // magro
   } else if (bmi > 30) {
-    circumferenceFactor = 2.6; // obeso
+    circumferenceFactor = 2.0; // obeso - corpo mais volumoso
   } else if (bmi > 27) {
-    circumferenceFactor = 2.4; // sobrepeso
+    circumferenceFactor = 1.9; // sobrepeso
   }
 
   // 🔹 AJUSTE por proporção ombro/quadril
-  // Ombros muito largos → peito desenvolvido → aumentar fator
+  // Ombros muito largos → peito desenvolvido → aumentar fator ligeiramente
   if (shoulderToHipRatio > 1.15) {
-    circumferenceFactor += 0.1; // corpo em V (atlético)
+    circumferenceFactor += 0.05; // corpo em V (atlético)
   } else if (shoulderToHipRatio < 0.95) {
     circumferenceFactor -= 0.05; // quadril dominante
   }

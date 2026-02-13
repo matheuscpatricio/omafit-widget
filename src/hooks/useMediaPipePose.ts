@@ -135,13 +135,11 @@ export function useMediaPipePose() {
     const hipWidthCm = pixelToCm(hipWidthPx);
     const heightCm = pixelToCm(bodyHeightPx);
 
-    // Estimativas realistas baseadas em proporções anatômicas
-    const chestWidthCm = shoulderWidthCm * 1.05; // peito ligeiramente mais largo que ombros
-    const waistWidthCm = shoulderWidthCm * 0.78; // cintura ~78% dos ombros
-    const hipWidthForCircCm = hipWidthCm * 1.15; // quadril é mais profundo que largo
-
-    // Usar profundidade estimada para circunferências mais realistas
-    const depthFactor = 0.65; // corpo não é cilíndrico perfeito
+    // Usar fatores antropométricos baseados em estudos reais
+    // A circunferência corporal é aproximadamente 1.7-1.9x a largura dos ombros
+    const chestCircumference = shoulderWidthCm * 1.8; // ~180% da largura dos ombros
+    const waistCircumference = shoulderWidthCm * 1.5; // ~150% da largura dos ombros
+    const hipCircumference = hipWidthCm * 1.75; // ~175% da largura do quadril
 
     // Calcular comprimentos de braço e perna
     const armLengthPx = (distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist) +
@@ -153,9 +151,9 @@ export function useMediaPipePose() {
     const legLengthCm = pixelToCm(legLengthPx);
 
     const shoulder_width = Math.round(shoulderWidthCm);
-    const chest = Math.round((chestWidthCm + chestWidthCm * depthFactor) * Math.PI * 0.5);
-    const waist = Math.round((waistWidthCm + waistWidthCm * depthFactor) * Math.PI * 0.5);
-    const hip = Math.round((hipWidthForCircCm + hipWidthForCircCm * depthFactor) * Math.PI * 0.5);
+    const chest = Math.round(chestCircumference);
+    const waist = Math.round(waistCircumference);
+    const hip = Math.round(hipCircumference);
     const height = Math.round(heightCm);
     const armLength = Math.round(armLengthCm);
     const legLength = Math.round(legLengthCm);
