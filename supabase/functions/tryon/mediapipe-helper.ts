@@ -204,7 +204,10 @@ async function detectPoseLandmarks(imageBase64: string): Promise<PoseLandmark[]>
     );
 
     if (!response.ok) {
+      const errorText = await response.text();
       console.error('❌ Erro na API Roboflow:', response.status);
+      console.error('   • Mensagem:', errorText.substring(0, 200));
+      console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
       return generateMockLandmarks();
     }
 
@@ -391,6 +394,8 @@ function calculateMeasurementsFromLandmarks(
     chestWidthCm = shoulderWidthCm * 0.92; // peito mais estreito
   }
 
+  console.log('🔍 DEBUG - chestWidthCm:', chestWidthCm);
+
   // Cintura: baseada em quadril e IMC
   let waistWidthCm = hipWidthCm * 0.85;
   if (bodyProfile.bmi > 27) {
@@ -399,22 +404,35 @@ function calculateMeasurementsFromLandmarks(
     waistWidthCm = hipWidthCm * 0.80; // cintura definida (atlético)
   }
 
+  console.log('🔍 DEBUG - waistWidthCm:', waistWidthCm);
+
   // 🔹 OMBROS: medida LINEAR (bi-acromial width)
   const shoulderWidthFinal = shoulderWidthCm;
+
+  console.log('🔍 DEBUG - shoulderWidthFinal:', shoulderWidthFinal);
+  console.log('🔍 DEBUG - bodyProfile.circumferenceFactor:', bodyProfile.circumferenceFactor);
 
   // 🔹 CIRCUNFERÊNCIAS: usar fator dinâmico baseado em perfil
   const chestCircumference = calculateCircumference(
     chestWidthCm,
     bodyProfile.circumferenceFactor
   );
+
+  console.log('🔍 DEBUG - chestCircumference APÓS cálculo:', chestCircumference);
+
   const waistCircumference = calculateCircumference(
     waistWidthCm,
     bodyProfile.circumferenceFactor * 0.95 // cintura ligeiramente menos profunda
   );
+
+  console.log('🔍 DEBUG - waistCircumference APÓS cálculo:', waistCircumference);
+
   const hipCircumference = calculateCircumference(
     hipWidthCm,
     bodyProfile.circumferenceFactor * 0.98 // quadril ligeiramente menos profundo
   );
+
+  console.log('🔍 DEBUG - hipCircumference APÓS cálculo:', hipCircumference);
 
   // Calcular comprimentos
   const armLength =
