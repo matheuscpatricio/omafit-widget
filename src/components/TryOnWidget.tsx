@@ -1293,8 +1293,20 @@ const handleSubmit = async () => {
     console.log('• FAL Request ID:', result.fal_request_id);
     console.log('• Body Measurements presente?', !!result.body_measurements);
 
-    if (result.body_measurements) {
+    // 🔹 MOSTRAR DEBUG INFO DA EDGE FUNCTION
+    if (result.debug) {
       console.log('');
+      console.log('🔍 DEBUG INFO DA EDGE FUNCTION:');
+      console.log('   • MediaPipe Status:', result.debug.mediapipe_status);
+      console.log('   • MediaPipe Retornou Algo?', result.debug.mediapipe_returned);
+      console.log('   • MediaPipe Source:', result.debug.mediapipe_source);
+      console.log('   • Altura Recebida no Backend:', result.debug.user_height_received);
+      console.log('   • Peso Recebido no Backend:', result.debug.user_weight_received);
+      console.log('   • Gênero Recebido no Backend:', result.debug.user_gender_received);
+      console.log('');
+    }
+
+    if (result.body_measurements) {
       console.log('📊 MEDIAPIPE - DADOS RECEBIDOS:');
       console.log('   Source:', result.body_measurements.source || 'N/A');
       console.log('   Confiança:', result.body_measurements.confidence ?

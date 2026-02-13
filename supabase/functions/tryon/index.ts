@@ -573,13 +573,26 @@ Deno.serve(async (req: Request) => {
       console.error('[Billing] ⚠️ Erro ao processar billing:', billingError);
     }
 
+    // 🔹 Criar log de debug para retornar ao frontend
+    const debugInfo = {
+      mediapipe_status: mediapipeResult.status,
+      mediapipe_returned: mediapipeResult.status === 'fulfilled' ? (mediapipeResult.value ? true : false) : false,
+      mediapipe_source: mediapipeMeasurements?.source || 'none',
+      user_height_received: user_measurements?.height || 'missing',
+      user_weight_received: user_measurements?.weight || 'missing',
+      user_gender_received: user_measurements?.gender || 'missing',
+    };
+
+    console.log('🔍 DEBUG INFO PARA FRONTEND:', debugInfo);
+
     return new Response(
       JSON.stringify({
         success: true,
         prediction_id: session.id,
         fal_request_id: request_id,
         credits_remaining: subscription.images_limit === -1 ? 'unlimited' : subscription.images_limit - subscription.images_used - 1,
-        body_measurements: mediapipeMeasurements || null
+        body_measurements: mediapipeMeasurements || null,
+        debug: debugInfo  // ← ADICIONAR DEBUG INFO
       }),
       {
         headers: {
