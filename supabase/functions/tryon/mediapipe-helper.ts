@@ -486,7 +486,7 @@ function calculateMeasurementsFromLandmarks(
     chestCircumference: Math.round(chestCircumference),
     waistCircumference: Math.round(waistCircumference),
     hipCircumference: Math.round(hipCircumference),
-    bodyHeight: Math.round(realHeight),
+    bodyHeight: Math.round(userHeight),
     armLength: Math.round(armLength),
     legLength: Math.round(legLength),
     confidence: confidence,
