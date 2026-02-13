@@ -286,31 +286,45 @@ function generateMockLandmarks(): PoseLandmark[] {
     });
   }
 
-  // Landmarks dos OMBROS (parte superior)
-  landmarks[POSE_LANDMARKS.LEFT_SHOULDER] = { x: 0.4, y: 0.25, z: -0.1, visibility: 0.95 };
-  landmarks[POSE_LANDMARKS.RIGHT_SHOULDER] = { x: 0.6, y: 0.25, z: -0.1, visibility: 0.95 };
+  // 🔹 CABEÇA (topo do corpo - Y menor)
+  landmarks[POSE_LANDMARKS.NOSE] = { x: 0.5, y: 0.05, z: 0, visibility: 0.95 };
+  landmarks[POSE_LANDMARKS.LEFT_EYE] = { x: 0.48, y: 0.04, z: 0, visibility: 0.9 };
+  landmarks[POSE_LANDMARKS.RIGHT_EYE] = { x: 0.52, y: 0.04, z: 0, visibility: 0.9 };
+  landmarks[POSE_LANDMARKS.LEFT_EAR] = { x: 0.45, y: 0.05, z: -0.05, visibility: 0.85 };
+  landmarks[POSE_LANDMARKS.RIGHT_EAR] = { x: 0.55, y: 0.05, z: -0.05, visibility: 0.85 };
 
-  // Landmarks dos COTOVELOS
+  // 🔹 OMBROS (parte superior)
+  landmarks[POSE_LANDMARKS.LEFT_SHOULDER] = { x: 0.4, y: 0.2, z: -0.1, visibility: 0.95 };
+  landmarks[POSE_LANDMARKS.RIGHT_SHOULDER] = { x: 0.6, y: 0.2, z: -0.1, visibility: 0.95 };
+
+  // 🔹 COTOVELOS
   landmarks[POSE_LANDMARKS.LEFT_ELBOW] = { x: 0.35, y: 0.4, z: -0.05, visibility: 0.9 };
   landmarks[POSE_LANDMARKS.RIGHT_ELBOW] = { x: 0.65, y: 0.4, z: -0.05, visibility: 0.9 };
 
-  // Landmarks dos PUNHOS
+  // 🔹 PUNHOS
   landmarks[POSE_LANDMARKS.LEFT_WRIST] = { x: 0.32, y: 0.55, z: 0, visibility: 0.85 };
   landmarks[POSE_LANDMARKS.RIGHT_WRIST] = { x: 0.68, y: 0.55, z: 0, visibility: 0.85 };
 
-  // Landmarks dos QUADRIS (meio do corpo)
-  landmarks[POSE_LANDMARKS.LEFT_HIP] = { x: 0.43, y: 0.55, z: -0.05, visibility: 0.95 };
-  landmarks[POSE_LANDMARKS.RIGHT_HIP] = { x: 0.57, y: 0.55, z: -0.05, visibility: 0.95 };
+  // 🔹 QUADRIS (meio do corpo)
+  landmarks[POSE_LANDMARKS.LEFT_HIP] = { x: 0.43, y: 0.6, z: -0.05, visibility: 0.95 };
+  landmarks[POSE_LANDMARKS.RIGHT_HIP] = { x: 0.57, y: 0.6, z: -0.05, visibility: 0.95 };
 
-  // Landmarks dos JOELHOS
-  landmarks[POSE_LANDMARKS.LEFT_KNEE] = { x: 0.42, y: 0.75, z: 0, visibility: 0.9 };
-  landmarks[POSE_LANDMARKS.RIGHT_KNEE] = { x: 0.58, y: 0.75, z: 0, visibility: 0.9 };
+  // 🔹 JOELHOS
+  landmarks[POSE_LANDMARKS.LEFT_KNEE] = { x: 0.42, y: 0.8, z: 0, visibility: 0.9 };
+  landmarks[POSE_LANDMARKS.RIGHT_KNEE] = { x: 0.58, y: 0.8, z: 0, visibility: 0.9 };
 
-  // Landmarks dos TORNOZELOS (parte inferior)
+  // 🔹 TORNOZELOS (parte inferior)
   landmarks[POSE_LANDMARKS.LEFT_ANKLE] = { x: 0.42, y: 0.95, z: 0, visibility: 0.9 };
   landmarks[POSE_LANDMARKS.RIGHT_ANKLE] = { x: 0.58, y: 0.95, z: 0, visibility: 0.9 };
 
+  // 🔹 PÉS (base do corpo - Y maior)
+  landmarks[POSE_LANDMARKS.LEFT_FOOT_INDEX] = { x: 0.42, y: 1.0, z: 0.1, visibility: 0.85 };
+  landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX] = { x: 0.58, y: 1.0, z: 0.1, visibility: 0.85 };
+
   console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
+  console.log('   • NOSE y:', landmarks[POSE_LANDMARKS.NOSE].y);
+  console.log('   • LEFT_FOOT_INDEX y:', landmarks[POSE_LANDMARKS.LEFT_FOOT_INDEX]?.y);
+  console.log('   • RIGHT_FOOT_INDEX y:', landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX]?.y);
 
   return landmarks;
 }
