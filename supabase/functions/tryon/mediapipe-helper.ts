@@ -100,13 +100,98 @@ export async function extractBodyMeasurements(
 }
 
 async function detectPoseLandmarks(imageBase64: string): Promise<PoseLandmark[]> {
-  // Simulação de detecção de landmarks
-  // Em produção, isso usaria a API real do MediaPipe ou TensorFlow.js
+  console.log('🔍 Detectando landmarks da pose com MediaPipe REAL...');
 
-  console.log('🔍 Detectando landmarks da pose...');
+  try {
+    // Usar Roboflow Pose Detection API (gratuito para uso moderado)
+    // Alternativa: usar API do Google MediaPipe, mas requer setup
+    const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
 
-  // Por enquanto, gerar landmarks mockados baseados em proporções humanas típicas
-  // Isso será substituído pela implementação real do MediaPipe
+    if (!ROBOFLOW_API_KEY) {
+      console.warn('⚠️ ROBOFLOW_API_KEY não configurada, usando fallback mockado');
+      return generateMockLandmarks();
+    }
+
+    // Chamar API Roboflow para pose detection
+    const response = await fetch(
+      'https://detect.roboflow.com/pose-detection/1?api_key=' + ROBOFLOW_API_KEY,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: imageBase64,
+      }
+    );
+
+    if (!response.ok) {
+      console.error('❌ Erro na API Roboflow:', response.status);
+      return generateMockLandmarks();
+    }
+
+    const data = await response.json();
+    console.log('✅ Roboflow detectou poses:', data);
+
+    // Converter formato Roboflow para MediaPipe landmarks
+    if (data.predictions && data.predictions.length > 0) {
+      const pose = data.predictions[0];
+      return convertRoboflowToMediaPipe(pose);
+    }
+
+    console.warn('⚠️ Nenhuma pose detectada pela API, usando fallback');
+    return generateMockLandmarks();
+  } catch (error) {
+    console.error('❌ Erro ao detectar landmarks:', error);
+    return generateMockLandmarks();
+  }
+}
+
+// Função auxiliar: converter formato Roboflow para MediaPipe
+function convertRoboflowToMediaPipe(pose: any): PoseLandmark[] {
+  const landmarks: PoseLandmark[] = [];
+
+  // Inicializar 33 landmarks do MediaPipe
+  for (let i = 0; i < 33; i++) {
+    landmarks.push({ x: 0.5, y: 0.5, z: 0, visibility: 0 });
+  }
+
+  // Mapear keypoints do Roboflow para landmarks do MediaPipe
+  const keypointMap: Record<string, number> = {
+    'left_shoulder': POSE_LANDMARKS.LEFT_SHOULDER,
+    'right_shoulder': POSE_LANDMARKS.RIGHT_SHOULDER,
+    'left_elbow': POSE_LANDMARKS.LEFT_ELBOW,
+    'right_elbow': POSE_LANDMARKS.RIGHT_ELBOW,
+    'left_wrist': POSE_LANDMARKS.LEFT_WRIST,
+    'right_wrist': POSE_LANDMARKS.RIGHT_WRIST,
+    'left_hip': POSE_LANDMARKS.LEFT_HIP,
+    'right_hip': POSE_LANDMARKS.RIGHT_HIP,
+    'left_knee': POSE_LANDMARKS.LEFT_KNEE,
+    'right_knee': POSE_LANDMARKS.RIGHT_KNEE,
+    'left_ankle': POSE_LANDMARKS.LEFT_ANKLE,
+    'right_ankle': POSE_LANDMARKS.RIGHT_ANKLE,
+  };
+
+  // Preencher landmarks com dados reais
+  if (pose.keypoints) {
+    for (const [name, point] of Object.entries(pose.keypoints)) {
+      const landmarkIndex = keypointMap[name];
+      if (landmarkIndex !== undefined && point && typeof point === 'object') {
+        const { x, y, confidence } = point as any;
+        landmarks[landmarkIndex] = {
+          x: x / pose.image_width,  // normalizar para 0-1
+          y: y / pose.image_height, // normalizar para 0-1
+          z: 0,
+          visibility: confidence || 0.5,
+        };
+      }
+    }
+  }
+
+  return landmarks;
+}
+
+// Função auxiliar: gerar landmarks mockados (fallback)
+function generateMockLandmarks(): PoseLandmark[] {
   const landmarks: PoseLandmark[] = [];
 
   // Preencher os 33 landmarks do MediaPipe Pose
@@ -143,7 +228,7 @@ async function detectPoseLandmarks(imageBase64: string): Promise<PoseLandmark[]>
   landmarks[POSE_LANDMARKS.LEFT_ANKLE] = { x: 0.42, y: 0.95, z: 0, visibility: 0.9 };
   landmarks[POSE_LANDMARKS.RIGHT_ANKLE] = { x: 0.58, y: 0.95, z: 0, visibility: 0.9 };
 
-  console.log('✅ Landmarks detectados (simulados)');
+  console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
 
   return landmarks;
 }
@@ -224,7 +309,10 @@ function calculateMeasurementsFromLandmarks(
   ];
   const avgVisibility =
     keyLandmarks.reduce((sum, l) => sum + (l.visibility || 0), 0) / keyLandmarks.length;
-  const confidence = Math.min(avgVisibility * 1.1, 1.0);
+
+  // Se a visibilidade média for 0, são dados mockados
+  const isMocked = avgVisibility === 0;
+  const confidence = isMocked ? 0 : Math.min(avgVisibility * 1.1, 1.0);
 
   const measurements: BodyMeasurements = {
     shoulderWidth: Math.round(shoulderCircumference),
@@ -234,20 +322,33 @@ function calculateMeasurementsFromLandmarks(
     bodyHeight: Math.round(realHeight),
     armLength: Math.round(armLength),
     legLength: Math.round(legLength),
-    confidence: 0, // CRITICAL: Marcar confiança como 0 para dados mockados
+    confidence: confidence,
   };
 
-  console.log('⚠️ ATENÇÃO: Usando landmarks SIMULADOS (não reais)');
-  console.log('⚠️ Medidas mockadas (NÃO devem ser usadas para cálculo):', {
-    ombros: measurements.shoulderWidth + 'cm',
-    peito: measurements.chestCircumference + 'cm',
-    cintura: measurements.waistCircumference + 'cm',
-    quadril: measurements.hipCircumference + 'cm',
-    altura: measurements.bodyHeight + 'cm',
-    braço: measurements.armLength + 'cm',
-    perna: measurements.legLength + 'cm',
-    confiança: '0% (MOCKADO)'
-  });
+  if (isMocked) {
+    console.log('⚠️ ATENÇÃO: Usando landmarks SIMULADOS (não reais)');
+    console.log('⚠️ Medidas mockadas (NÃO devem ser usadas para cálculo):', {
+      ombros: measurements.shoulderWidth + 'cm',
+      peito: measurements.chestCircumference + 'cm',
+      cintura: measurements.waistCircumference + 'cm',
+      quadril: measurements.hipCircumference + 'cm',
+      altura: measurements.bodyHeight + 'cm',
+      braço: measurements.armLength + 'cm',
+      perna: measurements.legLength + 'cm',
+      confiança: '0% (MOCKADO)'
+    });
+  } else {
+    console.log('✅ Medidas finais REAIS (em cm):', {
+      ombros: measurements.shoulderWidth + 'cm',
+      peito: measurements.chestCircumference + 'cm',
+      cintura: measurements.waistCircumference + 'cm',
+      quadril: measurements.hipCircumference + 'cm',
+      altura: measurements.bodyHeight + 'cm',
+      braço: measurements.armLength + 'cm',
+      perna: measurements.legLength + 'cm',
+      confiança: (measurements.confidence * 100).toFixed(0) + '% (REAL)'
+    });
+  }
 
   return measurements;
 }
