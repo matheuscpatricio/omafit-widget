@@ -326,27 +326,40 @@ Deno.serve(async (req: Request) => {
 
         // 2️⃣ MediaPipe Pose Landmarker (2-3s) ⚡
         (async () => {
-          console.log('🤖 Iniciando MediaPipe Pose Landmarker...');
+          console.log('═══════════════════════════════════════════════════════');
+          console.log('🤖 MEDIAPIPE: Iniciando análise de pose...');
+          console.log('═══════════════════════════════════════════════════════');
 
           try {
             // Extrair altura do usuário se disponível
             const userHeight = user_measurements?.height;
+            console.log('📏 MEDIAPIPE INPUT:');
+            console.log('   • Imagem do modelo:', modelImageUrl.substring(0, 100) + '...');
+            console.log('   • Altura do usuário (para calibração):', userHeight ? `${userHeight}cm` : 'NÃO FORNECIDA');
+            console.log('');
+
+            const startTime = Date.now();
 
             // Extrair medidas corporais reais da imagem usando MediaPipe
             // Passa a altura do usuário para calibrar as proporções
             const bodyMeasurements = await extractBodyMeasurements(modelImageUrl, userHeight);
 
+            const processingTime = Date.now() - startTime;
+
             if (bodyMeasurements) {
-              console.log('✅ MediaPipe extraiu medidas:', {
-                altura: bodyMeasurements.bodyHeight + 'cm',
-                ombros: bodyMeasurements.shoulderWidth + 'cm',
-                peito: bodyMeasurements.chestCircumference + 'cm',
-                cintura: bodyMeasurements.waistCircumference + 'cm',
-                quadril: bodyMeasurements.hipCircumference + 'cm',
-                braço: bodyMeasurements.armLength + 'cm',
-                perna: bodyMeasurements.legLength + 'cm',
-                confidence: (bodyMeasurements.confidence * 100).toFixed(0) + '%'
-              });
+              console.log('✅ MEDIAPIPE SUCCESS: Pose detectada!');
+              console.log('   ⏱️  Tempo de processamento:', processingTime + 'ms');
+              console.log('   📊 Confiança geral:', (bodyMeasurements.confidence * 100).toFixed(1) + '%');
+              console.log('');
+              console.log('📐 MEDIDAS EXTRAÍDAS:');
+              console.log('   • Altura corporal:', bodyMeasurements.bodyHeight + 'cm');
+              console.log('   • Largura dos ombros:', bodyMeasurements.shoulderWidth + 'cm');
+              console.log('   • Circunferência do peito:', bodyMeasurements.chestCircumference + 'cm');
+              console.log('   • Circunferência da cintura:', bodyMeasurements.waistCircumference + 'cm');
+              console.log('   • Circunferência do quadril:', bodyMeasurements.hipCircumference + 'cm');
+              console.log('   • Comprimento do braço:', bodyMeasurements.armLength + 'cm');
+              console.log('   • Comprimento da perna:', bodyMeasurements.legLength + 'cm');
+              console.log('═══════════════════════════════════════════════════════');
 
               // Combinar com dados do usuário se disponível
               return {
@@ -356,14 +369,31 @@ Deno.serve(async (req: Request) => {
               };
             }
 
-            console.log('⚠️ MediaPipe não detectou pose, usando dados do usuário');
+            console.log('═══════════════════════════════════════════════════════');
+            console.log('⚠️ MEDIAPIPE WARNING: Nenhuma pose detectada!');
+            console.log('   • Tempo de processamento:', processingTime + 'ms');
+            console.log('   • Possíveis causas:');
+            console.log('     - Imagem muito escura ou de baixa qualidade');
+            console.log('     - Pessoa não está de corpo inteiro');
+            console.log('     - Pose muito complexa ou obstruída');
+            console.log('   • Fallback: Usando dados manuais do usuário');
+            console.log('═══════════════════════════════════════════════════════');
+
             return user_measurements ? {
               source: 'user_input',
               userInput: user_measurements
             } : null;
 
           } catch (error) {
-            console.error('❌ Erro no MediaPipe:', error);
+            const processingTime = Date.now() - startTime;
+            console.log('═══════════════════════════════════════════════════════');
+            console.error('❌ MEDIAPIPE ERROR: Falha no processamento!');
+            console.error('   • Erro:', error.message);
+            console.error('   • Stack:', error.stack);
+            console.log('   • Tempo até erro:', processingTime + 'ms');
+            console.log('   • Fallback: Usando dados manuais do usuário');
+            console.log('═══════════════════════════════════════════════════════');
+
             // Fallback: usar dados do usuário se disponível
             return user_measurements ? {
               source: 'user_input_fallback',
@@ -383,12 +413,26 @@ Deno.serve(async (req: Request) => {
       }
 
       // Processar resultado do MediaPipe
+      console.log('');
+      console.log('📊 MEDIAPIPE RESULT STATUS:', mediapipeResult.status);
+
       if (mediapipeResult.status === 'fulfilled' && mediapipeResult.value) {
         mediapipeMeasurements = mediapipeResult.value;
-        console.log('✅ MediaPipe completed:', mediapipeMeasurements);
+
+        if (mediapipeMeasurements.source === 'mediapipe') {
+          console.log('✅ MEDIAPIPE: Medidas REAIS extraídas com sucesso!');
+          console.log('   → Serão enviadas ao frontend para cálculo de tamanho');
+        } else {
+          console.log('⚠️ MEDIAPIPE: Usando dados MANUAIS (fallback)');
+          console.log('   → Source:', mediapipeMeasurements.source);
+        }
       } else if (mediapipeResult.status === 'rejected') {
-        console.warn('⚠️ MediaPipe failed (non-blocking):', mediapipeResult.reason);
+        console.warn('⚠️ MEDIAPIPE: Processo rejeitado (non-blocking)');
+        console.warn('   → Erro:', mediapipeResult.reason);
+      } else {
+        console.log('⚠️ MEDIAPIPE: Nenhum resultado retornado');
       }
+      console.log('');
 
     } catch (error) {
       console.error('❌ Parallel processing error:', error);

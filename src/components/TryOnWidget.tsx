@@ -1268,6 +1268,35 @@ const handleSubmit = async () => {
 
     const result = await response.json();
 
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('📦 RESPOSTA DO BACKEND RECEBIDA');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('• FAL Request ID:', result.fal_request_id);
+    console.log('• Body Measurements presente?', !!result.body_measurements);
+
+    if (result.body_measurements) {
+      console.log('');
+      console.log('📊 MEDIAPIPE - DADOS RECEBIDOS:');
+      console.log('   Source:', result.body_measurements.source || 'N/A');
+      console.log('   Confiança:', result.body_measurements.confidence ?
+        (result.body_measurements.confidence * 100).toFixed(1) + '%' : 'N/A');
+
+      if (result.body_measurements.bodyHeight) {
+        console.log('');
+        console.log('📐 Medidas corporais detectadas:');
+        console.log('   • Altura:', result.body_measurements.bodyHeight + 'cm');
+        console.log('   • Ombros:', result.body_measurements.shoulderWidth + 'cm');
+        console.log('   • Peito:', result.body_measurements.chestCircumference + 'cm');
+        console.log('   • Cintura:', result.body_measurements.waistCircumference + 'cm');
+        console.log('   • Quadril:', result.body_measurements.hipCircumference + 'cm');
+        console.log('   • Braço:', result.body_measurements.armLength + 'cm');
+        console.log('   • Perna:', result.body_measurements.legLength + 'cm');
+      }
+    } else {
+      console.log('⚠️ Nenhum dado do MediaPipe retornado');
+    }
+    console.log('═══════════════════════════════════════════════════════');
+
     if (result.success && result.fal_request_id) {
       setPredictionId(result.fal_request_id);
       setProcessingMessage(t('generating'));
@@ -1278,8 +1307,9 @@ const handleSubmit = async () => {
       const isMediaPipeMocked = mediaPipeConfidence === 0;
 
       if (result.body_measurements && sizeChart.length > 0 && !isMediaPipeMocked) {
-        console.log('📏 Calculando tamanho com medidas REAIS do MediaPipe:', result.body_measurements);
-        console.log('   Confiança do MediaPipe:', (mediaPipeConfidence * 100).toFixed(0) + '%');
+        console.log('');
+        console.log('🧮 CALCULANDO TAMANHO com medidas REAIS do MediaPipe...');
+        console.log('   Confiança:', (mediaPipeConfidence * 100).toFixed(1) + '%');
 
         const realMeasurements = {
           height: result.body_measurements.bodyHeight,
@@ -1295,18 +1325,24 @@ const handleSubmit = async () => {
         };
 
         const sizeResult = calculateRecommendedSize(realMeasurements as any, sizeChart);
-        console.log('✅ Resultado do cálculo (MediaPipe):', sizeResult);
+        console.log('');
         if (sizeResult) {
           setRecommendedSize(sizeResult.size);
           setCalculatedSize(sizeResult.size);
-          console.log('✅ Tamanho recomendado (MediaPipe):', sizeResult.size);
+          console.log('✅ TAMANHO CALCULADO COM SUCESSO:', sizeResult.size);
+          console.log('   Match score:', sizeResult.matchScore?.toFixed(1) + '%');
         } else {
-          console.log('❌ calculateRecommendedSize retornou null');
+          console.log('❌ ERRO: calculateRecommendedSize retornou null');
+          console.log('   Verifique se o size chart está correto');
         }
       } else if (isMediaPipeMocked) {
-        console.log('⚠️ MediaPipe retornou dados MOCKADOS (confiança = 0)');
-        console.log('   → IGNORANDO medidas do MediaPipe');
-        console.log('   → Nenhum tamanho será calculado (necessário medidas reais)');
+        console.log('');
+        console.log('⚠️ MEDIAPIPE: Dados MOCKADOS detectados (confiança = 0)');
+        console.log('   → Ignorando medidas do MediaPipe');
+        console.log('   → Nenhum cálculo de tamanho será feito');
+      } else if (!result.body_measurements) {
+        console.log('');
+        console.log('⚠️ MEDIAPIPE: Nenhuma medida retornada');
       }
 
       startPolling(result.fal_request_id);
