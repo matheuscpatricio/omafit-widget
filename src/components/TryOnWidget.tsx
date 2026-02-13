@@ -1307,6 +1307,10 @@ const handleSubmit = async () => {
     }
 
     if (result.body_measurements) {
+      console.log('🔍 FRONTEND - body_measurements COMPLETO:');
+      console.log(JSON.stringify(result.body_measurements, null, 2));
+      console.log('');
+
       console.log('📊 MEDIAPIPE - DADOS RECEBIDOS:');
       console.log('   Source:', result.body_measurements.source || 'N/A');
       console.log('   Confiança:', result.body_measurements.confidence ?
