@@ -335,31 +335,98 @@ function calculateMeasurementsFromLandmarks(
 ): BodyMeasurements {
   console.log('📐 Calculando medidas a partir de landmarks...');
 
+  // Extrair todos os landmarks necessários
   const nose = landmarks[POSE_LANDMARKS.NOSE];
+  const leftEye = landmarks[POSE_LANDMARKS.LEFT_EYE];
+  const rightEye = landmarks[POSE_LANDMARKS.RIGHT_EYE];
+  const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
+  const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
   const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
   const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
-  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
-  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
-  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
-  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
-  const leftFootIndex = landmarks[POSE_LANDMARKS.LEFT_FOOT_INDEX];
-  const rightFootIndex = landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX];
   const leftElbow = landmarks[POSE_LANDMARKS.LEFT_ELBOW];
   const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
   const leftWrist = landmarks[POSE_LANDMARKS.LEFT_WRIST];
   const rightWrist = landmarks[POSE_LANDMARKS.RIGHT_WRIST];
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
   const leftKnee = landmarks[POSE_LANDMARKS.LEFT_KNEE];
   const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+  const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
+  const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+  const leftFootIndex = landmarks[POSE_LANDMARKS.LEFT_FOOT_INDEX];
+  const rightFootIndex = landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX];
 
-  // 🔹 ALTURA COMPLETA: topo da cabeça até pés (não ombro→tornozelo)
-  const headY = nose.y; // topo aproximado
+  // 🔹 1. TOPO REAL DA CABEÇA (não apenas nariz)
+  const headLandmarks = [nose, leftEye, rightEye, leftEar, rightEar];
+  const headY = Math.min(...headLandmarks.map(l => l.y));
   const footY = Math.max(
     (leftFootIndex?.y || leftAnkle.y),
     (rightFootIndex?.y || rightAnkle.y)
   );
   const bodyHeightNormalized = Math.abs(footY - headY);
 
+  console.log('   - Topo cabeça Y:', headY.toFixed(3));
+  console.log('   - Base pés Y:', footY.toFixed(3));
+
   console.log('   - Altura completa (cabeça→pés normalizada):', bodyHeightNormalized.toFixed(3));
+
+  // 🔹 2. DETECTAR INCLINAÇÃO CORPORAL
+  const shoulderAngle = Math.atan2(
+    rightShoulder.y - leftShoulder.y,
+    rightShoulder.x - leftShoulder.x
+  ) * (180 / Math.PI);
+
+  const hipAngle = Math.atan2(
+    rightHip.y - leftHip.y,
+    rightHip.x - leftHip.x
+  ) * (180 / Math.PI);
+
+  const avgTilt = (Math.abs(shoulderAngle) + Math.abs(hipAngle)) / 2;
+
+  console.log('   - Inclinação ombros:', shoulderAngle.toFixed(1), '°');
+  console.log('   - Inclinação quadril:', hipAngle.toFixed(1), '°');
+  console.log('   - Inclinação média:', avgTilt.toFixed(1), '°');
+
+  // Penalizar confiança se inclinação > 10°
+  let tiltPenalty = 1.0;
+  if (avgTilt > 15) {
+    tiltPenalty = 0.6;
+    console.warn('   ⚠️ Inclinação excessiva detectada (>15°)');
+  } else if (avgTilt > 10) {
+    tiltPenalty = 0.8;
+    console.warn('   ⚠️ Inclinação moderada detectada (>10°)');
+  }
+
+  // 🔹 3. DETECTAR SIMETRIA CORPORAL
+  const shoulderSymmetry = Math.abs(leftShoulder.y - rightShoulder.y);
+  const hipSymmetry = Math.abs(leftHip.y - rightHip.y);
+
+  let symmetryPenalty = 1.0;
+  if (shoulderSymmetry > 0.05 || hipSymmetry > 0.05) {
+    symmetryPenalty = 0.7;
+    console.warn('   ⚠️ Assimetria corporal detectada');
+  } else if (shoulderSymmetry > 0.03 || hipSymmetry > 0.03) {
+    symmetryPenalty = 0.85;
+  }
+
+  // 🔹 4. SCORE DE POSTURA
+  const shoulderHipAlignment = Math.abs(
+    ((leftShoulder.x + rightShoulder.x) / 2) -
+    ((leftHip.x + rightHip.x) / 2)
+  );
+
+  const hipKneeAlignment = Math.abs(
+    ((leftHip.x + rightHip.x) / 2) -
+    ((leftKnee.x + rightKnee.x) / 2)
+  );
+
+  let posturePenalty = 1.0;
+  if (shoulderHipAlignment > 0.08 || hipKneeAlignment > 0.08) {
+    posturePenalty = 0.7;
+    console.warn('   ⚠️ Postura desalinhada detectada');
+  } else if (shoulderHipAlignment > 0.05 || hipKneeAlignment > 0.05) {
+    posturePenalty = 0.85;
+  }
 
   // 🔹 ALTURA OBRIGATÓRIA (sem fallback)
   const PIXEL_TO_CM_RATIO = userHeight / bodyHeightNormalized;
@@ -379,131 +446,113 @@ function calculateMeasurementsFromLandmarks(
   const shoulderWidthCm = shoulderWidthNorm * PIXEL_TO_CM_RATIO;
   const hipWidthCm = hipWidthNorm * PIXEL_TO_CM_RATIO;
 
-  console.log('🔍 DEBUG - shoulderWidthCm:', shoulderWidthCm);
-  console.log('🔍 DEBUG - hipWidthCm:', hipWidthCm);
-  console.log('🔍 DEBUG - isNaN(shoulderWidthCm):', isNaN(shoulderWidthCm));
-  console.log('🔍 DEBUG - isNaN(hipWidthCm):', isNaN(hipWidthCm));
+  console.log('   - Largura ombros:', shoulderWidthCm.toFixed(1), 'cm');
+  console.log('   - Largura quadril:', hipWidthCm.toFixed(1), 'cm');
 
-  // 🔹 CALCULAR PERFIL CORPORAL (IMC, tipo corporal, fator dinâmico)
-  const bodyProfile = calculateBodyProfile(
-    userHeight,
-    userWeight,
-    shoulderWidthCm,
-    hipWidthCm
-  );
+  // 🔹 5. VALIDAR DISTORÇÃO DE PERSPECTIVA
+  const shoulderToHeightRatio = shoulderWidthCm / userHeight;
 
-  console.log('   - IMC:', bodyProfile.bmi.toFixed(1));
-  console.log('   - Tipo corporal:', bodyProfile.bodyType);
-  console.log('   - Proporção ombro/quadril:', bodyProfile.shoulderToHipRatio.toFixed(2));
-  console.log('   - Fator de circunferência dinâmico:', bodyProfile.circumferenceFactor.toFixed(2));
-
-  // 🔹 ESTIMATIVAS INTELIGENTES usando proporções corporais
-  // Peito: baseado em ombros e IMC
-  let chestWidthCm = shoulderWidthCm * 0.95;
-  if (bodyProfile.bmi > 25) {
-    chestWidthCm = shoulderWidthCm * 0.98; // peito mais desenvolvido
-  } else if (bodyProfile.bmi < 20) {
-    chestWidthCm = shoulderWidthCm * 0.92; // peito mais estreito
+  let perspectivePenalty = 1.0;
+  if (shoulderToHeightRatio > 0.35 || shoulderToHeightRatio < 0.20) {
+    perspectivePenalty = 0.6;
+    console.warn('   ⚠️ Distorção de perspectiva detectada (ratio:', shoulderToHeightRatio.toFixed(2), ')');
+  } else if (shoulderToHeightRatio > 0.32 || shoulderToHeightRatio < 0.22) {
+    perspectivePenalty = 0.8;
   }
 
-  console.log('🔍 DEBUG - chestWidthCm:', chestWidthCm);
+  // 🔹 6. VALIDAÇÃO ANTROPOMÉTRICA
+  const isPlausible =
+    shoulderWidthCm >= 30 && shoulderWidthCm <= 70 &&
+    hipWidthCm >= 25 && hipWidthCm <= 60;
 
-  // Cintura: baseada em quadril e IMC
-  let waistWidthCm = hipWidthCm * 0.85;
-  if (bodyProfile.bmi > 27) {
-    waistWidthCm = hipWidthCm * 0.95; // cintura mais larga (sobrepeso)
-  } else if (bodyProfile.shoulderToHipRatio > 1.15) {
-    waistWidthCm = hipWidthCm * 0.80; // cintura definida (atlético)
+  if (!isPlausible) {
+    console.error('   ❌ MEDIDAS FORA DA FAIXA HUMANA PLAUSÍVEL');
+    console.error('   • Ombros:', shoulderWidthCm.toFixed(1), 'cm (esperado: 30-70cm)');
+    console.error('   • Quadril:', hipWidthCm.toFixed(1), 'cm (esperado: 25-60cm)');
   }
 
-  console.log('🔍 DEBUG - waistWidthCm:', waistWidthCm);
+  // 🔹 7. CALCULAR IMC E PERFIL
+  const heightM = userHeight / 100;
+  const bmi = userWeight / (heightM * heightM);
+  const gender = userGender || 'male';
 
-  // 🔹 OMBROS: medida LINEAR (bi-acromial width)
-  const shoulderWidthFinal = shoulderWidthCm;
+  console.log('   - IMC calculado:', bmi.toFixed(1));
+  console.log('   - Gênero:', gender);
 
-  console.log('🔍 DEBUG - shoulderWidthFinal:', shoulderWidthFinal);
-  console.log('🔍 DEBUG - bodyProfile.circumferenceFactor:', bodyProfile.circumferenceFactor);
+  // 🔹 8. PROFUNDIDADE ESPECÍFICA POR GÊNERO
+  let chestDepthFactor = 0.55;
+  let waistDepthFactor = 0.45;
+  let hipDepthFactor = 0.58;
 
-  // 🔹 CIRCUNFERÊNCIAS: usar fator dinâmico baseado em perfil
-  const chestCircumference = calculateCircumference(
-    chestWidthCm,
-    bodyProfile.circumferenceFactor
-  );
-
-  console.log('🔍 DEBUG - chestCircumference APÓS cálculo:', chestCircumference);
-
-  const waistCircumference = calculateCircumference(
-    waistWidthCm,
-    bodyProfile.circumferenceFactor * 0.95 // cintura ligeiramente menos profunda
-  );
-
-  console.log('🔍 DEBUG - waistCircumference APÓS cálculo:', waistCircumference);
-
-  const hipCircumference = calculateCircumference(
-    hipWidthCm,
-    bodyProfile.circumferenceFactor * 0.98 // quadril ligeiramente menos profundo
-  );
-
-  console.log('🔍 DEBUG - hipCircumference APÓS cálculo:', hipCircumference);
-
-  // Calcular comprimentos (normalizados pela altura do corpo)
-  const armLengthNorm =
-    euclideanDistance(leftShoulder, leftElbow) +
-    euclideanDistance(leftElbow, leftWrist);
-
-  const legLengthNorm =
-    euclideanDistance(leftHip, leftKnee) +
-    euclideanDistance(leftKnee, leftAnkle);
-
-  // Converter para cm usando o ratio correto
-  const armLength = Math.round((armLengthNorm / bodyHeightNormalized) * userHeight * 0.38);
-  const legLength = Math.round((legLengthNorm / bodyHeightNormalized) * userHeight * 0.47);
-
-  console.log('   - Comprimento braço (normalizado):', armLengthNorm.toFixed(3));
-  console.log('   - Comprimento perna (normalizado):', legLengthNorm.toFixed(3));
-  console.log('   - Comprimento braço (cm):', armLength);
-  console.log('   - Comprimento perna (cm):', legLength);
-
-  // 🔹 CONFIANÇA INDIVIDUAL POR MEDIDA (penaliza baixa visibilidade)
-  interface MeasurementConfidence {
-    shoulder: number;
-    chest: number;
-    waist: number;
-    hip: number;
+  if (gender === 'female') {
+    chestDepthFactor = 0.52; // peito feminino menos profundo
+    waistDepthFactor = 0.42;
+    hipDepthFactor = 0.62; // quadril feminino mais profundo
   }
 
-  const visibilityThreshold = 0.6; // landmarks abaixo disso são penalizados
+  // Ajustar por IMC
+  if (bmi > 27) {
+    chestDepthFactor += 0.08;
+    waistDepthFactor += 0.10;
+    hipDepthFactor += 0.08;
+  } else if (bmi < 20) {
+    chestDepthFactor -= 0.05;
+    waistDepthFactor -= 0.05;
+    hipDepthFactor -= 0.05;
+  }
 
-  const shoulderVis = Math.min(
-    leftShoulder.visibility || 0,
-    rightShoulder.visibility || 0
-  );
-  const hipVis = Math.min(
-    leftHip.visibility || 0,
-    rightHip.visibility || 0
-  );
+  console.log('   - Fatores de profundidade: peito=', chestDepthFactor.toFixed(2),
+              'cintura=', waistDepthFactor.toFixed(2),
+              'quadril=', hipDepthFactor.toFixed(2));
 
-  // Penalizar fortemente se visibilidade baixa
-  const shoulderConfidence = shoulderVis < visibilityThreshold
-    ? shoulderVis * 0.5
-    : shoulderVis;
+  // 🔹 9. FÓRMULA ELÍPTICA PARA CIRCUNFERÊNCIAS
+  const chestWidth = shoulderWidthCm * 0.95;
+  const waistWidth = shoulderWidthCm * 0.78;
 
-  const hipConfidence = hipVis < visibilityThreshold
-    ? hipVis * 0.5
-    : hipVis;
+  const chestDepth = chestWidth * chestDepthFactor;
+  const waistDepth = waistWidth * waistDepthFactor;
+  const hipDepth = hipWidthCm * hipDepthFactor;
 
-  // Peito e cintura dependem de estimativas
-  const chestConfidence = shoulderConfidence * 0.85; // menos confiável (estimado)
-  const waistConfidence = hipConfidence * 0.80; // menos confiável (estimado)
-
-  const measurementConfidences: MeasurementConfidence = {
-    shoulder: shoulderConfidence,
-    chest: chestConfidence,
-    waist: waistConfidence,
-    hip: hipConfidence,
+  // Perímetro elíptico: π√(2(a² + b²)/2)
+  const ellipseCircumference = (width: number, depth: number): number => {
+    const a = width / 2;
+    const b = depth / 2;
+    return Math.PI * Math.sqrt(2 * (a * a + b * b));
   };
 
-  // Confiança geral: média ponderada
+  const chestCircumference = ellipseCircumference(chestWidth, chestDepth);
+  const waistCircumference = ellipseCircumference(waistWidth, waistDepth);
+  const hipCircumference = ellipseCircumference(hipWidthCm, hipDepth);
+
+  console.log('   - Circunf. peito:', chestCircumference.toFixed(1), 'cm (elíptica)');
+  console.log('   - Circunf. cintura:', waistCircumference.toFixed(1), 'cm (elíptica)');
+  console.log('   - Circunf. quadril:', hipCircumference.toFixed(1), 'cm (elíptica)');
+
+  // 🔹 10. PROPORÇÕES BRAÇO/PERNA POR GÊNERO E IMC
+  let armRatio = 0.38;
+  let legRatio = 0.47;
+
+  if (gender === 'female') {
+    legRatio = 0.49; // mulheres têm pernas proporcionalmente mais longas
+    armRatio = 0.37;
+  }
+
+  // Ajuste por IMC (visual)
+  if (bmi > 27) {
+    armRatio *= 0.95;
+    legRatio *= 0.95;
+  } else if (bmi < 20) {
+    armRatio *= 1.02;
+    legRatio *= 1.02;
+  }
+
+  const armLength = Math.round(userHeight * armRatio);
+  const legLength = Math.round(userHeight * legRatio);
+
+  console.log('   - Comprimento braço (cm):', armLength, '(' + (armRatio * 100).toFixed(0) + '% altura)');
+  console.log('   - Comprimento perna (cm):', legLength, '(' + (legRatio * 100).toFixed(0) + '% altura)');
+
+  // 🔹 11. CONFIANÇA GLOBAL COM TODOS OS FATORES
   const keyLandmarks = [
     leftShoulder, rightShoulder, leftHip, rightHip,
     leftKnee, rightKnee, leftAnkle, rightAnkle
@@ -513,24 +562,36 @@ function calculateMeasurementsFromLandmarks(
 
   // Se a visibilidade média for 0, são dados mockados
   const isMocked = avgVisibility === 0;
-  const confidence = isMocked ? 0 : Math.min(avgVisibility, 1.0);
 
-  console.log('   - Confiança por medida:', {
-    ombros: (measurementConfidences.shoulder * 100).toFixed(0) + '%',
-    peito: (measurementConfidences.chest * 100).toFixed(0) + '%',
-    cintura: (measurementConfidences.waist * 100).toFixed(0) + '%',
-    quadril: (measurementConfidences.hip * 100).toFixed(0) + '%',
-    geral: (confidence * 100).toFixed(0) + '%',
-  });
+  const baseConfidence = isMocked ? 0 : Math.min(avgVisibility, 1.0);
+
+  // Aplicar todas as penalidades
+  const confidence = Math.min(
+    baseConfidence,
+    tiltPenalty,
+    symmetryPenalty,
+    posturePenalty,
+    perspectivePenalty,
+    isPlausible ? 1.0 : 0.3
+  );
+
+  console.log('   - Confiança base (visibilidade):', (baseConfidence * 100).toFixed(0) + '%');
+  console.log('   - Penalidades aplicadas:');
+  console.log('     • Inclinação:', (tiltPenalty * 100).toFixed(0) + '%');
+  console.log('     • Simetria:', (symmetryPenalty * 100).toFixed(0) + '%');
+  console.log('     • Postura:', (posturePenalty * 100).toFixed(0) + '%');
+  console.log('     • Perspectiva:', (perspectivePenalty * 100).toFixed(0) + '%');
+  console.log('     • Plausibilidade:', isPlausible ? '100%' : '30%');
+  console.log('   - Confiança final:', (confidence * 100).toFixed(0) + '%');
 
   const measurements: BodyMeasurements = {
-    shoulderWidth: Math.round(shoulderWidthFinal),
+    shoulderWidth: Math.round(shoulderWidthCm),
     chestCircumference: Math.round(chestCircumference),
     waistCircumference: Math.round(waistCircumference),
     hipCircumference: Math.round(hipCircumference),
     bodyHeight: Math.round(userHeight),
-    armLength: Math.round(armLength),
-    legLength: Math.round(legLength),
+    armLength: armLength,
+    legLength: legLength,
     confidence: confidence,
   };
 
@@ -547,17 +608,16 @@ function calculateMeasurementsFromLandmarks(
       confiança: '0% (MOCKADO)'
     });
   } else {
-    console.log('✅ Medidas finais REAIS (em cm):', {
+    console.log('✅ Medidas finais PREMIUM (em cm):', {
       ombros: measurements.shoulderWidth + 'cm (linear)',
-      peito: measurements.chestCircumference + 'cm (circunf.)',
-      cintura: measurements.waistCircumference + 'cm (circunf.)',
-      quadril: measurements.hipCircumference + 'cm (circunf.)',
+      peito: measurements.chestCircumference + 'cm (elíptica)',
+      cintura: measurements.waistCircumference + 'cm (elíptica)',
+      quadril: measurements.hipCircumference + 'cm (elíptica)',
       altura: measurements.bodyHeight + 'cm',
-      braço: measurements.armLength + 'cm',
-      perna: measurements.legLength + 'cm',
-      imc: bodyProfile.bmi.toFixed(1),
-      tipo: bodyProfile.bodyType,
-      fator: bodyProfile.circumferenceFactor.toFixed(2),
+      braço: measurements.armLength + 'cm (ajustado por gênero/IMC)',
+      perna: measurements.legLength + 'cm (ajustado por gênero/IMC)',
+      imc: bmi.toFixed(1),
+      gênero: gender,
       confiança: (measurements.confidence * 100).toFixed(0) + '%'
     });
   }
