@@ -1164,29 +1164,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           setSizeChart(sizeChartData);
           console.log('✅ setSizeChart() chamado com sucesso');
           console.log('   - Tamanhos disponíveis:', sizeChartData.map((s: any) => s.size).join(', '));
-
-          // Calcular tamanho recomendado
-          const recommendedResult = calculateRecommendedSize(sizeData, sizeChartData);
-          console.log('📏 Resultado do cálculo inicial:', recommendedResult);
-          if (recommendedResult) {
-            setRecommendedSize(recommendedResult.size);
-            console.log('📏 Tamanho recomendado:', recommendedResult.size);
-          }
-
-          // Enviar mensagem para o parent window
-          if (recommended) {
-            console.log('📤 Enviando mensagem para parent window com tamanho recomendado');
-            window.parent.postMessage({
-              type: 'sizeCalculatorComplete',
-              measurements: {
-                height: sizeData.height,
-                bodyType: 0.9 + (sizeData.bodyTypeIndex * 0.1),
-                fit: 0.95 + (sizeData.fitIndex * 0.05),
-                gender: sizeData.gender
-              },
-              recommendedSize: recommended
-            }, '*');
-          }
+          console.log('⏳ Aguardando foto do usuário para calcular tamanho com MediaPipe...');
         } else {
           console.log('❌ PROBLEMA: Nenhum chart encontrado!');
           console.log('   - Shop Domain:', shopDomain);
@@ -1423,48 +1401,9 @@ const handleSubmit = async () => {
             console.log('✅ Setting result image:', imageUrl);
             setResult(imageUrl);
 
-          console.log('📏 ===== CALCULANDO TAMANHO IDEAL =====');
-          if (sizeData && sizeChart.length > 0) {
-            console.log('✅ Dados disponíveis para cálculo:');
-            console.log('   - Height:', sizeData.height);
-            console.log('   - Weight:', sizeData.weight);
-            console.log('   - Body Type:', sizeData.bodyType);
-            console.log('   - Fit:', sizeData.fit);
-            console.log('   - Gender:', sizeData.gender);
-            console.log('   - Size Chart disponível:', sizeChart.length, 'tamanhos');
-            console.log('   - Tamanhos:', sizeChart.map((s: any) => s.size || s.size_name).join(', '));
-            console.log('   - Measurement Weights:', measurementWeights);
-
-            const sizeResult = calculateIdealSize(
-              sizeData.height,
-              sizeData.weight,
-              sizeData.bodyType,
-              sizeData.fit,
-              sizeChart,
-              undefined,
-              measurementWeights
-            );
-            console.log('📏 Resultado do calculateIdealSize:', sizeResult);
-            if (sizeResult) {
-              setCalculatedSize(sizeResult.size);
-              console.log('✅ Tamanho calculado e definido:', sizeResult.size);
-            } else {
-              console.log('❌ calculateIdealSize retornou null/undefined');
-            }
-          } else {
-            console.log('❌ Cálculo NÃO pode ser realizado:');
-            console.log('   - sizeData existe?', !!sizeData);
-            if (sizeData) {
-              console.log('     • height:', sizeData.height);
-              console.log('     • weight:', sizeData.weight);
-              console.log('     • gender:', sizeData.gender);
-            }
-            console.log('   - sizeChart.length:', sizeChart?.length || 0);
-            if (sizeChart?.length === 0) {
-              console.log('   ⚠️ SIZE CHART VAZIO - Tabela não foi carregada corretamente!');
-            }
-          }
-          console.log('📏 ===== FIM DO CÁLCULO DE TAMANHO =====');
+          console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
+          console.log('   - recommendedSize:', recommendedSize);
+          console.log('   - calculatedSize:', calculatedSize);
 
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
