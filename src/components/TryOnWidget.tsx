@@ -1248,7 +1248,7 @@ const handleSubmit = async () => {
     if (!mediapipeLoading && !mediapipeError) {
       try {
         console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
-        setProcessingMessage(t('analyzing') || 'Analisando corpo...');
+        setProcessingMessage(t('analyzingPhoto'));
 
         const imgElement = new Image();
         imgElement.src = modelImageDataUrl;
