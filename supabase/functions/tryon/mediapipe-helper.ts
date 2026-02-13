@@ -364,6 +364,11 @@ function calculateMeasurementsFromLandmarks(
   const shoulderWidthCm = shoulderWidthNorm * PIXEL_TO_CM_RATIO;
   const hipWidthCm = hipWidthNorm * PIXEL_TO_CM_RATIO;
 
+  console.log('🔍 DEBUG - shoulderWidthCm:', shoulderWidthCm);
+  console.log('🔍 DEBUG - hipWidthCm:', hipWidthCm);
+  console.log('🔍 DEBUG - isNaN(shoulderWidthCm):', isNaN(shoulderWidthCm));
+  console.log('🔍 DEBUG - isNaN(hipWidthCm):', isNaN(hipWidthCm));
+
   // 🔹 CALCULAR PERFIL CORPORAL (IMC, tipo corporal, fator dinâmico)
   const bodyProfile = calculateBodyProfile(
     userHeight,
