@@ -14,6 +14,8 @@ export interface BodyMeasurements {
   waist: number;
   hip: number;
   height: number;
+  armLength: number;
+  legLength: number;
 }
 
 export function useMediaPipePose() {
@@ -106,6 +108,10 @@ export function useMediaPipePose() {
     const rightAnkle = landmarks[28];
     const leftElbow = landmarks[13];
     const rightElbow = landmarks[14];
+    const leftWrist = landmarks[15];
+    const rightWrist = landmarks[16];
+    const leftKnee = landmarks[25];
+    const rightKnee = landmarks[26];
 
     const pixelToCm = (pixels: number): number => {
       const referenceHeightCm = 170;
@@ -125,30 +131,43 @@ export function useMediaPipePose() {
     const hipWidthPx = distance(leftHip, rightHip);
     const bodyHeightPx = Math.abs((leftAnkle.y + rightAnkle.y) / 2 - nose.y) * imageHeight;
 
-    const shoulderToElbowPx = (distance(leftShoulder, leftElbow) + distance(rightShoulder, rightElbow)) / 2;
-    const chestY = (leftShoulder.y + rightShoulder.y) / 2;
-    const waistY = chestY + 0.25;
-    const hipY = (leftHip.y + rightHip.y) / 2;
-
     const shoulderWidthCm = pixelToCm(shoulderWidthPx);
     const hipWidthCm = pixelToCm(hipWidthPx);
     const heightCm = pixelToCm(bodyHeightPx);
 
-    const chestWidthCm = shoulderWidthCm * 0.95;
-    const waistWidthCm = hipWidthCm * 0.80;
+    // Estimativas realistas baseadas em proporções anatômicas
+    const chestWidthCm = shoulderWidthCm * 1.05; // peito ligeiramente mais largo que ombros
+    const waistWidthCm = shoulderWidthCm * 0.78; // cintura ~78% dos ombros
+    const hipWidthForCircCm = hipWidthCm * 1.15; // quadril é mais profundo que largo
+
+    // Usar profundidade estimada para circunferências mais realistas
+    const depthFactor = 0.65; // corpo não é cilíndrico perfeito
+
+    // Calcular comprimentos de braço e perna
+    const armLengthPx = (distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist) +
+                         distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)) / 2;
+    const legLengthPx = (distance(leftHip, leftKnee) + distance(leftKnee, leftAnkle) +
+                         distance(rightHip, rightKnee) + distance(rightKnee, rightAnkle)) / 2;
+
+    const armLengthCm = pixelToCm(armLengthPx);
+    const legLengthCm = pixelToCm(legLengthPx);
 
     const shoulder_width = Math.round(shoulderWidthCm);
-    const chest = Math.round(chestWidthCm * Math.PI * 0.95);
-    const waist = Math.round(waistWidthCm * Math.PI * 0.75);
-    const hip = Math.round(hipWidthCm * Math.PI * 0.95);
+    const chest = Math.round((chestWidthCm + chestWidthCm * depthFactor) * Math.PI * 0.5);
+    const waist = Math.round((waistWidthCm + waistWidthCm * depthFactor) * Math.PI * 0.5);
+    const hip = Math.round((hipWidthForCircCm + hipWidthForCircCm * depthFactor) * Math.PI * 0.5);
     const height = Math.round(heightCm);
+    const armLength = Math.round(armLengthCm);
+    const legLength = Math.round(legLengthCm);
 
     const measurements = {
       shoulder_width,
       chest,
       waist,
       hip,
-      height
+      height,
+      armLength,
+      legLength
     };
 
     console.log('✅ Medidas calculadas (CORRIGIDAS):');
@@ -157,6 +176,8 @@ export function useMediaPipePose() {
     console.log('   • Circunf. cintura:', waist, 'cm');
     console.log('   • Circunf. quadril:', hip, 'cm');
     console.log('   • Altura:', height, 'cm');
+    console.log('   • Comprimento braço:', armLength, 'cm');
+    console.log('   • Comprimento perna:', legLength, 'cm');
     return measurements;
   };
 

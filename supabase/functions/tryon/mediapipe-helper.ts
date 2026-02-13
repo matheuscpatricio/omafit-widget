@@ -142,9 +142,36 @@ export async function extractBodyMeasurements(
     console.log('🎯 Landmarks do frontend:', frontendLandmarks ? `presentes (${frontendLandmarks.length})` : '❌ não fornecido');
     console.log('📐 Medidas do frontend:', frontendMeasurements ? 'presentes' : '❌ não fornecido');
 
+    // 🎯 PRIORIDADE 1: Usar medidas calculadas no frontend (mais precisas)
+    if (frontendMeasurements && frontendLandmarks && frontendLandmarks.length > 0) {
+      console.log('✅ Usando medidas JÁ CALCULADAS pelo FRONTEND (MediaPipe real)');
+      console.log('📐 Medidas recebidas do frontend:', frontendMeasurements);
+
+      // Apenas ajustar campos se necessário e retornar
+      return {
+        shoulderWidth: frontendMeasurements.shoulder_width || frontendMeasurements.shoulderWidth,
+        chestCircumference: frontendMeasurements.chest || frontendMeasurements.chestCircumference,
+        waistCircumference: frontendMeasurements.waist || frontendMeasurements.waistCircumference,
+        hipCircumference: frontendMeasurements.hip || frontendMeasurements.hipCircumference,
+        bodyHeight: userHeight, // usar altura real do usuário
+        armLength: frontendMeasurements.armLength || Math.round(userHeight * 0.38),
+        legLength: frontendMeasurements.legLength || Math.round(userHeight * 0.47),
+        confidence: frontendMeasurements.confidence || 0.8,
+        userInput: {
+          gender: userGender || 'male',
+          height: userHeight,
+          weight: userWeight,
+          body_type_index: 1,
+          fit_preference_index: 1,
+          recommended_size: null
+        },
+        source: 'mediapipe'
+      };
+    }
+
     let landmarks: PoseLandmark[];
 
-    // 🎯 PRIORIDADE 1: Usar landmarks detectados no frontend (MediaPipe real)
+    // 🎯 PRIORIDADE 2: Usar landmarks do frontend para calcular aqui
     if (frontendLandmarks && frontendLandmarks.length > 0) {
       console.log('✅ Usando landmarks detectados no FRONTEND (MediaPipe real)');
       landmarks = frontendLandmarks;

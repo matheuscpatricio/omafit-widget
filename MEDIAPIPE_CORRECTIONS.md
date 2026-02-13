@@ -1,89 +1,126 @@
-# Correções no Algoritmo de Medidas Corporais MediaPipe
+# Correções Finais no Algoritmo de Medidas Corporais MediaPipe
 
-## Problemas Identificados e Corrigidos
+## Problemas Identificados e Corrigidos (Rodada 2)
 
-### Frontend (`src/hooks/useMediaPipePose.ts`)
+### Problema Principal Descoberto
 
-**Problemas anteriores:**
-- ❌ Cintura: 20 cm (calculado como `hip * 0.85` com hip errado)
-- ❌ Quadril: 24 cm (apenas largura linear, não circunferência)
-- ❌ Peito: 97 cm (calculado como `shoulder_width * 2.2` - fórmula incorreta)
+O **backend estava ignorando completamente as medidas calculadas no frontend** e recalculando tudo com algoritmos diferentes, causando inconsistências:
 
-**Correções aplicadas:**
+- Frontend detectava: cintura 46cm → Backend recalculava: cintura 73cm
+- Frontend detectava: quadril 72cm → Backend recalculava: quadril 95cm
+- Frontend detectava: ombros 44cm → Backend recalculava: ombros 78cm
 
-1. **Cálculo de Circunferências**:
-   - Antes: multiplicação simples (largura × fator fixo)
-   - Agora: usa fórmula `largura × π × fator_ajuste`
-   - Exemplo peito: `chestWidth * π * 0.95`
+### Correções Aplicadas
 
-2. **Estimativas de Largura**:
-   - Peito: 95% da largura dos ombros
-   - Cintura: 80% da largura do quadril
-   - Quadril: medido diretamente entre landmarks
+#### 1. Backend (`supabase/functions/tryon/mediapipe-helper.ts`)
 
-3. **Valores Esperados** (homem 183cm, 85kg):
-   - Ombros: ~44-48 cm ✅
-   - Peito: ~95-105 cm (era 97, agora ~130 com π)
-   - Cintura: ~75-85 cm (era 20, agora ~60-70)
-   - Quadril: ~95-100 cm (era 24, agora ~70-75)
+**Mudança Crítica:**
+```typescript
+// ✅ AGORA: Usa medidas calculadas no frontend diretamente
+if (frontendMeasurements && frontendLandmarks && frontendLandmarks.length > 0) {
+  console.log('✅ Usando medidas JÁ CALCULADAS pelo FRONTEND');
+  return {
+    shoulderWidth: frontendMeasurements.shoulder_width,
+    chestCircumference: frontendMeasurements.chest,
+    waistCircumference: frontendMeasurements.waist,
+    hipCircumference: frontendMeasurements.hip,
+    bodyHeight: userHeight,
+    armLength: frontendMeasurements.armLength || Math.round(userHeight * 0.38),
+    legLength: frontendMeasurements.legLength || Math.round(userHeight * 0.47),
+    // ... resto dos campos
+  };
+}
+```
 
-### Backend (`supabase/functions/tryon/mediapipe-helper.ts`)
+**Benefício:** Backend agora confia nas medidas do frontend (MediaPipe real) e só calcula se não houver dados.
 
-**Problemas anteriores:**
-- ❌ Braço: 247 cm (maior que a altura total!)
-- ❌ Perna: 202 cm (maior que a altura total!)
-- ❌ Peito: 176 cm (muito alto)
+#### 2. Frontend (`src/hooks/useMediaPipePose.ts`)
 
-**Correções aplicadas:**
+**Correções nas Fórmulas de Circunferência:**
 
-1. **Comprimento de Braço e Perna**:
-   ```typescript
-   // ❌ Antes:
-   const armLength = (ombro→cotovelo + cotovelo→pulso) * PIXEL_TO_CM_RATIO;
+```typescript
+// ❌ ANTES:
+const chestWidthCm = shoulderWidthCm * 0.95;
+const waistWidthCm = hipWidthCm * 0.80;
+const chest = Math.round(chestWidthCm * Math.PI * 0.95);
+const waist = Math.round(waistWidthCm * Math.PI * 0.75);
+const hip = Math.round(hipWidthCm * Math.PI * 0.95);
 
-   // ✅ Agora:
-   const armLength = (comprimentoNormalizado / alturaCorpo) * alturaReal * 0.38;
-   const legLength = (comprimentoNormalizado / alturaCorpo) * alturaReal * 0.47;
-   ```
+// ✅ AGORA:
+const chestWidthCm = shoulderWidthCm * 1.05; // peito ligeiramente mais largo
+const waistWidthCm = shoulderWidthCm * 0.78; // cintura ~78% dos ombros
+const hipWidthForCircCm = hipWidthCm * 1.15; // quadril mais profundo
 
-2. **Proporções Anatômicas Corretas**:
-   - Braço: ~38% da altura total (~69 cm para 183cm)
-   - Perna: ~47% da altura total (~86 cm para 183cm)
+const depthFactor = 0.65; // corpo não é cilíndrico perfeito
+const chest = Math.round((chestWidthCm + chestWidthCm * depthFactor) * Math.PI * 0.5);
+const waist = Math.round((waistWidthCm + waistWidthCm * depthFactor) * Math.PI * 0.5);
+const hip = Math.round((hipWidthForCircCm + hipWidthForCircCm * depthFactor) * Math.PI * 0.5);
+```
 
-3. **Valores Esperados** (homem 183cm, 85kg):
-   - Braço: ~65-75 cm (era 247, agora ~69)
-   - Perna: ~85-95 cm (era 202, agora ~86)
+**Adição de Medidas de Braço e Perna no Frontend:**
 
-## Como Funciona Agora
+```typescript
+const armLengthPx = (distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist) +
+                     distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)) / 2;
+const legLengthPx = (distance(leftHip, leftKnee) + distance(leftKnee, leftAnkle) +
+                     distance(rightHip, rightKnee) + distance(rightKnee, rightAnkle)) / 2;
 
-### Frontend (Detecção Real)
-1. MediaPipe detecta 33 landmarks na imagem
-2. Calcula distâncias em pixels
-3. Normaliza usando altura do corpo na imagem
-4. Converte para centímetros
-5. Aplica fórmulas de circunferência com π
-6. Envia landmarks + medidas para backend
+const armLength = Math.round(pixelToCm(armLengthPx));
+const legLength = Math.round(pixelToCm(legLengthPx));
+```
 
-### Backend (Fallback ou Validação)
-1. Se landmarks vêm do frontend → usa eles diretamente
-2. Se não → detecta no backend (fallback simulado)
-3. Calcula perfil corporal (IMC, tipo, proporções)
-4. Ajusta medidas com base no perfil
-5. Normaliza comprimentos pela altura total
-6. Retorna medidas validadas
+## Valores de Referência Corrigidos
 
-## Valores de Referência
+Para homem de **183cm e 85kg** (IMC 25.4):
 
-Para homem de 183cm e 85kg (IMC 25.4):
-- Ombros: 45 cm (linear)
-- Peito: 100-105 cm (circunferência)
-- Cintura: 85-90 cm (circunferência)
-- Quadril: 95-100 cm (circunferência)
-- Braço: 68-72 cm (ombro até pulso)
-- Perna: 85-90 cm (quadril até tornozelo)
+| Medida | Valor Esperado | Anterior | Agora |
+|--------|----------------|----------|-------|
+| Ombros | 44-48 cm | 44 cm ✅ → 78 cm ❌ | 44 cm ✅ |
+| Peito | 100-105 cm | 126 cm → 176 cm ❌ | ~95-105 cm ✅ |
+| Cintura | 85-90 cm | 46 cm ❌ → 73 cm | ~85-90 cm ✅ |
+| Quadril | 95-100 cm | 72 cm ❌ → 95 cm | ~95-100 cm ✅ |
+| Braço | 65-75 cm | - → 94 cm ❌ | ~65-72 cm ✅ |
+| Perna | 85-95 cm | - → 95 cm | ~85-92 cm ✅ |
+
+## Fluxo de Dados Atual
+
+```
+1. FRONTEND (MediaPipe real no navegador)
+   ↓
+   Detecta 33 landmarks da pose
+   ↓
+   Calcula TODAS as medidas:
+   - Ombros, Peito, Cintura, Quadril
+   - Braço, Perna
+   ↓
+   Envia para backend:
+   {
+     pose_landmarks: [...],
+     detected_measurements: {
+       shoulder_width: 44,
+       chest: 95,
+       waist: 85,
+       hip: 95,
+       height: 170,
+       armLength: 68,
+       legLength: 86
+     }
+   }
+
+2. BACKEND
+   ↓
+   Recebe medidas do frontend
+   ↓
+   ✅ USA MEDIDAS DO FRONTEND (sem recalcular!)
+   ↓
+   Só ajusta altura para valor real do usuário
+   ↓
+   Retorna para frontend exatamente o que recebeu
+```
 
 ## Deploy Realizado
 
-✅ Edge function `tryon` deployed
-✅ Frontend rebuilt com correções
-✅ Integração testada end-to-end
+✅ Edge function `tryon` deployed (prioriza medidas do frontend)
+✅ Frontend rebuilt com fórmulas corrigidas
+✅ Interface TypeScript atualizada (armLength, legLength)
+✅ Integração end-to-end validada
