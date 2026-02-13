@@ -4,6 +4,7 @@ import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
+import { useMediaPipePose } from '../hooks/useMediaPipePose';
 
 interface TryOnWidgetProps {
   garmentImage: string;
@@ -109,6 +110,19 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
+
+  // MediaPipe Pose Detection
+  const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose();
+
+  useEffect(() => {
+    if (mediapipeLoading) {
+      console.log('⏳ Carregando MediaPipe Pose Landmarker...');
+    } else if (mediapipeError) {
+      console.error('❌ Erro ao carregar MediaPipe:', mediapipeError);
+    } else {
+      console.log('✅ MediaPipe Pose Landmarker pronto!');
+    }
+  }, [mediapipeLoading, mediapipeError]);
 
   useEffect(() => {
     setIsVisible(true);
@@ -1227,6 +1241,54 @@ const handleSubmit = async () => {
       reader.readAsDataURL(modelImage);
     });
 
+    // 🎯 DETECTAR LANDMARKS COM MEDIAPIPE (FRONTEND)
+    let detectedLandmarks = null;
+    let detectedMeasurements = null;
+
+    if (!mediapipeLoading && !mediapipeError) {
+      try {
+        console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
+        setProcessingMessage(t('analyzing') || 'Analisando corpo...');
+
+        const imgElement = new Image();
+        imgElement.src = modelImageDataUrl;
+
+        await new Promise((resolve) => {
+          imgElement.onload = resolve;
+        });
+
+        const poseResult = await detectPose(imgElement);
+
+        if (poseResult && poseResult.landmarks && poseResult.landmarks.length > 0) {
+          const landmarks = poseResult.landmarks[0];
+          console.log('✅ MediaPipe detectou', landmarks.length, 'landmarks');
+
+          detectedLandmarks = landmarks.map((lm: any) => ({
+            x: lm.x,
+            y: lm.y,
+            z: lm.z,
+            visibility: lm.visibility || 0
+          }));
+
+          const measurements = calculateBodyMeasurements(
+            detectedLandmarks,
+            imgElement.width,
+            imgElement.height
+          );
+
+          detectedMeasurements = measurements;
+
+          console.log('📐 Medidas calculadas pelo MediaPipe:', measurements);
+        } else {
+          console.warn('⚠️ MediaPipe não detectou poses na imagem');
+        }
+      } catch (err) {
+        console.error('❌ Erro ao detectar landmarks no frontend:', err);
+      }
+    } else {
+      console.log('⏭️ MediaPipe não está pronto, edge function fará a detecção');
+    }
+
     // 🔹 VALIDAÇÃO CRÍTICA: altura e peso são obrigatórios para MediaPipe
     if (!sizeData || !sizeData.height || !sizeData.weight) {
       console.error('❌ ERRO: Dados do usuário incompletos!');
@@ -1252,7 +1314,10 @@ const handleSubmit = async () => {
         body_type_index: sizeData.bodyTypeIndex || 0,
         fit_preference_index: sizeData.fitIndex || 0,
         recommended_size: recommendedSize || calculatedSize
-      }
+      },
+      // 🎯 NOVOS CAMPOS: Landmarks e medidas detectadas pelo MediaPipe no frontend
+      pose_landmarks: detectedLandmarks,
+      detected_measurements: detectedMeasurements
     };
 
     console.log('═══════════════════════════════════════════════════════');
@@ -1269,6 +1334,8 @@ const handleSubmit = async () => {
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
     console.log('📷 model_image:', modelImageDataUrl ? 'presente (base64 ' + modelImageDataUrl.length + ' chars)' : '❌ AUSENTE');
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
+    console.log('🎯 pose_landmarks:', detectedLandmarks ? `presente (${detectedLandmarks.length} landmarks)` : '❌ não detectado (edge function fará)');
+    console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
     console.log('═══════════════════════════════════════════════════════');
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {

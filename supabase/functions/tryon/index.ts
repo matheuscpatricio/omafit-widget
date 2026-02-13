@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { model_image, garment_image, product_name, product_id, public_id, user_measurements } = await req.json();
+    const { model_image, garment_image, product_name, product_id, public_id, user_measurements, pose_landmarks, detected_measurements } = await req.json();
 
     if (!model_image || !garment_image) {
       throw new Error('model_image and garment_image are required');
@@ -377,17 +377,22 @@ Deno.serve(async (req: Request) => {
             console.log('   • Altura do usuário:', userHeight, 'cm');
             console.log('   • Peso do usuário:', userWeight, 'kg');
             console.log('   • Gênero:', userGender || 'não especificado');
+            console.log('   • 🎯 Landmarks do frontend:', pose_landmarks ? `presente (${pose_landmarks.length} landmarks)` : '❌ não fornecido');
+            console.log('   • 📐 Medidas detectadas no frontend:', detected_measurements ? 'presentes' : '❌ não fornecido');
             console.log('');
 
             const startTime = Date.now();
 
             // Extrair medidas corporais reais da imagem usando MediaPipe
-            // Passa altura, peso e gênero para análise precisa
+            // Se landmarks foram detectados no frontend, usa eles diretamente
+            // Caso contrário, faz a detecção aqui (fallback)
             const bodyMeasurements = await extractBodyMeasurements(
               modelImageUrl,
               userHeight,
               userWeight,
-              userGender
+              userGender,
+              pose_landmarks,
+              detected_measurements
             );
 
             const processingTime = Date.now() - startTime;

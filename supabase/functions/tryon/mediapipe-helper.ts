@@ -129,7 +129,9 @@ export async function extractBodyMeasurements(
   imageUrl: string,
   userHeight: number,
   userWeight: number,
-  userGender?: string
+  userGender?: string,
+  frontendLandmarks?: PoseLandmark[],
+  frontendMeasurements?: any
 ): Promise<BodyMeasurements | null> {
   try {
     console.log('🤖 Iniciando MediaPipe Pose Landmarker...');
@@ -137,30 +139,41 @@ export async function extractBodyMeasurements(
     console.log('📏 Altura do usuário:', userHeight, 'cm');
     console.log('⚖️ Peso do usuário:', userWeight, 'kg');
     console.log('👤 Gênero:', userGender || 'não especificado');
+    console.log('🎯 Landmarks do frontend:', frontendLandmarks ? `presentes (${frontendLandmarks.length})` : '❌ não fornecido');
+    console.log('📐 Medidas do frontend:', frontendMeasurements ? 'presentes' : '❌ não fornecido');
 
-    // Baixar a imagem
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    let landmarks: PoseLandmark[];
+
+    // 🎯 PRIORIDADE 1: Usar landmarks detectados no frontend (MediaPipe real)
+    if (frontendLandmarks && frontendLandmarks.length > 0) {
+      console.log('✅ Usando landmarks detectados no FRONTEND (MediaPipe real)');
+      landmarks = frontendLandmarks;
+    } else {
+      console.log('⏳ Landmarks não fornecidos pelo frontend, detectando no backend...');
+
+      // Baixar a imagem
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+      }
+
+      const imageBlob = await imageResponse.arrayBuffer();
+      const imageBase64 = btoa(
+        new Uint8Array(imageBlob).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      console.log('✅ Imagem baixada:', imageBlob.byteLength, 'bytes');
+
+      // Detectar landmarks no backend (fallback)
+      landmarks = await detectPoseLandmarks(imageBase64);
+
+      if (!landmarks || landmarks.length === 0) {
+        console.warn('⚠️ Nenhum pose landmark detectado na imagem');
+        return null;
+      }
+
+      console.log('✅ Landmarks detectados no backend:', landmarks.length);
     }
-
-    const imageBlob = await imageResponse.arrayBuffer();
-    const imageBase64 = btoa(
-      new Uint8Array(imageBlob).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-
-    console.log('✅ Imagem baixada:', imageBlob.byteLength, 'bytes');
-
-    // Usar MediaPipe via Google Cloud Vision API ou alternativa
-    // Por enquanto, vamos usar uma abordagem simplificada com análise de proporções
-    const landmarks = await detectPoseLandmarks(imageBase64);
-
-    if (!landmarks || landmarks.length === 0) {
-      console.warn('⚠️ Nenhum pose landmark detectado na imagem');
-      return null;
-    }
-
-    console.log('✅ Landmarks detectados:', landmarks.length);
 
     const measurements = calculateMeasurementsFromLandmarks(
       landmarks,
@@ -181,51 +194,10 @@ export async function extractBodyMeasurements(
 async function detectPoseLandmarks(imageBase64: string): Promise<PoseLandmark[]> {
   console.log('🔍 Detectando landmarks da pose com MediaPipe REAL...');
 
-  try {
-    // Usar Roboflow Pose Detection API (gratuito para uso moderado)
-    // Alternativa: usar API do Google MediaPipe, mas requer setup
-    const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
-
-    if (!ROBOFLOW_API_KEY) {
-      console.warn('⚠️ ROBOFLOW_API_KEY não configurada, usando fallback mockado');
-      return generateMockLandmarks();
-    }
-
-    // Chamar API Roboflow para pose detection
-    const response = await fetch(
-      'https://detect.roboflow.com/pose-detection/1?api_key=' + ROBOFLOW_API_KEY,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: imageBase64,
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erro na API Roboflow:', response.status);
-      console.error('   • Mensagem:', errorText.substring(0, 200));
-      console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
-      return generateMockLandmarks();
-    }
-
-    const data = await response.json();
-    console.log('✅ Roboflow detectou poses:', data);
-
-    // Converter formato Roboflow para MediaPipe landmarks
-    if (data.predictions && data.predictions.length > 0) {
-      const pose = data.predictions[0];
-      return convertRoboflowToMediaPipe(pose);
-    }
-
-    console.warn('⚠️ Nenhuma pose detectada pela API, usando fallback');
-    return generateMockLandmarks();
-  } catch (error) {
-    console.error('❌ Erro ao detectar landmarks:', error);
-    return generateMockLandmarks();
-  }
+  console.warn('⚠️ ATENÇÃO: Esta função é um fallback. O ideal é que os landmarks sejam detectados no FRONTEND usando MediaPipe.');
+  console.warn('⚠️ Para melhor precisão, certifique-se de que o frontend está enviando os landmarks.');
+  console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
+  return generateMockLandmarks();
 }
 
 // Função auxiliar: converter formato Roboflow para MediaPipe

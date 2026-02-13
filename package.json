@@ -13,6 +13,7 @@
     "@fal-ai/client": "^1.7.2",
     "@google-cloud/firestore": "^7.11.2",
     "@gsap/react": "^2.1.2",
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@shopify/polaris": "^13.9.5",
     "@studio-freight/lenis": "^1.0.42",
     "@supabase/auth-helpers-react": "^0.5.0",
