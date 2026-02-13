@@ -331,16 +331,32 @@ Deno.serve(async (req: Request) => {
           console.log('═══════════════════════════════════════════════════════');
 
           try {
+            // 🔹 DEBUG: Ver exatamente o que chegou
+            console.log('📦 user_measurements recebido no edge function:');
+            console.log('   • Objeto completo:', JSON.stringify(user_measurements, null, 2));
+            console.log('   • Tipo:', typeof user_measurements);
+            console.log('   • É null?', user_measurements === null);
+            console.log('   • É undefined?', user_measurements === undefined);
+            console.log('');
+
             // 🔹 VALIDAR altura e peso OBRIGATÓRIOS
             const userHeight = user_measurements?.height;
             const userWeight = user_measurements?.weight;
             const userGender = user_measurements?.gender;
 
+            console.log('📏 Valores extraídos:');
+            console.log('   • userHeight:', userHeight, '(tipo:', typeof userHeight + ')');
+            console.log('   • userWeight:', userWeight, '(tipo:', typeof userWeight + ')');
+            console.log('   • userGender:', userGender);
+            console.log('');
+
             if (!userHeight || !userWeight) {
-              console.log('⚠️ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios');
-              console.log('   • Altura fornecida:', userHeight);
-              console.log('   • Peso fornecido:', userWeight);
+              console.log('❌ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios!');
+              console.log('   • Altura fornecida:', userHeight, '→', !userHeight ? '❌ VAZIO/ZERO' : '✅ OK');
+              console.log('   • Peso fornecido:', userWeight, '→', !userWeight ? '❌ VAZIO/ZERO' : '✅ OK');
               console.log('   • Pulando análise MediaPipe...');
+              console.log('   • Retornando source: user_input');
+              console.log('═══════════════════════════════════════════════════════');
               console.log('');
               return user_measurements ? {
                 source: 'user_input',

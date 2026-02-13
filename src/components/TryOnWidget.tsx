@@ -1227,6 +1227,17 @@ const handleSubmit = async () => {
       reader.readAsDataURL(modelImage);
     });
 
+    // 🔹 VALIDAÇÃO CRÍTICA: altura e peso são obrigatórios para MediaPipe
+    if (!sizeData || !sizeData.height || !sizeData.weight) {
+      console.error('❌ ERRO: Dados do usuário incompletos!');
+      console.error('   sizeData completo:', sizeData);
+      console.error('   height:', sizeData?.height);
+      console.error('   weight:', sizeData?.weight);
+      setError('Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios)');
+      setProcessing(false);
+      return;
+    }
+
     const payload = {
       shop_domain: shopDomain,
       model_image: modelImageDataUrl,
@@ -1234,23 +1245,31 @@ const handleSubmit = async () => {
       product_name: product.name,
       product_id: product.id,
       public_id: publicId,
-      user_measurements: sizeData ? {
-        gender: sizeData.gender,
+      user_measurements: {
+        gender: sizeData.gender || 'unisex',
         height: sizeData.height,
         weight: sizeData.weight,
-        body_type_index: sizeData.bodyTypeIndex,
-        fit_preference_index: sizeData.fitIndex,
+        body_type_index: sizeData.bodyTypeIndex || 0,
+        fit_preference_index: sizeData.fitIndex || 0,
         recommended_size: recommendedSize || calculatedSize
-      } : null
+      }
     };
 
-    console.log('📤 Enviando payload:', {
-      ...payload,
-      model_image: 'base64...',
-      garment_image: payload.garment_image.substring(0, 50) + '...'
-    });
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('📤 PAYLOAD ENVIADO PARA EDGE FUNCTION');
+    console.log('═══════════════════════════════════════════════════════');
     console.log('🔑 publicId:', publicId);
-    console.log('📦 product:', product);
+    console.log('📦 product:', product.name, '(id:', product.id + ')');
+    console.log('👤 user_measurements enviado:');
+    console.log('   • gender:', payload.user_measurements.gender);
+    console.log('   • height:', payload.user_measurements.height, 'cm');
+    console.log('   • weight:', payload.user_measurements.weight, 'kg');
+    console.log('   • body_type_index:', payload.user_measurements.body_type_index);
+    console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
+    console.log('   • recommended_size:', payload.user_measurements.recommended_size);
+    console.log('📷 model_image:', modelImageDataUrl ? 'presente (base64 ' + modelImageDataUrl.length + ' chars)' : '❌ AUSENTE');
+    console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
+    console.log('═══════════════════════════════════════════════════════');
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
       method: 'POST',
