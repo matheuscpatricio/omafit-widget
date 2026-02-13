@@ -27,8 +27,20 @@ interface UserMeasurements {
   gender?: string;
 }
 
-// Apenas os pontos do CORPO (sem face)
+interface BodyProfile {
+  bmi: number;
+  shoulderToHipRatio: number;
+  bodyType: 'ectomorph' | 'mesomorph' | 'endomorph';
+  circumferenceFactor: number; // Fator dinâmico baseado em perfil
+}
+
+// Landmarks do MediaPipe Pose (33 pontos)
 const POSE_LANDMARKS = {
+  NOSE: 0,
+  LEFT_EYE: 2,
+  RIGHT_EYE: 5,
+  LEFT_EAR: 7,
+  RIGHT_EAR: 8,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
   LEFT_ELBOW: 13,
@@ -41,6 +53,10 @@ const POSE_LANDMARKS = {
   RIGHT_KNEE: 26,
   LEFT_ANKLE: 27,
   RIGHT_ANKLE: 28,
+  LEFT_HEEL: 29,
+  RIGHT_HEEL: 30,
+  LEFT_FOOT_INDEX: 31,
+  RIGHT_FOOT_INDEX: 32,
 };
 
 function euclideanDistance(point1: PoseLandmark, point2: PoseLandmark): number {
@@ -50,21 +66,77 @@ function euclideanDistance(point1: PoseLandmark, point2: PoseLandmark): number {
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function calculateCircumference(width: number): number {
-  // Fórmula antropométrica: circunferência ≈ largura frontal × 2.2
-  // (considera profundidade do tórax/corpo em vista frontal)
-  // Fator baseado em estudos antropométricos reais
-  return width * 2.2;
+/**
+ * Calcula o perfil corporal baseado em dados do usuário
+ */
+function calculateBodyProfile(
+  userHeight: number,
+  userWeight: number,
+  shoulderWidth: number,
+  hipWidth: number
+): BodyProfile {
+  // Calcular IMC
+  const heightM = userHeight / 100;
+  const bmi = userWeight / (heightM * heightM);
+
+  // Calcular proporção ombro/quadril
+  const shoulderToHipRatio = shoulderWidth / hipWidth;
+
+  // Determinar tipo corporal
+  let bodyType: 'ectomorph' | 'mesomorph' | 'endomorph' = 'mesomorph';
+  if (bmi < 20) bodyType = 'ectomorph';
+  else if (bmi > 27) bodyType = 'endomorph';
+
+  // 🔹 FATOR DINÂMICO baseado em IMC
+  // IMC baixo (magro) → corpo menos profundo → fator menor
+  // IMC alto (volumoso) → corpo mais profundo → fator maior
+  let circumferenceFactor = 2.2; // baseline
+
+  if (bmi < 18.5) {
+    circumferenceFactor = 2.0; // muito magro
+  } else if (bmi < 22) {
+    circumferenceFactor = 2.1; // magro
+  } else if (bmi > 30) {
+    circumferenceFactor = 2.6; // obeso
+  } else if (bmi > 27) {
+    circumferenceFactor = 2.4; // sobrepeso
+  }
+
+  // 🔹 AJUSTE por proporção ombro/quadril
+  // Ombros muito largos → peito desenvolvido → aumentar fator
+  if (shoulderToHipRatio > 1.15) {
+    circumferenceFactor += 0.1; // corpo em V (atlético)
+  } else if (shoulderToHipRatio < 0.95) {
+    circumferenceFactor -= 0.05; // quadril dominante
+  }
+
+  return {
+    bmi,
+    shoulderToHipRatio,
+    bodyType,
+    circumferenceFactor,
+  };
+}
+
+/**
+ * Calcula circunferência usando fator dinâmico
+ */
+function calculateCircumference(width: number, factor: number): number {
+  return width * factor;
 }
 
 export async function extractBodyMeasurements(
   imageUrl: string,
-  userHeight?: number
+  userHeight: number,
+  userWeight: number,
+  userGender?: string
 ): Promise<BodyMeasurements | null> {
   try {
     console.log('🤖 Iniciando MediaPipe Pose Landmarker...');
     console.log('📷 Processando imagem:', imageUrl.substring(0, 80) + '...');
-    console.log('📏 Altura do usuário fornecida:', userHeight ? userHeight + 'cm' : 'não fornecida');
+    console.log('📏 Altura do usuário:', userHeight, 'cm');
+    console.log('⚖️ Peso do usuário:', userWeight, 'kg');
+    console.log('👤 Gênero:', userGender || 'não especificado');
 
     // Baixar a imagem
     const imageResponse = await fetch(imageUrl);
@@ -90,7 +162,12 @@ export async function extractBodyMeasurements(
 
     console.log('✅ Landmarks detectados:', landmarks.length);
 
-    const measurements = calculateMeasurementsFromLandmarks(landmarks, userHeight);
+    const measurements = calculateMeasurementsFromLandmarks(
+      landmarks,
+      userHeight,
+      userWeight,
+      userGender
+    );
 
     console.log('📏 Medidas calculadas:', measurements);
 
@@ -237,16 +314,21 @@ function generateMockLandmarks(): PoseLandmark[] {
 
 function calculateMeasurementsFromLandmarks(
   landmarks: PoseLandmark[],
-  userHeight?: number
+  userHeight: number,
+  userWeight: number,
+  userGender?: string
 ): BodyMeasurements {
   console.log('📐 Calculando medidas a partir de landmarks...');
 
+  const nose = landmarks[POSE_LANDMARKS.NOSE];
   const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
   const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
   const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
   const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
   const leftAnkle = landmarks[POSE_LANDMARKS.LEFT_ANKLE];
   const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
+  const leftFootIndex = landmarks[POSE_LANDMARKS.LEFT_FOOT_INDEX];
+  const rightFootIndex = landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX];
   const leftElbow = landmarks[POSE_LANDMARKS.LEFT_ELBOW];
   const rightElbow = landmarks[POSE_LANDMARKS.RIGHT_ELBOW];
   const leftWrist = landmarks[POSE_LANDMARKS.LEFT_WRIST];
@@ -254,48 +336,80 @@ function calculateMeasurementsFromLandmarks(
   const leftKnee = landmarks[POSE_LANDMARKS.LEFT_KNEE];
   const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
 
-  // Calcular altura da pose em coordenadas normalizadas
-  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-  const ankleY = (leftAnkle.y + rightAnkle.y) / 2;
-  const bodyHeightNormalized = Math.abs(ankleY - shoulderY);
+  // 🔹 ALTURA COMPLETA: topo da cabeça até pés (não ombro→tornozelo)
+  const headY = nose.y; // topo aproximado
+  const footY = Math.max(
+    (leftFootIndex?.y || leftAnkle.y),
+    (rightFootIndex?.y || rightAnkle.y)
+  );
+  const bodyHeightNormalized = Math.abs(footY - headY);
 
-  console.log('   - Altura da pose (normalizada):', bodyHeightNormalized);
+  console.log('   - Altura completa (cabeça→pés normalizada):', bodyHeightNormalized.toFixed(3));
 
-  // Se temos a altura real do usuário, usar para calibrar
-  // Senão, assumir altura média de 170cm
-  const realHeight = userHeight || 170;
-  const PIXEL_TO_CM_RATIO = realHeight / bodyHeightNormalized;
+  // 🔹 ALTURA OBRIGATÓRIA (sem fallback)
+  const PIXEL_TO_CM_RATIO = userHeight / bodyHeightNormalized;
 
-  console.log('   - Altura real do usuário:', realHeight, 'cm');
+  console.log('   - Altura real do usuário:', userHeight, 'cm');
+  console.log('   - Peso do usuário:', userWeight, 'kg');
   console.log('   - Ratio pixel→cm:', PIXEL_TO_CM_RATIO.toFixed(2));
 
-  // Calcular larguras
-  const shoulderWidth = euclideanDistance(leftShoulder, rightShoulder);
-  const hipWidth = euclideanDistance(leftHip, rightHip);
+  // Calcular larguras em pixels normalizados
+  const shoulderWidthNorm = euclideanDistance(leftShoulder, rightShoulder);
+  const hipWidthNorm = euclideanDistance(leftHip, rightHip);
 
-  console.log('   - Largura dos ombros (normalizada):', shoulderWidth.toFixed(3));
-  console.log('   - Largura do quadril (normalizada):', hipWidth.toFixed(3));
+  console.log('   - Largura dos ombros (normalizada):', shoulderWidthNorm.toFixed(3));
+  console.log('   - Largura do quadril (normalizada):', hipWidthNorm.toFixed(3));
 
-  // Estimar largura do peito (95% da largura dos ombros)
-  // Estimar largura da cintura (85% da largura do quadril)
-  const chestWidth = shoulderWidth * 0.95;
-  const waistWidth = hipWidth * 0.85;
+  // Converter para cm ANTES de calcular proporções
+  const shoulderWidthCm = shoulderWidthNorm * PIXEL_TO_CM_RATIO;
+  const hipWidthCm = hipWidthNorm * PIXEL_TO_CM_RATIO;
 
-  // Converter para cm
-  const shoulderWidthCm = shoulderWidth * PIXEL_TO_CM_RATIO;
-  const chestWidthCm = chestWidth * PIXEL_TO_CM_RATIO;
-  const waistWidthCm = waistWidth * PIXEL_TO_CM_RATIO;
-  const hipWidthCm = hipWidth * PIXEL_TO_CM_RATIO;
+  // 🔹 CALCULAR PERFIL CORPORAL (IMC, tipo corporal, fator dinâmico)
+  const bodyProfile = calculateBodyProfile(
+    userHeight,
+    userWeight,
+    shoulderWidthCm,
+    hipWidthCm
+  );
 
-  // OMBROS: é medida LINEAR (bi-acromial width), não circunferência
-  // Manter como está (tipicamente 40-50cm para adultos)
+  console.log('   - IMC:', bodyProfile.bmi.toFixed(1));
+  console.log('   - Tipo corporal:', bodyProfile.bodyType);
+  console.log('   - Proporção ombro/quadril:', bodyProfile.shoulderToHipRatio.toFixed(2));
+  console.log('   - Fator de circunferência dinâmico:', bodyProfile.circumferenceFactor.toFixed(2));
+
+  // 🔹 ESTIMATIVAS INTELIGENTES usando proporções corporais
+  // Peito: baseado em ombros e IMC
+  let chestWidthCm = shoulderWidthCm * 0.95;
+  if (bodyProfile.bmi > 25) {
+    chestWidthCm = shoulderWidthCm * 0.98; // peito mais desenvolvido
+  } else if (bodyProfile.bmi < 20) {
+    chestWidthCm = shoulderWidthCm * 0.92; // peito mais estreito
+  }
+
+  // Cintura: baseada em quadril e IMC
+  let waistWidthCm = hipWidthCm * 0.85;
+  if (bodyProfile.bmi > 27) {
+    waistWidthCm = hipWidthCm * 0.95; // cintura mais larga (sobrepeso)
+  } else if (bodyProfile.shoulderToHipRatio > 1.15) {
+    waistWidthCm = hipWidthCm * 0.80; // cintura definida (atlético)
+  }
+
+  // 🔹 OMBROS: medida LINEAR (bi-acromial width)
   const shoulderWidthFinal = shoulderWidthCm;
 
-  // PEITO/CINTURA/QUADRIL: converter larguras frontais em circunferências
-  // Fator 2.2 é mais realista (considera profundidade do tórax)
-  const chestCircumference = calculateCircumference(chestWidthCm);
-  const waistCircumference = calculateCircumference(waistWidthCm);
-  const hipCircumference = calculateCircumference(hipWidthCm);
+  // 🔹 CIRCUNFERÊNCIAS: usar fator dinâmico baseado em perfil
+  const chestCircumference = calculateCircumference(
+    chestWidthCm,
+    bodyProfile.circumferenceFactor
+  );
+  const waistCircumference = calculateCircumference(
+    waistWidthCm,
+    bodyProfile.circumferenceFactor * 0.95 // cintura ligeiramente menos profunda
+  );
+  const hipCircumference = calculateCircumference(
+    hipWidthCm,
+    bodyProfile.circumferenceFactor * 0.98 // quadril ligeiramente menos profundo
+  );
 
   // Calcular comprimentos
   const armLength =
@@ -308,7 +422,46 @@ function calculateMeasurementsFromLandmarks(
       euclideanDistance(leftKnee, leftAnkle)) *
     PIXEL_TO_CM_RATIO;
 
-  // Calcular confiança baseada na visibilidade dos landmarks-chave
+  // 🔹 CONFIANÇA INDIVIDUAL POR MEDIDA (penaliza baixa visibilidade)
+  interface MeasurementConfidence {
+    shoulder: number;
+    chest: number;
+    waist: number;
+    hip: number;
+  }
+
+  const visibilityThreshold = 0.6; // landmarks abaixo disso são penalizados
+
+  const shoulderVis = Math.min(
+    leftShoulder.visibility || 0,
+    rightShoulder.visibility || 0
+  );
+  const hipVis = Math.min(
+    leftHip.visibility || 0,
+    rightHip.visibility || 0
+  );
+
+  // Penalizar fortemente se visibilidade baixa
+  const shoulderConfidence = shoulderVis < visibilityThreshold
+    ? shoulderVis * 0.5
+    : shoulderVis;
+
+  const hipConfidence = hipVis < visibilityThreshold
+    ? hipVis * 0.5
+    : hipVis;
+
+  // Peito e cintura dependem de estimativas
+  const chestConfidence = shoulderConfidence * 0.85; // menos confiável (estimado)
+  const waistConfidence = hipConfidence * 0.80; // menos confiável (estimado)
+
+  const measurementConfidences: MeasurementConfidence = {
+    shoulder: shoulderConfidence,
+    chest: chestConfidence,
+    waist: waistConfidence,
+    hip: hipConfidence,
+  };
+
+  // Confiança geral: média ponderada
   const keyLandmarks = [
     leftShoulder, rightShoulder, leftHip, rightHip,
     leftKnee, rightKnee, leftAnkle, rightAnkle
@@ -318,7 +471,15 @@ function calculateMeasurementsFromLandmarks(
 
   // Se a visibilidade média for 0, são dados mockados
   const isMocked = avgVisibility === 0;
-  const confidence = isMocked ? 0 : Math.min(avgVisibility * 1.1, 1.0);
+  const confidence = isMocked ? 0 : Math.min(avgVisibility, 1.0);
+
+  console.log('   - Confiança por medida:', {
+    ombros: (measurementConfidences.shoulder * 100).toFixed(0) + '%',
+    peito: (measurementConfidences.chest * 100).toFixed(0) + '%',
+    cintura: (measurementConfidences.waist * 100).toFixed(0) + '%',
+    quadril: (measurementConfidences.hip * 100).toFixed(0) + '%',
+    geral: (confidence * 100).toFixed(0) + '%',
+  });
 
   const measurements: BodyMeasurements = {
     shoulderWidth: Math.round(shoulderWidthFinal),
@@ -345,14 +506,17 @@ function calculateMeasurementsFromLandmarks(
     });
   } else {
     console.log('✅ Medidas finais REAIS (em cm):', {
-      ombros: measurements.shoulderWidth + 'cm',
-      peito: measurements.chestCircumference + 'cm',
-      cintura: measurements.waistCircumference + 'cm',
-      quadril: measurements.hipCircumference + 'cm',
+      ombros: measurements.shoulderWidth + 'cm (linear)',
+      peito: measurements.chestCircumference + 'cm (circunf.)',
+      cintura: measurements.waistCircumference + 'cm (circunf.)',
+      quadril: measurements.hipCircumference + 'cm (circunf.)',
       altura: measurements.bodyHeight + 'cm',
       braço: measurements.armLength + 'cm',
       perna: measurements.legLength + 'cm',
-      confiança: (measurements.confidence * 100).toFixed(0) + '% (REAL)'
+      imc: bodyProfile.bmi.toFixed(1),
+      tipo: bodyProfile.bodyType,
+      fator: bodyProfile.circumferenceFactor.toFixed(2),
+      confiança: (measurements.confidence * 100).toFixed(0) + '%'
     });
   }
 

@@ -331,18 +331,40 @@ Deno.serve(async (req: Request) => {
           console.log('═══════════════════════════════════════════════════════');
 
           try {
-            // Extrair altura do usuário se disponível
+            // 🔹 VALIDAR altura e peso OBRIGATÓRIOS
             const userHeight = user_measurements?.height;
+            const userWeight = user_measurements?.weight;
+            const userGender = user_measurements?.gender;
+
+            if (!userHeight || !userWeight) {
+              console.log('⚠️ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios');
+              console.log('   • Altura fornecida:', userHeight);
+              console.log('   • Peso fornecido:', userWeight);
+              console.log('   • Pulando análise MediaPipe...');
+              console.log('');
+              return user_measurements ? {
+                source: 'user_input',
+                userInput: user_measurements
+              } : null;
+            }
+
             console.log('📏 MEDIAPIPE INPUT:');
             console.log('   • Imagem do modelo:', modelImageUrl.substring(0, 100) + '...');
-            console.log('   • Altura do usuário (para calibração):', userHeight ? `${userHeight}cm` : 'NÃO FORNECIDA');
+            console.log('   • Altura do usuário:', userHeight, 'cm');
+            console.log('   • Peso do usuário:', userWeight, 'kg');
+            console.log('   • Gênero:', userGender || 'não especificado');
             console.log('');
 
             const startTime = Date.now();
 
             // Extrair medidas corporais reais da imagem usando MediaPipe
-            // Passa a altura do usuário para calibrar as proporções
-            const bodyMeasurements = await extractBodyMeasurements(modelImageUrl, userHeight);
+            // Passa altura, peso e gênero para análise precisa
+            const bodyMeasurements = await extractBodyMeasurements(
+              modelImageUrl,
+              userHeight,
+              userWeight,
+              userGender
+            );
 
             const processingTime = Date.now() - startTime;
 
