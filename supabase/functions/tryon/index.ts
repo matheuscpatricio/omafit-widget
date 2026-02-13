@@ -315,6 +315,14 @@ Deno.serve(async (req: Request) => {
 
     let request_id;
     let mediapipeMeasurements = null;
+    let debugInfo = {
+      mediapipe_status: 'unknown',
+      mediapipe_returned: false,
+      mediapipe_source: 'none',
+      user_height_received: user_measurements?.height || 'missing',
+      user_weight_received: user_measurements?.weight || 'missing',
+      user_gender_received: user_measurements?.gender || 'missing',
+    };
 
     try {
       // Iniciar AMBOS em paralelo
@@ -454,8 +462,13 @@ Deno.serve(async (req: Request) => {
       console.log('');
       console.log('📊 MEDIAPIPE RESULT STATUS:', mediapipeResult.status);
 
+      // Atualizar debug info
+      debugInfo.mediapipe_status = mediapipeResult.status;
+
       if (mediapipeResult.status === 'fulfilled' && mediapipeResult.value) {
         mediapipeMeasurements = mediapipeResult.value;
+        debugInfo.mediapipe_returned = true;
+        debugInfo.mediapipe_source = mediapipeMeasurements.source;
 
         if (mediapipeMeasurements.source === 'mediapipe') {
           console.log('✅ MEDIAPIPE: Medidas REAIS extraídas com sucesso!');
@@ -467,8 +480,10 @@ Deno.serve(async (req: Request) => {
       } else if (mediapipeResult.status === 'rejected') {
         console.warn('⚠️ MEDIAPIPE: Processo rejeitado (non-blocking)');
         console.warn('   → Erro:', mediapipeResult.reason);
+        debugInfo.mediapipe_returned = false;
       } else {
         console.log('⚠️ MEDIAPIPE: Nenhum resultado retornado');
+        debugInfo.mediapipe_returned = false;
       }
       console.log('');
 
@@ -573,16 +588,7 @@ Deno.serve(async (req: Request) => {
       console.error('[Billing] ⚠️ Erro ao processar billing:', billingError);
     }
 
-    // 🔹 Criar log de debug para retornar ao frontend
-    const debugInfo = {
-      mediapipe_status: mediapipeResult.status,
-      mediapipe_returned: mediapipeResult.status === 'fulfilled' ? (mediapipeResult.value ? true : false) : false,
-      mediapipe_source: mediapipeMeasurements?.source || 'none',
-      user_height_received: user_measurements?.height || 'missing',
-      user_weight_received: user_measurements?.weight || 'missing',
-      user_gender_received: user_measurements?.gender || 'missing',
-    };
-
+    // 🔹 Log final de debug
     console.log('🔍 DEBUG INFO PARA FRONTEND:', debugInfo);
 
     return new Response(
