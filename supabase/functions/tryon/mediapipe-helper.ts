@@ -51,10 +51,10 @@ function euclideanDistance(point1: PoseLandmark, point2: PoseLandmark): number {
 }
 
 function calculateCircumference(width: number): number {
-  // Fórmula antropométrica: circunferência ≈ largura frontal × 2.5
-  // (considera profundidade do tórax/corpo)
-  // Corpo humano não é circular, então não usamos π
-  return width * 2.5;
+  // Fórmula antropométrica: circunferência ≈ largura frontal × 2.2
+  // (considera profundidade do tórax/corpo em vista frontal)
+  // Fator baseado em estudos antropométricos reais
+  return width * 2.2;
 }
 
 export async function extractBodyMeasurements(
@@ -287,8 +287,12 @@ function calculateMeasurementsFromLandmarks(
   const waistWidthCm = waistWidth * PIXEL_TO_CM_RATIO;
   const hipWidthCm = hipWidth * PIXEL_TO_CM_RATIO;
 
-  // Converter larguras em circunferências
-  const shoulderCircumference = calculateCircumference(shoulderWidthCm);
+  // OMBROS: é medida LINEAR (bi-acromial width), não circunferência
+  // Manter como está (tipicamente 40-50cm para adultos)
+  const shoulderWidthFinal = shoulderWidthCm;
+
+  // PEITO/CINTURA/QUADRIL: converter larguras frontais em circunferências
+  // Fator 2.2 é mais realista (considera profundidade do tórax)
   const chestCircumference = calculateCircumference(chestWidthCm);
   const waistCircumference = calculateCircumference(waistWidthCm);
   const hipCircumference = calculateCircumference(hipWidthCm);
@@ -317,7 +321,7 @@ function calculateMeasurementsFromLandmarks(
   const confidence = isMocked ? 0 : Math.min(avgVisibility * 1.1, 1.0);
 
   const measurements: BodyMeasurements = {
-    shoulderWidth: Math.round(shoulderCircumference),
+    shoulderWidth: Math.round(shoulderWidthFinal),
     chestCircumference: Math.round(chestCircumference),
     waistCircumference: Math.round(waistCircumference),
     hipCircumference: Math.round(hipCircumference),
