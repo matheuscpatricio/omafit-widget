@@ -51,8 +51,10 @@ function euclideanDistance(point1: PoseLandmark, point2: PoseLandmark): number {
 }
 
 function calculateCircumference(width: number): number {
-  // Fórmula para estimar circunferência a partir de largura frontal
-  return width * Math.PI * 0.85;
+  // Fórmula antropométrica: circunferência ≈ largura frontal × 2.5
+  // (considera profundidade do tórax/corpo)
+  // Corpo humano não é circular, então não usamos π
+  return width * 2.5;
 }
 
 export async function extractBodyMeasurements(
