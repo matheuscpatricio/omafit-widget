@@ -405,14 +405,20 @@ Deno.serve(async (req: Request) => {
               console.log('   • Circunferência do quadril:', bodyMeasurements.hipCircumference + 'cm');
               console.log('   • Comprimento do braço:', bodyMeasurements.armLength + 'cm');
               console.log('   • Comprimento da perna:', bodyMeasurements.legLength + 'cm');
+              console.log('');
+              console.log('🔍 DEBUG: bodyMeasurements COMPLETO:', JSON.stringify(bodyMeasurements, null, 2));
               console.log('═══════════════════════════════════════════════════════');
 
               // Combinar com dados do usuário se disponível
-              return {
+              const finalResult = {
                 ...bodyMeasurements,
                 userInput: user_measurements || null,
                 source: 'mediapipe'
               };
+
+              console.log('🔍 DEBUG: finalResult que será retornado:', JSON.stringify(finalResult, null, 2));
+
+              return finalResult;
             }
 
             console.log('═══════════════════════════════════════════════════════');
