@@ -104,6 +104,8 @@ export function useMediaPipePose() {
     const nose = landmarks[0];
     const leftAnkle = landmarks[27];
     const rightAnkle = landmarks[28];
+    const leftElbow = landmarks[13];
+    const rightElbow = landmarks[14];
 
     const pixelToCm = (pixels: number): number => {
       const referenceHeightCm = 170;
@@ -123,11 +125,23 @@ export function useMediaPipePose() {
     const hipWidthPx = distance(leftHip, rightHip);
     const bodyHeightPx = Math.abs((leftAnkle.y + rightAnkle.y) / 2 - nose.y) * imageHeight;
 
-    const shoulder_width = Math.round(pixelToCm(shoulderWidthPx));
-    const hip = Math.round(pixelToCm(hipWidthPx));
-    const chest = Math.round(shoulder_width * 2.2);
-    const waist = Math.round(hip * 0.85);
-    const height = Math.round(pixelToCm(bodyHeightPx));
+    const shoulderToElbowPx = (distance(leftShoulder, leftElbow) + distance(rightShoulder, rightElbow)) / 2;
+    const chestY = (leftShoulder.y + rightShoulder.y) / 2;
+    const waistY = chestY + 0.25;
+    const hipY = (leftHip.y + rightHip.y) / 2;
+
+    const shoulderWidthCm = pixelToCm(shoulderWidthPx);
+    const hipWidthCm = pixelToCm(hipWidthPx);
+    const heightCm = pixelToCm(bodyHeightPx);
+
+    const chestWidthCm = shoulderWidthCm * 0.95;
+    const waistWidthCm = hipWidthCm * 0.80;
+
+    const shoulder_width = Math.round(shoulderWidthCm);
+    const chest = Math.round(chestWidthCm * Math.PI * 0.95);
+    const waist = Math.round(waistWidthCm * Math.PI * 0.75);
+    const hip = Math.round(hipWidthCm * Math.PI * 0.95);
+    const height = Math.round(heightCm);
 
     const measurements = {
       shoulder_width,
@@ -137,7 +151,12 @@ export function useMediaPipePose() {
       height
     };
 
-    console.log('✅ Medidas calculadas:', measurements);
+    console.log('✅ Medidas calculadas (CORRIGIDAS):');
+    console.log('   • Largura ombros:', shoulder_width, 'cm');
+    console.log('   • Circunf. peito:', chest, 'cm');
+    console.log('   • Circunf. cintura:', waist, 'cm');
+    console.log('   • Circunf. quadril:', hip, 'cm');
+    console.log('   • Altura:', height, 'cm');
     return measurements;
   };
 

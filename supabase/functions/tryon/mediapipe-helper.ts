@@ -420,16 +420,23 @@ function calculateMeasurementsFromLandmarks(
 
   console.log('🔍 DEBUG - hipCircumference APÓS cálculo:', hipCircumference);
 
-  // Calcular comprimentos
-  const armLength =
-    (euclideanDistance(leftShoulder, leftElbow) +
-      euclideanDistance(leftElbow, leftWrist)) *
-    PIXEL_TO_CM_RATIO;
+  // Calcular comprimentos (normalizados pela altura do corpo)
+  const armLengthNorm =
+    euclideanDistance(leftShoulder, leftElbow) +
+    euclideanDistance(leftElbow, leftWrist);
 
-  const legLength =
-    (euclideanDistance(leftHip, leftKnee) +
-      euclideanDistance(leftKnee, leftAnkle)) *
-    PIXEL_TO_CM_RATIO;
+  const legLengthNorm =
+    euclideanDistance(leftHip, leftKnee) +
+    euclideanDistance(leftKnee, leftAnkle);
+
+  // Converter para cm usando o ratio correto
+  const armLength = Math.round((armLengthNorm / bodyHeightNormalized) * userHeight * 0.38);
+  const legLength = Math.round((legLengthNorm / bodyHeightNormalized) * userHeight * 0.47);
+
+  console.log('   - Comprimento braço (normalizado):', armLengthNorm.toFixed(3));
+  console.log('   - Comprimento perna (normalizado):', legLengthNorm.toFixed(3));
+  console.log('   - Comprimento braço (cm):', armLength);
+  console.log('   - Comprimento perna (cm):', legLength);
 
   // 🔹 CONFIANÇA INDIVIDUAL POR MEDIDA (penaliza baixa visibilidade)
   interface MeasurementConfidence {
