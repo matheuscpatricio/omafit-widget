@@ -372,7 +372,22 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     const bodyTypeNames = ['mannequin1', 'mannequin2', 'mannequin3', 'mannequin4', 'mannequin5'] as const;
-    const selectedBodyType = bodyTypeProfiles[bodyTypeNames[bodyTypeIndex]] || bodyTypeProfiles.mannequin1;
+
+    console.log('🔍 DEBUG bodyTypeIndex:', {
+      raw: bodyTypeIndex,
+      isNumber: typeof bodyTypeIndex === 'number',
+      value: bodyTypeIndex,
+      max: bodyTypeNames.length - 1
+    });
+
+    // CRITICAL: Garantir que bodyTypeIndex esteja no intervalo válido
+    const safeBodyTypeIndex = Math.min(Math.max(0, bodyTypeIndex || 0), bodyTypeNames.length - 1);
+
+    if (safeBodyTypeIndex !== bodyTypeIndex) {
+      console.warn(`⚠️ bodyTypeIndex ajustado de ${bodyTypeIndex} para ${safeBodyTypeIndex}`);
+    }
+
+    const selectedBodyType = bodyTypeProfiles[bodyTypeNames[safeBodyTypeIndex]] || bodyTypeProfiles.mannequin1;
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔹 BLOCO 2 — CONSTRUÇÃO DO MODELO CORPORAL
@@ -383,6 +398,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     console.log('\n━━━━ 🔹 BLOCO 2: CONSTRUÇÃO DO MODELO CORPORAL ━━━━');
     console.log('🎭 Perfil do manequim selecionado:', selectedBodyType.description);
+    console.log('   - bodyTypeIndex usado:', safeBodyTypeIndex);
 
     // Calcular IMC para ajuste fino de coerência
     const heightInMeters = height / 100;
@@ -546,10 +562,26 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
     // Preferência de fit aplicada na COMPARAÇÃO
     const fitFactors = [0.94, 1.00, 1.06]; // Justa, Na medida, Solta
-    const fitMultiplier = fitFactors[fitIndex] || 1.00;
     const fitNames = ['Justa', 'Na medida', 'Solta'];
 
-    console.log('👔 Preferência de fit:', fitNames[fitIndex], `(${fitMultiplier})`);
+    console.log('🔍 DEBUG fitIndex:', {
+      raw: fitIndex,
+      isNumber: typeof fitIndex === 'number',
+      value: fitIndex,
+      max: fitFactors.length - 1
+    });
+
+    // CRITICAL: Garantir que fitIndex esteja no intervalo válido
+    const safeFitIndex = Math.min(Math.max(0, fitIndex || 1), fitFactors.length - 1);
+
+    if (safeFitIndex !== fitIndex) {
+      console.warn(`⚠️ fitIndex ajustado de ${fitIndex} para ${safeFitIndex}`);
+    }
+
+    const fitMultiplier = fitFactors[safeFitIndex] || 1.00;
+
+    console.log('👔 Preferência de fit:', fitNames[safeFitIndex], `(${fitMultiplier})`);
+    console.log('   - fitIndex usado:', safeFitIndex);
     console.log('⚠️ Fit aplicado na COMPARAÇÃO, não no corpo!\n');
 
     // Array para armazenar todos os scores
@@ -1641,8 +1673,31 @@ const handleSubmit = async () => {
         {step === 'calculator' && (
           <div className="animate-fade-in">
           <SizeCalculator
+            key={`calculator-${step}`}
             onComplete={(data) => {
-              setSizeData(data);
+              console.log('🎯 SizeCalculator onComplete - Dados recebidos:', data);
+              console.log('   - height:', data.height);
+              console.log('   - weight:', data.weight);
+              console.log('   - bodyTypeIndex:', data.bodyTypeIndex);
+              console.log('   - bodyType factor:', data.bodyType);
+              console.log('   - fitIndex:', data.fitIndex);
+              console.log('   - fit factor:', data.fit);
+              console.log('   - gender:', data.gender);
+
+              // CRITICAL: Garantir que não há medidas antigas do MediaPipe
+              const cleanData = {
+                gender: data.gender,
+                height: data.height,
+                weight: data.weight,
+                bodyType: data.bodyType,
+                fit: data.fit,
+                bodyTypeIndex: data.bodyTypeIndex,
+                fitIndex: data.fitIndex
+                // NÃO incluir chest, waist, hip, shoulder
+              };
+
+              console.log('✅ setSizeData com dados LIMPOS (sem MediaPipe):', cleanData);
+              setSizeData(cleanData);
               setStep('photo');
             }}
             onBack={() => setStep('info')}
