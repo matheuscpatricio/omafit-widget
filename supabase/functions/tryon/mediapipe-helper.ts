@@ -234,10 +234,11 @@ function calculateMeasurementsFromLandmarks(
     bodyHeight: Math.round(realHeight),
     armLength: Math.round(armLength),
     legLength: Math.round(legLength),
-    confidence: Math.round(confidence * 100) / 100,
+    confidence: 0, // CRITICAL: Marcar confiança como 0 para dados mockados
   };
 
-  console.log('✅ Medidas finais (em cm):', {
+  console.log('⚠️ ATENÇÃO: Usando landmarks SIMULADOS (não reais)');
+  console.log('⚠️ Medidas mockadas (NÃO devem ser usadas para cálculo):', {
     ombros: measurements.shoulderWidth + 'cm',
     peito: measurements.chestCircumference + 'cm',
     cintura: measurements.waistCircumference + 'cm',
@@ -245,7 +246,7 @@ function calculateMeasurementsFromLandmarks(
     altura: measurements.bodyHeight + 'cm',
     braço: measurements.armLength + 'cm',
     perna: measurements.legLength + 'cm',
-    confiança: (measurements.confidence * 100).toFixed(0) + '%'
+    confiança: '0% (MOCKADO)'
   });
 
   return measurements;

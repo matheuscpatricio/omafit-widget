@@ -1295,8 +1295,15 @@ const handleSubmit = async () => {
       setProcessingMessage(t('generating'));
 
       // Se temos medidas do MediaPipe, calcular tamanho recomendado com elas
-      if (result.body_measurements && sizeChart.length > 0) {
+      // MAS APENAS se:
+      // 1. Os valores manuais não foram alterados após o último MediaPipe
+      // 2. A confiança do MediaPipe > 0 (não são dados mockados)
+      const mediaPipeConfidence = result.body_measurements?.confidence || 0;
+      const isMediaPipeMocked = mediaPipeConfidence === 0;
+
+      if (result.body_measurements && sizeChart.length > 0 && !manualValuesChanged && !isMediaPipeMocked) {
         console.log('📏 Recalculando tamanho com medidas REAIS do MediaPipe:', result.body_measurements);
+        console.log('   Confiança do MediaPipe:', (mediaPipeConfidence * 100).toFixed(0) + '%');
 
         const realMeasurements = {
           height: result.body_measurements.bodyHeight,
@@ -1320,6 +1327,19 @@ const handleSubmit = async () => {
         } else {
           console.log('❌ calculateRecommendedSize retornou null');
         }
+
+        // Resetar a flag pois agora temos medidas novas do MediaPipe
+        setManualValuesChanged(false);
+        console.log('🚩 Resetando manualValuesChanged = false (MediaPipe executou)');
+      } else if (isMediaPipeMocked) {
+        console.log('⚠️ MediaPipe retornou dados MOCKADOS (confiança = 0)');
+        console.log('   → IGNORANDO completamente medidas do MediaPipe');
+        console.log('   → Usando APENAS valores manuais do formulário');
+        console.log('   → Tamanho será calculado no polling com sizeData atual');
+      } else if (manualValuesChanged) {
+        console.log('⚠️ MediaPipe detectou medidas, MAS valores manuais foram alterados');
+        console.log('   → Ignorando medidas do MediaPipe e usando apenas valores manuais do formulário');
+        console.log('   → Tamanho será calculado no polling com sizeData atual');
       }
 
       startPolling(result.fal_request_id);
