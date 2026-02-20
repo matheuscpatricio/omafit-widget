@@ -307,7 +307,7 @@ Deno.serve(async (req: Request) => {
       model_image: modelImageUrl.substring(0, 80) + '...',
       garment_image: garmentImageUrl.substring(0, 80) + '...',
       category: "auto",
-      mode: "balanced"
+      mode: "quality"
     });
 
     // 🎯 PROCESSAMENTO PARALELO: FASHN + MediaPipe
