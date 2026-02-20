@@ -118,6 +118,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
 
+  // Debug: Log sempre que step ou imagePreview mudar
+  useEffect(() => {
+    console.log('🔄 ====== ESTADO ATUALIZADO ======');
+    console.log('   📍 step atual:', step);
+    console.log('   🖼️ imagePreview:', imagePreview ? `${imagePreview.substring(0, 30)}...` : '❌ NULL');
+    console.log('   👕 selectedProductImage:', selectedProductImage ? selectedProductImage.substring(0, 30) + '...' : '❌ NULL');
+    console.log('   📁 modelImage:', modelImage ? `File: ${modelImage.name}` : '❌ NULL');
+    console.log('   🎨 primaryColor:', primaryColor);
+    console.log('================================');
+  }, [step, imagePreview, selectedProductImage, modelImage]);
+
   // MediaPipe Pose Detection
   const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose();
 
@@ -2137,13 +2148,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Step 4: Confirm */}
-        {step === 'confirm' && (() => {
-          console.log('🔵 Renderizando step CONFIRM');
-          console.log('   - imagePreview:', imagePreview ? `${imagePreview.substring(0, 50)}...` : 'VAZIO');
-          console.log('   - selectedProductImage:', selectedProductImage || 'VAZIO');
-          console.log('   - primaryColor:', primaryColor);
-          return true;
-        })() && (
+        {step === 'confirm' && (
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
             <div className="text-center mb-3 md:mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
