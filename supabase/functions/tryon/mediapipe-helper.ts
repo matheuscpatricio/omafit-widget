@@ -67,6 +67,202 @@ function euclideanDistance(point1: PoseLandmark, point2: PoseLandmark): number {
 }
 
 /**
+ * Valida se as medidas corporais são antropometricamente plausíveis
+ */
+interface MeasurementData {
+  height: number;
+  weight: number;
+  chest: number;
+  waist: number;
+  hip: number;
+  shoulder: number;
+  gender: string;
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  warnings: string[];
+  confidence: number;
+}
+
+function validateMeasurements(data: MeasurementData): ValidationResult {
+  const warnings: string[] = [];
+  let isValid = true;
+
+  const { height, weight, chest, waist, hip, shoulder, gender } = data;
+  const bmi = weight / ((height / 100) ** 2);
+
+  // REGRA 1: Limites absolutos baseados em dados antropométricos reais
+  const limits = {
+    male: {
+      chest: { min: 75, max: 145 },
+      waist: { min: 60, max: 135 },
+      hip: { min: 75, max: 125 },
+      shoulder: { min: 35, max: 55 }
+    },
+    female: {
+      chest: { min: 70, max: 135 },
+      waist: { min: 55, max: 125 },
+      hip: { min: 75, max: 140 },
+      shoulder: { min: 32, max: 50 }
+    }
+  };
+
+  const genderLimits = limits[gender === 'female' ? 'female' : 'male'];
+
+  if (chest < genderLimits.chest.min || chest > genderLimits.chest.max) {
+    warnings.push(`Peito ${chest.toFixed(0)}cm fora do limite (${genderLimits.chest.min}-${genderLimits.chest.max}cm)`);
+    isValid = false;
+  }
+
+  if (waist < genderLimits.waist.min || waist > genderLimits.waist.max) {
+    warnings.push(`Cintura ${waist.toFixed(0)}cm fora do limite (${genderLimits.waist.min}-${genderLimits.waist.max}cm)`);
+    isValid = false;
+  }
+
+  if (hip < genderLimits.hip.min || hip > genderLimits.hip.max) {
+    warnings.push(`Quadril ${hip.toFixed(0)}cm IMPOSSÍVEL (${genderLimits.hip.min}-${genderLimits.hip.max}cm) - Exemplo: homem 1.83m 85kg não pode ter 59cm de quadril`);
+    isValid = false;
+  }
+
+  // REGRA 2: Proporções relativas ao peso/altura
+  const expectedChest = {
+    male: 88 + (bmi - 22) * 3.5,
+    female: 85 + (bmi - 22) * 3.2
+  }[gender === 'female' ? 'female' : 'male'];
+
+  const expectedWaist = {
+    male: 80 + (bmi - 22) * 4.0,
+    female: 70 + (bmi - 22) * 3.8
+  }[gender === 'female' ? 'female' : 'male'];
+
+  const expectedHip = {
+    male: 92 + (bmi - 22) * 3.2,
+    female: 95 + (bmi - 22) * 3.5
+  }[gender === 'female' ? 'female' : 'male'];
+
+  // Tolerância de ±25% das medidas esperadas
+  if (Math.abs(chest - expectedChest) > expectedChest * 0.25) {
+    warnings.push(`Peito ${chest.toFixed(0)}cm muito diferente do esperado (${expectedChest.toFixed(0)}cm para IMC ${bmi.toFixed(1)})`);
+    isValid = false;
+  }
+
+  if (Math.abs(hip - expectedHip) > expectedHip * 0.25) {
+    warnings.push(`Quadril ${hip.toFixed(0)}cm muito diferente do esperado (${expectedHip.toFixed(0)}cm para IMC ${bmi.toFixed(1)})`);
+    isValid = false;
+  }
+
+  // REGRA 3: Proporções entre medidas (muito crítico!)
+  const chestWaistRatio = chest / waist;
+  const hipWaistRatio = hip / waist;
+
+  if (gender === 'male') {
+    // Homens: peito > cintura, quadril ≈ peito ou ligeiramente menor
+    if (chestWaistRatio < 1.0) {
+      warnings.push(`Homem com cintura maior que peito (anormal)`);
+      isValid = false;
+    }
+    if (hip < waist * 0.95) {
+      warnings.push(`Quadril ${hip.toFixed(0)}cm menor que cintura ${waist.toFixed(0)}cm - IMPOSSÍVEL em homens`);
+      isValid = false;
+    }
+    if (hip < chest * 0.75) {
+      warnings.push(`Quadril ${hip.toFixed(0)}cm muito estreito comparado ao peito ${chest.toFixed(0)}cm`);
+      isValid = false;
+    }
+  } else {
+    // Mulheres: quadril geralmente > peito
+    if (hip < chest * 0.85) {
+      warnings.push(`Quadril ${hip.toFixed(0)}cm muito menor que peito ${chest.toFixed(0)}cm (raro em mulheres)`);
+      isValid = false;
+    }
+  }
+
+  // REGRA 4: Ombros devem ser compatíveis com altura e estrutura
+  const shoulderToHeightRatio = shoulder / height;
+  if (shoulderToHeightRatio < 0.20 || shoulderToHeightRatio > 0.35) {
+    warnings.push(`Largura de ombros ${shoulder.toFixed(0)}cm incompatível com altura ${height}cm`);
+    isValid = false;
+  }
+
+  return {
+    isValid,
+    warnings,
+    confidence: isValid ? 1.0 : 0.4
+  };
+}
+
+/**
+ * Corrige medidas impossíveis usando regras antropométricas
+ */
+function correctMeasurements(data: MeasurementData): MeasurementData {
+  const { height, weight, chest, waist, hip, shoulder, gender } = data;
+  const bmi = weight / ((height / 100) ** 2);
+
+  // Calcular medidas esperadas baseadas em IMC e gênero
+  const expectedChest = gender === 'female'
+    ? 85 + (bmi - 22) * 3.2
+    : 88 + (bmi - 22) * 3.5;
+
+  const expectedWaist = gender === 'female'
+    ? 70 + (bmi - 22) * 3.8
+    : 80 + (bmi - 22) * 4.0;
+
+  const expectedHip = gender === 'female'
+    ? 95 + (bmi - 22) * 3.5
+    : 92 + (bmi - 22) * 3.2;
+
+  const expectedShoulder = height * 0.26;
+
+  // Corrigir usando média ponderada: 70% esperado + 30% medido
+  const correctedChest = chest < 70 || chest > 150
+    ? expectedChest
+    : expectedChest * 0.7 + chest * 0.3;
+
+  const correctedWaist = waist < 50 || waist > 140
+    ? expectedWaist
+    : expectedWaist * 0.7 + waist * 0.3;
+
+  const correctedHip = hip < 70 || hip > 150
+    ? expectedHip
+    : expectedHip * 0.7 + hip * 0.3;
+
+  const correctedShoulder = shoulder < 30 || shoulder > 60
+    ? expectedShoulder
+    : expectedShoulder * 0.6 + shoulder * 0.4;
+
+  // Garantir proporções lógicas
+  let finalChest = correctedChest;
+  let finalWaist = correctedWaist;
+  let finalHip = correctedHip;
+
+  // Peito sempre > cintura para homens
+  if (gender === 'male' && finalChest <= finalWaist) {
+    finalChest = finalWaist * 1.1;
+  }
+
+  // Quadril sempre > cintura (mínimo)
+  if (finalHip < finalWaist * 0.95) {
+    finalHip = finalWaist * 1.05;
+  }
+
+  // Quadril sempre > peito * 0.8 para homens (mínimo realista)
+  if (gender === 'male' && finalHip < finalChest * 0.80) {
+    finalHip = finalChest * 0.85;
+  }
+
+  return {
+    height,
+    weight,
+    chest: finalChest,
+    waist: finalWaist,
+    hip: finalHip,
+    shoulder: correctedShoulder,
+    gender
+  };
+}
+
+/**
  * Calcula o perfil corporal baseado em dados do usuário
  */
 function calculateBodyProfile(
@@ -527,6 +723,50 @@ function calculateMeasurementsFromLandmarks(
   console.log('   - Circunf. peito:', chestCircumference.toFixed(1), 'cm (elíptica)');
   console.log('   - Circunf. cintura:', waistCircumference.toFixed(1), 'cm (elíptica)');
   console.log('   - Circunf. quadril:', hipCircumference.toFixed(1), 'cm (elíptica)');
+
+  // 🔹 9.5. VALIDAÇÃO ANTROPOMÉTRICA RIGOROSA
+  const validationResult = validateMeasurements({
+    height: userHeight,
+    weight: userWeight,
+    chest: chestCircumference,
+    waist: waistCircumference,
+    hip: hipCircumference,
+    shoulder: shoulderWidthCm,
+    gender: gender
+  });
+
+  if (!validationResult.isValid) {
+    console.warn('⚠️ MEDIDAS INCONSISTENTES DETECTADAS:');
+    validationResult.warnings.forEach(w => console.warn('   • ' + w));
+
+    // Aplicar correções
+    const corrected = correctMeasurements({
+      height: userHeight,
+      weight: userWeight,
+      chest: chestCircumference,
+      waist: waistCircumference,
+      hip: hipCircumference,
+      shoulder: shoulderWidthCm,
+      gender: gender
+    });
+
+    console.log('✅ MEDIDAS CORRIGIDAS:');
+    console.log('   - Peito: ' + chestCircumference.toFixed(1) + 'cm → ' + corrected.chest.toFixed(1) + 'cm');
+    console.log('   - Cintura: ' + waistCircumference.toFixed(1) + 'cm → ' + corrected.waist.toFixed(1) + 'cm');
+    console.log('   - Quadril: ' + hipCircumference.toFixed(1) + 'cm → ' + corrected.hip.toFixed(1) + 'cm');
+
+    // Usar medidas corrigidas
+    return {
+      shoulderWidth: Math.round(corrected.shoulder),
+      chestCircumference: Math.round(corrected.chest),
+      waistCircumference: Math.round(corrected.waist),
+      hipCircumference: Math.round(corrected.hip),
+      bodyHeight: Math.round(userHeight),
+      armLength: Math.round(userHeight * (gender === 'female' ? 0.37 : 0.38)),
+      legLength: Math.round(userHeight * (gender === 'female' ? 0.49 : 0.47)),
+      confidence: 0.5, // Reduzir confiança para medidas corrigidas
+    };
+  }
 
   // 🔹 10. PROPORÇÕES BRAÇO/PERNA POR GÊNERO E IMC
   let armRatio = 0.38;
