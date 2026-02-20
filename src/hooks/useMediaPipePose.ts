@@ -260,27 +260,27 @@ export function useMediaPipePose() {
     console.log('   • Gênero:', gender);
 
     // 🔹 8. PROFUNDIDADE ESPECÍFICA POR GÊNERO
-    // A profundidade corporal é normalmente 50-70% da largura
-    // Para um homem: largura torácica ~40cm → profundidade ~24cm
-    let chestDepthFactor = 0.68;   // era 0.55
-    let waistDepthFactor = 0.58;   // era 0.45
-    let hipDepthFactor = 0.72;     // era 0.58
+    // A profundidade corporal é normalmente 40-55% da largura
+    // Para um homem: largura torácica ~40cm → profundidade ~18-20cm
+    let chestDepthFactor = 0.50;   // reduzido de 0.68
+    let waistDepthFactor = 0.45;   // reduzido de 0.58
+    let hipDepthFactor = 0.55;     // reduzido de 0.72
 
     if (gender === 'female') {
-      chestDepthFactor = 0.62;    // peito feminino menos profundo (era 0.52)
-      waistDepthFactor = 0.52;    // era 0.42
-      hipDepthFactor = 0.78;      // quadril feminino mais profundo (era 0.62)
+      chestDepthFactor = 0.48;    // peito feminino menos profundo
+      waistDepthFactor = 0.42;    // cintura mais fina
+      hipDepthFactor = 0.60;      // quadril feminino mais profundo
     }
 
-    // Ajustar por IMC
+    // Ajustar por IMC (ajustes menores)
     if (bmi > 27) {
-      chestDepthFactor += 0.12;   // era 0.08
-      waistDepthFactor += 0.15;   // era 0.10
-      hipDepthFactor += 0.12;     // era 0.08
+      chestDepthFactor += 0.08;   // reduzido de 0.12
+      waistDepthFactor += 0.10;   // reduzido de 0.15
+      hipDepthFactor += 0.08;     // reduzido de 0.12
     } else if (bmi < 20) {
-      chestDepthFactor -= 0.08;   // era 0.05
-      waistDepthFactor -= 0.08;   // era 0.05
-      hipDepthFactor -= 0.08;     // era 0.05
+      chestDepthFactor -= 0.05;   // reduzido de 0.08
+      waistDepthFactor -= 0.05;   // reduzido de 0.08
+      hipDepthFactor -= 0.05;     // reduzido de 0.08
     }
 
     // 🔹 9. FÓRMULA ELÍPTICA PARA CIRCUNFERÊNCIAS
