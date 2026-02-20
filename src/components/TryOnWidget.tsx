@@ -111,6 +111,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [interactionCount, setInteractionCount] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
+
+  // Armazenar medidas do modelo corporal final para envio ao GPT
+  const [finalBodyMeasurements, setFinalBodyMeasurements] = useState<{
+    chest: number;
+    waist: number;
+    hip: number;
+  } | null>(null);
   const touchEndX = useRef<number>(0);
 
   // Estados locais para configurações que podem ser atualizadas
@@ -523,6 +530,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       console.log('   Quadril:', bodyHip.toFixed(1), 'cm');
       console.log('   Ombro:', bodyShoulder.toFixed(1), 'cm');
     }
+
+    // Armazenar medidas do modelo corporal final para GPT
+    setFinalBodyMeasurements({
+      chest: Math.round(bodyChest * 10) / 10,
+      waist: Math.round(bodyWaist * 10) / 10,
+      hip: Math.round(bodyHip * 10) / 10
+    });
 
     console.log('⚠️ Corpo modelado. Fit será aplicado na DECISÃO (BLOCO 4).\n');
 
@@ -1669,26 +1683,47 @@ const handleSubmit = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      // Calcular medidas estimadas baseadas em altura, peso e tipo corporal
-      // Essas são estimativas padrão já que não usamos MediaPipe
-      const estimatedChest = sizeData.gender === 'female'
-        ? 80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5
-        : 90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6;
+      // Usar medidas do modelo corporal final (calculadas com MediaPipe ou estimadas)
+      // Se não houver, fazer fallback para estimativas básicas
+      let chestValue, waistValue, hipValue;
 
-      const estimatedWaist = sizeData.gender === 'female'
-        ? 60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4
-        : 75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5;
+      if (finalBodyMeasurements) {
+        // Usar medidas do modelo corporal final calculado
+        chestValue = Math.round(finalBodyMeasurements.chest);
+        waistValue = Math.round(finalBodyMeasurements.waist);
+        hipValue = Math.round(finalBodyMeasurements.hip);
+        console.log('✅ Usando medidas do MODELO CORPORAL FINAL para GPT:', {
+          peito: chestValue,
+          cintura: waistValue,
+          quadril: hipValue
+        });
+      } else {
+        // Fallback: estimativas básicas
+        chestValue = sizeData.gender === 'female'
+          ? Math.round(80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5)
+          : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6);
 
-      const estimatedHip = sizeData.gender === 'female'
-        ? 85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5
-        : 90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5;
+        waistValue = sizeData.gender === 'female'
+          ? Math.round(60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4)
+          : Math.round(75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5);
+
+        hipValue = sizeData.gender === 'female'
+          ? Math.round(85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5)
+          : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5);
+
+        console.log('⚠️ Usando medidas ESTIMADAS (fallback) para GPT:', {
+          peito: chestValue,
+          cintura: waistValue,
+          quadril: hipValue
+        });
+      }
 
       const payload = {
         altura_cm: sizeData.height,
         peso_kg: sizeData.weight,
-        peito_cm: Math.round(estimatedChest),
-        cintura_cm: Math.round(estimatedWaist),
-        quadril_cm: Math.round(estimatedHip),
+        peito_cm: chestValue,
+        cintura_cm: waistValue,
+        quadril_cm: hipValue,
         tipo_corpo: sizeData.bodyType || 'regular',
         ajuste_preferido: sizeData.fit || 'regular',
         genero: sizeData.gender || 'unisex',
