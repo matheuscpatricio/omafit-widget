@@ -2036,35 +2036,38 @@ const handleSubmit = async () => {
       )}
 
       <div className={`w-full h-full overflow-hidden flex flex-col bg-white rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-      {/* Header */}
-      <div className="bg-gray-50 border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
-        <div className="flex items-center justify-center relative">
-          {console.log('🖼️ TryOnWidget - localStoreLogo:', localStoreLogo, 'tipo:', typeof localStoreLogo, 'length:', localStoreLogo?.length)}
-          {localStoreLogo && localStoreLogo.trim() !== '' ? (
-            <>
-              {console.log('✅ Renderizando logo:', localStoreLogo)}
+      {/* Header - Padronizado em todas steps */}
+      <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
+        {/* Botão voltar (esquerda) */}
+        {step !== 'info' && step !== 'processing' && step !== 'result' ? (
+          <button
+            onClick={goBack}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        ) : (
+          <div className="w-6"></div>
+        )}
+
+        {/* Logo centralizado */}
+        <div className="flex-1 flex justify-center">
+          {localStoreLogo && localStoreLogo.trim() !== '' && (
             <img
               src={localStoreLogo}
               alt={localStoreName || 'Logo da loja'}
-              className="h-12 sm:h-16 w-auto object-contain opacity-0 animate-fade-in"
-              style={{ maxWidth: '300px', animationDelay: '0.1s', animationFillMode: 'forwards' }}
+              className="h-12 w-auto object-contain"
               onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
               onError={(e) => {
                 console.error('❌ Erro ao carregar logo:', localStoreLogo);
                 console.error('❌ Erro detalhado:', e);
               }}
             />
-            </>
-          ) : null}
-          {step !== 'info' && step !== 'processing' && step !== 'result' && (
-            <button
-              onClick={goBack}
-              className="absolute left-0 text-gray-600 hover:text-gray-900 p-1 rounded-full hover:bg-gray-200 transition-all duration-300 ease-in-out"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
           )}
         </div>
+
+        {/* Espaço vazio (direita) para balancear o layout */}
+        <div className="w-6"></div>
       </div>
 
       {/* Layout com duas colunas no desktop */}
