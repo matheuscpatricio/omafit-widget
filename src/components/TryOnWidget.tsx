@@ -1877,13 +1877,32 @@ const handleSubmit = async () => {
     return (
       <div className="w-full h-full bg-white flex items-center justify-center rounded-2xl">
         <div className="text-center">
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto mb-4"
-            style={{
-              borderColor: primaryColor,
-              borderTopColor: 'transparent'
-            }}
-          />
+          <div className="flex items-center justify-center gap-1 mb-4">
+            <span
+              className="inline-block w-2 h-2 rounded-full animate-bounce"
+              style={{
+                backgroundColor: primaryColor,
+                animationDelay: '0ms',
+                animationDuration: '1.4s'
+              }}
+            />
+            <span
+              className="inline-block w-2 h-2 rounded-full animate-bounce"
+              style={{
+                backgroundColor: primaryColor,
+                animationDelay: '200ms',
+                animationDuration: '1.4s'
+              }}
+            />
+            <span
+              className="inline-block w-2 h-2 rounded-full animate-bounce"
+              style={{
+                backgroundColor: primaryColor,
+                animationDelay: '400ms',
+                animationDuration: '1.4s'
+              }}
+            />
+          </div>
           <p className="text-gray-700 text-base">{t('loadingProduct')}</p>
         </div>
       </div>
@@ -1968,10 +1987,31 @@ const handleSubmit = async () => {
             {gptLoading && (
               <div className="flex justify-start">
                 <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: localPrimaryColor }}></div>
-                    <div className="w-2 h-2 rounded-full animate-pulse delay-75" style={{ backgroundColor: localPrimaryColor }}></div>
-                    <div className="w-2 h-2 rounded-full animate-pulse delay-150" style={{ backgroundColor: localPrimaryColor }}></div>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className="inline-block w-2 h-2 rounded-full animate-bounce"
+                      style={{
+                        backgroundColor: localPrimaryColor,
+                        animationDelay: '0ms',
+                        animationDuration: '1.4s'
+                      }}
+                    />
+                    <span
+                      className="inline-block w-2 h-2 rounded-full animate-bounce"
+                      style={{
+                        backgroundColor: localPrimaryColor,
+                        animationDelay: '200ms',
+                        animationDuration: '1.4s'
+                      }}
+                    />
+                    <span
+                      className="inline-block w-2 h-2 rounded-full animate-bounce"
+                      style={{
+                        backgroundColor: localPrimaryColor,
+                        animationDelay: '400ms',
+                        animationDuration: '1.4s'
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -2491,13 +2531,32 @@ const handleSubmit = async () => {
         {/* Step 5: Processing */}
         {step === 'processing' && (
           <div className="text-center py-10 md:py-12 animate-fade-in">
-            <div
-              className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-4 border-t-transparent mx-auto mb-6"
-              style={{
-                borderColor: primaryColor,
-                borderTopColor: 'transparent'
-              }}
-            />
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{
+                  backgroundColor: primaryColor,
+                  animationDelay: '0ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{
+                  backgroundColor: primaryColor,
+                  animationDelay: '200ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{
+                  backgroundColor: primaryColor,
+                  animationDelay: '400ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+            </div>
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>
