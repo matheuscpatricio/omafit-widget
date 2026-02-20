@@ -18,7 +18,30 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { model_image, garment_image, product_name, product_id, public_id, user_measurements, pose_landmarks, detected_measurements } = await req.json();
+    const {
+      model_image,
+      garment_image,
+      product_name,
+      product_id,
+      public_id,
+      user_measurements,
+      pose_landmarks,
+      detected_measurements,
+      shop_name,
+      shop_domain,
+      collection_handle
+    } = await req.json();
+
+    console.log('📦 DADOS RECEBIDOS DO WIDGET:');
+    console.log('   • shop_name:', shop_name || 'não fornecido');
+    console.log('   • shop_domain:', shop_domain || 'não fornecido');
+    console.log('   • collection_handle:', collection_handle || 'não fornecido');
+    console.log('   • product_name:', product_name || 'não fornecido');
+    console.log('   • product_id:', product_id || 'não fornecido');
+    console.log('   • public_id:', public_id || 'não fornecido');
+    console.log('   • user_measurements:', user_measurements ? 'presente' : 'não fornecido');
+    console.log('   • pose_landmarks:', pose_landmarks ? 'presente' : 'não fornecido');
+    console.log('   • detected_measurements:', detected_measurements ? 'presente' : 'não fornecido');
 
     if (!model_image || !garment_image) {
       throw new Error('model_image and garment_image are required');
@@ -241,27 +264,46 @@ Deno.serve(async (req: Request) => {
 
     const sessionStartTime = new Date().toISOString();
 
+    // Preparar dados da sessão com shop_name se disponível
+    const sessionData: any = {
+      product_id,
+      customer_email: clientIp,
+      model_image,
+      user_id: effectiveUserId,
+      fashn_status: 'processing',
+      session_start_time: sessionStartTime,
+      processing_start_time: sessionStartTime,
+    };
+
+    // Adicionar shop_name se disponível (para rastreamento de origem)
+    if (shop_name) {
+      sessionData.shop_name = shop_name;
+      console.log('✅ shop_name será salvo na sessão:', shop_name);
+    }
+
+    console.log('💾 Criando sessão no banco com dados:', {
+      product_id: sessionData.product_id,
+      user_id: sessionData.user_id,
+      shop_name: sessionData.shop_name || 'não definido',
+      has_user_measurements: !!user_measurements
+    });
+
     const { data: session, error: sessionError } = await supabaseClient
       .from('tryon_sessions')
-      .insert([
-        {
-          product_id,
-          customer_email: clientIp,
-          model_image,
-          user_id: effectiveUserId,
-          fashn_status: 'processing',
-          session_start_time: sessionStartTime,
-          processing_start_time: sessionStartTime,
-        }
-      ])
+      .insert([sessionData])
       .select()
       .single();
 
     if (sessionError) {
-      throw new Error('Failed to create try-on session');
+      console.error('❌ Erro ao criar sessão:', sessionError);
+      throw new Error('Failed to create try-on session: ' + sessionError.message);
     }
 
-    await supabaseClient
+    console.log('✅ Sessão criada com sucesso. ID:', session.id);
+
+    // Salvar analytics da sessão
+    console.log('💾 Criando analytics da sessão...');
+    const { error: analyticsError } = await supabaseClient
       .from('session_analytics')
       .insert([
         {
@@ -275,8 +317,22 @@ Deno.serve(async (req: Request) => {
         }
       ]);
 
+    if (analyticsError) {
+      console.error('⚠️ Erro ao criar analytics (não crítico):', analyticsError);
+    } else {
+      console.log('✅ Analytics criado com sucesso');
+    }
+
+    // Salvar medidas do usuário se disponíveis
     if (user_measurements) {
-      await supabaseClient
+      console.log('💾 Salvando medidas do usuário:', {
+        gender: user_measurements.gender,
+        height: user_measurements.height,
+        weight: user_measurements.weight,
+        recommended_size: user_measurements.recommended_size
+      });
+
+      const { error: measurementsError } = await supabaseClient
         .from('user_measurements')
         .insert([
           {
@@ -289,6 +345,14 @@ Deno.serve(async (req: Request) => {
             recommended_size: user_measurements.recommended_size
           }
         ]);
+
+      if (measurementsError) {
+        console.error('⚠️ Erro ao salvar medidas (não crítico):', measurementsError);
+      } else {
+        console.log('✅ Medidas do usuário salvas com sucesso');
+      }
+    } else {
+      console.log('⚠️ Nenhuma medida de usuário foi fornecida');
     }
 
     const falInput = {

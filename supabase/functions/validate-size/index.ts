@@ -21,7 +21,9 @@ interface ValidateSizeRequest {
   session_id?: string;
   interaction_count?: number;
   shop_name?: string;
+  shop_domain?: string;
   language?: string;
+  custom_message?: string;
   complementary_product?: {
     name: string;
     category: string;
@@ -517,8 +519,25 @@ Deno.serve(async (req: Request) => {
   try {
     const data: ValidateSizeRequest = await req.json();
 
+    console.log('📦 DADOS RECEBIDOS EM VALIDATE-SIZE:');
+    console.log('   • shop_name:', data.shop_name || 'não fornecido');
+    console.log('   • shop_domain:', data.shop_domain || 'não fornecido');
+    console.log('   • altura_cm:', data.altura_cm);
+    console.log('   • peso_kg:', data.peso_kg);
+    console.log('   • tamanho_calculado:', data.tamanho_calculado_algoritmo);
+    console.log('   • intencao_usuario:', data.intencao_usuario || 'validar tamanho');
+    console.log('   • custom_message:', data.custom_message || 'não fornecido');
+    console.log('   • language:', data.language || 'pt');
+    console.log('   • session_id:', data.session_id || 'não fornecido');
+    console.log('   • interaction_count:', data.interaction_count || 0);
+
     // Validar dados obrigatórios
     if (!data.altura_cm || !data.peso_kg || !data.tamanho_calculado_algoritmo) {
+      console.error('❌ Dados obrigatórios faltando:', {
+        altura_cm: data.altura_cm,
+        peso_kg: data.peso_kg,
+        tamanho_calculado: data.tamanho_calculado_algoritmo
+      });
       return new Response(
         JSON.stringify({
           error: "Dados obrigatórios faltando",
