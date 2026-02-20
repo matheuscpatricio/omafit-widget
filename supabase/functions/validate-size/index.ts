@@ -384,65 +384,83 @@ Return in JSON format:
 function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): string {
   const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const messages: Record<string, string> = {
-    pt: `O tamanho recomendado é ${data.tamanho_calculado_algoritmo}.
+    pt: `Você precisa criar uma mensagem persuasiva incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
 
-Crie uma mensagem persuasiva e amigável incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
+CONTEXTO:
+- Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
 
-REGRAS IMPORTANTES:
-1. Mencione o tamanho ideal APENAS NA PRIMEIRA FRASE (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
-2. Depois, continue naturalmente SEM repetir o tamanho${data.shop_name ? ` (você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante)` : ''}
-3. Seja breve (máximo 2-3 linhas no total)
-4. Use tom conversacional e profissional
-5. Mencione benefícios: confiança no tamanho, experiência try-on, ajuste perfeito
-6. Incentive a adicionar ao carrinho de forma natural
+REGRAS CRÍTICAS (NÃO IGNORE!):
+1. A palavra "tamanho" ou o valor "${data.tamanho_calculado_algoritmo}" deve aparecer APENAS UMA VEZ em toda a mensagem
+2. Coloque o tamanho SOMENTE na primeira frase (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
+3. Depois da primeira frase, NUNCA MAIS mencione o tamanho ou números de tamanho
+4. Continue naturalmente falando sobre benefícios: confiança, experiência try-on, ajuste perfeito${data.shop_name ? `\n5. Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante` : ''}
+5. Seja breve: máximo 2-3 linhas no total
+6. Não use asteriscos, negrito ou formatação especial
+7. Use tom conversacional e profissional
 
-Se você considera que um tamanho diferente seria mais adequado, informe no campo "tamanho_final". Não use asteriscos ou formatação especial.
+EXEMPLO CORRETO:
+"Seu tamanho ideal é M! Experimente virtualmente e adicione ao carrinho com total confiança no ajuste perfeito."
+
+EXEMPLO ERRADO (NÃO FAÇA ISSO):
+"Seu tamanho ideal é M! O tamanho M oferece ajuste perfeito. Adicione o tamanho M ao carrinho."
 
 Retorne no formato JSON:
 {
-  "tamanho_final": "tamanho ideal",
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
   "explicacao": "mensagem persuasiva (tamanho só na primeira frase!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
-    es: `La talla recomendada es ${data.tamanho_calculado_algoritmo}.
+    es: `Necesitas crear un mensaje persuasivo incentivando al usuario a agregar el producto${storeNameContext} al carrito.
 
-Crea un mensaje persuasivo y amigable incentivando al usuario a agregar el producto${storeNameContext} al carrito.
+CONTEXTO:
+- Talla recomendada: ${data.tamanho_calculado_algoritmo}
 
-REGLAS IMPORTANTES:
-1. Menciona la talla ideal SOLO EN LA PRIMERA FRASE (ejemplo: "¡Tu talla ideal es ${data.tamanho_calculado_algoritmo}!")
-2. Después, continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante)` : ''}
-3. Sé breve (máximo 2-3 líneas en total)
-4. Usa tono conversacional y profesional
-5. Menciona beneficios: confianza en la talla, experiencia try-on, ajuste perfecto
-6. Incentiva a agregar al carrito de forma natural
+REGLAS CRÍTICAS (¡NO IGNORES!):
+1. La palabra "talla" o el valor "${data.tamanho_calculado_algoritmo}" debe aparecer SOLO UNA VEZ en todo el mensaje
+2. Coloca la talla SOLAMENTE en la primera frase (ejemplo: "¡Tu talla ideal es ${data.tamanho_calculado_algoritmo}!")
+3. Después de la primera frase, NUNCA MÁS menciones la talla o números de talla
+4. Continúa naturalmente hablando sobre beneficios: confianza, experiencia try-on, ajuste perfecto${data.shop_name ? `\n5. Puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante` : ''}
+5. Sé breve: máximo 2-3 líneas en total
+6. No uses asteriscos, negrita o formato especial
+7. Usa tono conversacional y profesional
 
-Si consideras que una talla diferente sería más adecuada, informa en el campo "tamanho_final". No uses asteriscos ni formato especial.
+EJEMPLO CORRECTO:
+"¡Tu talla ideal es M! Experimenta virtualmente y agrégalo al carrito con total confianza en el ajuste perfecto."
+
+EJEMPLO ERRADO (NO HAGAS ESTO):
+"¡Tu talla ideal es M! La talla M ofrece ajuste perfecto. Agrega la talla M al carrito."
 
 Retorna en formato JSON:
 {
-  "tamanho_final": "talla ideal",
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
   "explicacao": "mensaje persuasivo (talla solo en la primera frase!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
-    en: `The recommended size is ${data.tamanho_calculado_algoritmo}.
+    en: `You need to create a persuasive message encouraging the user to add the product${storeNameContext} to cart.
 
-Create a persuasive and friendly message encouraging the user to add the product${storeNameContext} to cart.
+CONTEXT:
+- Recommended size: ${data.tamanho_calculado_algoritmo}
 
-IMPORTANT RULES:
-1. Mention the ideal size ONLY IN THE FIRST SENTENCE (example: "Your ideal size is ${data.tamanho_calculado_algoritmo}!")
-2. Then, continue naturally WITHOUT repeating the size${data.shop_name ? ` (you can mention the store "${data.shop_name}" naturally if relevant)` : ''}
-3. Be brief (max 2-3 lines total)
-4. Use conversational and professional tone
-5. Mention benefits: size confidence, try-on experience, perfect fit
-6. Encourage adding to cart naturally
+CRITICAL RULES (DO NOT IGNORE!):
+1. The word "size" or the value "${data.tamanho_calculado_algoritmo}" must appear ONLY ONCE in the entire message
+2. Put the size ONLY in the first sentence (example: "Your ideal size is ${data.tamanho_calculado_algoritmo}!")
+3. After the first sentence, NEVER mention the size or size numbers again
+4. Continue naturally talking about benefits: confidence, try-on experience, perfect fit${data.shop_name ? `\n5. You can mention the store "${data.shop_name}" naturally if relevant` : ''}
+5. Be brief: max 2-3 lines total
+6. Don't use asterisks, bold or special formatting
+7. Use conversational and professional tone
 
-If you think a different size would be more appropriate, inform in the "tamanho_final" field. Don't use asterisks or special formatting.
+CORRECT EXAMPLE:
+"Your ideal size is M! Try it virtually and add to cart with total confidence in the perfect fit."
+
+WRONG EXAMPLE (DON'T DO THIS):
+"Your ideal size is M! Size M offers perfect fit. Add size M to cart."
 
 Return in JSON format:
 {
-  "tamanho_final": "ideal size",
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
   "explicacao": "persuasive message (size only in first sentence!)",
   "coerencia": "alta",
   "confianca": 1.0
