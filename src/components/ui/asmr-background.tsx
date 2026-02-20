@@ -26,10 +26,10 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
     let particles: Particle[] = [];
     const mouse = { x: -1000, y: -1000 };
 
-    const PARTICLE_COUNT = 1000;
-    const MAGNETIC_RADIUS = 280;
-    const VORTEX_STRENGTH = 0.07;
-    const PULL_STRENGTH = 0.12;
+    const PARTICLE_COUNT = 800;
+    const MAGNETIC_RADIUS = 200;
+    const VORTEX_STRENGTH = 0.05;
+    const PULL_STRENGTH = 0.08;
 
     class Particle {
       x: number = 0;
@@ -50,14 +50,14 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
       reset() {
         this.x = Math.random() * width;
         this.y = Math.random() * height;
-        this.size = Math.random() * 1.5 + 0.5;
-        this.vx = (Math.random() - 0.5) * 0.2;
-        this.vy = (Math.random() - 0.5) * 0.2;
+        this.size = Math.random() * 0.8 + 0.3;
+        this.vx = (Math.random() - 0.5) * 0.15;
+        this.vy = (Math.random() - 0.5) * 0.15;
         const isGlass = Math.random() > 0.7;
         this.color = isGlass ? '240, 245, 255' : '80, 80, 85';
-        this.alpha = Math.random() * 0.4 + 0.1;
+        this.alpha = Math.random() * 0.35 + 0.08;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.03;
       }
 
       update() {
@@ -106,15 +106,15 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
         ctx.fillStyle = `rgba(${this.color}, ${finalAlpha})`;
 
         if (this.frictionGlow > 0.3) {
-          ctx.shadowBlur = 8 * this.frictionGlow;
-          ctx.shadowColor = `rgba(180, 220, 255, ${this.frictionGlow})`;
+          ctx.shadowBlur = 5 * this.frictionGlow;
+          ctx.shadowColor = `rgba(180, 220, 255, ${this.frictionGlow * 0.7})`;
         }
 
         ctx.beginPath();
-        ctx.moveTo(0, -this.size * 2.5);
-        ctx.lineTo(this.size, 0);
-        ctx.lineTo(0, this.size * 2.5);
-        ctx.lineTo(-this.size, 0);
+        ctx.moveTo(0, -this.size * 1.8);
+        ctx.lineTo(this.size * 0.8, 0);
+        ctx.lineTo(0, this.size * 1.8);
+        ctx.lineTo(-this.size * 0.8, 0);
         ctx.closePath();
         ctx.fill();
 
