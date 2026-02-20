@@ -60,9 +60,10 @@ SUA FUNÇÃO:
 REGRAS DE COMUNICAÇÃO:
 - Seja conversacional e caloroso, não robótico
 - Use frases curtas e diretas com energia positiva
-- Celebre características únicas do corpo de forma positiva
+- Celebre características únicas do corpo de forma positiva e NEUTRA (sem mencionar gênero)
 - Transmita confiança mas sem arrogância
 - Foque em como a peça vai valorizar o cliente
+- NUNCA mencione gênero específico (masculino, feminino, homem, mulher, etc)
 - Nunca use linguagem vaga como "talvez" ou "pode ser"
 - Responda SEMPRE em português com naturalidade
 
@@ -102,9 +103,10 @@ TU FUNCIÓN:
 REGLAS DE COMUNICACIÓN:
 - Sé conversacional y cálido, no robótico
 - Usa frases cortas y directas con energía positiva
-- Celebra características únicas del cuerpo de forma positiva
+- Celebra características únicas del cuerpo de forma positiva y NEUTRA (sin mencionar género)
 - Transmite confianza pero sin arrogancia
 - Enfócate en cómo la prenda va a realzar al cliente
+- NUNCA menciones género específico (masculino, femenino, hombre, mujer, etc)
 - Nunca uses lenguaje vago como "tal vez" o "puede ser"
 - Responde SIEMPRE en español con naturalidad
 
@@ -144,9 +146,10 @@ YOUR FUNCTION:
 COMMUNICATION RULES:
 - Be conversational and warm, not robotic
 - Use short, direct phrases with positive energy
-- Celebrate unique body characteristics in a positive way
+- Celebrate unique body characteristics in a positive and NEUTRAL way (without mentioning gender)
 - Convey confidence without arrogance
 - Focus on how the piece will enhance the client
+- NEVER mention specific gender (male, female, man, woman, etc)
 - Never use vague language like "maybe" or "might be"
 - Always respond in English with naturalness
 
@@ -552,13 +555,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Limitar a 5 interações por sessão
+    // Limitar a 2 interações por sessão
     const interactionCount = data.interaction_count || 0;
-    if (interactionCount >= 5) {
+    if (interactionCount >= 2) {
       return new Response(
         JSON.stringify({
           error: "Limite de interações atingido",
-          message: "Você atingiu o limite de 5 interações por sessão.",
+          message: "Você atingiu o limite de 2 interações por sessão.",
         }),
         {
           status: 429,

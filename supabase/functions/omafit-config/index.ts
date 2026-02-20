@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
 
     let query = supabaseClient
       .from('widget_configurations')
-      .select('shop_domain, link_text, store_logo, primary_color, widget_enabled')
+      .select('shop_domain, link_text, store_logo, primary_color, widget_enabled, store_name')
       .eq('widget_enabled', true);
 
     if (shop) {
@@ -194,7 +194,7 @@ Deno.serve(async (req: Request) => {
     const config = {
       publicId: shop || data.shop_domain,
       linkText: data.link_text || 'Experimentar virtualmente',
-      storeName: '',
+      storeName: data.store_name || '',
       storeLogo: storeLogo,
       fontFamily: 'Outfit, sans-serif',
       colors: {

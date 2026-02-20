@@ -1688,7 +1688,7 @@ const handleSubmit = async () => {
   };
 
   const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any, customMessage?: string) => {
-    if (interactionCount >= 5) {
+    if (interactionCount >= 2) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
         es: 'Has alcanzado el límite de interacciones por sesión.',
@@ -2021,7 +2021,7 @@ const handleSubmit = async () => {
           </div>
 
           {/* Input Area */}
-          {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
+          {interactionCount < 2 && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
               {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
               {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
