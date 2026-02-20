@@ -21,6 +21,7 @@ interface ValidateSizeRequest {
   session_id?: string;
   interaction_count?: number;
   shop_name?: string;
+  language?: string;
   complementary_product?: {
     name: string;
     category: string;
@@ -35,7 +36,9 @@ interface GPTResponse {
   confianca: number;
 }
 
-const SYSTEM_PROMPT = `Você é um assistente técnico especializado em ajuste de roupas e análise corporal.
+function getSystemPrompt(language: string): string {
+  const prompts: Record<string, string> = {
+    pt: `Você é um assistente técnico especializado em ajuste de roupas e análise corporal.
 Sua função é:
 
 - Validar coerência das medidas corporais fornecidas.
@@ -46,6 +49,7 @@ Sua função é:
 - Nunca extrapolar além das informações fornecidas.
 - Não usar linguagem vaga como "talvez" ou "pode ser".
 - Manter resposta objetiva, clara e profissional.
+- Responder SEMPRE em português.
 
 IMPORTANTE: Sua resposta deve ser um JSON válido com esta estrutura exata:
 {
@@ -53,10 +57,56 @@ IMPORTANTE: Sua resposta deve ser um JSON válido com esta estrutura exata:
   "explicacao": "explicação concisa e profissional",
   "coerencia": "alta/média/baixa",
   "confianca": 0.0-1.0
-}`;
+}`,
+    es: `Eres un asistente técnico especializado en ajuste de prendas y análisis corporal.
+Tu función es:
 
-async function callOpenAI(userPrompt: string): Promise<GPTResponse> {
+- Validar la coherencia de las medidas corporales proporcionadas.
+- Considerar el nivel de elasticidad de la prenda.
+- Confirmar o ajustar la talla recomendada por el algoritmo.
+- Priorizar la seguridad en el ajuste.
+- Nunca inventar datos.
+- Nunca extrapolar más allá de la información proporcionada.
+- No usar lenguaje vago como "tal vez" o "puede ser".
+- Mantener respuesta objetiva, clara y profesional.
+- Responder SIEMPRE en español.
+
+IMPORTANTE: Tu respuesta debe ser un JSON válido con esta estructura exacta:
+{
+  "tamanho_final": "S/M/L/XL/etc",
+  "explicacao": "explicación concisa y profesional",
+  "coerencia": "alta/media/baja",
+  "confianca": 0.0-1.0
+}`,
+    en: `You are a technical assistant specialized in clothing fit and body analysis.
+Your function is:
+
+- Validate consistency of provided body measurements.
+- Consider the elasticity level of the garment.
+- Confirm or adjust the size recommended by the algorithm.
+- Prioritize fit safety.
+- Never invent data.
+- Never extrapolate beyond the information provided.
+- Don't use vague language like "maybe" or "might be".
+- Keep response objective, clear and professional.
+- Always respond in English.
+
+IMPORTANT: Your response must be valid JSON with this exact structure:
+{
+  "tamanho_final": "XS/S/M/L/XL/etc",
+  "explicacao": "concise and professional explanation",
+  "coerencia": "high/medium/low",
+  "confianca": 0.0-1.0
+}`
+  };
+
+  return prompts[language] || prompts['en'];
+}
+
+async function callOpenAI(userPrompt: string, language: string = 'pt'): Promise<GPTResponse> {
   try {
+    const systemPrompt = getSystemPrompt(language);
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -66,7 +116,7 @@ async function callOpenAI(userPrompt: string): Promise<GPTResponse> {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         max_tokens: 250,
@@ -188,8 +238,11 @@ Deno.serve(async (req: Request) => {
       userPrompt = buildValidationPrompt(data);
     }
 
+    // Obter idioma (padrão: pt)
+    const language = data.language || 'pt';
+
     // Chamar OpenAI
-    const gptResponse = await callOpenAI(userPrompt);
+    const gptResponse = await callOpenAI(userPrompt, language);
 
     return new Response(
       JSON.stringify({

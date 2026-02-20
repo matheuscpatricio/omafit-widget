@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Camera, Sparkles, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart } from 'lucide-react';
+import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -1611,7 +1611,12 @@ const handleSubmit = async () => {
 
   const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any) => {
     if (interactionCount >= 3) {
-      setGptResponse('Você atingiu o limite de 3 interações por sessão.');
+      const limitMessages = {
+        pt: 'Você atingiu o limite de 3 interações por sessão.',
+        es: 'Has alcanzado el límite de 3 interacciones por sesión.',
+        en: 'You have reached the limit of 3 interactions per session.'
+      };
+      setGptResponse(limitMessages[currentLanguage]);
       return;
     }
 
@@ -1636,6 +1641,7 @@ const handleSubmit = async () => {
         session_id: sessionId,
         interaction_count: interactionCount,
         shop_name: storeName,
+        language: currentLanguage,
         complementary_product: complementaryProduct,
       };
 
@@ -1663,7 +1669,12 @@ const handleSubmit = async () => {
       }
     } catch (error) {
       console.error('Erro ao chamar GPT:', error);
-      setGptResponse('Não foi possível validar o tamanho no momento. Por favor, tente novamente.');
+      const errorMessages = {
+        pt: 'Não foi possível validar o tamanho no momento. Por favor, tente novamente.',
+        es: 'No fue posible validar la talla en este momento. Por favor, inténtalo de nuevo.',
+        en: 'Could not validate size at this time. Please try again.'
+      };
+      setGptResponse(errorMessages[currentLanguage]);
     } finally {
       setGptLoading(false);
     }
@@ -2239,8 +2250,7 @@ const handleSubmit = async () => {
                 {showAssistant && (
                   <div className="mt-4 mb-4">
                     <div className="bg-white border-2 rounded-lg p-4 shadow-sm" style={{ borderColor: primaryColor }}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="w-5 h-5" style={{ color: primaryColor }} />
+                      <div className="mb-3">
                         <h4 className="font-semibold text-gray-900">
                           Assistente {storeName}
                         </h4>
@@ -2249,12 +2259,16 @@ const handleSubmit = async () => {
                       {gptLoading ? (
                         <div className="flex items-center gap-2 text-gray-600">
                           <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
-                          <p className="text-sm">Analisando ajuste com assistente inteligente...</p>
+                          <p className="text-sm">
+                            {currentLanguage === 'pt' && 'Analisando ajuste com assistente inteligente...'}
+                            {currentLanguage === 'es' && 'Analizando ajuste con asistente inteligente...'}
+                            {currentLanguage === 'en' && 'Analyzing fit with intelligent assistant...'}
+                          </p>
                         </div>
                       ) : gptResponse ? (
                         <div>
-                          <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: `${primaryColor}15` }}>
-                            <p className="text-sm text-gray-800 whitespace-pre-line">{gptResponse}</p>
+                          <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: primaryColor }}>
+                            <p className="text-sm text-white whitespace-pre-line">{gptResponse}</p>
                           </div>
 
                           {interactionCount < 3 && (
@@ -2268,7 +2282,9 @@ const handleSubmit = async () => {
                                 style={{ backgroundColor: primaryColor }}
                               >
                                 <ShoppingCart className="w-4 h-4 inline mr-2" />
-                                Confirmar tamanho
+                                {currentLanguage === 'pt' && 'Confirmar tamanho'}
+                                {currentLanguage === 'es' && 'Confirmar talla'}
+                                {currentLanguage === 'en' && 'Confirm size'}
                               </button>
 
                               {recommendedProductName && recommendedProductUrl && (
@@ -2283,8 +2299,9 @@ const handleSubmit = async () => {
                                   className="w-full py-2 px-4 rounded-lg font-medium border-2 transition-all"
                                   style={{ borderColor: primaryColor, color: primaryColor }}
                                 >
-                                  <Sparkles className="w-4 h-4 inline mr-2" />
-                                  Sugerir combinações
+                                  {currentLanguage === 'pt' && 'Sugerir combinações'}
+                                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
+                                  {currentLanguage === 'en' && 'Suggest combinations'}
                                 </button>
                               )}
                             </div>
@@ -2380,8 +2397,7 @@ const handleSubmit = async () => {
                 {showAssistant && (
                   <div className="mt-4">
                     <div className="bg-white border-2 rounded-lg p-5 shadow-sm" style={{ borderColor: primaryColor }}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="w-6 h-6" style={{ color: primaryColor }} />
+                      <div className="mb-4">
                         <h4 className="font-semibold text-lg text-gray-900">
                           Assistente {storeName}
                         </h4>
@@ -2390,12 +2406,16 @@ const handleSubmit = async () => {
                       {gptLoading ? (
                         <div className="flex items-center gap-3 text-gray-600">
                           <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
-                          <p className="text-base">Analisando ajuste com assistente inteligente...</p>
+                          <p className="text-base">
+                            {currentLanguage === 'pt' && 'Analisando ajuste com assistente inteligente...'}
+                            {currentLanguage === 'es' && 'Analizando ajuste con asistente inteligente...'}
+                            {currentLanguage === 'en' && 'Analyzing fit with intelligent assistant...'}
+                          </p>
                         </div>
                       ) : gptResponse ? (
                         <div>
-                          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: `${primaryColor}15` }}>
-                            <p className="text-base text-gray-800 whitespace-pre-line">{gptResponse}</p>
+                          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: primaryColor }}>
+                            <p className="text-base text-white whitespace-pre-line">{gptResponse}</p>
                           </div>
 
                           {interactionCount < 3 && (
@@ -2409,7 +2429,9 @@ const handleSubmit = async () => {
                                 style={{ backgroundColor: primaryColor }}
                               >
                                 <ShoppingCart className="w-5 h-5 inline mr-2" />
-                                Confirmar tamanho
+                                {currentLanguage === 'pt' && 'Confirmar tamanho'}
+                                {currentLanguage === 'es' && 'Confirmar talla'}
+                                {currentLanguage === 'en' && 'Confirm size'}
                               </button>
 
                               {recommendedProductName && recommendedProductUrl && (
@@ -2424,8 +2446,9 @@ const handleSubmit = async () => {
                                   className="flex-1 py-3 px-4 rounded-lg font-medium border-2 transition-all"
                                   style={{ borderColor: primaryColor, color: primaryColor }}
                                 >
-                                  <Sparkles className="w-5 h-5 inline mr-2" />
-                                  Sugerir combinações
+                                  {currentLanguage === 'pt' && 'Sugerir combinações'}
+                                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
+                                  {currentLanguage === 'en' && 'Suggest combinations'}
                                 </button>
                               )}
                             </div>
