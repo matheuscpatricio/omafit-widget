@@ -81,7 +81,21 @@ export function useMediaPipePose() {
 
     try {
       console.log('🔍 Detectando pose na imagem...');
-      const result = poseLandmarkerRef.current.detect(imageElement);
+
+      // Executar detecção de forma assíncrona para não bloquear a UI
+      const result = await new Promise<PoseLandmarkerResult>((resolve) => {
+        // Use requestIdleCallback se disponível, senão setTimeout
+        const runDetection = () => {
+          const detectionResult = poseLandmarkerRef.current!.detect(imageElement);
+          resolve(detectionResult);
+        };
+
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(runDetection, { timeout: 100 });
+        } else {
+          setTimeout(runDetection, 0);
+        }
+      });
 
       if (result.landmarks && result.landmarks.length > 0) {
         console.log(`✅ Detectados ${result.landmarks[0].length} landmarks`);
@@ -104,6 +118,7 @@ export function useMediaPipePose() {
     userWeight?: number,
     userGender?: string
   ): BodyMeasurements => {
+    const startTime = performance.now();
     console.log('📏 Calculando medidas corporais a partir dos landmarks...');
 
     // Extrair landmarks
@@ -345,6 +360,9 @@ export function useMediaPipePose() {
     console.log('     - Postura:', (posturePenalty * 100).toFixed(0), '%');
     console.log('     - Perspectiva:', (perspectivePenalty * 100).toFixed(0), '%');
     console.log('     - Plausibilidade:', isPlausible ? '100%' : '30%');
+
+    const endTime = performance.now();
+    console.log(`⏱️ Tempo de cálculo: ${(endTime - startTime).toFixed(2)}ms`);
 
     return measurements;
   };

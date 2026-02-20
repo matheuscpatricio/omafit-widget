@@ -1267,12 +1267,18 @@ const handleSubmit = async () => {
         console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
         setProcessingMessage(t('analyzingPhoto'));
 
+        // Permitir que a UI atualize antes de processar
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         const imgElement = new Image();
         imgElement.src = modelImageDataUrl;
 
         await new Promise((resolve) => {
           imgElement.onload = resolve;
         });
+
+        // Permitir que a UI atualize novamente
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const poseResult = await detectPose(imgElement);
 
@@ -1286,6 +1292,9 @@ const handleSubmit = async () => {
             z: lm.z,
             visibility: lm.visibility || 0
           }));
+
+          // Permitir que a UI atualize antes do cálculo pesado
+          await new Promise(resolve => setTimeout(resolve, 50));
 
           const measurements = calculateBodyMeasurements(
             detectedLandmarks,
@@ -2179,7 +2188,7 @@ const handleSubmit = async () => {
         {/* Step 5: Processing */}
         {step === 'processing' && (
           <div className="text-center py-10 md:py-12 animate-fade-in">
-            <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6"></div>
+            <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6 will-change-transform"></div>
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>

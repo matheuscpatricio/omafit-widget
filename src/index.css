@@ -71,4 +71,11 @@
   .animate-fade-in {
     animation: fade-in 0.4s ease-in-out;
   }
+
+  /* GPU-accelerated spin animation */
+  .animate-spin {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
 }
