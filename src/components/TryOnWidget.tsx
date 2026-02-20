@@ -120,10 +120,24 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   } | null>(null);
   const touchEndX = useRef<number>(0);
 
+  // 🔹 Função auxiliar para derivar storeName do shopDomain
+  const deriveStoreName = (domain: string): string => {
+    if (!domain) return '';
+    return domain
+      .replace(/\.myshopify\.com$/, '')
+      .replace(/\./g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  // 🔹 Resolver storeName com fallback robusto (mesma lógica do omafit-widget.js)
+  const resolveStoreName = (): string => {
+    return storeName || deriveStoreName(shopDomain) || 'Omafit';
+  };
+
   // Estados locais para configurações que podem ser atualizadas
   const [localStoreLogo, setLocalStoreLogo] = useState<string>(storeLogo || '');
   const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
-  const [localStoreName, setLocalStoreName] = useState<string>(storeName);
+  const [localStoreName, setLocalStoreName] = useState<string>(resolveStoreName());
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
 
@@ -180,10 +194,14 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   }, [primaryColor]);
 
   useEffect(() => {
-    if (storeName) {
-      setLocalStoreName(storeName);
-    }
-  }, [storeName]);
+    const resolved = resolveStoreName();
+    console.log('🏪 Resolvendo storeName:', {
+      prop: storeName,
+      shopDomain,
+      resolved
+    });
+    setLocalStoreName(resolved);
+  }, [storeName, shopDomain]);
 
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
@@ -245,8 +263,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         }
 
         if (event.data.storeName) {
-          console.log('✅ Atualizando storeName:', event.data.storeName);
+          console.log('✅ Atualizando storeName via postMessage:', event.data.storeName);
           setLocalStoreName(event.data.storeName);
+        } else if (event.data.shopDomain) {
+          // Derivar storeName do shopDomain se não vier explicitamente
+          const derived = deriveStoreName(event.data.shopDomain);
+          console.log('✅ Derivando storeName do shopDomain:', derived);
+          setLocalStoreName(derived);
         }
       }
 
