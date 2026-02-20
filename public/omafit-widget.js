@@ -981,6 +981,12 @@
 
     // Garantir que shopDomain está disponível
     const shopDomain = OMAFIT_CONFIG.shopDomain || '';
+    const shopNameFromDomain = shopDomain ? shopDomain.replace(/\.myshopify\.com$/i, '') : '';
+    const resolvedStoreName =
+      (OMAFIT_CONFIG.storeName && String(OMAFIT_CONFIG.storeName).trim()) ||
+      shopNameFromDomain ||
+      'Omafit';
+    config.storeName = resolvedStoreName;
     const rootEl = document.getElementById('omafit-widget-root');
     let collectionHandle = (rootEl && rootEl.dataset && rootEl.dataset.collectionHandle) ? rootEl.dataset.collectionHandle : '';
     const defaultGender = (rootEl && rootEl.dataset && rootEl.dataset.defaultGender) ? rootEl.dataset.defaultGender : '';
@@ -1017,6 +1023,9 @@
       '&productName=' + encodeURIComponent(productInfo.productName || 'Produto') +
       '&publicId=' + encodeURIComponent(publicIdToUse) +
       '&shopDomain=' + encodeURIComponent(shopDomain) +
+      '&shop_domain=' + encodeURIComponent(shopDomain) +
+      '&shopName=' + encodeURIComponent(resolvedStoreName) +
+      '&shop_name=' + encodeURIComponent(resolvedStoreName) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
       (defaultGender ? '&defaultGender=' + encodeURIComponent(defaultGender) : '') +
       (collectionType ? '&collectionType=' + encodeURIComponent(collectionType) : '') +
@@ -1431,6 +1440,23 @@
       'button.product-form__cart-submit'
     ];
 
+    // Seletores comuns do botão/contêiner "Compre já" (dynamic checkout)
+    const buyNowSelectors = [
+      '.shopify-payment-button',
+      '.shopify-payment-button__button',
+      'shopify-buy-it-now-button',
+      '[data-shopify="payment-button"]'
+    ];
+
+    function findFirstVisible(selectors, root) {
+      const scope = root || document;
+      for (const sel of selectors) {
+        const el = scope.querySelector(sel);
+        if (el && el.offsetParent !== null) return { element: el, selector: sel };
+      }
+      return null;
+    }
+
     let addToCartButton = null;
     for (const sel of addToCartSelectors) {
       const btn = document.querySelector(sel);
@@ -1452,10 +1478,40 @@
     container.appendChild(link);
 
     if (addToCartButton) {
-      // Inserir logo após o botão de carrinho
-      if (addToCartButton.parentNode) {
-        addToCartButton.parentNode.insertBefore(container, addToCartButton.nextSibling);
-        console.log('✅ Widget inserido após botão de carrinho');
+      // Priorizar posicionamento abaixo do "Compre já", para ficar abaixo dos dois CTAs.
+      let anchorElement = null;
+
+      const closestForm = addToCartButton.closest('form');
+      const closestProductBlock =
+        addToCartButton.closest('.product-form') ||
+        addToCartButton.closest('.product') ||
+        addToCartButton.closest('[class*="product"]');
+
+      // Busca "Compre já" em raízes mais próximas primeiro (evita pegar botão de outra seção).
+      const searchRoots = [
+        closestForm?.parentElement || null,
+        closestForm || null,
+        closestProductBlock || null,
+        document
+      ].filter(Boolean);
+
+      for (const root of searchRoots) {
+        const foundBuyNow = findFirstVisible(buyNowSelectors, root);
+        if (foundBuyNow?.element) {
+          anchorElement = foundBuyNow.element;
+          console.log('✅ Botão/contêiner "Compre já" encontrado com seletor:', foundBuyNow.selector);
+          break;
+        }
+      }
+
+      // Se não encontrar "Compre já", mantém comportamento antigo (abaixo do adicionar ao carrinho).
+      if (!anchorElement) {
+        anchorElement = addToCartButton;
+      }
+
+      if (anchorElement.parentNode) {
+        anchorElement.parentNode.insertBefore(container, anchorElement.nextSibling);
+        console.log('✅ Widget inserido abaixo dos botões de compra');
       } else {
         // fallback: tenta inserir no root, se existir
         const root = document.getElementById('omafit-widget-root');
@@ -1489,19 +1545,6 @@
       // Inserir no body como último recurso
       document.body.appendChild(container);
       console.log('✅ Widget inserido no body (último recurso)');
-    }
-
-    // Inserir logo após o botão de carrinho
-    if (addToCartButton.parentNode) {
-      addToCartButton.parentNode.insertBefore(container, addToCartButton.nextSibling);
-    } else {
-      // fallback: tenta inserir no root, se existir
-      const root = document.getElementById('omafit-widget-root');
-      if (root) {
-        root.appendChild(container);
-      } else {
-        document.body.appendChild(container);
-      }
     }
 
     // CSS extra para mobile e foco
