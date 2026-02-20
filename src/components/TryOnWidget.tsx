@@ -185,11 +185,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
   }, [storeName]);
 
-  // Chamar assistente GPT automaticamente quando chegar no resultado
+  // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
     if (step === 'result' && result && sizeData && chatMessages.length === 0 && !gptLoading) {
       setTimeout(() => {
-        callGPTAssistant('validate');
+        callGPTAssistant('add_to_cart');
       }, 1000);
     }
   }, [step, result, sizeData]);
@@ -1735,7 +1735,7 @@ const handleSubmit = async () => {
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
-        intencao_usuario: intention === 'custom' ? 'custom_message' : intention === 'complementary' ? 'sugerir_combinacoes' : intention === 'confirm_size' ? 'induzir_adicionar_carrinho' : 'validar_tamanho',
+        intencao_usuario: intention === 'custom' ? 'custom_message' : intention === 'complementary' ? 'sugerir_combinacoes' : 'induzir_adicionar_carrinho',
         custom_message: customMessage,
         session_id: sessionId,
         interaction_count: interactionCount,
@@ -1765,7 +1765,18 @@ const handleSubmit = async () => {
       console.log('📥 Resposta recebida:', result);
 
       if (result.success && result.data) {
-        const { tamanho_final, explicacao } = result.data;
+        const { tamanho_final, explicacao, should_end_conversation } = result.data;
+
+        // Se a conversa deve ser encerrada (conteúdo inadequado), mostrar mensagem e bloquear
+        if (should_end_conversation) {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: explicacao,
+            timestamp: Date.now()
+          }]);
+          setInteractionCount(5); // Bloquear novas interações
+          return;
+        }
 
         setChatMessages(prev => [...prev, {
           role: 'assistant',
@@ -1951,23 +1962,6 @@ const handleSubmit = async () => {
             <div className="p-4 border-t bg-gray-50">
               {/* Quick Action Buttons inside chat */}
               <div className="flex gap-2 mb-3">
-                <button
-                  onClick={() => {
-                    setChatMessages(prev => [...prev, {
-                      role: 'user',
-                      content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
-                      timestamp: Date.now()
-                    }]);
-                    callGPTAssistant('confirm_size');
-                  }}
-                  className="py-3 px-6 rounded-xl font-medium text-white shadow-sm transition-all hover:shadow-md text-sm w-auto"
-                  style={{ backgroundColor: localPrimaryColor }}
-                >
-                  {currentLanguage === 'pt' && 'Confirmar tamanho'}
-                  {currentLanguage === 'es' && 'Confirmar talla'}
-                  {currentLanguage === 'en' && 'Confirm size'}
-                </button>
-
                 {recommendedProductName && recommendedProductUrl && (
                   <button
                     onClick={() => {
