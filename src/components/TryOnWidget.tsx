@@ -1877,22 +1877,20 @@ const handleSubmit = async () => {
         <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
-            <div className="flex items-center gap-3">
-              {localStoreLogo && (
-                <img src={localStoreLogo} alt={localStoreName} className="h-8 w-8 object-contain" />
-              )}
-              <h2 className="text-lg font-semibold" style={{ color: localPrimaryColor }}>
-                {currentLanguage === 'pt' && 'Assistente'}
-                {currentLanguage === 'es' && 'Asistente'}
-                {currentLanguage === 'en' && 'Assistant'} {localStoreName}
-              </h2>
-            </div>
             <button
               onClick={resetWidget}
               className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
+
+            <div className="flex-1 flex justify-center">
+              {localStoreLogo && (
+                <img src={localStoreLogo} alt={localStoreName} className="h-12 w-auto object-contain" />
+              )}
+            </div>
+
+            <div className="w-10"></div>
           </div>
 
           {/* Chat Messages */}
