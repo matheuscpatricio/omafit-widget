@@ -413,37 +413,24 @@ export function useMediaPipePose() {
     console.log('     - Cintura detectada:', waistCircumference.toFixed(1), 'cm');
     console.log('     - Quadril detectado:', hipCircumference.toFixed(1), 'cm');
 
-    // Função para ajustar medidas fora da faixa
+    // Função para ajustar medidas fora da faixa - SEMPRE traz de volta para dentro da faixa
     const clampToRange = (measured: number, range: MeasurementRange, label: string): number => {
-      if (measured < range.min || measured > range.max) {
-        console.warn(`   ⚠️ ${label} fora da faixa humanamente comum:`, measured.toFixed(1), 'cm');
+      // Se está fora da faixa, força para o valor esperado
+      if (measured < range.min) {
+        console.warn(`   ⚠️ ${label} ABAIXO do mínimo:`, measured.toFixed(1), 'cm');
         console.warn(`      Faixa permitida: ${range.min.toFixed(1)} - ${range.max.toFixed(1)} cm`);
-
-        // Calcular o quão fora está
-        const errorPercent = Math.abs(measured - range.expected) / range.expected * 100;
-        console.warn(`      Desvio do esperado: ${errorPercent.toFixed(0)}%`);
-
-        // Se muito fora (>30%), priorizar o valor esperado
-        // Se pouco fora (15-30%), fazer blend
-        let adjusted: number;
-
-        if (errorPercent > 30) {
-          // Erro grande: 70% esperado + 30% detectado (limitado à faixa)
-          const clampedMeasured = Math.max(range.min, Math.min(range.max, measured));
-          adjusted = range.expected * 0.7 + clampedMeasured * 0.3;
-          console.warn(`      Erro grande (${errorPercent.toFixed(0)}%), usando 70% do esperado`);
-        } else {
-          // Erro moderado: 50% esperado + 50% detectado (limitado à faixa)
-          const clampedMeasured = Math.max(range.min, Math.min(range.max, measured));
-          adjusted = range.expected * 0.5 + clampedMeasured * 0.5;
-          console.warn(`      Erro moderado (${errorPercent.toFixed(0)}%), usando 50% do esperado`);
-        }
-
-        console.warn(`      ✅ Valor ajustado: ${adjusted.toFixed(1)} cm`);
-        return adjusted;
+        console.warn(`      ✅ Ajustando para o valor esperado: ${range.expected.toFixed(1)} cm`);
+        return range.expected;
       }
 
-      console.log(`   ✓ ${label} dentro da faixa normal`);
+      if (measured > range.max) {
+        console.warn(`   ⚠️ ${label} ACIMA do máximo:`, measured.toFixed(1), 'cm');
+        console.warn(`      Faixa permitida: ${range.min.toFixed(1)} - ${range.max.toFixed(1)} cm`);
+        console.warn(`      ✅ Ajustando para o valor esperado: ${range.expected.toFixed(1)} cm`);
+        return range.expected;
+      }
+
+      console.log(`   ✓ ${label} dentro da faixa normal (${measured.toFixed(1)} cm)`);
       return measured;
     };
 
