@@ -330,44 +330,44 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </section>
 
-      {/* ZoomParallax Section - Precision & Analytics */}
-      <section className="relative bg-black">
-        <ZoomParallax
-          videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/video_1760123751873.mp4"
-          images={[
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
-              alt: 'Precisão na medição',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/818977cf-5249-4b75-a269-58101c30c9ac.jpeg',
-              alt: 'Analytics avançado',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/790e602d-8e3e-492e-b6b5-89c917c449d2.png',
-              alt: 'Dados em tempo real',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
-              alt: 'Moda e tecnologia',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fc6a657-bb77-4bd2-9774-1dbb316e4b5a.jpeg',
-              alt: 'Dashboard intuitivo',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/eee28427-629f-4b81-bcff-0b6204b61e27.png',
-              alt: 'Medidas precisas',
-            },
-            {
-              src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/f6eed9b9-aa98-4845-84ef-cc8fcd1650fc.jpeg',
-              alt: 'Relatórios detalhados',
-            },
-          ]}
-        />
+          {/* ZoomParallax Section - Precision & Analytics */}
+          <section className="relative">
+            <ZoomParallax
+              videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/video_1760123751873.mp4"
+              images={[
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
+                  alt: 'Precisão na medição',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/818977cf-5249-4b75-a269-58101c30c9ac.jpeg',
+                  alt: 'Analytics avançado',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/790e602d-8e3e-492e-b6b5-89c917c449d2.png',
+                  alt: 'Dados em tempo real',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
+                  alt: 'Moda e tecnologia',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fc6a657-bb77-4bd2-9774-1dbb316e4b5a.jpeg',
+                  alt: 'Dashboard intuitivo',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/eee28427-629f-4b81-bcff-0b6204b61e27.png',
+                  alt: 'Medidas precisas',
+                },
+                {
+                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/f6eed9b9-aa98-4845-84ef-cc8fcd1650fc.jpeg',
+                  alt: 'Relatórios detalhados',
+                },
+              ]}
+            />
 
-        <ZoomParallaxText />
-      </section>
+            <ZoomParallaxText />
+          </section>
 
           {/* Features Cards */}
           <section className="py-20">
