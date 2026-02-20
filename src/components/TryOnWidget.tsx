@@ -1957,34 +1957,17 @@ const handleSubmit = async () => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Input Area with Buttons */}
+          {/* Input Area */}
           {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
-              {/* Quick Action Buttons inside chat */}
-              <div className="flex gap-2 mb-3">
-                {recommendedProductName && recommendedProductUrl && (
-                  <button
-                    onClick={() => {
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('complementary', {
-                        name: recommendedProductName,
-                        category: 'complementar',
-                        image_url: recommendedProductUrl,
-                      });
-                    }}
-                    className="flex-1 py-3 px-4 rounded-xl font-medium border-2 transition-all hover:bg-gray-50 text-sm"
-                    style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
-                  >
-                    {currentLanguage === 'pt' && '🔗 Sugerir combinações'}
-                    {currentLanguage === 'es' && '🔗 Sugerir combinaciones'}
-                    {currentLanguage === 'en' && '🔗 Suggest combinations'}
-                  </button>
-                )}
-              </div>
+              {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
+              {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
+                <p className="text-sm text-gray-600 text-center mb-3">
+                  {currentLanguage === 'pt' && 'Tem alguma dúvida? Pergunte abaixo'}
+                  {currentLanguage === 'es' && '¿Tienes alguna duda? Pregunta abajo'}
+                  {currentLanguage === 'en' && 'Have any questions? Ask below'}
+                </p>
+              )}
 
               {/* Text Input */}
               <div className="flex gap-2">
