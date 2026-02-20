@@ -1669,12 +1669,29 @@ const handleSubmit = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+      // Calcular medidas estimadas baseadas em altura, peso e tipo corporal
+      // Essas são estimativas padrão já que não usamos MediaPipe
+      const estimatedChest = sizeData.gender === 'female'
+        ? 80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5
+        : 90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6;
+
+      const estimatedWaist = sizeData.gender === 'female'
+        ? 60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4
+        : 75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5;
+
+      const estimatedHip = sizeData.gender === 'female'
+        ? 85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5
+        : 90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5;
+
       const payload = {
         altura_cm: sizeData.height,
         peso_kg: sizeData.weight,
-        peito_cm: sizeData.chest,
-        cintura_cm: sizeData.waist,
-        quadril_cm: sizeData.hip,
+        peito_cm: Math.round(estimatedChest),
+        cintura_cm: Math.round(estimatedWaist),
+        quadril_cm: Math.round(estimatedHip),
+        tipo_corpo: sizeData.bodyType || 'regular',
+        ajuste_preferido: sizeData.fit || 'regular',
+        genero: sizeData.gender || 'unisex',
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
@@ -1812,6 +1829,153 @@ const handleSubmit = async () => {
         .hover\\:border-primary:hover { border-color: ${localPrimaryColor} !important; }
         .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
       `}</style>
+
+      {/* Full Screen Chat - Outside widget container */}
+      {step === 'result' && result && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
+            <div className="flex items-center gap-3">
+              {localStoreLogo && (
+                <img src={localStoreLogo} alt={localStoreName} className="h-8 w-8 object-contain" />
+              )}
+              <h2 className="text-lg font-semibold" style={{ color: localPrimaryColor }}>
+                {currentLanguage === 'pt' && 'Assistente'}
+                {currentLanguage === 'es' && 'Asistente'}
+                {currentLanguage === 'en' && 'Assistant'} {localStoreName}
+              </h2>
+            </div>
+            <button
+              onClick={resetWidget}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Initial Try-On Result Image */}
+            <div className="flex justify-center">
+              <div className="max-w-sm w-full">
+                <img
+                  src={result}
+                  alt="Try-on result"
+                  className="w-full rounded-2xl shadow-lg"
+                />
+                {(calculatedSize || recommendedSize) && (
+                  <div className="mt-4 text-center bg-gray-50 rounded-xl p-4">
+                    <p className="text-sm text-gray-600 mb-1">
+                      {t('recommendedSize')}
+                    </p>
+                    <p className="text-4xl font-bold" style={{ color: localPrimaryColor }}>
+                      {calculatedSize || recommendedSize}
+                    </p>
+                    {confidenceLevel && (
+                      <div className="mt-2 flex items-center justify-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          confidenceLevel === 'high' ? 'bg-green-500' :
+                          confidenceLevel === 'medium' ? 'bg-yellow-500' :
+                          'bg-orange-500'
+                        }`} />
+                        <p className={`text-xs ${
+                          confidenceLevel === 'high' ? 'text-green-700' :
+                          confidenceLevel === 'medium' ? 'text-yellow-700' :
+                          'text-orange-700'
+                        }`}>
+                          {confidenceLevel === 'high' && (currentLanguage === 'pt' ? 'Alta compatibilidade' : currentLanguage === 'es' ? 'Alta compatibilidad' : 'High compatibility')}
+                          {confidenceLevel === 'medium' && (currentLanguage === 'pt' ? 'Boa compatibilidade' : currentLanguage === 'es' ? 'Buena compatibilidad' : 'Good compatibility')}
+                          {confidenceLevel === 'low' && (currentLanguage === 'pt' ? 'Compatibilidade aceitável' : currentLanguage === 'es' ? 'Compatibilidad aceptable' : 'Acceptable compatibility')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            {chatMessages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-2xl p-4 ${
+                    message.role === 'assistant'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-white'
+                  }`}
+                  style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
+                >
+                  <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                </div>
+              </div>
+            ))}
+
+            {/* Loading Indicator */}
+            {gptLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: localPrimaryColor }}></div>
+                    <div className="w-2 h-2 rounded-full animate-pulse delay-75" style={{ backgroundColor: localPrimaryColor }}></div>
+                    <div className="w-2 h-2 rounded-full animate-pulse delay-150" style={{ backgroundColor: localPrimaryColor }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Action Buttons */}
+          {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
+            <div className="p-4 border-t space-y-2">
+              <button
+                onClick={() => {
+                  setChatMessages(prev => [...prev, {
+                    role: 'user',
+                    content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
+                    timestamp: Date.now()
+                  }]);
+                  callGPTAssistant('confirm_size');
+                }}
+                className="w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all hover:shadow-xl"
+                style={{ backgroundColor: localPrimaryColor }}
+              >
+                {currentLanguage === 'pt' && 'Confirmar tamanho'}
+                {currentLanguage === 'es' && 'Confirmar talla'}
+                {currentLanguage === 'en' && 'Confirm size'}
+              </button>
+
+              {recommendedProductName && recommendedProductUrl && (
+                <button
+                  onClick={() => {
+                    setChatMessages(prev => [...prev, {
+                      role: 'user',
+                      content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
+                      timestamp: Date.now()
+                    }]);
+                    callGPTAssistant('complementary', {
+                      name: recommendedProductName,
+                      category: 'complementar',
+                      image_url: recommendedProductUrl,
+                    });
+                  }}
+                  className="w-full py-4 rounded-xl font-semibold border-2 transition-all"
+                  style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
+                >
+                  {currentLanguage === 'pt' && 'Sugerir combinações'}
+                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
+                  {currentLanguage === 'en' && 'Suggest combinations'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className={`w-full h-full overflow-hidden flex flex-col bg-white rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
       {/* Header */}
       <div className="bg-gray-50 border-b border-gray-200 p-3 rounded-t-2xl flex-shrink-0">
@@ -2274,151 +2438,6 @@ const handleSubmit = async () => {
           </div>
         )}
 
-        {/* Step 6: Result - Full Screen Chat */}
-        {step === 'result' && result && (
-          <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
-              <div className="flex items-center gap-3">
-                {localStoreLogo && (
-                  <img src={localStoreLogo} alt={localStoreName} className="h-8 w-8 object-contain" />
-                )}
-                <h2 className="text-lg font-semibold" style={{ color: localPrimaryColor }}>
-                  {currentLanguage === 'pt' && 'Assistente'}
-                  {currentLanguage === 'es' && 'Asistente'}
-                  {currentLanguage === 'en' && 'Assistant'} {localStoreName}
-                </h2>
-              </div>
-              <button
-                onClick={resetWidget}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <ArrowLeft className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Initial Try-On Result Image */}
-              <div className="flex justify-center">
-                <div className="max-w-sm w-full">
-                  <img
-                    src={result}
-                    alt="Try-on result"
-                    className="w-full rounded-2xl shadow-lg"
-                  />
-                  {(calculatedSize || recommendedSize) && (
-                    <div className="mt-4 text-center bg-gray-50 rounded-xl p-4">
-                      <p className="text-sm text-gray-600 mb-1">
-                        {t('recommendedSize')}
-                      </p>
-                      <p className="text-4xl font-bold" style={{ color: localPrimaryColor }}>
-                        {calculatedSize || recommendedSize}
-                      </p>
-                      {confidenceLevel && (
-                        <div className="mt-2 flex items-center justify-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            confidenceLevel === 'high' ? 'bg-green-500' :
-                            confidenceLevel === 'medium' ? 'bg-yellow-500' :
-                            'bg-orange-500'
-                          }`} />
-                          <p className={`text-xs ${
-                            confidenceLevel === 'high' ? 'text-green-700' :
-                            confidenceLevel === 'medium' ? 'text-yellow-700' :
-                            'text-orange-700'
-                          }`}>
-                            {confidenceLevel === 'high' && (currentLanguage === 'pt' ? 'Alta compatibilidade' : currentLanguage === 'es' ? 'Alta compatibilidad' : 'High compatibility')}
-                            {confidenceLevel === 'medium' && (currentLanguage === 'pt' ? 'Boa compatibilidade' : currentLanguage === 'es' ? 'Buena compatibilidad' : 'Good compatibility')}
-                            {confidenceLevel === 'low' && (currentLanguage === 'pt' ? 'Compatibilidade aceitável' : currentLanguage === 'es' ? 'Compatibilidad aceptable' : 'Acceptable compatibility')}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Chat Messages */}
-              {chatMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl p-4 ${
-                      message.role === 'assistant'
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-white'
-                    }`}
-                    style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
-                  >
-                    <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
-                  </div>
-                </div>
-              ))}
-
-              {/* Loading Indicator */}
-              {gptLoading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: localPrimaryColor }}></div>
-                      <div className="w-2 h-2 rounded-full animate-pulse delay-75" style={{ backgroundColor: localPrimaryColor }}></div>
-                      <div className="w-2 h-2 rounded-full animate-pulse delay-150" style={{ backgroundColor: localPrimaryColor }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Action Buttons */}
-            {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
-              <div className="p-4 border-t space-y-2">
-                <button
-                  onClick={() => {
-                    setChatMessages(prev => [...prev, {
-                      role: 'user',
-                      content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
-                      timestamp: Date.now()
-                    }]);
-                    callGPTAssistant('confirm_size');
-                  }}
-                  className="w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all hover:shadow-xl"
-                  style={{ backgroundColor: localPrimaryColor }}
-                >
-                  {currentLanguage === 'pt' && 'Confirmar tamanho'}
-                  {currentLanguage === 'es' && 'Confirmar talla'}
-                  {currentLanguage === 'en' && 'Confirm size'}
-                </button>
-
-                {recommendedProductName && recommendedProductUrl && (
-                  <button
-                    onClick={() => {
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('complementary', {
-                        name: recommendedProductName,
-                        category: 'complementar',
-                        image_url: recommendedProductUrl,
-                      });
-                    }}
-                    className="w-full py-4 rounded-xl font-semibold border-2 transition-all"
-                    style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
-                  >
-                    {currentLanguage === 'pt' && 'Sugerir combinações'}
-                    {currentLanguage === 'es' && 'Sugerir combinaciones'}
-                    {currentLanguage === 'en' && 'Suggest combinations'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
         </div>
       </div>
     </div>
