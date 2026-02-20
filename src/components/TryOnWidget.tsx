@@ -1913,7 +1913,7 @@ const handleSubmit = async () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <div className="flex justify-start">
-              <div className="max-w-[65%] md:max-w-[40%]">
+              <div className="max-w-[65%] md:max-w-[30%]">
                 <img
                   src={result}
                   alt="Try-on result"
