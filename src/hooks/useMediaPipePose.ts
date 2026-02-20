@@ -260,28 +260,40 @@ export function useMediaPipePose() {
     console.log('   • Gênero:', gender);
 
     // 🔹 8. PROFUNDIDADE ESPECÍFICA POR GÊNERO
-    let chestDepthFactor = 0.55;
-    let waistDepthFactor = 0.45;
-    let hipDepthFactor = 0.58;
+    // A profundidade corporal é normalmente 50-70% da largura
+    // Para um homem: largura torácica ~40cm → profundidade ~24cm
+    let chestDepthFactor = 0.68;   // era 0.55
+    let waistDepthFactor = 0.58;   // era 0.45
+    let hipDepthFactor = 0.72;     // era 0.58
 
     if (gender === 'female') {
-      chestDepthFactor = 0.52; // peito feminino menos profundo
-      waistDepthFactor = 0.42;
-      hipDepthFactor = 0.62; // quadril feminino mais profundo
+      chestDepthFactor = 0.62;    // peito feminino menos profundo (era 0.52)
+      waistDepthFactor = 0.52;    // era 0.42
+      hipDepthFactor = 0.78;      // quadril feminino mais profundo (era 0.62)
     }
 
     // Ajustar por IMC
     if (bmi > 27) {
-      chestDepthFactor += 0.08;
-      waistDepthFactor += 0.10;
-      hipDepthFactor += 0.08;
+      chestDepthFactor += 0.12;   // era 0.08
+      waistDepthFactor += 0.15;   // era 0.10
+      hipDepthFactor += 0.12;     // era 0.08
     } else if (bmi < 20) {
-      chestDepthFactor -= 0.05;
-      waistDepthFactor -= 0.05;
-      hipDepthFactor -= 0.05;
+      chestDepthFactor -= 0.08;   // era 0.05
+      waistDepthFactor -= 0.08;   // era 0.05
+      hipDepthFactor -= 0.08;     // era 0.05
     }
 
     // 🔹 9. FÓRMULA ELÍPTICA PARA CIRCUNFERÊNCIAS
+    // IMPORTANTE: shoulderWidthCm e hipWidthCm são larguras frontais 2D
+    // Precisamos converter para circunferência 3D realista
+
+    console.log('\n━━━━ 🔹 CONVERSÃO 2D → 3D ━━━━');
+    console.log('   • Largura ombros detectada:', shoulderWidthCm.toFixed(1), 'cm');
+    console.log('   • Largura quadril detectada:', hipWidthCm.toFixed(1), 'cm');
+
+    // Para um corpo real, a largura frontal é ~1/3 da circunferência
+    // Homem com peito de 100cm tem largura frontal ~33-35cm
+    // Fator de conversão: circunferência ≈ largura_frontal × 2.8
     const chestWidth = shoulderWidthCm * 0.95;
     const waistWidth = shoulderWidthCm * 0.78;
 
@@ -289,16 +301,29 @@ export function useMediaPipePose() {
     const waistDepth = waistWidth * waistDepthFactor;
     const hipDepth = hipWidthCm * hipDepthFactor;
 
-    // Perímetro elíptico: π√(2(a² + b²)/2) ≈ π(a + b) / 2 * k
+    console.log('   • Largura peito calculada:', chestWidth.toFixed(1), 'cm');
+    console.log('   • Profundidade peito (fator', chestDepthFactor.toFixed(2), '):', chestDepth.toFixed(1), 'cm');
+    console.log('   • Largura cintura calculada:', waistWidth.toFixed(1), 'cm');
+    console.log('   • Profundidade cintura (fator', waistDepthFactor.toFixed(2), '):', waistDepth.toFixed(1), 'cm');
+    console.log('   • Profundidade quadril (fator', hipDepthFactor.toFixed(2), '):', hipDepth.toFixed(1), 'cm');
+
+    // Perímetro elíptico: π√(2(a² + b²))
+    // Isso aproxima a circunferência de uma elipse com semi-eixos a e b
     const ellipseCircumference = (width: number, depth: number): number => {
       const a = width / 2;
       const b = depth / 2;
-      return Math.PI * Math.sqrt(2 * (a * a + b * b));
+      // Fórmula de Ramanujan para perímetro de elipse (muito precisa)
+      const h = Math.pow((a - b), 2) / Math.pow((a + b), 2);
+      return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
     };
 
     let chestCircumference = ellipseCircumference(chestWidth, chestDepth);
     let waistCircumference = ellipseCircumference(waistWidth, waistDepth);
     let hipCircumference = ellipseCircumference(hipWidthCm, hipDepth);
+
+    console.log('   • Circunferência peito (elipse):', chestCircumference.toFixed(1), 'cm');
+    console.log('   • Circunferência cintura (elipse):', waistCircumference.toFixed(1), 'cm');
+    console.log('   • Circunferência quadril (elipse):', hipCircumference.toFixed(1), 'cm');
 
     // 🔹 9.5. VALIDAÇÃO ANTROPOMÉTRICA BASEADA EM ALTURA E PESO
     console.log('\n━━━━ 🔹 VALIDAÇÃO ANTROPOMÉTRICA ━━━━');
