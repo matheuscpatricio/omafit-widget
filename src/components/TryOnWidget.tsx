@@ -99,12 +99,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // GPT Assistant states
-  const [gptResponse, setGptResponse] = useState<string | null>(null);
+  // GPT Assistant states - Full Chat Interface
+  interface ChatMessage {
+    role: 'assistant' | 'user';
+    content: string;
+    timestamp: number;
+  }
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gptLoading, setGptLoading] = useState(false);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
   const [interactionCount, setInteractionCount] = useState(0);
-  const [showAssistant, setShowAssistant] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
@@ -175,13 +180,19 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   // Chamar assistente GPT automaticamente quando chegar no resultado
   useEffect(() => {
-    if (step === 'result' && result && sizeData && !gptResponse && !gptLoading) {
-      setShowAssistant(true);
+    if (step === 'result' && result && sizeData && chatMessages.length === 0 && !gptLoading) {
       setTimeout(() => {
         callGPTAssistant('validate');
       }, 1000);
     }
   }, [step, result, sizeData]);
+
+  // Auto-scroll para última mensagem
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
 
   // ═══════════════════════════════════════════════════════════════════
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
@@ -1630,19 +1641,23 @@ const handleSubmit = async () => {
     setError('');
     setPredictionId(null);
     setCurrentImageIndex(0);
-    setGptResponse(null);
+    setChatMessages([]);
     setInteractionCount(0);
-    setShowAssistant(false);
   };
 
   const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any) => {
-    if (interactionCount >= 3) {
+    if (interactionCount >= 5) {
       const limitMessages = {
-        pt: 'Você atingiu o limite de 3 interações por sessão.',
-        es: 'Has alcanzado el límite de 3 interacciones por sesión.',
-        en: 'You have reached the limit of 3 interactions per session.'
+        pt: 'Você atingiu o limite de interações por sessão.',
+        es: 'Has alcanzado el límite de interacciones por sesión.',
+        en: 'You have reached the interaction limit per session.'
       };
-      setGptResponse(limitMessages[currentLanguage]);
+
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: limitMessages[currentLanguage],
+        timestamp: Date.now()
+      }]);
       return;
     }
 
@@ -1660,16 +1675,18 @@ const handleSubmit = async () => {
         peito_cm: sizeData.chest,
         cintura_cm: sizeData.waist,
         quadril_cm: sizeData.hip,
-        elasticidade: collectionElasticity || 'light',
-        categoria: collectionType || 'upper',
+        elasticidade: localCollectionElasticity || 'light_flex',
+        categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
-        intencao_usuario: intention === 'complementary' ? 'sugerir_combinacoes' : 'validar_tamanho',
+        intencao_usuario: intention === 'complementary' ? 'sugerir_combinacoes' : intention === 'confirm_size' ? 'induzir_adicionar_carrinho' : 'validar_tamanho',
         session_id: sessionId,
         interaction_count: interactionCount,
-        shop_name: storeName,
+        shop_name: localStoreName,
         language: currentLanguage,
         complementary_product: complementaryProduct,
       };
+
+      console.log('📤 Enviando payload para validate-size:', payload);
 
       const response = await fetch(`${supabaseUrl}/functions/v1/validate-size`, {
         method: 'POST',
@@ -1681,14 +1698,23 @@ const handleSubmit = async () => {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro na resposta:', response.status, errorText);
         throw new Error('Erro ao chamar assistente');
       }
 
       const result = await response.json();
+      console.log('📥 Resposta recebida:', result);
 
       if (result.success && result.data) {
         const { tamanho_final, explicacao } = result.data;
-        setGptResponse(`**Tamanho ideal: ${tamanho_final}**\n\n${explicacao}`);
+
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `${tamanho_final ? `**Tamanho ideal: ${tamanho_final}**\n\n` : ''}${explicacao}`,
+          timestamp: Date.now()
+        }]);
+
         setInteractionCount(result.interaction_count || interactionCount + 1);
       } else {
         throw new Error(result.message || 'Erro ao processar resposta');
@@ -1700,7 +1726,12 @@ const handleSubmit = async () => {
         es: 'No fue posible validar la talla en este momento. Por favor, inténtalo de nuevo.',
         en: 'Could not validate size at this time. Please try again.'
       };
-      setGptResponse(errorMessages[currentLanguage]);
+
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: errorMessages[currentLanguage],
+        timestamp: Date.now()
+      }]);
     } finally {
       setGptLoading(false);
     }
@@ -2243,298 +2274,149 @@ const handleSubmit = async () => {
           </div>
         )}
 
-        {/* Step 6: Result */}
+        {/* Step 6: Result - Full Screen Chat */}
         {step === 'result' && result && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Mobile Layout */}
-            <div className="md:hidden space-y-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-4">
-                  <h3 className="text-2xl font-semibold text-primary">
-                    {t('yourPreview')}
-                  </h3>
-                </div>
-                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-4 flex items-center justify-center">
-                  <img
-                    src={result}
-                    alt="Resultado do try-on"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {(calculatedSize || recommendedSize) && (
-                  <div className="text-center mb-4">
-                    <p className="text-lg text-gray-700 mb-2">
-                      {t('recommendedSize')}
-                    </p>
-                    <p className="text-6xl font-bold" style={{ color: primaryColor }}>
-                      {calculatedSize || recommendedSize}
-                    </p>
-                    {confidenceLevel && (
-                      <div className="mt-3 flex items-center justify-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${
-                          confidenceLevel === 'high' ? 'bg-green-500' :
-                          confidenceLevel === 'medium' ? 'bg-yellow-500' :
-                          'bg-orange-500'
-                        }`} />
-                        <p className={`text-sm font-medium ${
-                          confidenceLevel === 'high' ? 'text-green-700' :
-                          confidenceLevel === 'medium' ? 'text-yellow-700' :
-                          'text-orange-700'
-                        }`}>
-                          {confidenceLevel === 'high' && 'Alta compatibilidade com seu corpo'}
-                          {confidenceLevel === 'medium' && 'Boa compatibilidade com seu corpo'}
-                          {confidenceLevel === 'low' && 'Compatibilidade aceitável'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+          <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
+              <div className="flex items-center gap-3">
+                {localStoreLogo && (
+                  <img src={localStoreLogo} alt={localStoreName} className="h-8 w-8 object-contain" />
                 )}
-
-                <p className="text-base text-gray-700 mb-4">
-                  {t('congratsMessage')}
-                </p>
-
-                {/* GPT Assistant - Mobile */}
-                {showAssistant && (
-                  <div className="mt-4 mb-4">
-                    <div className="bg-white border-2 rounded-lg p-4 shadow-sm" style={{ borderColor: primaryColor }}>
-                      <div className="mb-3">
-                        <h4 className="font-semibold text-gray-900">
-                          Assistente {storeName}
-                        </h4>
-                      </div>
-
-                      {gptLoading ? (
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
-                          <p className="text-sm">
-                            {currentLanguage === 'pt' && 'Analisando ajuste com assistente inteligente...'}
-                            {currentLanguage === 'es' && 'Analizando ajuste con asistente inteligente...'}
-                            {currentLanguage === 'en' && 'Analyzing fit with intelligent assistant...'}
-                          </p>
-                        </div>
-                      ) : gptResponse ? (
-                        <div>
-                          <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: primaryColor }}>
-                            <p className="text-sm text-white whitespace-pre-line">{gptResponse}</p>
-                          </div>
-
-                          {interactionCount < 3 && (
-                            <div className="flex flex-col gap-2">
-                              <button
-                                onClick={() => {
-                                  // Fechar assistente e induzir adicionar ao carrinho
-                                  setShowAssistant(false);
-                                }}
-                                className="w-full py-2 px-4 rounded-lg font-medium text-white transition-all"
-                                style={{ backgroundColor: primaryColor }}
-                              >
-                                <ShoppingCart className="w-4 h-4 inline mr-2" />
-                                {currentLanguage === 'pt' && 'Confirmar tamanho'}
-                                {currentLanguage === 'es' && 'Confirmar talla'}
-                                {currentLanguage === 'en' && 'Confirm size'}
-                              </button>
-
-                              {recommendedProductName && recommendedProductUrl && (
-                                <button
-                                  onClick={() => {
-                                    callGPTAssistant('complementary', {
-                                      name: recommendedProductName,
-                                      category: 'complementar',
-                                      image_url: recommendedProductUrl,
-                                    });
-                                  }}
-                                  className="w-full py-2 px-4 rounded-lg font-medium border-2 transition-all"
-                                  style={{ borderColor: primaryColor, color: primaryColor }}
-                                >
-                                  {currentLanguage === 'pt' && 'Sugerir combinações'}
-                                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
-                                  {currentLanguage === 'en' && 'Suggest combinations'}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
+                <h2 className="text-lg font-semibold" style={{ color: localPrimaryColor }}>
+                  {currentLanguage === 'pt' && 'Assistente'}
+                  {currentLanguage === 'es' && 'Asistente'}
+                  {currentLanguage === 'en' && 'Assistant'} {localStoreName}
+                </h2>
               </div>
-
-              {recommendedProductName && recommendedProductUrl && !showAssistant && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-gray-700 text-center">
-                    Uma ótima escolha para acompanhar seu pedido seria{' '}
-                    <strong>{recommendedProductName}</strong>,{' '}
-                    <a
-                      href={recommendedProductUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold underline hover:opacity-70 transition-opacity"
-                      style={{ color: primaryColor }}
-                    >
-                      clique aqui
-                    </a>{' '}
-                    e confira.
-                  </p>
-                </div>
-              )}
-
               <button
                 onClick={resetWidget}
-                className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
+                className="text-gray-500 hover:text-gray-700 transition-colors"
               >
-                {t('newTryOn')}
+                <ArrowLeft className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden md:flex md:gap-8">
-              {/* Left Side: Image */}
-              <div className="md:w-1/2">
-                <div className="mb-3">
-                  <h3 className="text-2xl font-semibold text-primary">
-                    {t('yourPreview')}
-                  </h3>
-                </div>
-                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden flex items-center justify-center">
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Initial Try-On Result Image */}
+              <div className="flex justify-center">
+                <div className="max-w-sm w-full">
                   <img
                     src={result}
-                    alt="Resultado do try-on"
-                    className="w-full h-full object-cover"
+                    alt="Try-on result"
+                    className="w-full rounded-2xl shadow-lg"
                   />
+                  {(calculatedSize || recommendedSize) && (
+                    <div className="mt-4 text-center bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-600 mb-1">
+                        {t('recommendedSize')}
+                      </p>
+                      <p className="text-4xl font-bold" style={{ color: localPrimaryColor }}>
+                        {calculatedSize || recommendedSize}
+                      </p>
+                      {confidenceLevel && (
+                        <div className="mt-2 flex items-center justify-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            confidenceLevel === 'high' ? 'bg-green-500' :
+                            confidenceLevel === 'medium' ? 'bg-yellow-500' :
+                            'bg-orange-500'
+                          }`} />
+                          <p className={`text-xs ${
+                            confidenceLevel === 'high' ? 'text-green-700' :
+                            confidenceLevel === 'medium' ? 'text-yellow-700' :
+                            'text-orange-700'
+                          }`}>
+                            {confidenceLevel === 'high' && (currentLanguage === 'pt' ? 'Alta compatibilidade' : currentLanguage === 'es' ? 'Alta compatibilidad' : 'High compatibility')}
+                            {confidenceLevel === 'medium' && (currentLanguage === 'pt' ? 'Boa compatibilidade' : currentLanguage === 'es' ? 'Buena compatibilidad' : 'Good compatibility')}
+                            {confidenceLevel === 'low' && (currentLanguage === 'pt' ? 'Compatibilidade aceitável' : currentLanguage === 'es' ? 'Compatibilidad aceptable' : 'Acceptable compatibility')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Right Side: Info and Actions */}
-              <div className="md:w-1/2 flex flex-col justify-center space-y-4">
-                {(calculatedSize || recommendedSize) && (
-                  <div className="text-center">
-                    <p className="text-xl text-gray-700 mb-2">
-                      {t('recommendedSize')}
-                    </p>
-                    <p className="text-7xl font-bold" style={{ color: primaryColor }}>
-                      {calculatedSize || recommendedSize}
-                    </p>
-                    {confidenceLevel && (
-                      <div className="mt-4 flex items-center justify-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${
-                          confidenceLevel === 'high' ? 'bg-green-500' :
-                          confidenceLevel === 'medium' ? 'bg-yellow-500' :
-                          'bg-orange-500'
-                        }`} />
-                        <p className={`text-base font-medium ${
-                          confidenceLevel === 'high' ? 'text-green-700' :
-                          confidenceLevel === 'medium' ? 'text-yellow-700' :
-                          'text-orange-700'
-                        }`}>
-                          {confidenceLevel === 'high' && 'Alta compatibilidade com seu corpo'}
-                          {confidenceLevel === 'medium' && 'Boa compatibilidade com seu corpo'}
-                          {confidenceLevel === 'low' && 'Compatibilidade aceitável'}
-                        </p>
-                      </div>
-                    )}
+              {/* Chat Messages */}
+              {chatMessages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-2xl p-4 ${
+                      message.role === 'assistant'
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-white'
+                    }`}
+                    style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
+                  >
+                    <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
                   </div>
-                )}
+                </div>
+              ))}
 
-                <p className="text-lg text-gray-700">
-                  {t('congratsMessage')}
-                </p>
-
-                {/* GPT Assistant - Desktop */}
-                {showAssistant && (
-                  <div className="mt-4">
-                    <div className="bg-white border-2 rounded-lg p-5 shadow-sm" style={{ borderColor: primaryColor }}>
-                      <div className="mb-4">
-                        <h4 className="font-semibold text-lg text-gray-900">
-                          Assistente {storeName}
-                        </h4>
-                      </div>
-
-                      {gptLoading ? (
-                        <div className="flex items-center gap-3 text-gray-600">
-                          <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
-                          <p className="text-base">
-                            {currentLanguage === 'pt' && 'Analisando ajuste com assistente inteligente...'}
-                            {currentLanguage === 'es' && 'Analizando ajuste con asistente inteligente...'}
-                            {currentLanguage === 'en' && 'Analyzing fit with intelligent assistant...'}
-                          </p>
-                        </div>
-                      ) : gptResponse ? (
-                        <div>
-                          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: primaryColor }}>
-                            <p className="text-base text-white whitespace-pre-line">{gptResponse}</p>
-                          </div>
-
-                          {interactionCount < 3 && (
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => {
-                                  // Fechar assistente e induzir adicionar ao carrinho
-                                  setShowAssistant(false);
-                                }}
-                                className="flex-1 py-3 px-4 rounded-lg font-medium text-white transition-all"
-                                style={{ backgroundColor: primaryColor }}
-                              >
-                                <ShoppingCart className="w-5 h-5 inline mr-2" />
-                                {currentLanguage === 'pt' && 'Confirmar tamanho'}
-                                {currentLanguage === 'es' && 'Confirmar talla'}
-                                {currentLanguage === 'en' && 'Confirm size'}
-                              </button>
-
-                              {recommendedProductName && recommendedProductUrl && (
-                                <button
-                                  onClick={() => {
-                                    callGPTAssistant('complementary', {
-                                      name: recommendedProductName,
-                                      category: 'complementar',
-                                      image_url: recommendedProductUrl,
-                                    });
-                                  }}
-                                  className="flex-1 py-3 px-4 rounded-lg font-medium border-2 transition-all"
-                                  style={{ borderColor: primaryColor, color: primaryColor }}
-                                >
-                                  {currentLanguage === 'pt' && 'Sugerir combinações'}
-                                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
-                                  {currentLanguage === 'en' && 'Suggest combinations'}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
+              {/* Loading Indicator */}
+              {gptLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: localPrimaryColor }}></div>
+                      <div className="w-2 h-2 rounded-full animate-pulse delay-75" style={{ backgroundColor: localPrimaryColor }}></div>
+                      <div className="w-2 h-2 rounded-full animate-pulse delay-150" style={{ backgroundColor: localPrimaryColor }}></div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {recommendedProductName && recommendedProductUrl && !showAssistant && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <p className="text-base text-gray-700 text-center">
-                      Uma ótima escolha para acompanhar seu pedido seria{' '}
-                      <strong>{recommendedProductName}</strong>,{' '}
-                      <a
-                        href={recommendedProductUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold underline hover:opacity-70 transition-opacity"
-                        style={{ color: primaryColor }}
-                      >
-                        clique aqui
-                      </a>{' '}
-                      e confira.
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={resetWidget}
-                  className="w-full bg-gray-100 text-gray-700 border border-gray-300 py-3 text-lg rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
-                >
-                  {t('newTryOn')}
-                </button>
-              </div>
+              <div ref={chatEndRef} />
             </div>
+
+            {/* Action Buttons */}
+            {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
+              <div className="p-4 border-t space-y-2">
+                <button
+                  onClick={() => {
+                    setChatMessages(prev => [...prev, {
+                      role: 'user',
+                      content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
+                      timestamp: Date.now()
+                    }]);
+                    callGPTAssistant('confirm_size');
+                  }}
+                  className="w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all hover:shadow-xl"
+                  style={{ backgroundColor: localPrimaryColor }}
+                >
+                  {currentLanguage === 'pt' && 'Confirmar tamanho'}
+                  {currentLanguage === 'es' && 'Confirmar talla'}
+                  {currentLanguage === 'en' && 'Confirm size'}
+                </button>
+
+                {recommendedProductName && recommendedProductUrl && (
+                  <button
+                    onClick={() => {
+                      setChatMessages(prev => [...prev, {
+                        role: 'user',
+                        content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
+                        timestamp: Date.now()
+                      }]);
+                      callGPTAssistant('complementary', {
+                        name: recommendedProductName,
+                        category: 'complementar',
+                        image_url: recommendedProductUrl,
+                      });
+                    }}
+                    className="w-full py-4 rounded-xl font-semibold border-2 transition-all"
+                    style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
+                  >
+                    {currentLanguage === 'pt' && 'Sugerir combinações'}
+                    {currentLanguage === 'es' && 'Sugerir combinaciones'}
+                    {currentLanguage === 'en' && 'Suggest combinations'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
         </div>

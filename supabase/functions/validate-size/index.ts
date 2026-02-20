@@ -114,12 +114,12 @@ async function callOpenAI(userPrompt: string, language: string = 'pt'): Promise<
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-mini-2025-08-07",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 250,
+        max_tokens: 300,
         temperature: 0.3,
         response_format: { type: "json_object" },
       }),
@@ -184,6 +184,52 @@ Retorne no formato JSON:
 }`;
 }
 
+function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): string {
+  const messages: Record<string, string> = {
+    pt: `O usuário confirmou o tamanho ${data.tamanho_calculado_algoritmo}.
+
+Crie uma mensagem persuasiva e amigável incentivando-o a adicionar o produto ao carrinho.
+Seja breve (máximo 2-3 linhas), use um tom conversacional e profissional.
+Mencione benefícios como: confiança no tamanho, experiência try-on, etc.
+
+Retorne no formato JSON:
+{
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
+  "explicacao": "mensagem persuasiva para adicionar ao carrinho",
+  "coerencia": "alta",
+  "confianca": 1.0
+}`,
+    es: `El usuario confirmó la talla ${data.tamanho_calculado_algoritmo}.
+
+Crea un mensaje persuasivo y amigable incentivándolo a agregar el producto al carrito.
+Sé breve (máximo 2-3 líneas), usa un tono conversacional y profesional.
+Menciona beneficios como: confianza en la talla, experiencia try-on, etc.
+
+Retorna en formato JSON:
+{
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
+  "explicacao": "mensaje persuasivo para agregar al carrito",
+  "coerencia": "alta",
+  "confianca": 1.0
+}`,
+    en: `The user confirmed size ${data.tamanho_calculado_algoritmo}.
+
+Create a persuasive and friendly message encouraging them to add the product to cart.
+Be brief (max 2-3 lines), use a conversational and professional tone.
+Mention benefits like: size confidence, try-on experience, etc.
+
+Return in JSON format:
+{
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
+  "explicacao": "persuasive message to add to cart",
+  "coerencia": "alta",
+  "confianca": 1.0
+}`
+  };
+
+  return messages[language] || messages['en'];
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -211,13 +257,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Limitar a 3 interações por sessão
+    // Limitar a 5 interações por sessão
     const interactionCount = data.interaction_count || 0;
-    if (interactionCount >= 3) {
+    if (interactionCount >= 5) {
       return new Response(
         JSON.stringify({
           error: "Limite de interações atingido",
-          message: "Você atingiu o limite de 3 interações por sessão.",
+          message: "Você atingiu o limite de 5 interações por sessão.",
         }),
         {
           status: 429,
@@ -231,15 +277,15 @@ Deno.serve(async (req: Request) => {
 
     // Construir prompt baseado na intenção
     let userPrompt: string;
+    const language = data.language || 'pt';
 
     if (data.intencao_usuario === "sugerir_combinacoes") {
       userPrompt = buildComplementaryPrompt(data);
+    } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
+      userPrompt = buildAddToCartPrompt(data, language);
     } else {
       userPrompt = buildValidationPrompt(data);
     }
-
-    // Obter idioma (padrão: pt)
-    const language = data.language || 'pt';
 
     // Chamar OpenAI
     const gptResponse = await callOpenAI(userPrompt, language);
