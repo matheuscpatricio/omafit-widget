@@ -1659,7 +1659,7 @@ const handleSubmit = async () => {
     setInteractionCount(0);
   };
 
-  const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any) => {
+  const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any, customMessage?: string) => {
     if (interactionCount >= 5) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
@@ -1730,7 +1730,8 @@ const handleSubmit = async () => {
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
-        intencao_usuario: intention === 'complementary' ? 'sugerir_combinacoes' : intention === 'confirm_size' ? 'induzir_adicionar_carrinho' : 'validar_tamanho',
+        intencao_usuario: intention === 'custom' ? 'custom_message' : intention === 'complementary' ? 'sugerir_combinacoes' : intention === 'confirm_size' ? 'induzir_adicionar_carrinho' : 'validar_tamanho',
+        custom_message: customMessage,
         session_id: sessionId,
         interaction_count: interactionCount,
         shop_name: localStoreName,
@@ -1896,42 +1897,14 @@ const handleSubmit = async () => {
 
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Initial Try-On Result Image */}
-            <div className="flex justify-center">
-              <div className="max-w-sm w-full">
+            {/* Initial Try-On Result Image - Left aligned like assistant message */}
+            <div className="flex justify-start">
+              <div className="max-w-[65%]">
                 <img
                   src={result}
                   alt="Try-on result"
-                  className="w-full rounded-2xl shadow-lg"
+                  className="w-full rounded-2xl shadow-md"
                 />
-                {(calculatedSize || recommendedSize) && (
-                  <div className="mt-4 text-center bg-gray-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-600 mb-1">
-                      {t('recommendedSize')}
-                    </p>
-                    <p className="text-4xl font-bold" style={{ color: localPrimaryColor }}>
-                      {calculatedSize || recommendedSize}
-                    </p>
-                    {confidenceLevel && (
-                      <div className="mt-2 flex items-center justify-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          confidenceLevel === 'high' ? 'bg-green-500' :
-                          confidenceLevel === 'medium' ? 'bg-yellow-500' :
-                          'bg-orange-500'
-                        }`} />
-                        <p className={`text-xs ${
-                          confidenceLevel === 'high' ? 'text-green-700' :
-                          confidenceLevel === 'medium' ? 'text-yellow-700' :
-                          'text-orange-700'
-                        }`}>
-                          {confidenceLevel === 'high' && (currentLanguage === 'pt' ? 'Alta compatibilidade' : currentLanguage === 'es' ? 'Alta compatibilidad' : 'High compatibility')}
-                          {confidenceLevel === 'medium' && (currentLanguage === 'pt' ? 'Boa compatibilidade' : currentLanguage === 'es' ? 'Buena compatibilidad' : 'Good compatibility')}
-                          {confidenceLevel === 'low' && (currentLanguage === 'pt' ? 'Compatibilidade aceitável' : currentLanguage === 'es' ? 'Compatibilidad aceptable' : 'Acceptable compatibility')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1970,48 +1943,98 @@ const handleSubmit = async () => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Action Buttons */}
+          {/* Input Area with Buttons */}
           {interactionCount < 5 && chatMessages.length > 0 && !gptLoading && (
-            <div className="p-4 border-t space-y-2">
-              <button
-                onClick={() => {
-                  setChatMessages(prev => [...prev, {
-                    role: 'user',
-                    content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
-                    timestamp: Date.now()
-                  }]);
-                  callGPTAssistant('confirm_size');
-                }}
-                className="w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all hover:shadow-xl"
-                style={{ backgroundColor: localPrimaryColor }}
-              >
-                {currentLanguage === 'pt' && 'Confirmar tamanho'}
-                {currentLanguage === 'es' && 'Confirmar talla'}
-                {currentLanguage === 'en' && 'Confirm size'}
-              </button>
-
-              {recommendedProductName && recommendedProductUrl && (
+            <div className="p-4 border-t bg-gray-50">
+              {/* Quick Action Buttons inside chat */}
+              <div className="flex gap-2 mb-3">
                 <button
                   onClick={() => {
                     setChatMessages(prev => [...prev, {
                       role: 'user',
-                      content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
+                      content: currentLanguage === 'pt' ? 'Confirmar tamanho' : currentLanguage === 'es' ? 'Confirmar talla' : 'Confirm size',
                       timestamp: Date.now()
                     }]);
-                    callGPTAssistant('complementary', {
-                      name: recommendedProductName,
-                      category: 'complementar',
-                      image_url: recommendedProductUrl,
-                    });
+                    callGPTAssistant('confirm_size');
                   }}
-                  className="w-full py-4 rounded-xl font-semibold border-2 transition-all"
-                  style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium text-white shadow-sm transition-all hover:shadow-md text-sm"
+                  style={{ backgroundColor: localPrimaryColor }}
                 >
-                  {currentLanguage === 'pt' && 'Sugerir combinações'}
-                  {currentLanguage === 'es' && 'Sugerir combinaciones'}
-                  {currentLanguage === 'en' && 'Suggest combinations'}
+                  {currentLanguage === 'pt' && '✓ Confirmar tamanho'}
+                  {currentLanguage === 'es' && '✓ Confirmar talla'}
+                  {currentLanguage === 'en' && '✓ Confirm size'}
                 </button>
-              )}
+
+                {recommendedProductName && recommendedProductUrl && (
+                  <button
+                    onClick={() => {
+                      setChatMessages(prev => [...prev, {
+                        role: 'user',
+                        content: currentLanguage === 'pt' ? 'Sugerir combinações' : currentLanguage === 'es' ? 'Sugerir combinaciones' : 'Suggest combinations',
+                        timestamp: Date.now()
+                      }]);
+                      callGPTAssistant('complementary', {
+                        name: recommendedProductName,
+                        category: 'complementar',
+                        image_url: recommendedProductUrl,
+                      });
+                    }}
+                    className="flex-1 py-3 px-4 rounded-xl font-medium border-2 transition-all hover:bg-gray-50 text-sm"
+                    style={{ borderColor: localPrimaryColor, color: localPrimaryColor }}
+                  >
+                    {currentLanguage === 'pt' && '🔗 Sugerir combinações'}
+                    {currentLanguage === 'es' && '🔗 Sugerir combinaciones'}
+                    {currentLanguage === 'en' && '🔗 Suggest combinations'}
+                  </button>
+                )}
+              </div>
+
+              {/* Text Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={
+                    currentLanguage === 'pt' ? 'Digite sua mensagem...' :
+                    currentLanguage === 'es' ? 'Escribe tu mensaje...' :
+                    'Type your message...'
+                  }
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
+                  style={{ focusRing: localPrimaryColor }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      const message = e.currentTarget.value.trim();
+                      setChatMessages(prev => [...prev, {
+                        role: 'user',
+                        content: message,
+                        timestamp: Date.now()
+                      }]);
+                      callGPTAssistant('custom', undefined, message);
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+                <button
+                  className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md"
+                  style={{ backgroundColor: localPrimaryColor }}
+                  onClick={(e) => {
+                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                    if (input && input.value.trim()) {
+                      const message = input.value.trim();
+                      setChatMessages(prev => [...prev, {
+                        role: 'user',
+                        content: message,
+                        timestamp: Date.now()
+                      }]);
+                      callGPTAssistant('custom', undefined, message);
+                      input.value = '';
+                    }
+                  }}
+                >
+                  {currentLanguage === 'pt' && 'Enviar'}
+                  {currentLanguage === 'es' && 'Enviar'}
+                  {currentLanguage === 'en' && 'Send'}
+                </button>
+              </div>
             </div>
           )}
         </div>
