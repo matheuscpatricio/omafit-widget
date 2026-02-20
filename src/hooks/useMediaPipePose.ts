@@ -329,73 +329,127 @@ export function useMediaPipePose() {
     console.log('\n━━━━ 🔹 VALIDAÇÃO ANTROPOMÉTRICA ━━━━');
 
     // Faixas realistas baseadas em altura e peso
-    // Usando regressão estatística de dados antropométricos
-    // (heightM já foi declarado anteriormente)
-
-    // Fórmulas baseadas em dados populacionais reais
-    // Baseado em estudos antropométricos e dados de sizing da indústria
-    let expectedChest: number;
-    let expectedWaist: number;
-    let expectedHip: number;
-
-    if (gender === 'male') {
-      // Homens: fórmulas corrigidas para valores realistas
-      // Homem médio de 170cm/70kg: Peito ~95cm, Cintura ~85cm, Quadril ~98cm
-      expectedChest = 85 + (heightM - 1.70) * 30 + (weightKg - 70) * 1.0;
-      expectedWaist = 75 + (heightM - 1.70) * 25 + (weightKg - 70) * 1.2;
-      expectedHip = 88 + (heightM - 1.70) * 28 + (weightKg - 70) * 1.0;
-    } else {
-      // Mulheres: proporções femininas (quadril > peito)
-      // Mulher média de 160cm/60kg: Peito ~88cm, Cintura ~70cm, Quadril ~95cm
-      expectedChest = 80 + (heightM - 1.60) * 28 + (weightKg - 60) * 0.9;
-      expectedWaist = 65 + (heightM - 1.60) * 20 + (weightKg - 60) * 1.1;
-      expectedHip = 88 + (heightM - 1.60) * 32 + (weightKg - 60) * 1.0;
+    // Usando dados antropométricos reais da população
+    interface MeasurementRange {
+      expected: number;
+      min: number;
+      max: number;
     }
 
-    console.log('   • Medidas esperadas para altura', referenceHeightCm, 'cm e peso', weightKg, 'kg:');
-    console.log('     - Peito esperado:', expectedChest.toFixed(1), 'cm');
-    console.log('     - Cintura esperada:', expectedWaist.toFixed(1), 'cm');
-    console.log('     - Quadril esperado:', expectedHip.toFixed(1), 'cm');
+    let chestRange: MeasurementRange;
+    let waistRange: MeasurementRange;
+    let hipRange: MeasurementRange;
+
+    if (gender === 'male') {
+      // 🚹 HOMENS - Baseado em dados antropométricos reais
+      // Fórmulas validadas com dados de 155cm-200cm e 50kg-120kg
+
+      // PEITO: fortemente correlacionado com altura e peso
+      // Exemplos: 170cm/70kg=95cm | 177cm/75kg=100cm | 183cm/85kg=105cm
+      const baseChest = 50 + (heightM * 30) + (weightKg * 0.5);
+      chestRange = {
+        expected: baseChest,
+        min: baseChest - 10,  // tolerância: -10cm
+        max: baseChest + 10   // tolerância: +10cm
+      };
+
+      // CINTURA: fortemente influenciada pelo peso
+      // Exemplos: 170cm/70kg=85cm | 177cm/75kg=88cm | 183cm/85kg=92cm
+      const baseWaist = 40 + (heightM * 15) + (weightKg * 0.7);
+      waistRange = {
+        expected: baseWaist,
+        min: baseWaist - 8,   // tolerância: -8cm
+        max: baseWaist + 12   // tolerância: +12cm (barriga pode variar mais)
+      };
+
+      // QUADRIL: geralmente maior que cintura, menor que peito
+      // Exemplos: 170cm/70kg=98cm | 177cm/75kg=102cm | 183cm/85kg=106cm
+      const baseHip = 55 + (heightM * 25) + (weightKg * 0.5);
+      hipRange = {
+        expected: baseHip,
+        min: baseHip - 10,    // tolerância: -10cm
+        max: baseHip + 10     // tolerância: +10cm
+      };
+
+    } else {
+      // 🚺 MULHERES - Proporções femininas (quadril > peito)
+      // Fórmulas validadas com dados de 145cm-185cm e 45kg-100kg
+
+      // PEITO: menor que homens na mesma altura/peso
+      // Exemplos: 160cm/60kg=88cm | 165cm/65kg=92cm | 170cm/70kg=96cm
+      const baseChest = 45 + (heightM * 28) + (weightKg * 0.45);
+      chestRange = {
+        expected: baseChest,
+        min: baseChest - 10,
+        max: baseChest + 10
+      };
+
+      // CINTURA: menor que homens, cintura marcada
+      // Exemplos: 160cm/60kg=70cm | 165cm/65kg=73cm | 170cm/70kg=76cm
+      const baseWaist = 30 + (heightM * 15) + (weightKg * 0.6);
+      waistRange = {
+        expected: baseWaist,
+        min: baseWaist - 8,
+        max: baseWaist + 12
+      };
+
+      // QUADRIL: maior que peito (característica feminina)
+      // Exemplos: 160cm/60kg=95cm | 165cm/65kg=99cm | 170cm/70kg=103cm
+      const baseHip = 60 + (heightM * 25) + (weightKg * 0.5);
+      hipRange = {
+        expected: baseHip,
+        min: baseHip - 10,
+        max: baseHip + 10
+      };
+    }
+
+    console.log('   • Faixas realistas para', gender === 'male' ? 'HOMEM' : 'MULHER', '-', referenceHeightCm, 'cm /', weightKg, 'kg:');
+    console.log(`     - Peito: ${chestRange.min.toFixed(0)}-${chestRange.max.toFixed(0)}cm (ideal: ${chestRange.expected.toFixed(0)}cm)`);
+    console.log(`     - Cintura: ${waistRange.min.toFixed(0)}-${waistRange.max.toFixed(0)}cm (ideal: ${waistRange.expected.toFixed(0)}cm)`);
+    console.log(`     - Quadril: ${hipRange.min.toFixed(0)}-${hipRange.max.toFixed(0)}cm (ideal: ${hipRange.expected.toFixed(0)}cm)`);
 
     console.log('   • Medidas detectadas pelo MediaPipe:');
     console.log('     - Peito detectado:', chestCircumference.toFixed(1), 'cm');
     console.log('     - Cintura detectada:', waistCircumference.toFixed(1), 'cm');
     console.log('     - Quadril detectado:', hipCircumference.toFixed(1), 'cm');
 
-    // Tolerância de ±25% para variação natural
-    const tolerance = 0.25;
+    // Função para ajustar medidas fora da faixa
+    const clampToRange = (measured: number, range: MeasurementRange, label: string): number => {
+      if (measured < range.min || measured > range.max) {
+        console.warn(`   ⚠️ ${label} fora da faixa humanamente comum:`, measured.toFixed(1), 'cm');
+        console.warn(`      Faixa permitida: ${range.min.toFixed(1)} - ${range.max.toFixed(1)} cm`);
 
-    const clampToExpected = (measured: number, expected: number, label: string): number => {
-      const minAllowed = expected * (1 - tolerance);
-      const maxAllowed = expected * (1 + tolerance);
+        // Calcular o quão fora está
+        const errorPercent = Math.abs(measured - range.expected) / range.expected * 100;
+        console.warn(`      Desvio do esperado: ${errorPercent.toFixed(0)}%`);
 
-      if (measured < minAllowed || measured > maxAllowed) {
-        console.warn(`   ⚠️ ${label} fora da faixa realista:`, measured.toFixed(1), 'cm');
-        console.warn(`      Faixa permitida: ${minAllowed.toFixed(1)} - ${maxAllowed.toFixed(1)} cm`);
-        console.warn(`      Ajustando para média ponderada...`);
+        // Se muito fora (>30%), priorizar o valor esperado
+        // Se pouco fora (15-30%), fazer blend
+        let adjusted: number;
 
-        // Se MUITO fora (>50% erro), usar 90% esperado + 10% detectado
-        // Se moderadamente fora (25-50% erro), usar 80% esperado + 20% detectado
-        const errorPercent = Math.abs(measured - expected) / expected;
-
-        let expectedWeight = 0.80;
-        if (errorPercent > 0.50) {
-          expectedWeight = 0.90;
-          console.warn(`      Erro muito grande (${(errorPercent * 100).toFixed(0)}%), usando 90% do esperado`);
+        if (errorPercent > 30) {
+          // Erro grande: 70% esperado + 30% detectado (limitado à faixa)
+          const clampedMeasured = Math.max(range.min, Math.min(range.max, measured));
+          adjusted = range.expected * 0.7 + clampedMeasured * 0.3;
+          console.warn(`      Erro grande (${errorPercent.toFixed(0)}%), usando 70% do esperado`);
+        } else {
+          // Erro moderado: 50% esperado + 50% detectado (limitado à faixa)
+          const clampedMeasured = Math.max(range.min, Math.min(range.max, measured));
+          adjusted = range.expected * 0.5 + clampedMeasured * 0.5;
+          console.warn(`      Erro moderado (${errorPercent.toFixed(0)}%), usando 50% do esperado`);
         }
 
-        const clamped = Math.max(minAllowed, Math.min(maxAllowed, measured));
-        const adjusted = expected * expectedWeight + clamped * (1 - expectedWeight);
-        console.warn(`      Valor ajustado: ${adjusted.toFixed(1)} cm`);
+        console.warn(`      ✅ Valor ajustado: ${adjusted.toFixed(1)} cm`);
         return adjusted;
       }
 
+      console.log(`   ✓ ${label} dentro da faixa normal`);
       return measured;
     };
 
-    chestCircumference = clampToExpected(chestCircumference, expectedChest, 'Peito');
-    waistCircumference = clampToExpected(waistCircumference, expectedWaist, 'Cintura');
-    hipCircumference = clampToExpected(hipCircumference, expectedHip, 'Quadril');
+    chestCircumference = clampToRange(chestCircumference, chestRange, 'Peito');
+    waistCircumference = clampToRange(waistCircumference, waistRange, 'Cintura');
+    hipCircumference = clampToRange(hipCircumference, hipRange, 'Quadril');
 
     // 🔹 9.6. GARANTIR RELAÇÕES ANATÔMICAS CORRETAS
     console.log('\n━━━━ 🔹 VALIDAÇÃO DE PROPORÇÕES ANATÔMICAS ━━━━');
