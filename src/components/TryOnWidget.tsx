@@ -2069,7 +2069,7 @@ const handleSubmit = async () => {
         )}
 
         {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-2 md:px-8 md:py-4 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        <div className={`flex-1 p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
           {error && (
             <div className="bg-red-500/10 backdrop-blur-sm border border-red-400/30 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -2389,7 +2389,7 @@ const handleSubmit = async () => {
 
         {/* Step 4: Confirm */}
         {step === 'confirm' && (
-          <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
+          <div className="space-y-4 animate-fade-in">
             <div className="text-center mb-3 md:mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 {t('confirmData')}
