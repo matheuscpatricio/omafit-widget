@@ -1688,7 +1688,7 @@ const handleSubmit = async () => {
   };
 
   const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any, customMessage?: string) => {
-    if (interactionCount >= 2) {
+    if (interactionCount >= 3) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
         es: 'Has alcanzado el límite de interacciones por sesión.',
