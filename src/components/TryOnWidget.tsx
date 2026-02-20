@@ -2081,7 +2081,7 @@ const handleSubmit = async () => {
         </div>
       )}
 
-      <div className={`w-full h-full overflow-hidden flex flex-col bg-white rounded-2xl transition-all duration-400 ease-in-out transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+      <div className={`fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* Header - Padronizado em todas steps */}
       <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
         {/* Botão voltar (esquerda) */}
