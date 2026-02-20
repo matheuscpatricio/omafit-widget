@@ -195,16 +195,18 @@ Valide a coerência das medidas e confirme ou ajuste o tamanho recomendado.`;
 
 function buildComplementaryPrompt(data: ValidateSizeRequest): string {
   const product = data.complementary_product;
+  const storeContext = data.shop_name ? ` da ${data.shop_name}` : '';
+
   if (!product) {
-    return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira um tipo de peça complementar que combinaria bem e explique brevemente o porquê da combinação.`;
+    return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira um tipo de peça complementar${storeContext} que combinaria bem e explique brevemente o porquê da combinação.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}`;
   }
 
-  return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo} em ${data.categoria}), analise esta peça complementar:
+  return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo} em ${data.categoria}), analise esta peça complementar${storeContext}:
 
 Produto: ${product.name}
 Categoria: ${product.category}
 
-Explique em poucas palavras por que esta peça combina bem com o perfil do usuário e crie um texto persuasivo mas profissional para incentivá-lo a conhecer o produto.
+Explique em poucas palavras por que esta peça combina bem com o perfil do usuário e crie um texto persuasivo mas profissional para incentivá-lo a conhecer o produto.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}
 
 Retorne no formato JSON:
 {
@@ -306,19 +308,20 @@ Return JSON:
 }
 
 function buildCustomMessagePrompt(data: ValidateSizeRequest, language: string): string {
+  const storeContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const messages: Record<string, string> = {
-    pt: `O usuário fez a seguinte pergunta sobre o produto/tamanho:
+    pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}/tamanho:
 
 "${data.custom_message}"
 
 Contexto:
 - Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
 - Categoria: ${data.categoria}
-- Elasticidade: ${data.elasticidade}
+- Elasticidade: ${data.elasticidade}${data.shop_name ? `\n- Loja: ${data.shop_name}` : ''}
 
 REGRAS IMPORTANTES:
 1. Se mencionar o tamanho, faça APENAS UMA VEZ no início da resposta
-2. Depois continue naturalmente SEM repetir o tamanho
+2. Depois continue naturalmente SEM repetir o tamanho${data.shop_name ? ` (você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante)` : ''}
 3. Responda de forma útil, profissional e breve (máximo 3-4 linhas)
 4. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
 
@@ -329,18 +332,18 @@ Retorne no formato JSON:
   "coerencia": "alta",
   "confianca": 1.0
 }`,
-    es: `El usuario hizo la siguiente pregunta sobre el producto/talla:
+    es: `El usuario hizo la siguiente pregunta sobre el producto${storeContext}/talla:
 
 "${data.custom_message}"
 
 Contexto:
 - Talla recomendada: ${data.tamanho_calculado_algoritmo}
 - Categoría: ${data.categoria}
-- Elasticidad: ${data.elasticidade}
+- Elasticidad: ${data.elasticidade}${data.shop_name ? `\n- Tienda: ${data.shop_name}` : ''}
 
 REGLAS IMPORTANTES:
 1. Si mencionas la talla, hazlo SOLO UNA VEZ al inicio de la respuesta
-2. Después continúa naturalmente SIN repetir la talla
+2. Después continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante)` : ''}
 3. Responde de forma útil, profesional y breve (máximo 3-4 líneas)
 4. Mantén el foco en ayudar al usuario a tomar la decisión de compra
 
@@ -351,18 +354,18 @@ Retorna en formato JSON:
   "coerencia": "alta",
   "confianca": 1.0
 }`,
-    en: `The user asked the following question about the product/size:
+    en: `The user asked the following question about the product${storeContext}/size:
 
 "${data.custom_message}"
 
 Context:
 - Recommended size: ${data.tamanho_calculado_algoritmo}
 - Category: ${data.categoria}
-- Elasticity: ${data.elasticidade}
+- Elasticity: ${data.elasticidade}${data.shop_name ? `\n- Store: ${data.shop_name}` : ''}
 
 IMPORTANT RULES:
 1. If you mention the size, do it ONLY ONCE at the beginning of your response
-2. Then continue naturally WITHOUT repeating the size
+2. Then continue naturally WITHOUT repeating the size${data.shop_name ? ` (you can mention the store "${data.shop_name}" naturally if relevant)` : ''}
 3. Answer in a helpful, professional and brief way (max 3-4 lines)
 4. Keep focus on helping the user make the purchase decision
 
@@ -379,14 +382,15 @@ Return in JSON format:
 }
 
 function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): string {
+  const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const messages: Record<string, string> = {
     pt: `O tamanho recomendado é ${data.tamanho_calculado_algoritmo}.
 
-Crie uma mensagem persuasiva e amigável incentivando o usuário a adicionar o produto ao carrinho.
+Crie uma mensagem persuasiva e amigável incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
 
 REGRAS IMPORTANTES:
 1. Mencione o tamanho ideal APENAS NA PRIMEIRA FRASE (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
-2. Depois, continue naturalmente SEM repetir o tamanho
+2. Depois, continue naturalmente SEM repetir o tamanho${data.shop_name ? ` (você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante)` : ''}
 3. Seja breve (máximo 2-3 linhas no total)
 4. Use tom conversacional e profissional
 5. Mencione benefícios: confiança no tamanho, experiência try-on, ajuste perfeito
@@ -403,11 +407,11 @@ Retorne no formato JSON:
 }`,
     es: `La talla recomendada es ${data.tamanho_calculado_algoritmo}.
 
-Crea un mensaje persuasivo y amigable incentivando al usuario a agregar el producto al carrito.
+Crea un mensaje persuasivo y amigable incentivando al usuario a agregar el producto${storeNameContext} al carrito.
 
 REGLAS IMPORTANTES:
 1. Menciona la talla ideal SOLO EN LA PRIMERA FRASE (ejemplo: "¡Tu talla ideal es ${data.tamanho_calculado_algoritmo}!")
-2. Después, continúa naturalmente SIN repetir la talla
+2. Después, continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante)` : ''}
 3. Sé breve (máximo 2-3 líneas en total)
 4. Usa tono conversacional y profesional
 5. Menciona beneficios: confianza en la talla, experiencia try-on, ajuste perfecto
@@ -424,11 +428,11 @@ Retorna en formato JSON:
 }`,
     en: `The recommended size is ${data.tamanho_calculado_algoritmo}.
 
-Create a persuasive and friendly message encouraging the user to add the product to cart.
+Create a persuasive and friendly message encouraging the user to add the product${storeNameContext} to cart.
 
 IMPORTANT RULES:
 1. Mention the ideal size ONLY IN THE FIRST SENTENCE (example: "Your ideal size is ${data.tamanho_calculado_algoritmo}!")
-2. Then, continue naturally WITHOUT repeating the size
+2. Then, continue naturally WITHOUT repeating the size${data.shop_name ? ` (you can mention the store "${data.shop_name}" naturally if relevant)` : ''}
 3. Be brief (max 2-3 lines total)
 4. Use conversational and professional tone
 5. Mention benefits: size confidence, try-on experience, perfect fit
