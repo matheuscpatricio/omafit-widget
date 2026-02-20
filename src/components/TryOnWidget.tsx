@@ -1218,6 +1218,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
   if (file) {
+    console.log('📸 Arquivo selecionado:', file.name, file.size, 'bytes');
+
     if (file.size > 5 * 1024 * 1024) {
       setError(t('maxFileSize'));
       return;
@@ -1231,9 +1233,13 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setModelImage(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      const preview = reader.result as string;
+      console.log('✅ Image preview gerado, tamanho:', preview.length, 'caracteres');
+      console.log('🎯 selectedProductImage:', selectedProductImage);
+      setImagePreview(preview);
       setError('');
-      setStep('confirm'); // 👈 ADICIONE ESTA LINHA
+      setStep('confirm');
+      console.log('📍 Step alterado para: confirm');
     };
     reader.readAsDataURL(file);
   }
@@ -2131,10 +2137,16 @@ const handleSubmit = async () => {
         )}
 
         {/* Step 4: Confirm */}
-        {step === 'confirm' && imagePreview && (
+        {step === 'confirm' && (() => {
+          console.log('🔵 Renderizando step CONFIRM');
+          console.log('   - imagePreview:', imagePreview ? `${imagePreview.substring(0, 50)}...` : 'VAZIO');
+          console.log('   - selectedProductImage:', selectedProductImage || 'VAZIO');
+          console.log('   - primaryColor:', primaryColor);
+          return true;
+        })() && (
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in">
             <div className="text-center mb-3 md:mb-4">
-              <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-1 md:mb-2">
+              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 {t('confirmData')}
               </h3>
               <p className="text-gray-700 text-base md:text-lg">
@@ -2143,41 +2155,64 @@ const handleSubmit = async () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+              {/* Produto */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">{t('product')}</h4>
-                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
-                  <img
-                    src={selectedProductImage}
-                    alt="Produto"
-                    className="w-full h-full object-cover"
-                  />
+                <h4 className="font-medium mb-3 text-center text-base md:text-lg" style={{ color: primaryColor }}>
+                  {t('product')}
+                </h4>
+                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-white">
+                  {selectedProductImage ? (
+                    <img
+                      src={selectedProductImage}
+                      alt="Produto"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      Sem imagem
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* Foto do Usuário */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium text-primary mb-3 text-center text-base md:text-lg">{t('yourPhotoLabel')}</h4>
-                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden">
-                  <img
-                    src={imagePreview}
-                    alt="Sua foto"
-                    className="w-full h-full object-cover"
-                  />
+                <h4 className="font-medium mb-3 text-center text-base md:text-lg" style={{ color: primaryColor }}>
+                  {t('yourPhotoLabel')}
+                </h4>
+                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-white">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Sua foto"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      Sem imagem
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button
-                onClick={() => setStep('photo')}
-                className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-lg md:text-xl rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out"
-                              >
+                onClick={() => {
+                  setStep('photo');
+                  setImagePreview('');
+                  setModelImage(null);
+                }}
+                className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-lg md:text-xl rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out font-medium"
+              >
                 {t('change')}
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex-1 bg-primary text-white py-3 md:py-3.5 text-lg md:text-xl rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50"
-                              >
+                className="flex-1 text-white py-3 md:py-3.5 text-lg md:text-xl rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 font-medium"
+                style={{ backgroundColor: primaryColor }}
+              >
                 <Sparkles className="w-5 h-5" />
                 {t('process')}
               </button>
