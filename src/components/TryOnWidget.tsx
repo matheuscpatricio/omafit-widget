@@ -1902,7 +1902,7 @@ const handleSubmit = async () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <div className="flex justify-start">
-              <div className="max-w-[65%]">
+              <div className="max-w-[65%] md:max-w-[40%]">
                 <img
                   src={result}
                   alt="Try-on result"
@@ -1960,12 +1960,12 @@ const handleSubmit = async () => {
                     }]);
                     callGPTAssistant('confirm_size');
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl font-medium text-white shadow-sm transition-all hover:shadow-md text-sm"
+                  className="py-3 px-6 rounded-xl font-medium text-white shadow-sm transition-all hover:shadow-md text-sm w-auto"
                   style={{ backgroundColor: localPrimaryColor }}
                 >
-                  {currentLanguage === 'pt' && '✓ Confirmar tamanho'}
-                  {currentLanguage === 'es' && '✓ Confirmar talla'}
-                  {currentLanguage === 'en' && '✓ Confirm size'}
+                  {currentLanguage === 'pt' && 'Confirmar tamanho'}
+                  {currentLanguage === 'es' && 'Confirmar talla'}
+                  {currentLanguage === 'en' && 'Confirm size'}
                 </button>
 
                 {recommendedProductName && recommendedProductUrl && (
@@ -2033,9 +2033,7 @@ const handleSubmit = async () => {
                     }
                   }}
                 >
-                  {currentLanguage === 'pt' && 'Enviar'}
-                  {currentLanguage === 'es' && 'Enviar'}
-                  {currentLanguage === 'en' && 'Send'}
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
