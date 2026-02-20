@@ -2026,9 +2026,9 @@ const handleSubmit = async () => {
               {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
               {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
                 <p className="text-sm text-gray-600 text-center mb-3">
-                  {currentLanguage === 'pt' && 'Tem alguma dúvida? Pergunte abaixo'}
-                  {currentLanguage === 'es' && '¿Tienes alguna duda? Pregunta abajo'}
-                  {currentLanguage === 'en' && 'Have any questions? Ask below'}
+                  {currentLanguage === 'pt' && 'Restou alguma dúvida sobre esta roupa? Pergunte abaixo'}
+                  {currentLanguage === 'es' && '¿Quedó alguna duda sobre esta prenda? Pregunta abajo'}
+                  {currentLanguage === 'en' && 'Any questions about this garment? Ask below'}
                 </p>
               )}
 
