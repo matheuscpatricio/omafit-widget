@@ -1780,7 +1780,7 @@ const handleSubmit = async () => {
 
         setChatMessages(prev => [...prev, {
           role: 'assistant',
-          content: `${tamanho_final ? `**Tamanho ideal: ${tamanho_final}**\n\n` : ''}${explicacao}`,
+          content: explicacao,
           timestamp: Date.now()
         }]);
 
