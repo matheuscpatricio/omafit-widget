@@ -316,14 +316,16 @@ Contexto:
 - Categoria: ${data.categoria}
 - Elasticidade: ${data.elasticidade}
 
-Responda a pergunta de forma útil, profissional e breve (máximo 3-4 linhas).
-Se a pergunta for sobre tamanho, reforce a recomendação do tamanho ${data.tamanho_calculado_algoritmo}.
-Mantenha o foco em ajudar o usuário a tomar a decisão de compra.
+REGRAS IMPORTANTES:
+1. Se mencionar o tamanho, faça APENAS UMA VEZ no início da resposta
+2. Depois continue naturalmente SEM repetir o tamanho
+3. Responda de forma útil, profissional e breve (máximo 3-4 linhas)
+4. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
 
 Retorne no formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "sua resposta à pergunta do usuário",
+  "explicacao": "sua resposta à pergunta do usuário (tamanho só no início se necessário)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
@@ -336,14 +338,16 @@ Contexto:
 - Categoría: ${data.categoria}
 - Elasticidad: ${data.elasticidade}
 
-Responde la pregunta de forma útil, profesional y breve (máximo 3-4 líneas).
-Si la pregunta es sobre talla, refuerza la recomendación de la talla ${data.tamanho_calculado_algoritmo}.
-Mantén el foco en ayudar al usuario a tomar la decisión de compra.
+REGLAS IMPORTANTES:
+1. Si mencionas la talla, hazlo SOLO UNA VEZ al inicio de la respuesta
+2. Después continúa naturalmente SIN repetir la talla
+3. Responde de forma útil, profesional y breve (máximo 3-4 líneas)
+4. Mantén el foco en ayudar al usuario a tomar la decisión de compra
 
 Retorna en formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "tu respuesta a la pregunta del usuario",
+  "explicacao": "tu respuesta a la pregunta del usuario (talla solo al inicio si es necesario)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
@@ -356,14 +360,16 @@ Context:
 - Category: ${data.categoria}
 - Elasticity: ${data.elasticidade}
 
-Answer the question in a helpful, professional and brief way (max 3-4 lines).
-If the question is about size, reinforce the recommendation of size ${data.tamanho_calculado_algoritmo}.
-Keep focus on helping the user make the purchase decision.
+IMPORTANT RULES:
+1. If you mention the size, do it ONLY ONCE at the beginning of your response
+2. Then continue naturally WITHOUT repeating the size
+3. Answer in a helpful, professional and brief way (max 3-4 lines)
+4. Keep focus on helping the user make the purchase decision
 
 Return in JSON format:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "your answer to the user's question",
+  "explicacao": "your answer to the user's question (size only at the beginning if needed)",
   "coerencia": "alta",
   "confianca": 1.0
 }`
@@ -377,45 +383,63 @@ function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): stri
     pt: `O tamanho recomendado é ${data.tamanho_calculado_algoritmo}.
 
 Crie uma mensagem persuasiva e amigável incentivando o usuário a adicionar o produto ao carrinho.
-Seja breve (máximo 2-3 linhas), use um tom conversacional e profissional.
-Mencione benefícios como: confiança no tamanho, experiência try-on, ajuste perfeito, etc.
 
-IMPORTANTE: Se você considera que um tamanho diferente de ${data.tamanho_calculado_algoritmo} seria mais adequado, informe o tamanho ideal no campo "tamanho_final". Não use asteriscos ou formatação especial ao mencionar o tamanho - apenas escreva o tamanho naturalmente no texto.
+REGRAS IMPORTANTES:
+1. Mencione o tamanho ideal APENAS NA PRIMEIRA FRASE (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
+2. Depois, continue naturalmente SEM repetir o tamanho
+3. Seja breve (máximo 2-3 linhas no total)
+4. Use tom conversacional e profissional
+5. Mencione benefícios: confiança no tamanho, experiência try-on, ajuste perfeito
+6. Incentive a adicionar ao carrinho de forma natural
+
+Se você considera que um tamanho diferente seria mais adequado, informe no campo "tamanho_final". Não use asteriscos ou formatação especial.
 
 Retorne no formato JSON:
 {
-  "tamanho_final": "tamanho que você considera ideal (pode ser diferente do calculado)",
-  "explicacao": "mensagem persuasiva para adicionar ao carrinho",
+  "tamanho_final": "tamanho ideal",
+  "explicacao": "mensagem persuasiva (tamanho só na primeira frase!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
     es: `La talla recomendada es ${data.tamanho_calculado_algoritmo}.
 
 Crea un mensaje persuasivo y amigable incentivando al usuario a agregar el producto al carrito.
-Sé breve (máximo 2-3 líneas), usa un tono conversacional y profesional.
-Menciona beneficios como: confianza en la talla, experiencia try-on, ajuste perfecto, etc.
 
-IMPORTANTE: Si consideras que una talla diferente de ${data.tamanho_calculado_algoritmo} sería más adecuada, informa la talla ideal en el campo "tamanho_final". No uses asteriscos ni formato especial al mencionar la talla - solo escribe la talla naturalmente en el texto.
+REGLAS IMPORTANTES:
+1. Menciona la talla ideal SOLO EN LA PRIMERA FRASE (ejemplo: "¡Tu talla ideal es ${data.tamanho_calculado_algoritmo}!")
+2. Después, continúa naturalmente SIN repetir la talla
+3. Sé breve (máximo 2-3 líneas en total)
+4. Usa tono conversacional y profesional
+5. Menciona beneficios: confianza en la talla, experiencia try-on, ajuste perfecto
+6. Incentiva a agregar al carrito de forma natural
+
+Si consideras que una talla diferente sería más adecuada, informa en el campo "tamanho_final". No uses asteriscos ni formato especial.
 
 Retorna en formato JSON:
 {
-  "tamanho_final": "talla que consideras ideal (puede ser diferente de la calculada)",
-  "explicacao": "mensaje persuasivo para agregar al carrito",
+  "tamanho_final": "talla ideal",
+  "explicacao": "mensaje persuasivo (talla solo en la primera frase!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
     en: `The recommended size is ${data.tamanho_calculado_algoritmo}.
 
 Create a persuasive and friendly message encouraging the user to add the product to cart.
-Be brief (max 2-3 lines), use a conversational and professional tone.
-Mention benefits like: size confidence, try-on experience, perfect fit, etc.
 
-IMPORTANT: If you think a different size than ${data.tamanho_calculado_algoritmo} would be more appropriate, inform the ideal size in the "tamanho_final" field. Don't use asterisks or special formatting when mentioning the size - just write the size naturally in the text.
+IMPORTANT RULES:
+1. Mention the ideal size ONLY IN THE FIRST SENTENCE (example: "Your ideal size is ${data.tamanho_calculado_algoritmo}!")
+2. Then, continue naturally WITHOUT repeating the size
+3. Be brief (max 2-3 lines total)
+4. Use conversational and professional tone
+5. Mention benefits: size confidence, try-on experience, perfect fit
+6. Encourage adding to cart naturally
+
+If you think a different size would be more appropriate, inform in the "tamanho_final" field. Don't use asterisks or special formatting.
 
 Return in JSON format:
 {
-  "tamanho_final": "size you consider ideal (can be different from calculated)",
-  "explicacao": "persuasive message to add to cart",
+  "tamanho_final": "ideal size",
+  "explicacao": "persuasive message (size only in first sentence!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`
