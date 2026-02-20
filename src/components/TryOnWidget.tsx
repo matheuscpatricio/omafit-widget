@@ -98,6 +98,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [processingMessage, setProcessingMessage] = useState(t('generating'));
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // GPT Assistant states
+  const [gptResponse, setGptResponse] = useState<string | null>(null);
+  const [gptLoading, setGptLoading] = useState(false);
+  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  const [interactionCount, setInteractionCount] = useState(0);
+  const [showAssistant, setShowAssistant] = useState(false);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
@@ -154,6 +161,16 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       setLocalStoreName(storeName);
     }
   }, [storeName]);
+
+  // Chamar assistente GPT automaticamente quando chegar no resultado
+  useEffect(() => {
+    if (step === 'result' && result && sizeData && !gptResponse && !gptLoading) {
+      setShowAssistant(true);
+      setTimeout(() => {
+        callGPTAssistant('validate');
+      }, 1000);
+    }
+  }, [step, result, sizeData]);
 
   // ═══════════════════════════════════════════════════════════════════
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
@@ -1587,6 +1604,69 @@ const handleSubmit = async () => {
     setError('');
     setPredictionId(null);
     setCurrentImageIndex(0);
+    setGptResponse(null);
+    setInteractionCount(0);
+    setShowAssistant(false);
+  };
+
+  const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any) => {
+    if (interactionCount >= 3) {
+      setGptResponse('Você atingiu o limite de 3 interações por sessão.');
+      return;
+    }
+
+    if (!sizeData) return;
+
+    setGptLoading(true);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const payload = {
+        altura_cm: sizeData.height,
+        peso_kg: sizeData.weight,
+        peito_cm: sizeData.chest,
+        cintura_cm: sizeData.waist,
+        quadril_cm: sizeData.hip,
+        elasticidade: collectionElasticity || 'light',
+        categoria: collectionType || 'upper',
+        tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
+        intencao_usuario: intention === 'complementary' ? 'sugerir_combinacoes' : 'validar_tamanho',
+        session_id: sessionId,
+        interaction_count: interactionCount,
+        shop_name: storeName,
+        complementary_product: complementaryProduct,
+      };
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/validate-size`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao chamar assistente');
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const { tamanho_final, explicacao } = result.data;
+        setGptResponse(`**Tamanho ideal: ${tamanho_final}**\n\n${explicacao}`);
+        setInteractionCount(result.interaction_count || interactionCount + 1);
+      } else {
+        throw new Error(result.message || 'Erro ao processar resposta');
+      }
+    } catch (error) {
+      console.error('Erro ao chamar GPT:', error);
+      setGptResponse('Não foi possível validar o tamanho no momento. Por favor, tente novamente.');
+    } finally {
+      setGptLoading(false);
+    }
   };
 
   const nextImage = () => {
@@ -2154,9 +2234,69 @@ const handleSubmit = async () => {
                 <p className="text-base text-gray-700 mb-4">
                   {t('congratsMessage')}
                 </p>
+
+                {/* GPT Assistant - Mobile */}
+                {showAssistant && (
+                  <div className="mt-4 mb-4">
+                    <div className="bg-white border-2 rounded-lg p-4 shadow-sm" style={{ borderColor: primaryColor }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-5 h-5" style={{ color: primaryColor }} />
+                        <h4 className="font-semibold text-gray-900">
+                          Assistente {storeName}
+                        </h4>
+                      </div>
+
+                      {gptLoading ? (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
+                          <p className="text-sm">Analisando ajuste com assistente inteligente...</p>
+                        </div>
+                      ) : gptResponse ? (
+                        <div>
+                          <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: `${primaryColor}15` }}>
+                            <p className="text-sm text-gray-800 whitespace-pre-line">{gptResponse}</p>
+                          </div>
+
+                          {interactionCount < 3 && (
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={() => {
+                                  // Fechar assistente e induzir adicionar ao carrinho
+                                  setShowAssistant(false);
+                                }}
+                                className="w-full py-2 px-4 rounded-lg font-medium text-white transition-all"
+                                style={{ backgroundColor: primaryColor }}
+                              >
+                                <ShoppingCart className="w-4 h-4 inline mr-2" />
+                                Confirmar tamanho
+                              </button>
+
+                              {recommendedProductName && recommendedProductUrl && (
+                                <button
+                                  onClick={() => {
+                                    callGPTAssistant('complementary', {
+                                      name: recommendedProductName,
+                                      category: 'complementar',
+                                      image_url: recommendedProductUrl,
+                                    });
+                                  }}
+                                  className="w-full py-2 px-4 rounded-lg font-medium border-2 transition-all"
+                                  style={{ borderColor: primaryColor, color: primaryColor }}
+                                >
+                                  <Sparkles className="w-4 h-4 inline mr-2" />
+                                  Sugerir combinações
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {recommendedProductName && recommendedProductUrl && (
+              {recommendedProductName && recommendedProductUrl && !showAssistant && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-gray-700 text-center">
                     Uma ótima escolha para acompanhar seu pedido seria{' '}
@@ -2236,7 +2376,67 @@ const handleSubmit = async () => {
                   {t('congratsMessage')}
                 </p>
 
-                {recommendedProductName && recommendedProductUrl && (
+                {/* GPT Assistant - Desktop */}
+                {showAssistant && (
+                  <div className="mt-4">
+                    <div className="bg-white border-2 rounded-lg p-5 shadow-sm" style={{ borderColor: primaryColor }}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="w-6 h-6" style={{ color: primaryColor }} />
+                        <h4 className="font-semibold text-lg text-gray-900">
+                          Assistente {storeName}
+                        </h4>
+                      </div>
+
+                      {gptLoading ? (
+                        <div className="flex items-center gap-3 text-gray-600">
+                          <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }}></div>
+                          <p className="text-base">Analisando ajuste com assistente inteligente...</p>
+                        </div>
+                      ) : gptResponse ? (
+                        <div>
+                          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: `${primaryColor}15` }}>
+                            <p className="text-base text-gray-800 whitespace-pre-line">{gptResponse}</p>
+                          </div>
+
+                          {interactionCount < 3 && (
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => {
+                                  // Fechar assistente e induzir adicionar ao carrinho
+                                  setShowAssistant(false);
+                                }}
+                                className="flex-1 py-3 px-4 rounded-lg font-medium text-white transition-all"
+                                style={{ backgroundColor: primaryColor }}
+                              >
+                                <ShoppingCart className="w-5 h-5 inline mr-2" />
+                                Confirmar tamanho
+                              </button>
+
+                              {recommendedProductName && recommendedProductUrl && (
+                                <button
+                                  onClick={() => {
+                                    callGPTAssistant('complementary', {
+                                      name: recommendedProductName,
+                                      category: 'complementar',
+                                      image_url: recommendedProductUrl,
+                                    });
+                                  }}
+                                  className="flex-1 py-3 px-4 rounded-lg font-medium border-2 transition-all"
+                                  style={{ borderColor: primaryColor, color: primaryColor }}
+                                >
+                                  <Sparkles className="w-5 h-5 inline mr-2" />
+                                  Sugerir combinações
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
+                {recommendedProductName && recommendedProductUrl && !showAssistant && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <p className="text-base text-gray-700 text-center">
                       Uma ótima escolha para acompanhar seu pedido seria{' '}
