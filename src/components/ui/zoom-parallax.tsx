@@ -20,7 +20,7 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
     offset: ['start start', 'end end'],
   });
 
-  const scale4 = useTransform(scrollYProgress, [0, 1], [1, 4.5]);
+  const scale4 = useTransform(scrollYProgress, [0, 1], [1, 4]);
   const scale5 = useTransform(scrollYProgress, [0, 1], [1, 5]);
   const scale6 = useTransform(scrollYProgress, [0, 1], [1, 6]);
   const scale8 = useTransform(scrollYProgress, [0, 1], [1, 8]);
@@ -28,20 +28,52 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
 
   const scales = [scale4, scale5, scale6, scale5, scale6, scale8, scale9];
 
+  const positions = [
+    { top: '50%', left: '50%', transform: '-translate-x-1/2 -translate-y-1/2' },
+    { top: '0%', left: '5%', transform: 'md:-translate-y-[30vh]' },
+    { top: '0%', left: '-15%', transform: 'md:-translate-y-[10vh] md:-translate-x-[10vw]' },
+    { top: '50%', left: '60%', transform: '-translate-y-1/2' },
+    { top: '70%', left: '5%', transform: '' },
+    { top: '70%', left: '-10%', transform: 'md:-translate-x-[12.5vw]' },
+    { top: '60%', left: '65%', transform: '' },
+  ];
+
   return (
     <div ref={container} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen overflow-hidden">
+      <div className="sticky top-0 h-screen overflow-hidden bg-black/50">
         {images.map(({ src, alt }, index) => {
           const scale = scales[index % scales.length];
           const isCentralItem = index === 0;
+          const position = positions[index] || positions[0];
 
           return (
             <motion.div
               key={index}
-              style={{ scale }}
-              className={`absolute top-0 flex h-full w-full items-center justify-center ${index === 1 ? '[&>div]:!-top-[30vh] [&>div]:!left-[5vw] [&>div]:!h-[30vh] [&>div]:!w-[35vw]' : ''} ${index === 2 ? '[&>div]:!-top-[10vh] [&>div]:!-left-[25vw] [&>div]:!h-[45vh] [&>div]:!w-[20vw]' : ''} ${index === 3 ? '[&>div]:!left-[27.5vw] [&>div]:!h-[25vh] [&>div]:!w-[25vw]' : ''} ${index === 4 ? '[&>div]:!top-[27.5vh] [&>div]:!left-[5vw] [&>div]:!h-[25vh] [&>div]:!w-[20vw]' : ''} ${index === 5 ? '[&>div]:!top-[27.5vh] [&>div]:!-left-[22.5vw] [&>div]:!h-[25vh] [&>div]:!w-[30vw]' : ''} ${index === 6 ? '[&>div]:!top-[22.5vh] [&>div]:!left-[25vw] [&>div]:!h-[15vh] [&>div]:!w-[15vw]' : ''} `}
+              style={{
+                scale,
+                top: position.top,
+                left: position.left,
+              }}
+              className={`absolute ${position.transform}`}
             >
-              <div className="relative h-[25vh] w-[25vw] rounded-2xl overflow-hidden shadow-2xl">
+              <div
+                className={`relative rounded-2xl overflow-hidden shadow-2xl
+                  ${isCentralItem
+                    ? 'h-[40vh] w-[80vw] md:h-[50vh] md:w-[40vw]'
+                    : index === 1
+                      ? 'h-[20vh] w-[40vw] md:h-[30vh] md:w-[35vw]'
+                      : index === 2
+                        ? 'h-[25vh] w-[35vw] md:h-[45vh] md:w-[20vw]'
+                        : index === 3
+                          ? 'h-[18vh] w-[35vw] md:h-[25vh] md:w-[25vw]'
+                          : index === 4
+                            ? 'h-[18vh] w-[30vw] md:h-[25vh] md:w-[20vw]'
+                            : index === 5
+                              ? 'h-[20vh] w-[40vw] md:h-[25vh] md:w-[30vw]'
+                              : 'h-[15vh] w-[25vw] md:h-[15vh] md:w-[15vw]'
+                  }
+                `}
+              >
                 {isCentralItem && videoUrl ? (
                   <video
                     src={videoUrl}
