@@ -190,145 +190,145 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header - Visible at top or when scrolling up */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrollY < 100
-          ? 'bg-transparent translate-y-0'
-          : showHeader
-          ? 'bg-white shadow-lg translate-y-0'
-          : 'bg-transparent -translate-y-full'
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <span className={`text-2xl font-bold transition-colors ${scrollY < 100 || !showHeader ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
-            </div>
+    <div className="min-h-screen relative">
+      <ASMRStaticBackground>
+        <div className="relative z-10">
+          {/* Header - Visible at top or when scrolling up */}
+          <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+            scrollY < 100
+              ? 'bg-transparent translate-y-0'
+              : showHeader
+              ? 'bg-black/80 backdrop-blur-sm shadow-lg translate-y-0'
+              : 'bg-transparent -translate-y-full'
+          }`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center">
+                  <span className="text-2xl font-bold text-white" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+                </div>
 
-            <div className="flex items-center gap-8">
-              <nav className="hidden md:flex space-x-8">
-                <a href="#features" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Recursos</a>
-                <a href="#benefits" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Benefícios</a>
-                <a href="#pricing" className={`transition-colors ${scrollY < 100 || !showHeader ? 'text-white hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>Planos</a>
-              </nav>
-              <a
-                href="mailto:contato@omafit.co"
-                className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-2 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
+                <div className="flex items-center gap-8">
+                  <nav className="hidden md:flex space-x-8">
+                    <a href="#features" className="text-white hover:text-gray-200 transition-colors">Recursos</a>
+                    <a href="#benefits" className="text-white hover:text-gray-200 transition-colors">Benefícios</a>
+                    <a href="#pricing" className="text-white hover:text-gray-200 transition-colors">Planos</a>
+                  </nav>
+                  <a
+                    href="mailto:contato@omafit.co"
+                    className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-2 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
+                  >
+                    Entrar em contato
+                  </a>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Hero Section */}
+          <section className="relative h-screen">
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 pointer-events-none">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+                Encante seus clientes com uma
+                <br />
+                <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
+              </h1>
+              <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+                When techno meets fashion.
+              </p>
+            </div>
+          </section>
+
+          {/* Stats Section */}
+          <section className="py-12 sm:py-16" data-animate="stats">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                <div className="text-center" data-animate="stat-1">
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
+                  <div className="text-white/80 text-sm sm:text-base">Aumento na Conversão</div>
+                </div>
+                <div className="text-center" data-animate="stat-2">
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
+                  <div className="text-white/80 text-sm sm:text-base">Redução em Devoluções</div>
+                </div>
+                <div className="text-center" data-animate="stat-3">
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
+                  <div className="text-white/80 text-sm sm:text-base">Satisfação do Cliente</div>
+                </div>
+                <div className="text-center" data-animate="stat-4">
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
+                  <div className="text-white/80 text-sm sm:text-base">Tempo de Integração</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Benefits Section */}
+          <section className="py-16 sm:py-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                    As pessoas acreditam no que conseguem visualizar.
+                  </p>
+                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                    - Donald Norman
+                  </p>
+                </div>
+
+                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                    A incerteza é emocionalmente custosa.
+                  </p>
+                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                    - Daniel Kahneman
+                  </p>
+                </div>
+
+                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                    Marcas fortes reduzem a ansiedade na decisão.
+                  </p>
+                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                    - Marty Neumeier
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Features Section */}
+          <section id="features" className="py-16 sm:py-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-black" style={{ minHeight: '600px' }}>
+                <iframe
+                  width="100%"
+                  height="600"
+                  src="https://www.youtube.com/embed/o6OHZzTjB9s"
+                  title="OmaFit Demo"
+                  frameBorder="0"
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
+              </div>
+
+              <div
+                id="tech-tagline"
+                data-animate="tech-tagline"
+                className="text-center mt-12 opacity-0 translate-y-8 transition-all duration-1000 ease-out"
+                style={{
+                  opacity: visibleSections.has('tech-tagline') ? 1 : 0,
+                  transform: visibleSections.has('tech-tagline') ? 'translateY(0)' : 'translateY(2rem)'
+                }}
               >
-                Entrar em contato
-              </a>
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+                  Dê a experiência aos seus clientes de ver a roupa da sua loja no{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+                    próprio corpo
+                  </span>
+                </h3>
+              </div>
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section - ASMR Background */}
-      <section className="relative h-screen">
-        <ASMRStaticBackground>
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 pointer-events-none">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-              Encante seus clientes com uma
-              <br />
-              <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
-            </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-              When techno meets fashion.
-            </p>
-          </div>
-        </ASMRStaticBackground>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-12 sm:py-16 bg-white" data-animate="stats">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-            <div className="text-center" data-animate="stat-1">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
-              <div className="text-gray-600 text-sm sm:text-base">Aumento na Conversão</div>
-            </div>
-            <div className="text-center" data-animate="stat-2">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
-              <div className="text-gray-600 text-sm sm:text-base">Redução em Devoluções</div>
-            </div>
-            <div className="text-center" data-animate="stat-3">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
-              <div className="text-gray-600 text-sm sm:text-base">Satisfação do Cliente</div>
-            </div>
-            <div className="text-center" data-animate="stat-4">
-              <div className="text-3xl sm:text-4xl font-bold text-[#810707] mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
-              <div className="text-gray-600 text-sm sm:text-base">Tempo de Integração</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
-            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
-              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                As pessoas acreditam no que conseguem visualizar.
-              </p>
-              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                - Donald Norman
-              </p>
-            </div>
-
-            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
-              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                A incerteza é emocionalmente custosa.
-              </p>
-              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                - Daniel Kahneman
-              </p>
-            </div>
-
-            <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
-              <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed bg-gradient-to-b from-[#810707] to-gray-400 bg-clip-text text-transparent">
-                Marcas fortes reduzem a ansiedade na decisão.
-              </p>
-              <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                - Marty Neumeier
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-16 sm:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-black" style={{ minHeight: '600px' }}>
-            <iframe
-              width="100%"
-              height="600"
-              src="https://www.youtube.com/embed/o6OHZzTjB9s"
-              title="OmaFit Demo"
-              frameBorder="0"
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            ></iframe>
-          </div>
-
-          <div
-            id="tech-tagline"
-            data-animate="tech-tagline"
-            className="text-center mt-12 opacity-0 translate-y-8 transition-all duration-1000 ease-out"
-            style={{
-              opacity: visibleSections.has('tech-tagline') ? 1 : 0,
-              transform: visibleSections.has('tech-tagline') ? 'translateY(0)' : 'translateY(2rem)'
-            }}
-          >
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-              Dê a experiência aos seus clientes de ver a roupa da sua loja no{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#810707] to-red-700">
-                próprio corpo
-              </span>
-            </h3>
-          </div>
-        </div>
-      </section>
+          </section>
 
       {/* ZoomParallax Section - Precision & Analytics */}
       <section className="relative bg-black">
@@ -369,8 +369,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         <ZoomParallaxText />
       </section>
 
-      {/* Features Cards */}
-      <section className="py-20 bg-gradient-to-b from-white to-gray-50">
+          {/* Features Cards */}
+          <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
             {/* Card 1 - Calculadora de Medidas */}
@@ -485,34 +485,34 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       </section>
 
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-16 sm:py-20 bg-white" data-animate="pricing">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-              O plano para sua marca
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-600">
-              Escolha o plano ideal para o tamanho do seu negócio
-            </p>
-          </div>
+          {/* Pricing Section */}
+          <section id="pricing" className="py-16 sm:py-20" data-animate="pricing">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 sm:mb-16">
+                <h2 className="landing-title text-2xl sm:text-3xl font-bold text-white mb-4">
+                  O plano para sua marca
+                </h2>
+                <p className="text-lg sm:text-xl text-white/80">
+                  Escolha o plano ideal para o tamanho do seu negócio
+                </p>
+              </div>
 
-          {/* Plan Calculator */}
-          <PlanCalculator />
-        </div>
-      </section>
+              {/* Plan Calculator */}
+              <PlanCalculator />
+            </div>
+          </section>
 
-      {/* Platforms Section - Carousel */}
-      <section className="py-16 sm:py-20 bg-gray-50" data-animate="platforms">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Plataformas
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-600">
-              Clique e integre facilmente com as principais plataformas de e-commerce
-            </p>
-          </div>
+          {/* Platforms Section - Carousel */}
+          <section className="py-16 sm:py-20" data-animate="platforms">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12">
+                <h2 className="landing-title text-3xl sm:text-4xl font-bold text-white mb-4">
+                  Plataformas
+                </h2>
+                <p className="text-lg sm:text-xl text-white/80">
+                  Clique e integre facilmente com as principais plataformas de e-commerce
+                </p>
+              </div>
 
           <div className="relative max-w-4xl mx-auto">
             <div
@@ -671,32 +671,34 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   aria-label={`Ir para plataforma ${index + 1}`}
                 />
               ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+          </section>
 
-      {/* CTA Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-r from-[#810707] to-red-700">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="landing-title text-2xl sm:text-3xl font-bold text-white mb-6 animate-swipe-up">
-            Entre em contato conosco e aplique agora o Omafit na sua marca
-          </h2>
-          <p className="text-lg sm:text-xl text-red-100 mb-8 animate-swipe-up-delay-1">
-            Junte-se a marcas que pensam à frente e usam o Omafit
-          </p>
-          <a
-            href="mailto:contato@omafit.co"
-            className="bg-white text-[#810707] px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
-          >
-            Entrar em contato
-            <Mail className="w-5 h-5" />
-          </a>
-          <p className="text-red-200 text-sm mt-4 animate-swipe-up-delay-3">
-            
-          </p>
+          {/* CTA Section */}
+          <section className="py-16 sm:py-20">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <h2 className="landing-title text-2xl sm:text-3xl font-bold text-white mb-6 animate-swipe-up">
+                Entre em contato conosco e aplique agora o Omafit na sua marca
+              </h2>
+              <p className="text-lg sm:text-xl text-white/80 mb-8 animate-swipe-up-delay-1">
+                Junte-se a marcas que pensam à frente e usam o Omafit
+              </p>
+              <a
+                href="mailto:contato@omafit.co"
+                className="bg-white text-[#810707] px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
+              >
+                Entrar em contato
+                <Mail className="w-5 h-5" />
+              </a>
+              <p className="text-white/60 text-sm mt-4 animate-swipe-up-delay-3">
+
+              </p>
+            </div>
+          </section>
         </div>
-      </section>
+      </ASMRStaticBackground>
 
       {/* Video Modal */}
       {showVideoModal && (
@@ -749,8 +751,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      {/* Footer - fora do ASMR background */}
+      <footer className="relative z-20 bg-black/90 backdrop-blur-sm text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
