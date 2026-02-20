@@ -1837,7 +1837,13 @@ const handleSubmit = async () => {
     return (
       <div className="w-full h-full bg-white flex items-center justify-center rounded-2xl">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: primaryColor }}></div>
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto mb-4"
+            style={{
+              borderColor: primaryColor,
+              borderTopColor: 'transparent'
+            }}
+          />
           <p className="text-gray-700 text-base">{t('loadingProduct')}</p>
         </div>
       </div>
@@ -2458,7 +2464,13 @@ const handleSubmit = async () => {
         {/* Step 5: Processing */}
         {step === 'processing' && (
           <div className="text-center py-10 md:py-12 animate-fade-in">
-            <div className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-b-2 border-primary mx-auto mb-6 will-change-transform"></div>
+            <div
+              className="animate-spin rounded-full h-16 w-16 md:h-20 md:w-20 border-4 border-t-transparent mx-auto mb-6"
+              style={{
+                borderColor: primaryColor,
+                borderTopColor: 'transparent'
+              }}
+            />
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>
