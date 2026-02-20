@@ -32,6 +32,7 @@ export function WidgetPage() {
     const configParam = params.get('config');
     const pubId = params.get('publicId');
     const shop = params.get('shopDomain');
+    const shopNameParam = params.get('shopName') || params.get('shop_name'); // Suporte para ambos
     const logoParam = params.get('storeLogo');
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
@@ -44,6 +45,7 @@ export function WidgetPage() {
     const complementaryProductParam = params.get('complementaryProductUrl');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
+    console.log('   - shopName/shop_name:', shopNameParam);
     console.log('   - storeLogo:', logoParam);
     console.log('   - shop:', shop);
     console.log('   - publicId:', pubId);
@@ -87,6 +89,12 @@ export function WidgetPage() {
 
     if (shop) {
       setShopDomain(shop);
+    }
+
+    // Definir storeName a partir do shopName/shop_name da URL (prioridade alta)
+    if (shopNameParam) {
+      console.log('✅ Store Name definido da URL:', shopNameParam);
+      setStoreName(decodeURIComponent(shopNameParam));
     }
 
     if (collectionIdParam) {
