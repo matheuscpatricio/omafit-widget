@@ -39,7 +39,7 @@ interface SizeChartEntry {
   length?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = 'Omafit', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');

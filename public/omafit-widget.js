@@ -971,7 +971,7 @@
     // Montar configuração - NÃO incluir storeLogo (base64) na URL para evitar 414
     // O widget buscará do Supabase usando shopDomain
     const config = {
-      storeName: OMAFIT_CONFIG.storeName || 'Omafit',
+      storeName: OMAFIT_CONFIG.storeName || '',
       primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
       // storeLogo será enviado via postMessage
       fontFamily: detectedFontFamily, // Usar fonte detectada da loja
@@ -985,7 +985,7 @@
     const resolvedStoreName =
       (OMAFIT_CONFIG.storeName && String(OMAFIT_CONFIG.storeName).trim()) ||
       shopNameFromDomain ||
-      'Omafit';
+      '';
     config.storeName = resolvedStoreName;
     const rootEl = document.getElementById('omafit-widget-root');
     let collectionHandle = (rootEl && rootEl.dataset && rootEl.dataset.collectionHandle) ? rootEl.dataset.collectionHandle : '';
@@ -1181,7 +1181,7 @@
             iframe.contentWindow.postMessage({
               type: 'omafit-config-update',
               primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-              storeName: OMAFIT_CONFIG.storeName || 'Omafit',
+              storeName: OMAFIT_CONFIG.storeName || '',
               storeLogo: OMAFIT_CONFIG.storeLogo, // Incluir logo na configuração também
               fontFamily: detectedFontFamily, // Enviar fonte detectada
               shopDomain: shopDomain,
@@ -1211,7 +1211,7 @@
             iframe.contentWindow.postMessage({
               type: 'omafit-config-update',
               primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-              storeName: OMAFIT_CONFIG.storeName || 'Omafit',
+              storeName: OMAFIT_CONFIG.storeName || '',
               fontFamily: detectedFontFamily,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
@@ -1235,7 +1235,7 @@
           iframe.contentWindow.postMessage({
             type: 'omafit-config-update',
             primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-            storeName: OMAFIT_CONFIG.storeName || 'Omafit',
+            storeName: OMAFIT_CONFIG.storeName || '',
             fontFamily: detectedFontFamily,
             shopDomain: shopDomain,
             collectionHandle: collectionHandle || '',
