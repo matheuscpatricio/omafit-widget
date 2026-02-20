@@ -1315,8 +1315,11 @@ const handleSubmit = async () => {
         const imgElement = new Image();
         imgElement.src = modelImageDataUrl;
 
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
           imgElement.onload = resolve;
+          imgElement.onerror = reject;
+          // Timeout de segurança
+          setTimeout(() => reject(new Error('Image load timeout')), 5000);
         });
 
         // Permitir que a UI atualize novamente
@@ -1352,6 +1355,7 @@ const handleSubmit = async () => {
         }
       } catch (err) {
         console.error('❌ Erro ao detectar landmarks no frontend:', err);
+        // Continuar mesmo com erro no MediaPipe - edge function fará a detecção
       }
     } else {
       console.log('⏭️ MediaPipe não está pronto, edge function fará a detecção');
@@ -1364,7 +1368,8 @@ const handleSubmit = async () => {
       console.error('   height:', sizeData?.height);
       console.error('   weight:', sizeData?.weight);
       setError('Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios)');
-      setProcessing(false);
+      setLoading(false);
+      setStep('confirm');
       return;
     }
 
