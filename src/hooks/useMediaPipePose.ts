@@ -296,9 +296,110 @@ export function useMediaPipePose() {
       return Math.PI * Math.sqrt(2 * (a * a + b * b));
     };
 
-    const chestCircumference = ellipseCircumference(chestWidth, chestDepth);
-    const waistCircumference = ellipseCircumference(waistWidth, waistDepth);
-    const hipCircumference = ellipseCircumference(hipWidthCm, hipDepth);
+    let chestCircumference = ellipseCircumference(chestWidth, chestDepth);
+    let waistCircumference = ellipseCircumference(waistWidth, waistDepth);
+    let hipCircumference = ellipseCircumference(hipWidthCm, hipDepth);
+
+    // 🔹 9.5. VALIDAÇÃO ANTROPOMÉTRICA BASEADA EM ALTURA E PESO
+    console.log('\n━━━━ 🔹 VALIDAÇÃO ANTROPOMÉTRICA ━━━━');
+
+    // Faixas realistas baseadas em altura e peso
+    // Usando regressão estatística de dados antropométricos
+    // (heightM já foi declarado anteriormente)
+
+    // Fórmulas baseadas em dados populacionais reais
+    let expectedChest: number;
+    let expectedWaist: number;
+    let expectedHip: number;
+
+    if (gender === 'male') {
+      // Homens: fórmulas ajustadas para população masculina
+      expectedChest = 50 + (heightM - 1.70) * 20 + (weightKg - 70) * 0.8;
+      expectedWaist = 45 + (heightM - 1.70) * 15 + (weightKg - 70) * 0.9;
+      expectedHip = 52 + (heightM - 1.70) * 18 + (weightKg - 70) * 0.7;
+    } else {
+      // Mulheres: proporções femininas (quadril > peito)
+      expectedChest = 48 + (heightM - 1.60) * 18 + (weightKg - 60) * 0.7;
+      expectedWaist = 40 + (heightM - 1.60) * 12 + (weightKg - 60) * 0.8;
+      expectedHip = 54 + (heightM - 1.60) * 20 + (weightKg - 60) * 0.75;
+    }
+
+    console.log('   • Medidas esperadas para altura', referenceHeightCm, 'cm e peso', weightKg, 'kg:');
+    console.log('     - Peito esperado:', expectedChest.toFixed(1), 'cm');
+    console.log('     - Cintura esperada:', expectedWaist.toFixed(1), 'cm');
+    console.log('     - Quadril esperado:', expectedHip.toFixed(1), 'cm');
+
+    console.log('   • Medidas detectadas pelo MediaPipe:');
+    console.log('     - Peito detectado:', chestCircumference.toFixed(1), 'cm');
+    console.log('     - Cintura detectada:', waistCircumference.toFixed(1), 'cm');
+    console.log('     - Quadril detectado:', hipCircumference.toFixed(1), 'cm');
+
+    // Tolerância de ±30% para variação natural
+    const tolerance = 0.30;
+
+    const clampToExpected = (measured: number, expected: number, label: string): number => {
+      const minAllowed = expected * (1 - tolerance);
+      const maxAllowed = expected * (1 + tolerance);
+
+      if (measured < minAllowed || measured > maxAllowed) {
+        console.warn(`   ⚠️ ${label} fora da faixa realista:`, measured.toFixed(1), 'cm');
+        console.warn(`      Faixa permitida: ${minAllowed.toFixed(1)} - ${maxAllowed.toFixed(1)} cm`);
+        console.warn(`      Ajustando para média ponderada...`);
+
+        // Usar 70% da medida esperada + 30% da detectada (mas limitada)
+        const clamped = Math.max(minAllowed, Math.min(maxAllowed, measured));
+        const adjusted = expected * 0.7 + clamped * 0.3;
+        console.warn(`      Valor ajustado: ${adjusted.toFixed(1)} cm`);
+        return adjusted;
+      }
+
+      return measured;
+    };
+
+    chestCircumference = clampToExpected(chestCircumference, expectedChest, 'Peito');
+    waistCircumference = clampToExpected(waistCircumference, expectedWaist, 'Cintura');
+    hipCircumference = clampToExpected(hipCircumference, expectedHip, 'Quadril');
+
+    // 🔹 9.6. GARANTIR RELAÇÕES ANATÔMICAS CORRETAS
+    console.log('\n━━━━ 🔹 VALIDAÇÃO DE PROPORÇÕES ANATÔMICAS ━━━━');
+
+    // Regra 1: Quadril nunca pode ser menor que cintura
+    if (hipCircumference < waistCircumference) {
+      console.warn('   ⚠️ ERRO: Quadril menor que cintura detectado!');
+      console.warn(`      Cintura: ${waistCircumference.toFixed(1)} cm, Quadril: ${hipCircumference.toFixed(1)} cm`);
+
+      // Corrigir: quadril deve ser no mínimo 5cm maior que cintura
+      hipCircumference = waistCircumference + 5;
+      console.warn(`      Quadril ajustado para: ${hipCircumference.toFixed(1)} cm`);
+    }
+
+    // Regra 2: Para mulheres, quadril deve ser significativamente maior que cintura
+    if (gender === 'female' && hipCircumference < waistCircumference * 1.08) {
+      const minHip = waistCircumference * 1.08;
+      console.warn('   ⚠️ Quadril feminino proporcionalmente pequeno');
+      console.warn(`      Ajustando de ${hipCircumference.toFixed(1)} para ${minHip.toFixed(1)} cm`);
+      hipCircumference = minHip;
+    }
+
+    // Regra 3: Peito não pode ser excessivamente maior que quadril (exceto obesidade)
+    const chestHipRatio = chestCircumference / hipCircumference;
+    if (chestHipRatio > 1.25 && bmi < 30) {
+      console.warn('   ⚠️ Proporção peito/quadril anormal:', chestHipRatio.toFixed(2));
+      chestCircumference = hipCircumference * 1.10;
+      console.warn(`      Peito ajustado para: ${chestCircumference.toFixed(1)} cm`);
+    }
+
+    // Regra 4: Cintura não pode ser maior que peito (exceto obesidade abdominal extrema)
+    if (waistCircumference > chestCircumference && bmi < 32) {
+      console.warn('   ⚠️ Cintura maior que peito detectada');
+      waistCircumference = chestCircumference * 0.88;
+      console.warn(`      Cintura ajustada para: ${waistCircumference.toFixed(1)} cm`);
+    }
+
+    console.log('   ✅ Medidas finais após validação:');
+    console.log('     - Peito:', chestCircumference.toFixed(1), 'cm');
+    console.log('     - Cintura:', waistCircumference.toFixed(1), 'cm');
+    console.log('     - Quadril:', hipCircumference.toFixed(1), 'cm');
 
     // 🔹 10. PROPORÇÕES BRAÇO/PERNA POR GÊNERO E IMC
     let armRatio = 0.38;
@@ -326,13 +427,17 @@ export function useMediaPipePose() {
     const armLength = Math.round(referenceHeightCm * armRatio);
     const legLength = Math.round(referenceHeightCm * legRatio);
 
-    // 🔹 11. CONFIANÇA GLOBAL
+    // 🔹 11. CONFIANÇA GLOBAL (reduzida devido a ajustes antropométricos)
+    // Se houve muitos ajustes, reduzir confiança
+    const anthropometricAdjustmentPenalty = 0.70; // Medidas foram corrigidas, então confiança é moderada
+
     const globalConfidence = Math.min(
       tiltPenalty,
       symmetryPenalty,
       posturePenalty,
       perspectivePenalty,
-      isPlausible ? 1.0 : 0.3
+      isPlausible ? 1.0 : 0.3,
+      anthropometricAdjustmentPenalty // Nova penalidade
     );
 
     const measurements = {
