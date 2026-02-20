@@ -2021,7 +2021,7 @@ const handleSubmit = async () => {
           </div>
 
           {/* Input Area */}
-          {interactionCount < 2 && chatMessages.length > 0 && !gptLoading && (
+          {interactionCount < 3 && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
               {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
               {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
@@ -2076,6 +2076,17 @@ const handleSubmit = async () => {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Mensagem de agradecimento quando limite for atingido */}
+          {interactionCount >= 3 && chatMessages.length > 0 && !gptLoading && (
+            <div className="p-4 border-t bg-gray-50">
+              <p className="text-sm text-gray-600 text-center">
+                {currentLanguage === 'pt' && `Obrigado por usar o assistente da ${localStoreName}! Clique no X e adicione o produto ao carrinho.`}
+                {currentLanguage === 'es' && `¡Gracias por usar el asistente de ${localStoreName}! Haz clic en la X y agrega el producto al carrito.`}
+                {currentLanguage === 'en' && `Thank you for using ${localStoreName}'s assistant! Click the X and add the product to cart.`}
+              </p>
             </div>
           )}
         </div>
