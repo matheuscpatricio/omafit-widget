@@ -26,74 +26,104 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
   const scale8 = useTransform(scrollYProgress, [0, 1], [1, 8]);
   const scale9 = useTransform(scrollYProgress, [0, 1], [1, 9]);
 
-  const scales = [scale4, scale5, scale6, scale5, scale6, scale8, scale9];
+  const y = useTransform(scrollYProgress, [0, 1], ['0vh', '-150vh']);
+  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1, 0]);
 
-  const positions = [
-    { top: '50%', left: '50%', transform: '-translate-x-1/2 -translate-y-1/2' },
-    { top: '0%', left: '5%', transform: 'md:-translate-y-[30vh]' },
-    { top: '0%', left: '-15%', transform: 'md:-translate-y-[10vh] md:-translate-x-[10vw]' },
-    { top: '50%', left: '60%', transform: '-translate-y-1/2' },
-    { top: '70%', left: '5%', transform: '' },
-    { top: '70%', left: '-10%', transform: 'md:-translate-x-[12.5vw]' },
-    { top: '60%', left: '65%', transform: '' },
+  const pictures = [
+    {
+      scale: scale4,
+      top: '50%',
+      left: '50%',
+      className: '-translate-x-1/2 -translate-y-1/2 w-[70vw] h-[40vh] md:w-[25vw] md:h-[25vw]',
+    },
+    {
+      scale: scale5,
+      top: '0',
+      left: '25%',
+      className: '-translate-x-1/2 w-[35vw] h-[30vh] md:w-[25vw] md:h-[25vw]',
+    },
+    {
+      scale: scale6,
+      top: '5vh',
+      left: '5vw',
+      className: 'w-[25vw] h-[30vh] md:w-[20vw] md:h-[45vh]',
+    },
+    {
+      scale: scale5,
+      top: '10vh',
+      left: '70vw',
+      className: 'w-[25vw] h-[25vh] md:w-[25vw] md:h-[25vw]',
+    },
+    {
+      scale: scale6,
+      top: '75vh',
+      left: '27.5vw',
+      className: 'w-[25vw] h-[20vh] md:w-[20vw] md:h-[25vw]',
+    },
+    {
+      scale: scale8,
+      top: '60vh',
+      left: '5vw',
+      className: 'w-[30vw] h-[25vh] md:w-[30vw] md:h-[25vw]',
+    },
+    {
+      scale: scale9,
+      top: '65vh',
+      left: '70vw',
+      className: 'w-[20vw] h-[20vh] md:w-[15vw] md:h-[15vw]',
+    },
   ];
 
   return (
     <div ref={container} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-black/50">
-        {images.map(({ src, alt }, index) => {
-          const scale = scales[index % scales.length];
+      <div className="sticky top-0 h-screen overflow-hidden">
+        {pictures.map((picture, index) => {
           const isCentralItem = index === 0;
-          const position = positions[index] || positions[0];
 
           return (
             <motion.div
               key={index}
-              style={{
-                scale,
-                top: position.top,
-                left: position.left,
-              }}
-              className={`absolute ${position.transform}`}
+              style={{ scale: picture.scale }}
+              className="absolute w-full h-full flex items-center justify-center"
             >
               <div
-                className={`relative rounded-2xl overflow-hidden shadow-2xl
-                  ${isCentralItem
-                    ? 'h-[40vh] w-[80vw] md:h-[50vh] md:w-[40vw]'
-                    : index === 1
-                      ? 'h-[20vh] w-[40vw] md:h-[30vh] md:w-[35vw]'
-                      : index === 2
-                        ? 'h-[25vh] w-[35vw] md:h-[45vh] md:w-[20vw]'
-                        : index === 3
-                          ? 'h-[18vh] w-[35vw] md:h-[25vh] md:w-[25vw]'
-                          : index === 4
-                            ? 'h-[18vh] w-[30vw] md:h-[25vh] md:w-[20vw]'
-                            : index === 5
-                              ? 'h-[20vh] w-[40vw] md:h-[25vh] md:w-[30vw]'
-                              : 'h-[15vh] w-[25vw] md:h-[15vh] md:w-[15vw]'
-                  }
-                `}
+                className={`relative ${picture.className}`}
+                style={{
+                  top: picture.top,
+                  left: picture.left,
+                }}
               >
-                {isCentralItem && videoUrl ? (
-                  <video
-                    src={videoUrl}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <img
-                    src={src || '/placeholder.svg'}
-                    alt={alt || `Parallax image ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                )}
+                <div className="relative w-full h-full rounded-2xl overflow-hidden">
+                  {isCentralItem && videoUrl ? (
+                    <video
+                      src={videoUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={images[index]?.src || '/placeholder.svg'}
+                      alt={images[index]?.alt || `Parallax image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
               </div>
             </motion.div>
           );
         })}
+
+        <motion.div
+          style={{ y, opacity }}
+          className="absolute left-1/2 top-[calc(50vh+15rem)] -translate-x-1/2 pointer-events-none z-50"
+        >
+          <p className="text-white text-4xl md:text-6xl lg:text-7xl font-bold text-center px-4 drop-shadow-2xl">
+            Precisão absoluta em medidas
+          </p>
+        </motion.div>
       </div>
     </div>
   );
