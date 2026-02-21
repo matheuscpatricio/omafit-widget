@@ -89,4 +89,50 @@
     perspective: 1000px;
     will-change: transform;
   }
+
+  /* Video text effect with fire background */
+  .video-text {
+    position: relative;
+    display: inline-block;
+    isolation: isolate;
+  }
+
+  .video-text-bg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 200%;
+    object-fit: cover;
+    pointer-events: none;
+    opacity: 0.9;
+    filter: brightness(1.2) contrast(1.3) saturate(1.4);
+  }
+
+  .video-text span {
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    mix-blend-mode: multiply;
+    font-weight: bold;
+  }
+
+  /* Fallback for browsers that don't support mix-blend-mode well */
+  @supports not (mix-blend-mode: multiply) {
+    .video-text span {
+      background: linear-gradient(45deg, #ff4500, #ff8c00, #ffd700, #ff4500);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: fire-gradient 3s ease infinite;
+    }
+
+    @keyframes fire-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  }
 }

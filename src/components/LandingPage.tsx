@@ -15,6 +15,7 @@ interface LandingPageProps {
 
 function HeroZoomParallax() {
   const container = useRef(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { scrollYProgress } = useScroll({
     target: container,
     offset: ['start start', 'end end'],
@@ -24,6 +25,14 @@ function HeroZoomParallax() {
   const scale2 = useTransform(scrollYProgress, [0.5, 1], [1, 2.5]);
   const opacity1 = useTransform(scrollYProgress, [0, 0.3, 0.5], [1, 1, 0]);
   const opacity2 = useTransform(scrollYProgress, [0.5, 0.65, 0.95], [0, 1, 1]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch((error) => {
+        console.log('Autoplay prevented:', error);
+      });
+    }
+  }, []);
 
   return (
     <div ref={container} className="relative h-[300vh]">
@@ -37,7 +46,19 @@ function HeroZoomParallax() {
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 Encante seus clientes com uma
                 <br />
-                <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
+                <span className="video-text" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="video-text-bg"
+                  >
+                    <source src="https://cdn.pixabay.com/video/2021/08/09/84823-588178509_large.mp4" type="video/mp4" />
+                  </video>
+                  <span>experiência envolvente</span>
+                </span>
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 When techno meets fashion.
@@ -48,8 +69,10 @@ function HeroZoomParallax() {
               style={{ scale: scale2, opacity: opacity2 }}
               className="absolute inset-0 flex items-center justify-center px-4"
             >
-              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                Um <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>assistente inteligente de vendas</span> para sua marca
+              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl leading-tight" style={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 500 }}>
+                Um assistente inteligente
+                <br />
+                de vendas para sua marca
               </h2>
             </motion.div>
           </div>
