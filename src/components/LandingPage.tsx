@@ -4,7 +4,6 @@ import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
-import ASMRStaticBackground from './ui/asmr-background';
 import { ZoomParallax } from './ui/zoom-parallax';
 import Lenis from '@studio-freight/lenis';
 import { motion } from 'framer-motion';
@@ -146,28 +145,27 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
 
   return (
-    <div className="min-h-screen relative">
-      <ASMRStaticBackground>
+    <div className="min-h-screen relative bg-white">
         <div className="relative z-10">
           {/* Header - Visible at top or when scrolling up */}
           <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
             scrollY < 100
-              ? 'bg-transparent translate-y-0'
+              ? 'bg-white/80 backdrop-blur-sm translate-y-0'
               : showHeader
-              ? 'bg-black/80 backdrop-blur-sm shadow-lg translate-y-0'
+              ? 'bg-white/95 backdrop-blur-sm shadow-lg translate-y-0'
               : 'bg-transparent -translate-y-full'
           }`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center">
-                  <span className="text-2xl font-bold text-white" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+                  <span className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
                 </div>
 
                 <div className="flex items-center gap-8">
                   <nav className="hidden md:flex space-x-8">
-                    <a href="#features" className="text-white hover:text-gray-200 transition-colors">Recursos</a>
-                    <a href="#benefits" className="text-white hover:text-gray-200 transition-colors">Benefícios</a>
-                    <a href="#pricing" className="text-white hover:text-gray-200 transition-colors">Planos</a>
+                    <a href="#features" className="text-gray-900 hover:text-gray-600 transition-colors">Recursos</a>
+                    <a href="#benefits" className="text-gray-900 hover:text-gray-600 transition-colors">Benefícios</a>
+                    <a href="#pricing" className="text-gray-900 hover:text-gray-600 transition-colors">Planos</a>
                   </nav>
                   <a
                     href="mailto:contato@omafit.co"
@@ -183,12 +181,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           {/* Hero Section */}
           <section className="relative h-screen">
             <div className="flex flex-col items-center justify-center h-full text-center px-4 pointer-events-none">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-2xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 Encante seus clientes com uma
                 <br />
                 <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
               </h1>
-              <p className="text-lg sm:text-xl md:text-2xl text-white/90 drop-shadow-lg" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+              <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 When techno meets fashion.
               </p>
             </div>
@@ -199,20 +197,20 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
                 <div className="text-center" data-animate="stat-1">
-                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
-                  <div className="text-white/80 text-sm sm:text-base">Aumento na Conversão</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
+                  <div className="text-gray-600 text-sm sm:text-base">Aumento na Conversão</div>
                 </div>
                 <div className="text-center" data-animate="stat-2">
-                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
-                  <div className="text-white/80 text-sm sm:text-base">Redução em Devoluções</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
+                  <div className="text-gray-600 text-sm sm:text-base">Redução em Devoluções</div>
                 </div>
                 <div className="text-center" data-animate="stat-3">
-                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
-                  <div className="text-white/80 text-sm sm:text-base">Satisfação do Cliente</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
+                  <div className="text-gray-600 text-sm sm:text-base">Satisfação do Cliente</div>
                 </div>
                 <div className="text-center" data-animate="stat-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-white mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
-                  <div className="text-white/80 text-sm sm:text-base">Tempo de Integração</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
+                  <div className="text-gray-600 text-sm sm:text-base">Tempo de Integração</div>
                 </div>
               </div>
             </div>
@@ -223,28 +221,28 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
                     As pessoas acreditam no que conseguem visualizar.
                   </p>
-                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Donald Norman
                   </p>
                 </div>
 
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
                     A incerteza é emocionalmente custosa.
                   </p>
-                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Daniel Kahneman
                   </p>
                 </div>
 
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-white">
+                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
                     Marcas fortes reduzem a ansiedade na decisão.
                   </p>
-                  <p className="mt-4 text-lg text-white/70" style={{ fontFamily: '"Playfair Display", serif' }}>
+                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Marty Neumeier
                   </p>
                 </div>
@@ -276,9 +274,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   transform: visibleSections.has('tech-tagline') ? 'translateY(0)' : 'translateY(2rem)'
                 }}
               >
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
                   Dê a experiência aos seus clientes de ver a roupa da sua loja no{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#810707] to-red-700">
                     próprio corpo
                   </span>
                 </h3>
@@ -443,10 +441,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <section id="pricing" className="py-16 sm:py-20" data-animate="pricing">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center mb-12 sm:mb-16">
-                <h2 className="landing-title text-2xl sm:text-3xl font-bold text-white mb-4">
+                <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                   O plano para sua marca
                 </h2>
-                <p className="text-lg sm:text-xl text-white/80">
+                <p className="text-lg sm:text-xl text-gray-600">
                   Escolha o plano ideal para o tamanho do seu negócio
                 </p>
               </div>
@@ -460,10 +458,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <section className="py-16 sm:py-20" data-animate="platforms">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center mb-12">
-                <h2 className="landing-title text-3xl sm:text-4xl font-bold text-white mb-4">
+                <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
                   Plataformas
                 </h2>
-                <p className="text-lg sm:text-xl text-white/80">
+                <p className="text-lg sm:text-xl text-gray-600">
                   Clique e integre facilmente com as principais plataformas de e-commerce
                 </p>
               </div>
@@ -633,26 +631,22 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           {/* CTA Section */}
           <section className="py-16 sm:py-20">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <h2 className="landing-title text-2xl sm:text-3xl font-bold text-white mb-6 animate-swipe-up">
+              <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-6 animate-swipe-up">
                 Entre em contato conosco e aplique agora o Omafit na sua marca
               </h2>
-              <p className="text-lg sm:text-xl text-white/80 mb-8 animate-swipe-up-delay-1">
+              <p className="text-lg sm:text-xl text-gray-600 mb-8 animate-swipe-up-delay-1">
                 Junte-se a marcas que pensam à frente e usam o Omafit
               </p>
               <a
                 href="mailto:contato@omafit.co"
-                className="bg-white text-[#810707] px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
+                className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
               >
                 Entrar em contato
                 <Mail className="w-5 h-5" />
               </a>
-              <p className="text-white/60 text-sm mt-4 animate-swipe-up-delay-3">
-
-              </p>
             </div>
           </section>
         </div>
-      </ASMRStaticBackground>
 
       {/* Video Modal */}
       {showVideoModal && (
