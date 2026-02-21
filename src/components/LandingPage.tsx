@@ -46,29 +46,35 @@ function HeroZoomParallax() {
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 Encante seus clientes com uma
                 <br />
-                <span className="video-text relative inline-block" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>
-                  <span className="relative z-10">experiência envolvente</span>
+                <span className="video-text" style={{
+                  fontFamily: '"Playfair Display", serif',
+                  fontStyle: 'italic',
+                  fontSize: '1.1em',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundImage: 'url(https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4)',
+                }}>
                   <video
                     ref={videoRef}
                     autoPlay
                     loop
                     muted
                     playsInline
-                    className="video-text-bg absolute inset-0"
                     style={{
-                      width: '120%',
-                      height: '300%',
-                      objectFit: 'cover',
+                      position: 'absolute',
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      mixBlendMode: 'screen',
-                      filter: 'brightness(1.5) contrast(1.6) saturate(1.8)',
-                      opacity: 0.85
+                      width: '100%',
+                      minHeight: '200%',
+                      objectFit: 'cover',
+                      zIndex: -1,
                     }}
                   >
                     <source src="https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4" type="video/mp4" />
                   </video>
+                  experiência envolvente
                 </span>
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
