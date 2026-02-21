@@ -1358,11 +1358,12 @@ const handleSubmit = async () => {
     if (!mediapipeLoading && !mediapipeError) {
       try {
         console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
-        setProcessingMessage(t('analyzingPhoto'));
+        setProcessingMessage('Analisando pose corporal...');
 
         // Permitir que a UI atualize antes de processar
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100));
 
+        console.log('📷 Carregando imagem para análise...');
         const imgElement = new Image();
         imgElement.src = modelImageDataUrl;
 
@@ -1373,10 +1374,14 @@ const handleSubmit = async () => {
           setTimeout(() => reject(new Error('Image load timeout')), 5000);
         });
 
+        console.log('✅ Imagem carregada, iniciando detecção de pose...');
+        setProcessingMessage('Detectando pontos corporais...');
+
         // Permitir que a UI atualize novamente
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         const poseResult = await detectPose(imgElement);
+        console.log('📊 detectPose() retornou:', poseResult);
 
         if (poseResult && poseResult.landmarks && poseResult.landmarks.length > 0) {
           const landmarks = poseResult.landmarks[0];
@@ -1389,9 +1394,11 @@ const handleSubmit = async () => {
             visibility: lm.visibility || 0
           }));
 
+          setProcessingMessage('Calculando medidas corporais...');
           // Permitir que a UI atualize antes do cálculo pesado
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 100));
 
+          console.log('📏 Calculando medidas corporais...');
           const measurements = calculateBodyMeasurements(
             detectedLandmarks,
             imgElement.width,
@@ -1400,16 +1407,19 @@ const handleSubmit = async () => {
 
           detectedMeasurements = measurements;
 
-          console.log('📐 Medidas calculadas pelo MediaPipe:', measurements);
+          console.log('✅ Medidas calculadas pelo MediaPipe:', measurements);
         } else {
           console.warn('⚠️ MediaPipe não detectou poses na imagem');
         }
       } catch (err) {
         console.error('❌ Erro ao detectar landmarks no frontend:', err);
+        console.error('   Detalhes do erro:', err);
         // Continuar mesmo com erro no MediaPipe - edge function fará a detecção
       }
     } else {
       console.log('⏭️ MediaPipe não está pronto, edge function fará a detecção');
+      console.log('   - mediapipeLoading:', mediapipeLoading);
+      console.log('   - mediapipeError:', mediapipeError);
     }
 
     // 🔹 VALIDAÇÃO CRÍTICA: altura e peso são obrigatórios para MediaPipe

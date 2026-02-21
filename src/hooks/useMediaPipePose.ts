@@ -23,75 +23,137 @@ export function useMediaPipePose() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isInitializedRef = useRef(false);
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    workerRef.current = new Worker(
-      new URL('../workers/mediapipe.worker.ts', import.meta.url),
-      { type: 'module' }
-    );
+    console.log('🔧 [useMediaPipePose] Criando Worker...');
+    try {
+      workerRef.current = new Worker(
+        new URL('../workers/mediapipe.worker.ts', import.meta.url),
+        { type: 'module' }
+      );
+      console.log('✅ [useMediaPipePose] Worker criado');
 
-    workerRef.current.onmessage = (e) => {
-      const { type, error: workerError } = e.data;
-      if (type === 'initialized') {
-        isInitializedRef.current = true;
+      workerRef.current.onmessage = (e) => {
+        const { type, error: workerError } = e.data;
+        console.log('📥 [useMediaPipePose] Mensagem do Worker:', type);
+
+        if (type === 'initialized') {
+          if (initTimeoutRef.current) {
+            clearTimeout(initTimeoutRef.current);
+            initTimeoutRef.current = null;
+          }
+          isInitializedRef.current = true;
+          setIsLoading(false);
+          console.log('✅ MediaPipe inicializado no Worker (sem travar a UI)');
+        } else if (type === 'error') {
+          if (initTimeoutRef.current) {
+            clearTimeout(initTimeoutRef.current);
+            initTimeoutRef.current = null;
+          }
+          console.error('❌ Erro no Worker:', workerError);
+          setError(workerError);
+          setIsLoading(false);
+        }
+      };
+
+      workerRef.current.onerror = (err) => {
+        console.error('❌ [useMediaPipePose] Worker error event:', err);
+        setError('Worker error: ' + err.message);
         setIsLoading(false);
-        console.log('✅ MediaPipe inicializado no Worker (sem travar a UI)');
-      } else if (type === 'error') {
-        console.error('❌ Erro no Worker:', workerError);
-        setError(workerError);
-        setIsLoading(false);
-      }
-    };
+      };
+
+      console.log('✅ [useMediaPipePose] Worker configurado');
+    } catch (err) {
+      console.error('❌ [useMediaPipePose] Falha ao criar Worker:', err);
+      setError('Failed to create Worker');
+    }
 
     return () => {
+      console.log('🔄 [useMediaPipePose] Limpando Worker...');
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
       workerRef.current?.terminate();
     };
   }, []);
 
   const initializePoseLandmarker = useCallback(async () => {
-    if (isInitializedRef.current || !workerRef.current) return;
+    console.log('🔧 [initializePoseLandmarker] Chamado');
+    console.log('   - Já inicializado?', isInitializedRef.current);
+    console.log('   - Worker disponível?', !!workerRef.current);
+
+    if (isInitializedRef.current) {
+      console.log('✅ [initializePoseLandmarker] Já inicializado, retornando');
+      return;
+    }
+
+    if (!workerRef.current) {
+      console.error('❌ [initializePoseLandmarker] Worker não disponível');
+      throw new Error('Worker not available');
+    }
 
     setIsLoading(true);
     console.log('🔧 Inicializando MediaPipe no Worker (não trava a UI)...');
 
-    workerRef.current.postMessage({ type: 'initialize' });
-
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('MediaPipe initialization timeout'));
-      }, 30000);
+        console.error('❌ [initializePoseLandmarker] TIMEOUT após 20 segundos');
+        workerRef.current?.removeEventListener('message', handler);
+        setIsLoading(false);
+        reject(new Error('MediaPipe initialization timeout after 20s'));
+      }, 20000); // Reduzido de 30s para 20s
 
       const handler = (e: MessageEvent) => {
+        console.log('📥 [initializePoseLandmarker] Resposta:', e.data.type);
         const { type, error: workerError } = e.data;
+
         if (type === 'initialized') {
           clearTimeout(timeout);
           workerRef.current?.removeEventListener('message', handler);
+          console.log('✅ [initializePoseLandmarker] Inicialização bem-sucedida');
           resolve();
         } else if (type === 'error') {
           clearTimeout(timeout);
           workerRef.current?.removeEventListener('message', handler);
+          console.error('❌ [initializePoseLandmarker] Erro:', workerError);
+          setIsLoading(false);
           reject(new Error(workerError));
         }
       };
 
       workerRef.current?.addEventListener('message', handler);
+
+      console.log('📤 [initializePoseLandmarker] Enviando comando "initialize"...');
+      workerRef.current?.postMessage({ type: 'initialize' });
+      console.log('✅ [initializePoseLandmarker] Comando enviado');
     });
   }, []);
 
   const detectPose = async (imageElement: HTMLImageElement): Promise<PoseLandmarkerResult | null> => {
+    console.log('🔍 [detectPose] Iniciando detecção de pose...');
+    console.log('   - Imagem:', imageElement.naturalWidth, 'x', imageElement.naturalHeight);
+    console.log('   - Worker inicializado:', isInitializedRef.current);
+    console.log('   - Worker disponível:', !!workerRef.current);
+
     if (!isInitializedRef.current) {
       console.log('⏳ MediaPipe não inicializado. Inicializando no Worker...');
-      await initializePoseLandmarker();
+      try {
+        await initializePoseLandmarker();
+        console.log('✅ Inicialização concluída');
+      } catch (err) {
+        console.error('❌ Falha na inicialização:', err);
+        return null;
+      }
     }
 
     if (!workerRef.current) {
-      console.error('❌ Worker não disponível');
+      console.error('❌ Worker não disponível após inicialização');
       return null;
     }
 
     try {
-      console.log('🔍 Processando pose no Worker (não trava a UI)...');
-
+      console.log('🔍 Criando canvas para processar imagem...');
       const canvas = document.createElement('canvas');
       canvas.width = imageElement.naturalWidth;
       canvas.height = imageElement.naturalHeight;
@@ -100,28 +162,55 @@ export function useMediaPipePose() {
 
       ctx.drawImage(imageElement, 0, 0);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      console.log('✅ Canvas criado, ImageData pronta:', imageData.width, 'x', imageData.height);
 
       return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        console.log('📤 Enviando ImageData para Worker...');
+
         const timeout = setTimeout(() => {
-          reject(new Error('Pose detection timeout'));
-        }, 30000);
+          console.error('❌ TIMEOUT: Worker não respondeu em 15 segundos');
+          console.error('   Tempo decorrido:', Date.now() - startTime, 'ms');
+          workerRef.current?.removeEventListener('message', handler);
+          reject(new Error('Pose detection timeout after 15s'));
+        }, 15000); // Reduzido de 30s para 15s
 
         const handler = (e: MessageEvent) => {
+          const elapsed = Date.now() - startTime;
+          console.log('📥 Resposta do Worker recebida (', elapsed, 'ms)');
+
           const { type, landmarks, error: workerError } = e.data;
+          console.log('   - Tipo:', type);
+
           if (type === 'result') {
             clearTimeout(timeout);
             workerRef.current?.removeEventListener('message', handler);
             console.log('✅ Pose detectada com sucesso no Worker');
+            console.log('   - Landmarks:', landmarks?.length || 0);
             resolve({ landmarks: [landmarks] } as PoseLandmarkerResult);
           } else if (type === 'error') {
             clearTimeout(timeout);
             workerRef.current?.removeEventListener('message', handler);
+            console.error('❌ Worker retornou erro:', workerError);
             reject(new Error(workerError));
+          } else if (type === 'initialized') {
+            console.log('ℹ️ Worker enviou "initialized" durante processamento (ignorando)');
+          } else {
+            console.warn('⚠️ Tipo de mensagem desconhecida:', type);
           }
         };
 
         workerRef.current?.addEventListener('message', handler);
-        workerRef.current?.postMessage({ type: 'process', imageData }, [imageData.data.buffer]);
+
+        try {
+          workerRef.current?.postMessage({ type: 'process', imageData }, [imageData.data.buffer]);
+          console.log('✅ Mensagem enviada para Worker');
+        } catch (err) {
+          clearTimeout(timeout);
+          workerRef.current?.removeEventListener('message', handler);
+          console.error('❌ Erro ao enviar para Worker:', err);
+          reject(err);
+        }
       });
     } catch (err) {
       console.error('❌ Erro ao detectar pose:', err);
