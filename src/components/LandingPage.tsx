@@ -49,7 +49,7 @@ function HeroZoomParallax() {
               className="absolute inset-0 flex items-center justify-center px-4"
             >
               <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                Um assistente inteligente de vendas para sua marca
+                Um <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>assistente inteligente de vendas</span> para sua marca
               </h2>
             </motion.div>
           </div>
