@@ -26,7 +26,7 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
     let particles: Particle[] = [];
     const mouse = { x: -1000, y: -1000 };
 
-    const PARTICLE_COUNT = 800;
+    const PARTICLE_COUNT = 1500;
     const MAGNETIC_RADIUS = 200;
     const VORTEX_STRENGTH = 0.05;
     const PULL_STRENGTH = 0.08;
@@ -50,7 +50,7 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
       reset() {
         this.x = Math.random() * width;
         this.y = Math.random() * height;
-        this.size = Math.random() * 0.8 + 0.3;
+        this.size = Math.random() * 0.4 + 0.15;
         this.vx = (Math.random() - 0.5) * 0.15;
         this.vy = (Math.random() - 0.5) * 0.15;
         const isGlass = Math.random() > 0.7;

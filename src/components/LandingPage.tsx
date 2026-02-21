@@ -7,51 +7,7 @@ import { supabase } from '../lib/supabase';
 import ASMRStaticBackground from './ui/asmr-background';
 import { ZoomParallax } from './ui/zoom-parallax';
 import Lenis from '@studio-freight/lenis';
-import { motion, useScroll, useTransform } from 'framer-motion';
-
-function ZoomParallaxText() {
-  const targetRef = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: targetRef,
-    offset: ['start end', 'end start'],
-  });
-
-  const opacity1 = useTransform(scrollYProgress, [0.15, 0.3, 0.7, 0.85], [0, 1, 1, 0]);
-  const opacity2 = useTransform(scrollYProgress, [0.25, 0.4, 0.7, 0.85], [0, 1, 1, 0]);
-
-  return (
-    <div ref={targetRef} className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-      <div className="w-full px-4 max-w-7xl">
-        <motion.h2
-          style={{ opacity: opacity1, fontFamily: '"DM Sans", sans-serif' }}
-          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-2xl text-left"
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-        >
-          precisão e inteligência
-        </motion.h2>
-        <motion.h3
-          style={{ opacity: opacity2, fontFamily: '"DM Sans", sans-serif' }}
-          className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-2xl mt-2 md:mt-4 text-right"
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-        >
-          que fortalecem sua{' '}
-          <span
-            className="inline-block bg-clip-text text-transparent"
-            style={{
-              backgroundImage: 'url(https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/omafitbanner2.png)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            marca
-          </span>
-        </motion.h3>
-      </div>
-    </div>
-  );
-}
+import { motion } from 'framer-motion';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -365,8 +321,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 },
               ]}
             />
-
-            <ZoomParallaxText />
           </section>
 
           {/* Features Cards */}

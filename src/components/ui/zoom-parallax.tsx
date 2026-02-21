@@ -26,51 +26,44 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
   const scale8 = useTransform(scrollYProgress, [0, 1], [1, 8]);
   const scale9 = useTransform(scrollYProgress, [0, 1], [1, 9]);
 
-  const y = useTransform(scrollYProgress, [0, 1], ['0vh', '-150vh']);
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1, 0]);
+  const opacity1 = useTransform(scrollYProgress, [0.15, 0.3, 0.7, 0.85], [0, 1, 1, 0]);
+  const opacity2 = useTransform(scrollYProgress, [0.25, 0.4, 0.7, 0.85], [0, 1, 1, 0]);
 
   const pictures = [
     {
       scale: scale4,
-      top: '50%',
-      left: '50%',
-      className: '-translate-x-1/2 -translate-y-1/2 w-[70vw] h-[40vh] md:w-[25vw] md:h-[25vw]',
+      className: 'w-[70vw] h-[40vh] md:w-[25vw] md:h-[25vw]',
+      position: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
     },
     {
       scale: scale5,
-      top: '0',
-      left: '25%',
-      className: '-translate-x-1/2 w-[35vw] h-[30vh] md:w-[25vw] md:h-[25vw]',
+      className: 'w-[35vw] h-[30vh] md:w-[25vw] md:h-[25vw]',
+      position: 'top-[5vh] left-[5vw]',
     },
     {
       scale: scale6,
-      top: '5vh',
-      left: '5vw',
       className: 'w-[25vw] h-[30vh] md:w-[20vw] md:h-[45vh]',
+      position: 'top-[10vh] left-[75vw] -translate-x-full',
     },
     {
       scale: scale5,
-      top: '10vh',
-      left: '70vw',
       className: 'w-[25vw] h-[25vh] md:w-[25vw] md:h-[25vw]',
+      position: 'top-[70vh] left-[5vw]',
     },
     {
       scale: scale6,
-      top: '75vh',
-      left: '27.5vw',
       className: 'w-[25vw] h-[20vh] md:w-[20vw] md:h-[25vw]',
+      position: 'bottom-[5vh] right-[5vw]',
     },
     {
       scale: scale8,
-      top: '60vh',
-      left: '5vw',
       className: 'w-[30vw] h-[25vh] md:w-[30vw] md:h-[25vw]',
+      position: 'top-[15vh] left-[35vw]',
     },
     {
       scale: scale9,
-      top: '65vh',
-      left: '70vw',
       className: 'w-[20vw] h-[20vh] md:w-[15vw] md:h-[15vw]',
+      position: 'bottom-[15vh] left-[50%] -translate-x-1/2',
     },
   ];
 
@@ -84,46 +77,56 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
             <motion.div
               key={index}
               style={{ scale: picture.scale }}
-              className="absolute w-full h-full flex items-center justify-center"
+              className={`absolute ${picture.position}`}
             >
-              <div
-                className={`relative ${picture.className}`}
-                style={{
-                  top: picture.top,
-                  left: picture.left,
-                }}
-              >
-                <div className="relative w-full h-full rounded-2xl overflow-hidden">
-                  {isCentralItem && videoUrl ? (
-                    <video
-                      src={videoUrl}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={images[index]?.src || '/placeholder.svg'}
-                      alt={images[index]?.alt || `Parallax image ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </div>
+              <div className={`relative ${picture.className} rounded-2xl overflow-hidden`}>
+                {isCentralItem && videoUrl ? (
+                  <video
+                    src={videoUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={images[index]?.src || '/placeholder.svg'}
+                    alt={images[index]?.alt || `Parallax image ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
             </motion.div>
           );
         })}
 
-        <motion.div
-          style={{ y, opacity }}
-          className="absolute left-1/2 top-[calc(50vh+15rem)] -translate-x-1/2 pointer-events-none z-50"
-        >
-          <p className="text-white text-4xl md:text-6xl lg:text-7xl font-bold text-center px-4 drop-shadow-2xl">
-            Precisão absoluta em medidas
-          </p>
-        </motion.div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div className="w-full px-4 max-w-7xl">
+            <motion.h2
+              style={{ opacity: opacity1, fontFamily: '"DM Sans", sans-serif' }}
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-2xl text-left"
+            >
+              precisão e inteligência
+            </motion.h2>
+            <motion.h3
+              style={{ opacity: opacity2, fontFamily: '"DM Sans", sans-serif' }}
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white drop-shadow-2xl mt-2 md:mt-4 text-right"
+            >
+              que fortalecem sua{' '}
+              <span
+                className="inline-block bg-clip-text text-transparent"
+                style={{
+                  backgroundImage: 'url(https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/omafitbanner2.png)',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                marca
+              </span>
+            </motion.h3>
+          </div>
+        </div>
       </div>
     </div>
   );
