@@ -6,13 +6,27 @@ export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
     include: ['@shopify/polaris'],
-    exclude: ['lucide-react'],
+    exclude: ['lucide-react', '@mediapipe/tasks-vision'],
   },
   ssr: {
     noExternal: ['@shopify/polaris'],
   },
   worker: {
-    format: 'es'
+    format: 'es',
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: false
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'mediapipe': ['@mediapipe/tasks-vision']
+        }
+      }
+    }
   },
   server: {
     headers: {
