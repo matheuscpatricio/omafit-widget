@@ -153,6 +153,7 @@
     let productId = '';
     let productName = '';
     let productHandle = '';
+    let productDescription = '';
 
     // Pegar do elemento omafit-widget-root primeiro (prioridade)
     const rootElement = document.getElementById('omafit-widget-root');
@@ -165,6 +166,7 @@
     if (!productId && window.meta && window.meta.product) {
       productId = window.meta.product.id;
       productName = window.meta.product.title;
+      productDescription = window.meta.product.description || '';
     } else if (
       !productId &&
       window.ShopifyAnalytics &&
@@ -173,6 +175,7 @@
     ) {
       productId = window.ShopifyAnalytics.meta.product.id;
       productName = window.ShopifyAnalytics.meta.product.name;
+      productDescription = window.ShopifyAnalytics.meta.product.description || '';
     }
 
     // Nome do produto
@@ -183,6 +186,14 @@
       if (nameEl) productName = nameEl.textContent.trim();
     }
 
+    // Descrição do produto
+    if (!productDescription) {
+      const descEl = document.querySelector(
+        '.product-single__description, .product__description, [itemprop="description"]'
+      );
+      if (descEl) productDescription = descEl.textContent.trim();
+    }
+
     // Handle do produto
     if (!productHandle) {
       const urlParts = window.location.pathname.split('/products/');
@@ -191,7 +202,7 @@
       }
     }
 
-    return { productId, productName, productHandle };
+    return { productId, productName, productHandle, productDescription };
   }
 
   // Buscar um produto complementar de uma coleção (diferente da atual, ou qualquer se não houver atual)
@@ -1118,7 +1129,11 @@
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
           complementaryProduct: complementaryProduct || null,
           recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+          productName: productInfo.productName || '',
+          product_name: productInfo.productName || '',
+          productDescription: productInfo.productDescription || '',
+          product_description: productInfo.productDescription || ''
         }, 'https://omafit.netlify.app');
 
         // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
@@ -1191,7 +1206,11 @@
               collectionElasticity: collectionElasticity || '',
               complementaryProduct: complementaryProduct || null,
               recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+              productName: productInfo.productName || '',
+              product_name: productInfo.productName || '',
+              productDescription: productInfo.productDescription || '',
+              product_description: productInfo.productDescription || ''
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (com logo):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1220,7 +1239,11 @@
               collectionElasticity: collectionElasticity || '',
               complementaryProduct: complementaryProduct || null,
               recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+              productName: productInfo.productName || '',
+              product_name: productInfo.productName || '',
+              productDescription: productInfo.productDescription || '',
+              product_description: productInfo.productDescription || ''
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (sem logo - inválido):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1244,7 +1267,11 @@
             collectionElasticity: collectionElasticity || '',
             complementaryProduct: complementaryProduct || null,
             recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-            recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+            recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+            productName: productInfo.productName || '',
+            product_name: productInfo.productName || '',
+            productDescription: productInfo.productDescription || '',
+            product_description: productInfo.productDescription || ''
           }, 'https://omafit.netlify.app');
           console.log('📤 Configuração enviada via postMessage (sem logo):', {
             primaryColor: OMAFIT_CONFIG.colors?.primary,

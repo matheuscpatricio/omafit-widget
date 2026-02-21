@@ -140,6 +140,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localStoreName, setLocalStoreName] = useState<string>(resolveStoreName());
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
+  const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
+  const [localProductDescription, setLocalProductDescription] = useState<string>('');
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
@@ -237,6 +239,19 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           console.log('✅ Atualizando collectionElasticity:', event.data.collectionElasticity);
           setLocalCollectionElasticity(event.data.collectionElasticity);
         }
+
+        // Atualizar productName e productDescription via omafit-context
+        if (event.data.productName || event.data.product_name) {
+          const name = event.data.productName || event.data.product_name;
+          console.log('✅ Atualizando productName:', name);
+          setLocalProductName(name);
+        }
+
+        if (event.data.productDescription || event.data.product_description) {
+          const description = event.data.productDescription || event.data.product_description;
+          console.log('✅ Atualizando productDescription:', description.substring(0, 100) + '...');
+          setLocalProductDescription(description);
+        }
       }
 
       // Configuração completa (também pode incluir type + elasticity)
@@ -270,6 +285,19 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           const derived = deriveStoreName(event.data.shopDomain);
           console.log('✅ Derivando storeName do shopDomain:', derived);
           setLocalStoreName(derived);
+        }
+
+        // Atualizar productName e productDescription via omafit-config-update
+        if (event.data.productName || event.data.product_name) {
+          const name = event.data.productName || event.data.product_name;
+          console.log('✅ Atualizando productName:', name);
+          setLocalProductName(name);
+        }
+
+        if (event.data.productDescription || event.data.product_description) {
+          const description = event.data.productDescription || event.data.product_description;
+          console.log('✅ Atualizando productDescription:', description.substring(0, 100) + '...');
+          setLocalProductDescription(description);
         }
       }
 
