@@ -1792,6 +1792,8 @@ const handleSubmit = async () => {
         interaction_count: interactionCount,
         shop_name: localStoreName,
         language: currentLanguage,
+        product_name: localProductName,
+        product_description: localProductDescription,
         complementary_product: complementaryProduct,
       };
 

@@ -24,6 +24,8 @@ interface ValidateSizeRequest {
   shop_domain?: string;
   language?: string;
   custom_message?: string;
+  product_name?: string;
+  product_description?: string;
   complementary_product?: {
     name: string;
     category: string;
@@ -350,26 +352,32 @@ Return JSON:
 
 function buildCustomMessagePrompt(data: ValidateSizeRequest, language: string): string {
   const storeContext = data.shop_name ? ` da ${data.shop_name}` : '';
+  const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
+  const productDesc = data.product_description ? `\n- Descrição do produto: ${data.product_description}` : '';
+
   const messages: Record<string, string> = {
-    pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}/tamanho:
+    pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}:
 
 "${data.custom_message}"
 
 Contexto:
 - Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
 - Categoria: ${data.categoria}
-- Elasticidade: ${data.elasticidade}${data.shop_name ? `\n- Loja: ${data.shop_name}` : ''}
+- Elasticidade: ${data.elasticidade}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}${productInfo}${productDesc}
 
 REGRAS IMPORTANTES:
-1. Se mencionar o tamanho, faça APENAS UMA VEZ no início da resposta
-2. Depois continue naturalmente SEM repetir o tamanho${data.shop_name ? ` (você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante)` : ''}
-3. Responda de forma útil, profissional e breve (máximo 3-4 linhas)
-4. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
+1. Se a pergunta for sobre o produto/descrição, use as informações acima para responder de forma útil
+2. Se mencionar o tamanho, faça APENAS UMA VEZ no início da resposta
+3. Depois continue naturalmente SEM repetir o tamanho
+4. Se a pergunta for sobre a marca/loja, mencione "${data.shop_name}" de forma natural e positiva
+5. Responda de forma útil, persuasiva mas MUITO breve (máximo 2-3 linhas)
+6. Sempre induza à compra de forma sutil ao final
+7. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
 
 Retorne no formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "sua resposta à pergunta do usuário (tamanho só no início se necessário)",
+  "explicacao": "sua resposta curta e persuasiva à pergunta do usuário",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
@@ -424,23 +432,27 @@ Return in JSON format:
 
 function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): string {
   const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
+  const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
+  const productDesc = data.product_description ? `\n- Descrição: ${data.product_description}` : '';
+
   const messages: Record<string, string> = {
     pt: `Você precisa criar uma mensagem persuasiva incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
 
 CONTEXTO:
-- Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
+- Tamanho recomendado: ${data.tamanho_calculado_algoritmo}${productInfo}${productDesc}
 
 REGRAS CRÍTICAS (NÃO IGNORE!):
 1. A palavra "tamanho" ou o valor "${data.tamanho_calculado_algoritmo}" deve aparecer APENAS UMA VEZ em toda a mensagem
 2. Coloque o tamanho SOMENTE na primeira frase (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
 3. Depois da primeira frase, NUNCA MAIS mencione o tamanho ou números de tamanho
-4. Continue naturalmente falando sobre benefícios: confiança, experiência try-on, ajuste perfeito${data.shop_name ? `\n5. Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante` : ''}
-5. Seja breve: máximo 2-3 linhas no total
+4. Continue naturalmente falando sobre benefícios do produto e induzindo à compra${data.shop_name ? `\n5. Você pode mencionar a marca/loja "${data.shop_name}" de forma natural e persuasiva` : ''}
+5. Seja MUITO breve e direto: máximo 2-3 linhas no total
 6. Não use asteriscos, negrito ou formatação especial
-7. Use tom conversacional e profissional
+7. Use tom conversacional, persuasivo mas profissional
+8. Foque na confiança do ajuste perfeito e induza ao carrinho
 
 EXEMPLO CORRETO:
-"Seu tamanho ideal é M! Experimente virtualmente e adicione ao carrinho com total confiança no ajuste perfeito."
+"Seu tamanho ideal é M! ${data.product_name ? `Este ${data.product_name}` : 'Esta peça'} vai valorizar seu estilo. Adicione ao carrinho agora!"
 
 EXEMPLO ERRADO (NÃO FAÇA ISSO):
 "Seu tamanho ideal é M! O tamanho M oferece ajuste perfeito. Adicione o tamanho M ao carrinho."
@@ -448,7 +460,7 @@ EXEMPLO ERRADO (NÃO FAÇA ISSO):
 Retorne no formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "mensagem persuasiva (tamanho só na primeira frase!)",
+  "explicacao": "mensagem persuasiva e curta (tamanho só na primeira frase!)",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
