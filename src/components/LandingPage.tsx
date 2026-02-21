@@ -16,44 +16,67 @@ interface LandingPageProps {
 function VideoText() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
+
+    let animationFrameId: number;
 
     const renderFrame = () => {
       if (video.readyState >= 2) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.globalCompositeOperation = 'destination-in';
+        ctx.fillStyle = '#000000';
         ctx.font = 'bold italic 120px "Playfair Display", serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('experiência envolvente', canvas.width / 2, canvas.height / 2);
         ctx.globalCompositeOperation = 'source-over';
       }
-      requestAnimationFrame(renderFrame);
+      animationFrameId = requestAnimationFrame(renderFrame);
     };
 
-    video.addEventListener('loadeddata', () => {
+    const handleVideoReady = () => {
       canvas.width = 1200;
       canvas.height = 200;
+      setIsVideoReady(true);
       renderFrame();
-    });
+    };
 
+    video.addEventListener('loadeddata', handleVideoReady);
     video.play().catch(err => console.log('Autoplay prevented:', err));
 
     return () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      video.removeEventListener('loadeddata', handleVideoReady);
     };
   }, []);
 
   return (
-    <>
-      <canvas ref={canvasRef} className="video-text-canvas" style={{ maxWidth: '100%', height: 'auto' }} />
+    <div className="relative inline-block">
+      <canvas
+        ref={canvasRef}
+        className="video-text-canvas mx-auto"
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          display: isVideoReady ? 'block' : 'none'
+        }}
+      />
+      {!isVideoReady && (
+        <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic', fontWeight: 'bold' }}>
+          experiência envolvente
+        </span>
+      )}
       <video
         ref={videoRef}
         autoPlay
@@ -65,7 +88,7 @@ function VideoText() {
       >
         <source src="https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4" type="video/mp4" />
       </video>
-    </>
+    </div>
   );
 }
 
