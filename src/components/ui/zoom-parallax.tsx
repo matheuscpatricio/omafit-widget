@@ -32,38 +32,8 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
   const pictures = [
     {
       scale: scale4,
-      className: 'w-[70vw] h-[40vh] md:w-[25vw] md:h-[25vw]',
+      className: 'w-[80vw] h-[45vh] md:w-[50vw] md:h-[50vh] lg:w-[40vw] lg:h-[60vh]',
       position: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-    },
-    {
-      scale: scale5,
-      className: 'w-[35vw] h-[30vh] md:w-[25vw] md:h-[25vw]',
-      position: 'top-[5vh] left-[5vw]',
-    },
-    {
-      scale: scale6,
-      className: 'w-[25vw] h-[30vh] md:w-[20vw] md:h-[45vh]',
-      position: 'top-[10vh] left-[75vw] -translate-x-full',
-    },
-    {
-      scale: scale5,
-      className: 'w-[25vw] h-[25vh] md:w-[25vw] md:h-[25vw]',
-      position: 'top-[70vh] left-[5vw]',
-    },
-    {
-      scale: scale6,
-      className: 'w-[25vw] h-[20vh] md:w-[20vw] md:h-[25vw]',
-      position: 'bottom-[5vh] right-[5vw]',
-    },
-    {
-      scale: scale8,
-      className: 'w-[30vw] h-[25vh] md:w-[30vw] md:h-[25vw]',
-      position: 'top-[15vh] left-[35vw]',
-    },
-    {
-      scale: scale9,
-      className: 'w-[20vw] h-[20vh] md:w-[15vw] md:h-[15vw]',
-      position: 'bottom-[15vh] left-[50%] -translate-x-1/2',
     },
   ];
 

@@ -26,10 +26,10 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
     let particles: Particle[] = [];
     const mouse = { x: -1000, y: -1000 };
 
-    const PARTICLE_COUNT = 1500;
-    const MAGNETIC_RADIUS = 200;
-    const VORTEX_STRENGTH = 0.05;
-    const PULL_STRENGTH = 0.08;
+    const PARTICLE_COUNT = 4500;
+    const MAGNETIC_RADIUS = 250;
+    const VORTEX_STRENGTH = 0.15;
+    const PULL_STRENGTH = 0.25;
 
     class Particle {
       x: number = 0;
@@ -50,12 +50,12 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
       reset() {
         this.x = Math.random() * width;
         this.y = Math.random() * height;
-        this.size = Math.random() * 0.4 + 0.15;
+        this.size = Math.random() * 0.25 + 0.08;
         this.vx = (Math.random() - 0.5) * 0.15;
         this.vy = (Math.random() - 0.5) * 0.15;
         const isGlass = Math.random() > 0.7;
         this.color = isGlass ? '240, 245, 255' : '80, 80, 85';
-        this.alpha = Math.random() * 0.35 + 0.08;
+        this.alpha = Math.random() * 0.3 + 0.05;
         this.rotation = Math.random() * Math.PI * 2;
         this.rotationSpeed = (Math.random() - 0.5) * 0.03;
       }
@@ -111,10 +111,10 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
         }
 
         ctx.beginPath();
-        ctx.moveTo(0, -this.size * 1.8);
-        ctx.lineTo(this.size * 0.8, 0);
-        ctx.lineTo(0, this.size * 1.8);
-        ctx.lineTo(-this.size * 0.8, 0);
+        ctx.moveTo(0, -this.size * 1.5);
+        ctx.lineTo(this.size * 0.6, 0);
+        ctx.lineTo(0, this.size * 1.5);
+        ctx.lineTo(-this.size * 0.6, 0);
         ctx.closePath();
         ctx.fill();
 
