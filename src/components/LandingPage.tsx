@@ -20,24 +20,18 @@ function HeroZoomParallax() {
     offset: ['start start', 'end end'],
   });
 
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 4]);
+  const scale1 = useTransform(scrollYProgress, [0, 0.5], [1, 3.5]);
+  const scale2 = useTransform(scrollYProgress, [0.5, 1], [1, 2.5]);
   const opacity1 = useTransform(scrollYProgress, [0, 0.3, 0.5], [1, 1, 0]);
-  const opacity2 = useTransform(scrollYProgress, [0.4, 0.6, 0.9], [0, 1, 1]);
+  const opacity2 = useTransform(scrollYProgress, [0.5, 0.65, 0.95], [0, 1, 1]);
 
   return (
     <div ref={container} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-white">
-        <motion.div
-          style={{ scale }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <div className="w-full h-full bg-white" />
-        </motion.div>
-
+      <div className="sticky top-0 h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100">
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <div className="w-full px-4 max-w-7xl text-center">
             <motion.div
-              style={{ opacity: opacity1 }}
+              style={{ scale: scale1, opacity: opacity1 }}
               className="space-y-4"
             >
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
@@ -51,10 +45,10 @@ function HeroZoomParallax() {
             </motion.div>
 
             <motion.div
-              style={{ opacity: opacity2 }}
-              className="absolute inset-0 flex items-center justify-center"
+              style={{ scale: scale2, opacity: opacity2 }}
+              className="absolute inset-0 flex items-center justify-center px-4"
             >
-              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 px-4" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 Um assistente inteligente de vendas para sua marca
               </h2>
             </motion.div>
