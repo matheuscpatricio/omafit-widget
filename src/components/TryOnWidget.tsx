@@ -2001,11 +2001,11 @@ const handleSubmit = async () => {
                 className={`flex gap-2 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
               >
                 {message.role === 'assistant' && localStoreLogo && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
                     <img
                       src={localStoreLogo}
                       alt={localStoreName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                 )}
@@ -2026,11 +2026,11 @@ const handleSubmit = async () => {
             {gptLoading && (
               <div className="flex gap-2 justify-start">
                 {localStoreLogo && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
                     <img
                       src={localStoreLogo}
                       alt={localStoreName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                 )}
