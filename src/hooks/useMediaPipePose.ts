@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { PoseLandmarker, FilesetResolver, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface PoseLandmark {
@@ -20,21 +20,28 @@ export interface BodyMeasurements {
 
 export function useMediaPipePose() {
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const initializingRef = useRef<Promise<void> | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const initializePoseLandmarker = useCallback(async () => {
+    if (poseLandmarkerRef.current) {
+      return;
+    }
 
-    async function initializePoseLandmarker() {
+    if (initializingRef.current) {
+      await initializingRef.current;
+      return;
+    }
+
+    const initPromise = (async () => {
       try {
-        console.log('🔧 Inicializando MediaPipe Pose Landmarker...');
+        setIsLoading(true);
+        console.log('🔧 Inicializando MediaPipe Pose Landmarker (lazy loading)...');
 
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
-
-        if (!mounted) return;
 
         const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
@@ -49,42 +56,38 @@ export function useMediaPipePose() {
           outputSegmentationMasks: false
         });
 
-        if (!mounted) return;
-
         poseLandmarkerRef.current = poseLandmarker;
         setIsLoading(false);
         console.log('✅ MediaPipe Pose Landmarker inicializado com sucesso!');
       } catch (err) {
         console.error('❌ Erro ao inicializar MediaPipe:', err);
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Erro desconhecido');
-          setIsLoading(false);
-        }
+        setError(err instanceof Error ? err.message : 'Erro desconhecido');
+        setIsLoading(false);
+        throw err;
+      } finally {
+        initializingRef.current = null;
       }
-    }
+    })();
 
-    initializePoseLandmarker();
-
-    return () => {
-      mounted = false;
-      if (poseLandmarkerRef.current) {
-        poseLandmarkerRef.current.close();
-      }
-    };
+    initializingRef.current = initPromise;
+    await initPromise;
   }, []);
 
   const detectPose = async (imageElement: HTMLImageElement): Promise<PoseLandmarkerResult | null> => {
     if (!poseLandmarkerRef.current) {
-      console.error('❌ PoseLandmarker não inicializado');
+      console.log('⏳ MediaPipe não inicializado. Inicializando agora...');
+      await initializePoseLandmarker();
+    }
+
+    if (!poseLandmarkerRef.current) {
+      console.error('❌ Falha ao inicializar PoseLandmarker');
       return null;
     }
 
     try {
       console.log('🔍 Detectando pose na imagem...');
 
-      // Executar detecção de forma assíncrona para não bloquear a UI
       const result = await new Promise<PoseLandmarkerResult>((resolve) => {
-        // Use requestIdleCallback se disponível, senão setTimeout
         const runDetection = () => {
           const detectionResult = poseLandmarkerRef.current!.detect(imageElement);
           resolve(detectionResult);
