@@ -32,8 +32,8 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
   const pictures = [
     {
       scale: scale4,
-      className: 'w-[80vw] h-[45vh] md:w-[50vw] md:h-[50vh] lg:w-[40vw] lg:h-[60vh]',
-      position: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+      className: 'w-screen h-screen',
+      position: 'inset-0',
     },
   ];
 
@@ -49,7 +49,7 @@ export function ZoomParallax({ images, videoUrl }: ZoomParallaxProps) {
               style={{ scale: picture.scale }}
               className={`absolute ${picture.position}`}
             >
-              <div className={`relative ${picture.className} rounded-2xl overflow-hidden`}>
+              <div className={`relative ${picture.className} overflow-hidden`}>
                 {isCentralItem && videoUrl ? (
                   <video
                     src={videoUrl}

@@ -26,7 +26,7 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
     let particles: Particle[] = [];
     const mouse = { x: -1000, y: -1000 };
 
-    const PARTICLE_COUNT = 4500;
+    const PARTICLE_COUNT = 8000;
     const MAGNETIC_RADIUS = 250;
     const VORTEX_STRENGTH = 0.15;
     const PULL_STRENGTH = 0.25;
@@ -50,14 +50,14 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
       reset() {
         this.x = Math.random() * width;
         this.y = Math.random() * height;
-        this.size = Math.random() * 0.25 + 0.08;
-        this.vx = (Math.random() - 0.5) * 0.15;
-        this.vy = (Math.random() - 0.5) * 0.15;
+        this.size = Math.random() * 0.15 + 0.05;
+        this.vx = (Math.random() - 0.5) * 0.35;
+        this.vy = (Math.random() - 0.5) * 0.35;
         const isGlass = Math.random() > 0.7;
         this.color = isGlass ? '240, 245, 255' : '80, 80, 85';
         this.alpha = Math.random() * 0.3 + 0.05;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.03;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.05;
       }
 
       update() {
@@ -82,11 +82,11 @@ const ASMRStaticBackground: React.FC<ASMRStaticBackgroundProps> = ({
         this.x += this.vx;
         this.y += this.vy;
 
-        this.vx *= 0.95;
-        this.vy *= 0.95;
+        this.vx *= 0.98;
+        this.vy *= 0.98;
 
-        this.vx += (Math.random() - 0.5) * 0.04;
-        this.vy += (Math.random() - 0.5) * 0.04;
+        this.vx += (Math.random() - 0.5) * 0.08;
+        this.vy += (Math.random() - 0.5) * 0.08;
 
         this.rotation += this.rotationSpeed + (Math.abs(this.vx) + Math.abs(this.vy)) * 0.05;
 
