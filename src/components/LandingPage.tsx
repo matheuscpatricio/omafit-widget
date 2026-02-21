@@ -6,11 +6,63 @@ import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
 import Lenis from '@studio-freight/lenis';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
   onLogin: () => void;
+}
+
+function HeroZoomParallax() {
+  const container = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: container,
+    offset: ['start start', 'end end'],
+  });
+
+  const scale = useTransform(scrollYProgress, [0, 1], [1, 4]);
+  const opacity1 = useTransform(scrollYProgress, [0, 0.3, 0.5], [1, 1, 0]);
+  const opacity2 = useTransform(scrollYProgress, [0.4, 0.6, 0.9], [0, 1, 1]);
+
+  return (
+    <div ref={container} className="relative h-[300vh]">
+      <div className="sticky top-0 h-screen overflow-hidden bg-white">
+        <motion.div
+          style={{ scale }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <div className="w-full h-full bg-white" />
+        </motion.div>
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div className="w-full px-4 max-w-7xl text-center">
+            <motion.div
+              style={{ opacity: opacity1 }}
+              className="space-y-4"
+            >
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+                Encante seus clientes com uma
+                <br />
+                <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
+              </h1>
+              <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+                When techno meets fashion.
+              </p>
+            </motion.div>
+
+            <motion.div
+              style={{ opacity: opacity2 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 px-4" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
+                Um assistente inteligente de vendas para sua marca
+              </h2>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
@@ -178,19 +230,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </header>
 
-          {/* Hero Section */}
-          <section className="relative h-screen">
-            <div className="flex flex-col items-center justify-center h-full text-center px-4 pointer-events-none">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                Encante seus clientes com uma
-                <br />
-                <span style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>experiência envolvente</span>
-              </h1>
-              <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                When techno meets fashion.
-              </p>
-            </div>
-          </section>
+          {/* Hero Section - Zoom Parallax */}
+          <HeroZoomParallax />
 
           {/* Stats Section */}
           <section className="py-12 sm:py-16" data-animate="stats">
