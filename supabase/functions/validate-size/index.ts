@@ -438,21 +438,36 @@ function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): stri
   const messages: Record<string, string> = {
     pt: `Você precisa criar uma mensagem persuasiva incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
 
-CONTEXTO:
-- Tamanho recomendado: ${data.tamanho_calculado_algoritmo}${productInfo}${productDesc}
+CONTEXTO DO USUÁRIO:
+- Altura: ${data.altura_cm} cm
+- Peso: ${data.peso_kg} kg
+- Peito: ${data.peito_cm} cm
+- Cintura: ${data.cintura_cm} cm
+- Quadril: ${data.quadril_cm} cm
+- Tipo de corpo: ${data.tipo_corpo || 'regular'}
+- Ajuste preferido: ${data.ajuste_preferido || 'regular'}
+
+CONTEXTO DO PRODUTO:
+- Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
+- Categoria: ${data.categoria}
+- Elasticidade: ${data.elasticidade}${productInfo}${productDesc}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}
+
+ESTRUTURA DA MENSAGEM (OBRIGATÓRIA):
+1ª FRASE: Confirme o tamanho ideal e explique BREVEMENTE o motivo baseado nas medidas/corpo
+2ª FRASE: Mencione benefício do produto e induza ao carrinho
 
 REGRAS CRÍTICAS (NÃO IGNORE!):
 1. A palavra "tamanho" ou o valor "${data.tamanho_calculado_algoritmo}" deve aparecer APENAS UMA VEZ em toda a mensagem
-2. Coloque o tamanho SOMENTE na primeira frase (exemplo: "Seu tamanho ideal é ${data.tamanho_calculado_algoritmo}!")
-3. Depois da primeira frase, NUNCA MAIS mencione o tamanho ou números de tamanho
-4. Continue naturalmente falando sobre benefícios do produto e induzindo à compra${data.shop_name ? `\n5. Você pode mencionar a marca/loja "${data.shop_name}" de forma natural e persuasiva` : ''}
+2. Coloque o tamanho SOMENTE na primeira frase
+3. Na primeira frase, explique de forma BREVE e QUALITATIVA o motivo (ex: "combina com suas proporções", "ideal para seu tipo de corpo atlético", "perfeito para sua silhueta")
+4. NUNCA mencione medidas em centímetros - use descrições qualitativas
 5. Seja MUITO breve e direto: máximo 2-3 linhas no total
 6. Não use asteriscos, negrito ou formatação especial
 7. Use tom conversacional, persuasivo mas profissional
-8. Foque na confiança do ajuste perfeito e induza ao carrinho
+8. Sempre induza ao carrinho na última frase
 
 EXEMPLO CORRETO:
-"Seu tamanho ideal é M! ${data.product_name ? `Este ${data.product_name}` : 'Esta peça'} vai valorizar seu estilo. Adicione ao carrinho agora!"
+"Seu tamanho ideal é M, perfeito para suas proporções harmoniosas! ${data.product_name ? `Este ${data.product_name}` : 'Esta peça'} vai valorizar seu estilo - adicione ao carrinho agora!"
 
 EXEMPLO ERRADO (NÃO FAÇA ISSO):
 "Seu tamanho ideal é M! O tamanho M oferece ajuste perfeito. Adicione o tamanho M ao carrinho."
@@ -460,7 +475,7 @@ EXEMPLO ERRADO (NÃO FAÇA ISSO):
 Retorne no formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "mensagem persuasiva e curta (tamanho só na primeira frase!)",
+  "explicacao": "mensagem persuasiva com motivo breve + indução ao carrinho",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
