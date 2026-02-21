@@ -1,5 +1,5 @@
-import { useRef, useCallback, useState } from 'react';
-import { PoseLandmarker, FilesetResolver, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import { useRef, useCallback, useState, useEffect } from 'react';
+import { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface PoseLandmark {
   x: number;
@@ -19,94 +19,110 @@ export interface BodyMeasurements {
 }
 
 export function useMediaPipePose() {
-  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
-  const initializingRef = useRef<Promise<void> | null>(null);
+  const workerRef = useRef<Worker | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isInitializedRef = useRef(false);
+
+  useEffect(() => {
+    workerRef.current = new Worker(
+      new URL('../workers/mediapipe.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    workerRef.current.onmessage = (e) => {
+      const { type, error: workerError } = e.data;
+      if (type === 'initialized') {
+        isInitializedRef.current = true;
+        setIsLoading(false);
+        console.log('✅ MediaPipe inicializado no Worker (sem travar a UI)');
+      } else if (type === 'error') {
+        console.error('❌ Erro no Worker:', workerError);
+        setError(workerError);
+        setIsLoading(false);
+      }
+    };
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   const initializePoseLandmarker = useCallback(async () => {
-    if (poseLandmarkerRef.current) {
-      return;
-    }
+    if (isInitializedRef.current || !workerRef.current) return;
 
-    if (initializingRef.current) {
-      await initializingRef.current;
-      return;
-    }
+    setIsLoading(true);
+    console.log('🔧 Inicializando MediaPipe no Worker (não trava a UI)...');
 
-    const initPromise = (async () => {
-      try {
-        setIsLoading(true);
-        console.log('🔧 Inicializando MediaPipe Pose Landmarker (lazy loading)...');
+    workerRef.current.postMessage({ type: 'initialize' });
 
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-        );
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('MediaPipe initialization timeout'));
+      }, 30000);
 
-        const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: '/models/pose_landmarker_lite.task',
-            delegate: 'GPU'
-          },
-          runningMode: 'IMAGE',
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-          outputSegmentationMasks: false
-        });
+      const handler = (e: MessageEvent) => {
+        const { type, error: workerError } = e.data;
+        if (type === 'initialized') {
+          clearTimeout(timeout);
+          workerRef.current?.removeEventListener('message', handler);
+          resolve();
+        } else if (type === 'error') {
+          clearTimeout(timeout);
+          workerRef.current?.removeEventListener('message', handler);
+          reject(new Error(workerError));
+        }
+      };
 
-        poseLandmarkerRef.current = poseLandmarker;
-        setIsLoading(false);
-        console.log('✅ MediaPipe Pose Landmarker inicializado com sucesso!');
-      } catch (err) {
-        console.error('❌ Erro ao inicializar MediaPipe:', err);
-        setError(err instanceof Error ? err.message : 'Erro desconhecido');
-        setIsLoading(false);
-        throw err;
-      } finally {
-        initializingRef.current = null;
-      }
-    })();
-
-    initializingRef.current = initPromise;
-    await initPromise;
+      workerRef.current?.addEventListener('message', handler);
+    });
   }, []);
 
   const detectPose = async (imageElement: HTMLImageElement): Promise<PoseLandmarkerResult | null> => {
-    if (!poseLandmarkerRef.current) {
-      console.log('⏳ MediaPipe não inicializado. Inicializando agora...');
+    if (!isInitializedRef.current) {
+      console.log('⏳ MediaPipe não inicializado. Inicializando no Worker...');
       await initializePoseLandmarker();
     }
 
-    if (!poseLandmarkerRef.current) {
-      console.error('❌ Falha ao inicializar PoseLandmarker');
+    if (!workerRef.current) {
+      console.error('❌ Worker não disponível');
       return null;
     }
 
     try {
-      console.log('🔍 Detectando pose na imagem...');
+      console.log('🔍 Processando pose no Worker (não trava a UI)...');
 
-      const result = await new Promise<PoseLandmarkerResult>((resolve) => {
-        const runDetection = () => {
-          const detectionResult = poseLandmarkerRef.current!.detect(imageElement);
-          resolve(detectionResult);
+      const canvas = document.createElement('canvas');
+      canvas.width = imageElement.naturalWidth;
+      canvas.height = imageElement.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get canvas context');
+
+      ctx.drawImage(imageElement, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Pose detection timeout'));
+        }, 30000);
+
+        const handler = (e: MessageEvent) => {
+          const { type, landmarks, error: workerError } = e.data;
+          if (type === 'result') {
+            clearTimeout(timeout);
+            workerRef.current?.removeEventListener('message', handler);
+            console.log('✅ Pose detectada com sucesso no Worker');
+            resolve({ landmarks: [landmarks] } as PoseLandmarkerResult);
+          } else if (type === 'error') {
+            clearTimeout(timeout);
+            workerRef.current?.removeEventListener('message', handler);
+            reject(new Error(workerError));
+          }
         };
 
-        if ('requestIdleCallback' in window) {
-          requestIdleCallback(runDetection, { timeout: 100 });
-        } else {
-          setTimeout(runDetection, 0);
-        }
+        workerRef.current?.addEventListener('message', handler);
+        workerRef.current?.postMessage({ type: 'process', imageData }, [imageData.data.buffer]);
       });
-
-      if (result.landmarks && result.landmarks.length > 0) {
-        console.log(`✅ Detectados ${result.landmarks[0].length} landmarks`);
-      } else {
-        console.warn('⚠️ Nenhuma pose detectada na imagem');
-      }
-
-      return result;
     } catch (err) {
       console.error('❌ Erro ao detectar pose:', err);
       return null;

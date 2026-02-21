@@ -11,6 +11,9 @@ export default defineConfig({
   ssr: {
     noExternal: ['@shopify/polaris'],
   },
+  worker: {
+    format: 'es'
+  },
   server: {
     headers: {
       'Access-Control-Allow-Origin': '*',
