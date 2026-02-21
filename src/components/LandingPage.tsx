@@ -55,7 +55,7 @@ function HeroZoomParallax() {
                     playsInline
                     className="video-text-bg"
                   >
-                    <source src="https://cdn.pixabay.com/video/2021/08/09/84823-588178509_large.mp4" type="video/mp4" />
+                    <source src="https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4" type="video/mp4" />
                   </video>
                   <span>experiência envolvente</span>
                 </span>
