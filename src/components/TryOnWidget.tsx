@@ -1968,8 +1968,17 @@ const handleSubmit = async () => {
             {chatMessages.map((message, index) => (
               <div
                 key={index}
-                className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                className={`flex gap-2 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
               >
+                {message.role === 'assistant' && localStoreLogo && (
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm">
+                    <img
+                      src={localStoreLogo}
+                      alt={localStoreName}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div
                   className={`max-w-[80%] rounded-2xl p-4 ${
                     message.role === 'assistant'
@@ -1985,7 +1994,16 @@ const handleSubmit = async () => {
 
             {/* Loading Indicator */}
             {gptLoading && (
-              <div className="flex justify-start">
+              <div className="flex gap-2 justify-start">
+                {localStoreLogo && (
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm">
+                    <img
+                      src={localStoreLogo}
+                      alt={localStoreName}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
                   <div className="flex items-center gap-1">
                     <span
