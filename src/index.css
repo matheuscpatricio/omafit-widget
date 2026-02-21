@@ -90,27 +90,19 @@
     will-change: transform;
   }
 
-  /* Video text effect - video clipped inside text */
+  /* Video text effect - video clipped inside text using canvas approach */
   .video-text {
     position: relative;
     display: inline-block;
     font-weight: bold;
-    color: #000;
-    background: #000;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
   }
 
-  .video-text video {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
-    height: auto;
-    min-height: 200%;
-    object-fit: cover;
-    z-index: -1;
+  .video-text-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .video-text-canvas {
+    display: block;
   }
 }

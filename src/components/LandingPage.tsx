@@ -13,9 +13,64 @@ interface LandingPageProps {
   onLogin: () => void;
 }
 
+function VideoText() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const renderFrame = () => {
+      if (video.readyState >= 2) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.font = 'bold italic 120px "Playfair Display", serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('experiência envolvente', canvas.width / 2, canvas.height / 2);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      requestAnimationFrame(renderFrame);
+    };
+
+    video.addEventListener('loadeddata', () => {
+      canvas.width = 1200;
+      canvas.height = 200;
+      renderFrame();
+    });
+
+    video.play().catch(err => console.log('Autoplay prevented:', err));
+
+    return () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, []);
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="video-text-canvas" style={{ maxWidth: '100%', height: 'auto' }} />
+      <video
+        ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
+        crossOrigin="anonymous"
+        style={{ display: 'none' }}
+      >
+        <source src="https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+      </video>
+    </>
+  );
+}
+
 function HeroZoomParallax() {
   const container = useRef(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const { scrollYProgress } = useScroll({
     target: container,
     offset: ['start start', 'end end'],
@@ -25,14 +80,6 @@ function HeroZoomParallax() {
   const scale2 = useTransform(scrollYProgress, [0.5, 1], [1, 2.5]);
   const opacity1 = useTransform(scrollYProgress, [0, 0.3, 0.5], [1, 1, 0]);
   const opacity2 = useTransform(scrollYProgress, [0.5, 0.65, 0.95], [0, 1, 1]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.play().catch((error) => {
-        console.log('Autoplay prevented:', error);
-      });
-    }
-  }, []);
 
   return (
     <div ref={container} className="relative h-[300vh]">
@@ -46,36 +93,7 @@ function HeroZoomParallax() {
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 Encante seus clientes com uma
                 <br />
-                <span className="video-text" style={{
-                  fontFamily: '"Playfair Display", serif',
-                  fontStyle: 'italic',
-                  fontSize: '1.1em',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundImage: 'url(https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4)',
-                }}>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: '100%',
-                      minHeight: '200%',
-                      objectFit: 'cover',
-                      zIndex: -1,
-                    }}
-                  >
-                    <source src="https://videos.pexels.com/video-files/6985297/6985297-uhd_2560_1440_25fps.mp4" type="video/mp4" />
-                  </video>
-                  experiência envolvente
-                </span>
+                <VideoText />
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
                 When techno meets fashion.
