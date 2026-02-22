@@ -63,7 +63,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   // Detectar idioma
   const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
   const t = (key: WidgetTranslationKey): string => {
-    return widgetTranslations[currentLanguage][key] || widgetTranslations['en'][key] || key;
+    const translation = widgetTranslations[currentLanguage][key] || widgetTranslations['en'][key] || key;
+    // Substituir {storeName} pelo nome real da loja
+    return translation.replace('{storeName}', storeName || 'nossa loja');
   };
 
   console.log('🌍 Idioma detectado no widget:', currentLanguage);
