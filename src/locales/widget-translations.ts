@@ -4,10 +4,10 @@ export const widgetTranslations = {
     loadingProduct: 'Carregando produto...',
 
     // Step 1: Info
-    visualExperience: 'Sua experiência visual',
-    visualExperienceDesc: 'Veja seu tamanho ideal e como esta peça fica no seu corpo.',
+    visualExperience: 'Bem vindo ao assistente inteligente de vendas da {storeName}',
+    visualExperienceDesc: 'Iremos te ajudar qualquer dúvida sobre esta roupa',
     howItWorks: 'Como funciona?',
-    howItWorksDesc: 'Nossa tecnologia aplica digitalmente este produto em uma foto sua, mostrando como ele ficaria no seu corpo de forma realista.',
+    howItWorksDesc: 'Nós iremos te indicar seu tamanho ideal para esta roupa, te entregar uma prévia de como você ficará usando-a e tirar qualquer dúvida que você tenha.',
     startNow: 'Começar Agora',
     privacyNote: 'Suas fotos são processadas de forma segura e não são compartilhadas.',
 
@@ -73,10 +73,10 @@ export const widgetTranslations = {
     loadingProduct: 'Cargando producto...',
 
     // Step 1: Info
-    visualExperience: 'Tu experiencia visual',
-    visualExperienceDesc: 'Ve tu talla ideal y cómo se ve esta prenda en tu cuerpo.',
+    visualExperience: 'Bienvenido al asistente inteligente de ventas de {storeName}',
+    visualExperienceDesc: 'Te ayudaremos con cualquier duda sobre esta prenda',
     howItWorks: '¿Cómo funciona?',
-    howItWorksDesc: 'Nuestra tecnología aplica digitalmente este producto en una foto tuya, mostrando cómo se vería en tu cuerpo de forma realista.',
+    howItWorksDesc: 'Te indicaremos tu talla ideal para esta prenda, te entregaremos una vista previa de cómo te verás usándola y aclararemos cualquier duda que tengas.',
     startNow: 'Empezar Ahora',
     privacyNote: 'Tus fotos se procesan de forma segura y no se comparten.',
 
@@ -142,10 +142,10 @@ export const widgetTranslations = {
     loadingProduct: 'Loading product...',
 
     // Step 1: Info
-    visualExperience: 'Your visual experience',
-    visualExperienceDesc: 'See your ideal size and how this piece looks on your body.',
+    visualExperience: 'Welcome to {storeName}\'s intelligent sales assistant',
+    visualExperienceDesc: 'We will help you with any questions about this garment',
     howItWorks: 'How does it work?',
-    howItWorksDesc: 'Our technology digitally applies this product to a photo of you, showing how it would look on your body realistically.',
+    howItWorksDesc: 'We will indicate your ideal size for this garment, deliver a preview of how you will look wearing it, and answer any questions you have.',
     startNow: 'Start Now',
     privacyNote: 'Your photos are securely processed and not shared.',
 
