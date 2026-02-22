@@ -4,7 +4,7 @@ export const widgetTranslations = {
     loadingProduct: 'Carregando produto...',
 
     // Step 1: Info
-    visualExperience: 'Bem vindo ao assistente inteligente de vendas da {storeName}!',
+    visualExperience: 'Olá, sou o assistente inteligente da {storeName}!',
     visualExperienceDesc: 'Iremos te ajudar com qualquer dúvida sobre esta roupa',
     howItWorks: 'Como funciona?',
     howItWorksDesc: 'Nós iremos te indicar seu tamanho ideal para esta roupa, te entregar uma prévia de como você ficará usando-a e tirar qualquer dúvida que você tenha.',
