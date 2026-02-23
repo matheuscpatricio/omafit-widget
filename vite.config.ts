@@ -19,15 +19,6 @@ export default defineConfig({
       }
     }
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'mediapipe': ['@mediapipe/tasks-vision']
-        }
-      }
-    }
-  },
   server: {
     headers: {
       'Access-Control-Allow-Origin': '*',

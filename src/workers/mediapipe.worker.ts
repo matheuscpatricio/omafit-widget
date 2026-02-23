@@ -1,3 +1,5 @@
+import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+
 let poseLandmarkerInstance: any = null;
 let isInitialized = false;
 
@@ -42,8 +44,6 @@ async function initializeMediaPipe() {
   try {
     console.log('[Worker] Carregando biblioteca MediaPipe...');
 
-    const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
-
     console.log('[Worker] Biblioteca carregada, carregando FilesetResolver...');
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
@@ -54,7 +54,7 @@ async function initializeMediaPipe() {
     poseLandmarkerInstance = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: '/models/pose_landmarker_lite.task',
-        delegate: 'GPU'
+        delegate: 'CPU'
       },
       runningMode: 'IMAGE',
       numPoses: 1
@@ -71,6 +71,7 @@ async function initializeMediaPipe() {
       type: 'error',
       error: error instanceof Error ? error.message : 'Failed to initialize MediaPipe'
     });
+    throw error;
   }
 }
 
