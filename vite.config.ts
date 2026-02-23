@@ -15,7 +15,7 @@ export default defineConfig({
     format: 'es',
     rollupOptions: {
       output: {
-        inlineDynamicImports: false
+        inlineDynamicImports: true
       }
     }
   },

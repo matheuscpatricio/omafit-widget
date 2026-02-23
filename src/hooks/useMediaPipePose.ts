@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import { FilesetResolver, PoseLandmarker, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface PoseLandmark {
   x: number;
@@ -20,8 +20,11 @@ export interface BodyMeasurements {
 
 export function useMediaPipePose() {
   const workerRef = useRef<Worker | null>(null);
+  const mainThreadPoseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  const mainThreadInitPromiseRef = useRef<Promise<void> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useMainThreadFallback, setUseMainThreadFallback] = useState(false);
   const isInitializedRef = useRef(false);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -52,7 +55,13 @@ export function useMediaPipePose() {
             initTimeoutRef.current = null;
           }
           console.error('❌ Erro no Worker:', workerError);
-          setError(workerError);
+          if (String(workerError || '').includes('self.import is not a function')) {
+            console.warn('⚠️ Worker incompatível com MediaPipe neste ambiente. Ativando fallback para main thread.');
+            setUseMainThreadFallback(true);
+            setError(null);
+          } else {
+            setError(workerError);
+          }
           setIsLoading(false);
         }
       };
@@ -75,7 +84,43 @@ export function useMediaPipePose() {
         clearTimeout(initTimeoutRef.current);
       }
       workerRef.current?.terminate();
+      mainThreadPoseLandmarkerRef.current?.close?.();
     };
+  }, []);
+
+  const initializeMainThreadPoseLandmarker = useCallback(async () => {
+    if (mainThreadPoseLandmarkerRef.current) return;
+    if (mainThreadInitPromiseRef.current) {
+      await mainThreadInitPromiseRef.current;
+      return;
+    }
+
+    setIsLoading(true);
+    const initPromise = (async () => {
+      console.log('🔧 [MainThreadFallback] Inicializando MediaPipe no main thread...');
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
+      );
+
+      mainThreadPoseLandmarkerRef.current = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: '/models/pose_landmarker_lite.task',
+          delegate: 'CPU'
+        },
+        runningMode: 'IMAGE',
+        numPoses: 1
+      });
+      console.log('✅ [MainThreadFallback] MediaPipe pronto no main thread');
+    })();
+
+    mainThreadInitPromiseRef.current = initPromise;
+
+    try {
+      await initPromise;
+    } finally {
+      mainThreadInitPromiseRef.current = null;
+      setIsLoading(false);
+    }
   }, []);
 
   const initializePoseLandmarker = useCallback(async () => {
@@ -136,6 +181,22 @@ export function useMediaPipePose() {
     console.log('   - Worker inicializado:', isInitializedRef.current);
     console.log('   - Worker disponível:', !!workerRef.current);
 
+    if (useMainThreadFallback) {
+      try {
+        await initializeMainThreadPoseLandmarker();
+        const result = mainThreadPoseLandmarkerRef.current?.detect(imageElement) || null;
+        if (!result?.landmarks?.length) {
+          console.warn('⚠️ [MainThreadFallback] Nenhuma pose detectada na imagem');
+          return null;
+        }
+        return result;
+      } catch (err) {
+        console.error('❌ [MainThreadFallback] Falha na detecção:', err);
+        setError(err instanceof Error ? err.message : 'Main thread fallback failed');
+        return null;
+      }
+    }
+
     if (!isInitializedRef.current) {
       console.log('⏳ MediaPipe não inicializado. Inicializando no Worker...');
       try {
@@ -143,6 +204,17 @@ export function useMediaPipePose() {
         console.log('✅ Inicialização concluída');
       } catch (err) {
         console.error('❌ Falha na inicialização:', err);
+        if (err instanceof Error && err.message.includes('self.import is not a function')) {
+          console.warn('⚠️ Ativando fallback para main thread após falha de inicialização do Worker');
+          setUseMainThreadFallback(true);
+          try {
+            await initializeMainThreadPoseLandmarker();
+            const result = mainThreadPoseLandmarkerRef.current?.detect(imageElement) || null;
+            return result?.landmarks?.length ? result : null;
+          } catch (fallbackErr) {
+            console.error('❌ Falha no fallback para main thread:', fallbackErr);
+          }
+        }
         return null;
       }
     }
