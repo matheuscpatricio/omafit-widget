@@ -2273,8 +2273,8 @@ const handleSubmit = async () => {
                 disabled={isAddingToCart}
                 className="w-full mb-3 px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: selectedColorHex || localPrimaryColor,
-                  color: getContrastTextColor(selectedColorHex || localPrimaryColor)
+                  backgroundColor: localPrimaryColor,
+                  color: getContrastTextColor(localPrimaryColor)
                 }}
               >
                 {isAddingToCart
