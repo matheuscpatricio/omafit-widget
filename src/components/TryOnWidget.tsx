@@ -111,6 +111,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [gptLoading, setGptLoading] = useState(false);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
   const [interactionCount, setInteractionCount] = useState(0);
+  const [selectedColorHex, setSelectedColorHex] = useState<string>(primaryColor);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [addToCartFeedback, setAddToCartFeedback] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
 
@@ -147,6 +150,99 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
+
+  const getContrastTextColor = (hexColor: string): string => {
+    const hex = hexColor.replace('#', '');
+    if (hex.length !== 6) return '#FFFFFF';
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.6 ? '#111827' : '#FFFFFF';
+  };
+
+  const extractDominantColorFromImage = async (imageUrl: string): Promise<string | null> => {
+    if (!imageUrl) return null;
+
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.referrerPolicy = 'no-referrer';
+
+      image.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (!context) {
+            resolve(null);
+            return;
+          }
+
+          const maxSize = 64;
+          const scale = Math.min(maxSize / image.width, maxSize / image.height, 1);
+          canvas.width = Math.max(1, Math.floor(image.width * scale));
+          canvas.height = Math.max(1, Math.floor(image.height * scale));
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          const pixelData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          const colorBuckets = new Map<string, { count: number; r: number; g: number; b: number; saturation: number }>();
+
+          for (let i = 0; i < pixelData.length; i += 16) {
+            const r = pixelData[i];
+            const g = pixelData[i + 1];
+            const b = pixelData[i + 2];
+            const alpha = pixelData[i + 3];
+            if (alpha < 120) continue;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max === 0 ? 0 : (max - min) / max;
+            const isNearWhite = r > 245 && g > 245 && b > 245;
+            const isNearBlack = r < 10 && g < 10 && b < 10;
+            if (isNearWhite || isNearBlack || saturation < 0.08) continue;
+
+            const bucketKey = `${Math.round(r / 24) * 24}-${Math.round(g / 24) * 24}-${Math.round(b / 24) * 24}`;
+            const existing = colorBuckets.get(bucketKey) || { count: 0, r: 0, g: 0, b: 0, saturation: 0 };
+            existing.count += 1;
+            existing.r += r;
+            existing.g += g;
+            existing.b += b;
+            existing.saturation += saturation;
+            colorBuckets.set(bucketKey, existing);
+          }
+
+          let bestBucket: { count: number; r: number; g: number; b: number; saturation: number } | null = null;
+          let bestScore = -1;
+
+          colorBuckets.forEach((bucket) => {
+            const averageSaturation = bucket.saturation / bucket.count;
+            const score = bucket.count * (1 + averageSaturation);
+            if (score > bestScore) {
+              bestScore = score;
+              bestBucket = bucket;
+            }
+          });
+
+          if (!bestBucket) {
+            resolve(null);
+            return;
+          }
+
+          const r = Math.round(bestBucket.r / bestBucket.count);
+          const g = Math.round(bestBucket.g / bestBucket.count);
+          const b = Math.round(bestBucket.b / bestBucket.count);
+          const dominantHex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+          resolve(dominantHex);
+        } catch (error) {
+          console.warn('⚠️ Não foi possível extrair cor predominante da imagem:', error);
+          resolve(null);
+        }
+      };
+
+      image.onerror = () => resolve(null);
+      image.src = imageUrl;
+    });
+  };
 
   // Debug: Log sempre que step ou imagePreview mudar
   useEffect(() => {
@@ -196,6 +292,23 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       setLocalPrimaryColor(primaryColor);
     }
   }, [primaryColor]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const updateSelectedColor = async () => {
+      const dominantColor = await extractDominantColorFromImage(selectedProductImage);
+      if (!cancelled) {
+        setSelectedColorHex(dominantColor || localPrimaryColor);
+      }
+    };
+
+    updateSelectedColor();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProductImage, localPrimaryColor]);
 
   useEffect(() => {
     const resolved = resolveStoreName();
@@ -309,6 +422,29 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         if (event.data.logo) {
           setLocalStoreLogo(event.data.logo);
         }
+      }
+
+      if (event.data.type === 'omafit-add-to-cart-result') {
+        setIsAddingToCart(false);
+
+        const successMessages = {
+          pt: 'Produto adicionado ao carrinho!',
+          es: 'Producto agregado al carrito!',
+          en: 'Product added to cart!'
+        };
+
+        const errorMessages = {
+          pt: 'Não foi possível adicionar ao carrinho.',
+          es: 'No se pudo agregar al carrito.',
+          en: 'Could not add product to cart.'
+        };
+
+        if (event.data.success) {
+          setAddToCartFeedback(event.data.message || successMessages[currentLanguage]);
+          return;
+        }
+
+        setAddToCartFeedback(event.data.message || errorMessages[currentLanguage]);
       }
     };
 
@@ -1871,6 +2007,54 @@ const handleSubmit = async () => {
     }
   };
 
+  const handleAddToCart = () => {
+    if (isAddingToCart) return;
+
+    setIsAddingToCart(true);
+    setAddToCartFeedback('');
+
+    const requestId = `cart_${sessionId}_${Date.now()}`;
+    const cartPayload = {
+      type: 'omafit-add-to-cart-request',
+      requestId,
+      source: 'omafit-widget',
+      product: {
+        id: product?.id || productId,
+        name: localProductName || productName
+      },
+      selection: {
+        image_url: selectedProductImage,
+        color_hex: selectedColorHex,
+        recommended_size: recommendedSize || calculatedSize || null
+      },
+      quantity: 1,
+      shop_domain: shopDomain,
+      metadata: {
+        session_id: sessionId,
+        language: currentLanguage
+      }
+    };
+
+    console.log('🛒 Solicitando add to cart ao parent:', cartPayload);
+
+    window.parent.postMessage(cartPayload, '*');
+
+    setTimeout(() => {
+      setIsAddingToCart((current) => {
+        if (current) {
+          const timeoutMessages = {
+            pt: 'Ainda processando o carrinho... tente novamente em instantes.',
+            es: 'Aún procesando el carrito... inténtalo de nuevo en instantes.',
+            en: 'Still processing cart... please try again shortly.'
+          };
+          setAddToCartFeedback(timeoutMessages[currentLanguage]);
+          return false;
+        }
+        return current;
+      });
+    }, 8000);
+  };
+
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % availableImages.length);
   };
@@ -2083,6 +2267,25 @@ const handleSubmit = async () => {
           {/* Input Area */}
           {interactionCount < 3 && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAddingToCart}
+                className="w-full mb-3 px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: selectedColorHex || localPrimaryColor,
+                  color: getContrastTextColor(selectedColorHex || localPrimaryColor)
+                }}
+              >
+                {isAddingToCart
+                  ? (currentLanguage === 'pt' ? 'Adicionando ao carrinho...' : currentLanguage === 'es' ? 'Agregando al carrito...' : 'Adding to cart...')
+                  : (currentLanguage === 'pt' ? 'Adicionar ao carrinho' : currentLanguage === 'es' ? 'Agregar al carrito' : 'Add to cart')}
+              </button>
+
+              {addToCartFeedback && (
+                <p className="text-xs text-center text-gray-600 mb-3">{addToCartFeedback}</p>
+              )}
+
               {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
               {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
                 <p className="text-sm text-gray-600 text-center mb-3">
