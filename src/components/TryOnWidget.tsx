@@ -2405,7 +2405,7 @@ const handleSubmit = async () => {
               <img
                 src={displayImage}
                 alt={product.name}
-                className="max-w-full max-h-full object-cover"
+                className="max-w-full max-h-full object-contain"
               />
               </div>
             </div>
@@ -2429,7 +2429,7 @@ const handleSubmit = async () => {
               <img
                 src={displayImage}
                 alt={product.name}
-                className="w-full h-auto max-h-[45vh] object-cover"
+                className="w-full h-auto max-h-[45vh] object-contain"
               />
               </div>
             </div>
