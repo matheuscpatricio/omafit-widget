@@ -25,6 +25,7 @@ interface TryOnWidgetProps {
   collectionElasticity?: 'structured' | 'light_flex' | 'flexible' | 'high_elasticity';
   recommendedProductName?: string;
   recommendedProductUrl?: string;
+  language?: 'pt' | 'es' | 'en';
 }
 
 interface SizeChartEntry {
@@ -39,7 +40,7 @@ interface SizeChartEntry {
   length?: string;
 }
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl }: TryOnWidgetProps) {
+export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl, language }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -61,7 +62,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrl || 'não fornecido');
 
   // Detectar idioma
-  const [currentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage());
+  const [currentLanguage, setCurrentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage(language));
   const t = (key: WidgetTranslationKey): string => {
     const translation = widgetTranslations[currentLanguage][key] || widgetTranslations['en'][key] || key;
     // Substituir {storeName} pelo nome real da loja
@@ -340,6 +341,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
+    if (language && ['pt', 'es', 'en'].includes(language)) {
+      setCurrentLanguage(language);
+    }
+  }, [language]);
+
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Contexto da coleção (handle + gender + type + elasticity)
       if (event.data.type === 'omafit-context') {
@@ -422,6 +429,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         if (event.data.logo) {
           setLocalStoreLogo(event.data.logo);
         }
+      }
+
+      if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
+        const newLanguage = String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en';
+        setCurrentLanguage(newLanguage);
       }
 
       if (event.data.type === 'omafit-add-to-cart-result') {
@@ -1660,7 +1672,7 @@ const handleSubmit = async () => {
     if (!mediapipeLoading && !mediapipeError) {
       try {
         console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
-        setProcessingMessage('Analisando pose corporal...');
+        setProcessingMessage(t('analyzingPhoto'));
 
         // Permitir que a UI atualize antes de processar
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1677,7 +1689,7 @@ const handleSubmit = async () => {
         });
 
         console.log('✅ Imagem carregada, iniciando detecção de pose...');
-        setProcessingMessage('Detectando pontos corporais...');
+        setProcessingMessage(t('detectingBodyPoints'));
 
         // Permitir que a UI atualize novamente
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1709,7 +1721,7 @@ const handleSubmit = async () => {
             return;
           }
 
-          setProcessingMessage('Calculando medidas corporais...');
+          setProcessingMessage(t('calculatingMeasurements'));
           // Permitir que a UI atualize antes do cálculo pesado
           await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -1755,7 +1767,7 @@ const handleSubmit = async () => {
       console.error('   sizeData completo:', sizeData);
       console.error('   height:', sizeData?.height);
       console.error('   weight:', sizeData?.weight);
-      setError('Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios)');
+      setError(t('requiredBodyData'));
       setLoading(false);
       setStep('confirm');
       return;
@@ -2563,7 +2575,7 @@ const handleSubmit = async () => {
           {localStoreLogo && localStoreLogo.trim() !== '' && (
             <img
               src={localStoreLogo}
-              alt={localStoreName || 'Logo da loja'}
+              alt={localStoreName || t('storeLogoAlt')}
               className="h-12 w-auto object-contain"
               onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
               onError={(e) => {
@@ -2767,7 +2779,7 @@ const handleSubmit = async () => {
                   <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
                     {t('photoInstructions')}
                     <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
-                      IMPORTANTE
+                      {t('importantBadge')}
                     </span>
                   </h4>
                   <ul className="text-base text-blue-900 space-y-1.5 mb-3">
@@ -2779,7 +2791,7 @@ const handleSubmit = async () => {
                   </ul>
                   <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
                     <p className="text-sm text-blue-900 font-semibold">
-                      Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
+                      {t('photoInstructionWarning')}
                     </p>
                   </div>
                 </div>
@@ -2814,7 +2826,7 @@ const handleSubmit = async () => {
                   </h4>
                   {availableImages.length > 1 && (
                     <p className="text-base text-gray-600">
-                      (escolha uma imagem frontal do produto)
+                      {t('chooseImageNote')}
                     </p>
                   )}
                 </div>
@@ -2884,7 +2896,7 @@ const handleSubmit = async () => {
                     <h4 className="font-bold text-blue-900 mb-1.5 text-sm flex items-center gap-2">
                       {t('photoInstructions')}
                       <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
-                        IMPORTANTE
+                        {t('importantBadge')}
                       </span>
                     </h4>
                     <ul className="text-sm text-blue-900 space-y-0.5 mb-2">
@@ -2896,7 +2908,7 @@ const handleSubmit = async () => {
                     </ul>
                     <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
                       <p className="text-sm text-blue-900 font-semibold">
-                         Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!
+                         {t('photoInstructionWarning')}
                       </p>
                     </div>
                   </div>
@@ -2951,7 +2963,7 @@ const handleSubmit = async () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      Sem imagem
+                      {t('noImage')}
                     </div>
                   )}
                 </div>
@@ -2971,7 +2983,7 @@ const handleSubmit = async () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      Sem imagem
+                      {t('noImage')}
                     </div>
                   )}
                 </div>

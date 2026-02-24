@@ -22,6 +22,7 @@ export function WidgetPage() {
   const [collectionElasticity, setCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
+  const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>('en');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -43,6 +44,7 @@ export function WidgetPage() {
     const recommendedProductNameParam = params.get('recommendedProductName');
     const recommendedProductUrlParam = params.get('recommendedProductUrl');
     const complementaryProductParam = params.get('complementaryProductUrl');
+    const languageParam = params.get('language') || params.get('lang') || params.get('storeLanguage');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - shopName/shop_name:', shopNameParam);
@@ -152,6 +154,11 @@ export function WidgetPage() {
         console.log('✅ URL do produto recomendado definida (formato antigo):', decodedUrl);
         setRecommendedProductUrl(decodedUrl);
       }
+
+    if (languageParam && ['pt', 'es', 'en'].includes(languageParam.toLowerCase())) {
+      setStoreLanguage(languageParam.toLowerCase() as 'pt' | 'es' | 'en');
+      console.log('✅ Idioma da loja definido via URL:', languageParam.toLowerCase());
+    }
     }
 
     // Prioridade 1: parâmetro direto storeLogo
@@ -221,6 +228,10 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
+        if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
+          setStoreLanguage(String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en');
+          console.log('🌍 Idioma recebido via contexto:', String(event.data.language).toLowerCase());
+        }
         if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
           console.log('👕 Collection Type do contexto:', event.data.collectionType);
           setCollectionType(event.data.collectionType);
@@ -275,6 +286,10 @@ export function WidgetPage() {
         if (event.data.collectionElasticity && ['structured', 'light_flex', 'flexible', 'high_elasticity'].includes(event.data.collectionElasticity)) {
           console.log('🧵 Collection Elasticity do config:', event.data.collectionElasticity);
           setCollectionElasticity(event.data.collectionElasticity);
+        }
+        if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
+          setStoreLanguage(String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en');
+          console.log('🌍 Idioma recebido via config-update:', String(event.data.language).toLowerCase());
         }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
@@ -334,6 +349,7 @@ export function WidgetPage() {
           collectionElasticity={collectionElasticity}
           recommendedProductName={recommendedProductName}
           recommendedProductUrl={recommendedProductUrl}
+          language={storeLanguage}
         />
       </div>
     </div>

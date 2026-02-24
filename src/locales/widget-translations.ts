@@ -29,6 +29,12 @@ export const widgetTranslations = {
     neutralBackgroundDesc: 'preferencialmente liso',
     clickToUpload: 'Clique para enviar sua foto',
     imageFormats: 'JPG, PNG ou WEBP (máx. 5MB)',
+    importantBadge: 'IMPORTANTE',
+    photoInstructionWarning: 'Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados!',
+    noImage: 'Sem imagem',
+    storeLogoAlt: 'Logo da loja',
+    detectingBodyPoints: 'Detectando pontos corporais...',
+    calculatingMeasurements: 'Calculando medidas corporais...',
 
     // Step 3: Confirm
     confirmData: 'Confirmar dados',
@@ -67,6 +73,7 @@ export const widgetTranslations = {
     timeoutExceeded: 'Tempo limite excedido. Tente novamente.',
     sessionExpired: 'Sessão expirada. Por favor, tente novamente.',
     checkImageClear: 'Falha no processamento da imagem. Por favor, verifique se a imagem está clara e tente novamente.',
+    requiredBodyData: 'Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios).',
   },
   es: {
     // Loading
@@ -98,6 +105,12 @@ export const widgetTranslations = {
     neutralBackgroundDesc: 'preferiblemente liso',
     clickToUpload: 'Haz clic para subir tu foto',
     imageFormats: 'JPG, PNG o WEBP (máx. 5MB)',
+    importantBadge: 'IMPORTANTE',
+    photoInstructionWarning: '¡Las fotos que no sigan estas instrucciones pueden generar errores o resultados inadecuados!',
+    noImage: 'Sin imagen',
+    storeLogoAlt: 'Logo de la tienda',
+    detectingBodyPoints: 'Detectando puntos corporales...',
+    calculatingMeasurements: 'Calculando medidas corporales...',
 
     // Step 3: Confirm
     confirmData: 'Confirmar datos',
@@ -136,6 +149,7 @@ export const widgetTranslations = {
     timeoutExceeded: 'Tiempo límite excedido. Inténtalo de nuevo.',
     sessionExpired: 'Sesión expirada. Por favor, inténtalo de nuevo.',
     checkImageClear: 'Falla en el procesamiento de la imagen. Por favor, verifica que la imagen esté clara e inténtalo de nuevo.',
+    requiredBodyData: 'Por favor, completa todos los datos del formulario (altura y peso son obligatorios).',
   },
   en: {
     // Loading
@@ -167,6 +181,12 @@ export const widgetTranslations = {
     neutralBackgroundDesc: 'preferably plain',
     clickToUpload: 'Click to upload your photo',
     imageFormats: 'JPG, PNG or WEBP (max. 5MB)',
+    importantBadge: 'IMPORTANT',
+    photoInstructionWarning: 'Photos that do not follow these instructions may lead to errors or poor results.',
+    noImage: 'No image',
+    storeLogoAlt: 'Store logo',
+    detectingBodyPoints: 'Detecting body landmarks...',
+    calculatingMeasurements: 'Calculating body measurements...',
 
     // Step 3: Confirm
     confirmData: 'Confirm data',
@@ -205,13 +225,21 @@ export const widgetTranslations = {
     timeoutExceeded: 'Timeout exceeded. Try again.',
     sessionExpired: 'Session expired. Please try again.',
     checkImageClear: 'Image processing failed. Please check that the image is clear and try again.',
+    requiredBodyData: 'Please fill in all required form data (height and weight are mandatory).',
   },
 };
 
 export type WidgetTranslationKey = keyof typeof widgetTranslations.en;
 
 // Detect language from browser
-export function detectWidgetLanguage(): 'pt' | 'es' | 'en' {
+export function detectWidgetLanguage(preferredLanguage?: string): 'pt' | 'es' | 'en' {
+  if (preferredLanguage) {
+    const preferred = preferredLanguage.toLowerCase().split('-')[0];
+    if (preferred === 'pt' || preferred === 'es' || preferred === 'en') {
+      return preferred;
+    }
+  }
+
   const browserLang = navigator.language || 'en';
   const langCode = browserLang.toLowerCase().split('-')[0];
 

@@ -34,6 +34,26 @@
   }
 
   // Obter só imagens de produto, usando várias fontes de dados Shopify
+  function getStoreLanguage() {
+    try {
+      const fromShopify =
+        (window.Shopify && (window.Shopify.locale || window.Shopify.shopLocale)) ||
+        '';
+      const fromHtml = (document.documentElement && document.documentElement.lang) || '';
+      const fromNavigator = (navigator.language || navigator.userLanguage || '') || '';
+
+      const raw = String(fromShopify || fromHtml || fromNavigator || 'en').toLowerCase();
+      const normalized = raw.split('-')[0];
+      if (normalized === 'pt' || normalized === 'es' || normalized === 'en') {
+        return normalized;
+      }
+      return 'en';
+    } catch (_error) {
+      return 'en';
+    }
+  }
+
+  // Obter só imagens de produto, usando várias fontes de dados Shopify
   async function getOnlyProductImages() {
     // 1. window.meta.product
     if (window.meta && window.meta.product) {
@@ -1003,6 +1023,7 @@
     const defaultGender = (rootEl && rootEl.dataset && rootEl.dataset.defaultGender) ? rootEl.dataset.defaultGender : '';
     const collectionType = await fetchCollectionType(shopDomain, collectionHandle);
     const collectionElasticity = await fetchCollectionElasticity(shopDomain, collectionHandle);
+    const storeLanguage = getStoreLanguage();
     
     // Buscar produto complementar (usa coleção atual se houver; senão busca de qualquer coleção)
     const complementaryProduct = await getComplementaryProduct(collectionHandle);
@@ -1035,6 +1056,7 @@
       '&publicId=' + encodeURIComponent(publicIdToUse) +
       '&shopDomain=' + encodeURIComponent(shopDomain) +
       '&shop_domain=' + encodeURIComponent(shopDomain) +
+      '&language=' + encodeURIComponent(storeLanguage) +
       '&shopName=' + encodeURIComponent(resolvedStoreName) +
       '&shop_name=' + encodeURIComponent(resolvedStoreName) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
@@ -1127,6 +1149,7 @@
           defaultGender: typeof defaultGender === 'string' ? defaultGender : '',
           collectionType: typeof collectionType === 'string' ? collectionType : '',
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
+          language: storeLanguage,
           complementaryProduct: complementaryProduct || null,
           recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
           recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
@@ -1199,6 +1222,7 @@
               storeName: OMAFIT_CONFIG.storeName || '',
               storeLogo: OMAFIT_CONFIG.storeLogo, // Incluir logo na configuração também
               fontFamily: detectedFontFamily, // Enviar fonte detectada
+              language: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
               defaultGender: defaultGender || '',
@@ -1232,6 +1256,7 @@
               primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
               storeName: OMAFIT_CONFIG.storeName || '',
               fontFamily: detectedFontFamily,
+              language: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
               defaultGender: defaultGender || '',
@@ -1260,6 +1285,7 @@
             primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
             storeName: OMAFIT_CONFIG.storeName || '',
             fontFamily: detectedFontFamily,
+            language: storeLanguage,
             shopDomain: shopDomain,
             collectionHandle: collectionHandle || '',
             defaultGender: defaultGender || '',
