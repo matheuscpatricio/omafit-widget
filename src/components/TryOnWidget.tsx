@@ -1533,6 +1533,107 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   }
 };
 
+const validatePhotoForCollection = (
+  landmarks: Array<{ x: number; y: number; z: number; visibility?: number }>,
+  collectionTypeToValidate: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
+): { valid: boolean; message?: string } => {
+  const getPoint = (index: number) => landmarks[index];
+  const hasPoint = (index: number, minVisibility: number = 0.55) =>
+    !!getPoint(index) && (getPoint(index).visibility ?? 0) >= minVisibility;
+
+  const noPoseMessage = {
+    pt: 'Não conseguimos detectar seu corpo na foto. Envie outra imagem com melhor iluminação e enquadramento.',
+    es: 'No pudimos detectar tu cuerpo en la foto. Envía otra imagen con mejor iluminación y encuadre.',
+    en: 'We could not detect your body in the photo. Please upload another image with better lighting and framing.'
+  };
+
+  if (!landmarks || landmarks.length < 29) {
+    return { valid: false, message: noPoseMessage[currentLanguage] };
+  }
+
+  const nose = getPoint(0);
+  const leftShoulder = getPoint(11);
+  const rightShoulder = getPoint(12);
+  const leftHip = getPoint(23);
+  const rightHip = getPoint(24);
+  const leftKnee = getPoint(25);
+  const rightKnee = getPoint(26);
+  const leftAnkle = getPoint(27);
+  const rightAnkle = getPoint(28);
+
+  const avgShoulderY = ((leftShoulder?.y ?? 0) + (rightShoulder?.y ?? 0)) / 2;
+  const avgHipY = ((leftHip?.y ?? 0) + (rightHip?.y ?? 0)) / 2;
+  const avgKneeY = ((leftKnee?.y ?? 0) + (rightKnee?.y ?? 0)) / 2;
+  const avgAnkleY = ((leftAnkle?.y ?? 0) + (rightAnkle?.y ?? 0)) / 2;
+
+  const messagesByType = {
+    upper: {
+      pt: 'Para peças superiores, envie uma foto frontal com cabeça, ombros e tronco visíveis (até a cintura/quadril).',
+      es: 'Para prendas superiores, envía una foto frontal con cabeza, hombros y torso visibles (hasta cintura/cadera).',
+      en: 'For upper garments, upload a front-facing photo with head, shoulders, and torso visible (down to waist/hips).'
+    },
+    lower: {
+      pt: 'Para peças inferiores, envie uma foto frontal mostrando quadril, joelhos e pernas completas até os tornozelos/pés.',
+      es: 'Para prendas inferiores, envía una foto frontal mostrando cadera, rodillas y piernas completas hasta tobillos/pies.',
+      en: 'For lower garments, upload a front-facing photo showing hips, knees, and full legs down to ankles/feet.'
+    },
+    full: {
+      pt: 'Para peças de corpo inteiro, envie uma foto frontal de corpo inteiro (da cabeça aos pés).',
+      es: 'Para prendas de cuerpo completo, envía una foto frontal de cuerpo entero (de la cabeza a los pies).',
+      en: 'For full-body garments, upload a full front-facing body photo (head to feet).'
+    }
+  };
+
+  if (collectionTypeToValidate === 'upper') {
+    const requiredPointsVisible =
+      hasPoint(0, 0.45) &&
+      hasPoint(11) &&
+      hasPoint(12) &&
+      hasPoint(23, 0.45) &&
+      hasPoint(24, 0.45);
+
+    const torsoSpan = avgHipY - avgShoulderY;
+    const torsoLooksValid = torsoSpan > 0.12 && avgShoulderY < avgHipY;
+
+    if (!requiredPointsVisible || !torsoLooksValid) {
+      return { valid: false, message: messagesByType.upper[currentLanguage] };
+    }
+  } else if (collectionTypeToValidate === 'lower') {
+    const requiredPointsVisible =
+      hasPoint(23, 0.45) &&
+      hasPoint(24, 0.45) &&
+      hasPoint(25, 0.45) &&
+      hasPoint(26, 0.45) &&
+      hasPoint(27, 0.45) &&
+      hasPoint(28, 0.45);
+
+    const legSpan = avgAnkleY - avgHipY;
+    const legLooksValid = legSpan > 0.20 && avgHipY < avgKneeY && avgKneeY < avgAnkleY;
+
+    if (!requiredPointsVisible || !legLooksValid) {
+      return { valid: false, message: messagesByType.lower[currentLanguage] };
+    }
+  } else {
+    const requiredPointsVisible =
+      hasPoint(0, 0.45) &&
+      hasPoint(11) &&
+      hasPoint(12) &&
+      hasPoint(23, 0.45) &&
+      hasPoint(24, 0.45) &&
+      hasPoint(27, 0.45) &&
+      hasPoint(28, 0.45);
+
+    const fullSpan = avgAnkleY - (nose?.y ?? 0);
+    const fullBodyLooksValid = fullSpan > 0.45 && (nose?.y ?? 1) < avgShoulderY && avgShoulderY < avgHipY && avgHipY < avgAnkleY;
+
+    if (!requiredPointsVisible || !fullBodyLooksValid) {
+      return { valid: false, message: messagesByType.full[currentLanguage] };
+    }
+  }
+
+  return { valid: true };
+};
+
 const handleSubmit = async () => {
   if (!modelImage || !product) {
     setError(t('selectProductAndPhoto'));
@@ -1595,6 +1696,19 @@ const handleSubmit = async () => {
             visibility: lm.visibility || 0
           }));
 
+          const photoValidation = validatePhotoForCollection(
+            detectedLandmarks,
+            localCollectionType || 'upper'
+          );
+
+          if (!photoValidation.valid) {
+            console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
+            setError(photoValidation.message || t('processingError'));
+            setLoading(false);
+            setStep('confirm');
+            return;
+          }
+
           setProcessingMessage('Calculando medidas corporais...');
           // Permitir que a UI atualize antes do cálculo pesado
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -1614,6 +1728,15 @@ const handleSubmit = async () => {
           console.log('✅ Medidas calculadas pelo MediaPipe:', measurements);
         } else {
           console.warn('⚠️ MediaPipe não detectou poses na imagem');
+          const noPoseMessage = {
+            pt: 'Não conseguimos detectar seu corpo na foto. Envie outra imagem frontal com melhor iluminação.',
+            es: 'No pudimos detectar tu cuerpo en la foto. Envía otra imagen frontal con mejor iluminación.',
+            en: 'We could not detect your body in the photo. Please upload another front-facing image with better lighting.'
+          };
+          setError(noPoseMessage[currentLanguage]);
+          setLoading(false);
+          setStep('confirm');
+          return;
         }
       } catch (err) {
         console.error('❌ Erro ao detectar landmarks no frontend:', err);
