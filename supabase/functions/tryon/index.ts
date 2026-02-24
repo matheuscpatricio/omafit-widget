@@ -301,21 +301,42 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Sessão criada com sucesso. ID:', session.id);
 
-    // Salvar analytics da sessão
+    // Salvar analytics da sessão (com medidas para robustez de analytics).
+    // Fallback automático para schema antigo sem colunas enriquecidas.
     console.log('💾 Criando analytics da sessão...');
-    const { error: analyticsError } = await supabaseClient
+    const baseSessionAnalytics: Record<string, unknown> = {
+      tryon_session_id: session.id,
+      user_id: effectiveUserId,
+      duration_seconds: 0,
+      completed: false,
+      shared: false,
+      processing_time_seconds: 0,
+      images_processed: 1,
+    };
+
+    const enrichedSessionAnalytics: Record<string, unknown> = {
+      ...baseSessionAnalytics,
+      gender: user_measurements?.gender || null,
+      height: user_measurements?.height || null,
+      weight: user_measurements?.weight || null,
+      recommended_size: user_measurements?.recommended_size || null,
+      body_type_index: user_measurements?.body_type_index ?? null,
+      fit_preference_index: user_measurements?.fit_preference_index ?? null,
+      user_measurements: user_measurements || null,
+    };
+
+    let { error: analyticsError } = await supabaseClient
       .from('session_analytics')
-      .insert([
-        {
-          tryon_session_id: session.id,
-          user_id: effectiveUserId,
-          duration_seconds: 0,
-          completed: false,
-          shared: false,
-          processing_time_seconds: 0,
-          images_processed: 1,
-        }
-      ]);
+      .insert([enrichedSessionAnalytics]);
+
+    // Compatibilidade: se o schema não tiver algum campo enriquecido, salva ao menos o básico.
+    if (analyticsError) {
+      console.warn('⚠️ Insert enriquecido em session_analytics falhou. Tentando fallback básico...', analyticsError);
+      const fallbackResult = await supabaseClient
+        .from('session_analytics')
+        .insert([baseSessionAnalytics]);
+      analyticsError = fallbackResult.error;
+    }
 
     if (analyticsError) {
       console.error('⚠️ Erro ao criar analytics (não crítico):', analyticsError);
@@ -371,7 +392,7 @@ Deno.serve(async (req: Request) => {
       model_image: modelImageUrl.substring(0, 80) + '...',
       garment_image: garmentImageUrl.substring(0, 80) + '...',
       category: "auto",
-      mode: "quality"
+      mode: "performance"
     });
 
     // 🎯 PROCESSAMENTO PARALELO: FASHN + MediaPipe

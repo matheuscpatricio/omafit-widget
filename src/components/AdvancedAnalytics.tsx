@@ -174,11 +174,26 @@ export function AdvancedAnalytics() {
       const productsData = products || [];
       const customerData = customerAnalytics || [];
 
-      // Get user measurements (only for sessions that belong to this user)
+      // Get user measurements.
+      // Não depender apenas de session_analytics: usar também as sessões diretas.
+      const sessionIdsFromAnalytics = sessionAnalyticsData
+        .map(sa => sa.tryon_session_id)
+        .filter(Boolean);
+      const sessionIdsFromSessions = sessionsData
+        .map(s => s.id)
+        .filter(Boolean);
+      const measurementSessionIds = Array.from(new Set([
+        ...sessionIdsFromAnalytics,
+        ...sessionIdsFromSessions
+      ]));
+
       let measurementsQuery = supabase
         .from('user_measurements')
-        .select('*')
-        .in('tryon_session_id', sessionAnalyticsData.map(sa => sa.tryon_session_id));
+        .select('*');
+
+      if (measurementSessionIds.length > 0) {
+        measurementsQuery = measurementsQuery.in('tryon_session_id', measurementSessionIds);
+      }
 
       if (selectedGender !== 'all') {
         measurementsQuery = measurementsQuery.eq('gender', selectedGender);
