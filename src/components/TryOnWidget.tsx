@@ -2399,7 +2399,7 @@ const handleSubmit = async () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
         {step === 'info' && (
-          <div className="md:w-1/2 bg-gray-50 p-4 md:p-8 flex items-center justify-center">
+          <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
               <img
                 src={displayImage}
@@ -2422,6 +2422,14 @@ const handleSubmit = async () => {
         {/* Step 1: Info */}
         {step === 'info' && (
           <div className="space-y-4 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
+            <div className="md:hidden bg-gray-50 rounded-xl p-3">
+              <img
+                src={displayImage}
+                alt={product.name}
+                className="w-full h-auto max-h-[45vh] object-contain rounded-lg"
+              />
+            </div>
+
             <div className="text-center">
               <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
                 {t('visualExperience')}
