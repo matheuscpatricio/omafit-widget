@@ -323,12 +323,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
-    if (step === 'result' && result && sizeData && chatMessages.length === 0 && !gptLoading) {
+    if (step === 'result' && sizeData && chatMessages.length === 0 && !gptLoading) {
       setTimeout(() => {
         callGPTAssistant('add_to_cart');
       }, 1000);
     }
-  }, [step, result, sizeData]);
+  }, [step, sizeData]);
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -1760,6 +1760,16 @@ const handleSubmit = async () => {
       return;
     }
 
+    const provisionalSize =
+      recommendedSize ||
+      calculatedSize ||
+      (sizeChart.length > 0 ? calculateRecommendedSize(sizeData as any, sizeChart)?.size : null);
+
+    if (!recommendedSize && !calculatedSize && provisionalSize) {
+      setRecommendedSize(provisionalSize);
+      setCalculatedSize(provisionalSize);
+    }
+
     const payload = {
       shop_domain: shopDomain,
       model_image: modelImageDataUrl,
@@ -1773,7 +1783,7 @@ const handleSubmit = async () => {
         weight: sizeData.weight,
         body_type_index: sizeData.bodyTypeIndex || 0,
         fit_preference_index: sizeData.fitIndex || 0,
-        recommended_size: recommendedSize || calculatedSize
+        recommended_size: provisionalSize
       },
       // 🎯 NOVOS CAMPOS: Landmarks e medidas detectadas pelo MediaPipe no frontend
       pose_landmarks: detectedLandmarks,
@@ -1919,6 +1929,13 @@ const handleSubmit = async () => {
   }
 };
 
+  const openFinalStepWithoutImage = () => {
+    setError('');
+    setResult(null);
+    setStep('result');
+    setLoading(false);
+  };
+
   const startPolling = (predictionId: string) => {
     let pollCount = 0;
     const maxPolls = 60;
@@ -1928,9 +1945,7 @@ const handleSubmit = async () => {
 
       if (pollCount > maxPolls) {
         clearInterval(pollInterval);
-        setError(t('processingTimeout'));
-        setStep('confirm');
-        setLoading(false);
+        openFinalStepWithoutImage();
         return;
       }
 
@@ -1953,9 +1968,7 @@ const handleSubmit = async () => {
 
             if (errorData.status === 'error' || errorData.status === 'failed') {
               clearInterval(pollInterval);
-              setError(errorData.error || t('processingFailed'));
-              setStep('confirm');
-              setLoading(false);
+              openFinalStepWithoutImage();
               return;
             }
           } catch (e) {
@@ -1969,9 +1982,7 @@ const handleSubmit = async () => {
 
           if (statusResponse.status >= 500) {
             clearInterval(pollInterval);
-            setError(t('serverError'));
-            setStep('confirm');
-            setLoading(false);
+            openFinalStepWithoutImage();
             return;
           }
 
@@ -1998,15 +2009,10 @@ const handleSubmit = async () => {
           }
         } else if (statusData.status === 'failed' || statusData.status === 'error') {
           clearInterval(pollInterval);
-          const errorMsg = statusData.error || t('checkImageClear');
-          setError(errorMsg);
-          setStep('confirm');
-          setLoading(false);
+          openFinalStepWithoutImage();
         } else if (statusData.status === 'not_found') {
           clearInterval(pollInterval);
-          setError(t('sessionExpired'));
-          setStep('confirm');
-          setLoading(false);
+          openFinalStepWithoutImage();
         } else {
           const messages = [
             t('sendingImages'),
@@ -2020,9 +2026,7 @@ const handleSubmit = async () => {
       } catch (error) {
         console.error('❌ Polling error:', error);
         clearInterval(pollInterval);
-        setError(t('statusCheckError'));
-        setStep('confirm');
-        setLoading(false);
+        openFinalStepWithoutImage();
       }
     }, 3000); // Poll every 3 seconds
     
@@ -2030,9 +2034,7 @@ const handleSubmit = async () => {
     setTimeout(() => {
       clearInterval(pollInterval);
       if (loading) {
-        setError(t('timeoutExceeded'));
-        setStep('confirm');
-        setLoading(false);
+        openFinalStepWithoutImage();
       }
     }, 300000); // 5 minutes
   };
@@ -2345,7 +2347,7 @@ const handleSubmit = async () => {
       `}</style>
 
       {/* Full Screen - All steps now use full screen */}
-      {step === 'result' && result ? (
+      {step === 'result' ? (
         <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
@@ -2370,11 +2372,13 @@ const handleSubmit = async () => {
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <div className="flex justify-start">
               <div className="max-w-[65%] md:max-w-[30%]">
-                <img
-                  src={result}
-                  alt="Try-on result"
-                  className="w-full rounded-2xl shadow-md"
-                />
+                {result ? (
+                  <img
+                    src={result}
+                    alt="Try-on result"
+                    className="w-full rounded-2xl shadow-md"
+                  />
+                ) : null}
               </div>
             </div>
 

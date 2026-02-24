@@ -178,6 +178,30 @@ Deno.serve(async (req: Request) => {
           } else {
             console.log('✅ Database updated successfully');
 
+            // Backfill de recommended_size no user_measurements se ainda estiver nulo.
+            // Isso cobre cenários em que o frontend envia o tamanho após iniciar o polling.
+            try {
+              const { data: measurementRow } = await supabase
+                .from('user_measurements')
+                .select('id, recommended_size')
+                .eq('tryon_session_id', sessionInfo.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (measurementRow && !measurementRow.recommended_size) {
+                const fallbackSize = sessionInfo?.size_recommendation || null;
+                if (fallbackSize) {
+                  await supabase
+                    .from('user_measurements')
+                    .update({ recommended_size: fallbackSize })
+                    .eq('id', measurementRow.id);
+                }
+              }
+            } catch (measurementUpdateError) {
+              console.warn('⚠️ Could not backfill recommended_size:', measurementUpdateError);
+            }
+
             if (sessionInfo && sessionInfo.session_start_time && sessionInfo.processing_start_time) {
               const sessionStartTime = new Date(sessionInfo.session_start_time);
               const processingStartTime = new Date(sessionInfo.processing_start_time);
