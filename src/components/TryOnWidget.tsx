@@ -2401,11 +2401,13 @@ const handleSubmit = async () => {
         {step === 'info' && (
           <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
+              <div className="rounded-2xl overflow-hidden">
               <img
                 src={displayImage}
                 alt={product.name}
-                className="max-w-full max-h-full object-contain rounded-2xl"
+                className="max-w-full max-h-full object-cover"
               />
+              </div>
             </div>
           </div>
         )}
@@ -2423,11 +2425,13 @@ const handleSubmit = async () => {
         {step === 'info' && (
           <div className="space-y-4 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
             <div className="md:hidden bg-gray-50 rounded-xl p-3">
+              <div className="rounded-2xl overflow-hidden">
               <img
                 src={displayImage}
                 alt={product.name}
-                className="w-full h-auto max-h-[45vh] object-contain rounded-2xl"
+                className="w-full h-auto max-h-[45vh] object-cover"
               />
+              </div>
             </div>
 
             <div className="text-center">
