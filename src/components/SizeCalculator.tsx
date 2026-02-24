@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { User, Ruler, Weight } from 'lucide-react';
+import { widgetTranslations, type WidgetTranslationKey } from '../locales/widget-translations';
 
 interface SizeCalculatorProps {
   onComplete: (data: SizeCalculatorData) => void;
   onBack: () => void;
   primaryColor?: string;
   defaultGender?: 'male' | 'female' | 'unisex';
+  language?: 'pt' | 'es' | 'en';
 }
 
 export interface SizeCalculatorData {
@@ -19,28 +21,28 @@ export interface SizeCalculatorData {
 }
 
 const bodyTypesMale = [
-  { label: 'Balanceado', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg', description: 'Proporções uniformes' },
-  { label: 'Busto mais largo', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg', description: 'Busto desenvolvido' },
-  { label: 'Tronco largo', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg', description: 'Busto e cintura largos' },
-  { label: 'Busto muito largo', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg', description: 'Busto muito desenvolvido' },
-  { label: 'Cintura larga', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg', description: 'Cintura muito larga + corpo arredondado' }
+  { labelKey: 'bodyTypeLabelBalanced', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg', descriptionKey: 'bodyTypeDescBalanced' },
+  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg', descriptionKey: 'bodyTypeDescWiderChest' },
+  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg', descriptionKey: 'bodyTypeDescWideTorso' },
+  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg', descriptionKey: 'bodyTypeDescVeryWideChest' },
+  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg', descriptionKey: 'bodyTypeDescWideWaist' }
 ];
 
 const bodyTypesFemale = [
-  { label: 'Balanceada', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg', description: 'Proporções uniformes' },
-  { label: 'Busto mais largo', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg', description: 'Busto desenvolvido' },
-  { label: 'Tronco largo', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg', description: 'Busto e cintura largos' },
-  { label: 'Busto muito largo', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg', description: 'Busto muito desenvolvido' },
-  { label: 'Cintura larga', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg', description: 'Cintura muito larga + corpo arredondado' }
+  { labelKey: 'bodyTypeLabelBalanced', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg', descriptionKey: 'bodyTypeDescBalanced' },
+  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg', descriptionKey: 'bodyTypeDescWiderChest' },
+  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg', descriptionKey: 'bodyTypeDescWideTorso' },
+  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg', descriptionKey: 'bodyTypeDescVeryWideChest' },
+  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg', descriptionKey: 'bodyTypeDescWideWaist' }
 ];
 
 const fitOptions = [
-  { label: 'Justa', factor: 0.97 },
-  { label: 'Na medida', factor: 1.00 },
-  { label: 'Solta', factor: 1.03 }
+  { labelKey: 'fitTight', factor: 0.97 },
+  { labelKey: 'fitRegular', factor: 1.00 },
+  { labelKey: 'fitLoose', factor: 1.03 }
 ];
 
-export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female' }: SizeCalculatorProps) {
+export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female', language = 'en' }: SizeCalculatorProps) {
   // Usar defaultGender como valor inicial, convertendo 'unisex' para 'female'
   const initialGender = (defaultGender === 'unisex' ? 'female' : defaultGender) as 'male' | 'female';
   const [gender, setGender] = useState<'male' | 'female'>(initialGender);
@@ -50,11 +52,12 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
   const [fitIndex, setFitIndex] = useState<number>(1);
   const weightInputRef = useRef<HTMLInputElement>(null);
 
+  const t = (key: WidgetTranslationKey) => widgetTranslations[language][key] || widgetTranslations.en[key] || key;
   const bodyTypes = gender === 'male' ? bodyTypesMale : bodyTypesFemale;
 
   const handleSubmit = () => {
     if (!height || !weight || bodyTypeIndex === null) {
-      alert('Por favor, preencha todos os campos');
+      alert(t('fillAllFields'));
       return;
     }
 
@@ -62,12 +65,12 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
     const weightNum = parseFloat(weight);
 
     if (heightNum < 100 || heightNum > 250) {
-      alert('Por favor, insira uma altura válida (100-250 cm)');
+      alert(t('invalidHeight'));
       return;
     }
 
     if (weightNum < 30 || weightNum > 300) {
-      alert('Por favor, insira um peso válido (30-300 kg)');
+      alert(t('invalidWeight'));
       return;
     }
 
@@ -85,11 +88,11 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-6 py-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Calculadora de Tamanho</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">{t('sizeCalculatorTitle')}</h2>
 
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Gênero</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('genderLabel')}</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
@@ -103,7 +106,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Feminino
+                {t('female')}
               </button>
               <button
                 onClick={() => {
@@ -117,7 +120,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Masculino
+                {t('male')}
               </button>
             </div>
           </div>
@@ -125,7 +128,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <Ruler className="w-4 h-4" />
-              Altura (cm)
+              {t('heightLabel')}
             </label>
             <input
               type="number"
@@ -137,7 +140,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                   weightInputRef.current?.focus();
                 }
               }}
-              placeholder="Ex: 170"
+              placeholder={t('heightPlaceholder')}
               style={{ outline: 'none' }}
               onFocus={(e) => {
                 e.target.style.borderColor = primaryColor;
@@ -154,14 +157,14 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <Weight className="w-4 h-4" />
-              Peso (kg)
+              {t('weightLabel')}
             </label>
             <input
               ref={weightInputRef}
               type="number"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              placeholder="Ex: 70"
+              placeholder={t('weightPlaceholder')}
               style={{ outline: 'none' }}
               onFocus={(e) => {
                 e.target.style.borderColor = primaryColor;
@@ -178,7 +181,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <User className="w-4 h-4" />
-              Qual corpo se parece mais com o seu?
+              {t('bodyTypeQuestion')}
             </label>
             <div className="flex flex-col gap-2">
               {/* Mobile: Primeira linha com 3 imagens */}
@@ -196,7 +199,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                   >
                     <img
                       src={type.image}
-                      alt={type.label}
+                      alt={t(type.labelKey as WidgetTranslationKey)}
                       className="w-full h-full object-cover object-top"
                     />
                   </button>
@@ -220,7 +223,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                   >
                     <img
                       src={type.image}
-                      alt={type.label}
+                      alt={t(type.labelKey as WidgetTranslationKey)}
                       className="w-full h-full object-cover object-top"
                     />
                   </button>
@@ -241,7 +244,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                   >
                     <img
                       src={type.image}
-                      alt={type.label}
+                      alt={t(type.labelKey as WidgetTranslationKey)}
                       className="w-full h-full object-cover object-top"
                     />
                   </button>
@@ -252,7 +255,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">
-              Ajuste desejado da roupa
+              {t('fitPreferenceLabel')}
             </label>
             <div className="px-2">
               {/* Slider Container */}
@@ -293,7 +296,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                           fitIndex === index ? 'text-gray-900' : 'text-gray-500'
                         }`}
                       >
-                        {option.label}
+                        {t(option.labelKey as WidgetTranslationKey)}
                       </span>
                     </button>
                   ))}
@@ -309,7 +312,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
           onClick={onBack}
           className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
         >
-          Voltar
+          {t('back')}
         </button>
         <button
           onClick={handleSubmit}
@@ -317,7 +320,7 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
           style={!height || !weight || bodyTypeIndex === null ? {} : { backgroundColor: primaryColor }}
           className="flex-1 py-2 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
         >
-          Continuar
+          {t('continue')}
         </button>
       </div>
     </div>

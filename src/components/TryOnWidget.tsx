@@ -2695,6 +2695,7 @@ const handleSubmit = async () => {
             onBack={() => setStep('info')}
             primaryColor={primaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
+            language={currentLanguage}
           />
           </div>
         )}
