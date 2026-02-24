@@ -557,7 +557,18 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       return null;
     }
 
-    const { height, weight, bodyTypeIndex, fitIndex, gender, chest: realChest, waist: realWaist, hip: realHip, shoulder: realShoulder } = measurements;
+    const {
+      height,
+      weight,
+      bodyTypeIndex,
+      fitIndex,
+      gender,
+      chest: realChest,
+      waist: realWaist,
+      hip: realHip,
+      shoulder: realShoulder,
+      legLength: realLegLength
+    } = measurements;
 
     console.log('━━━━ 🔹 BLOCO 1: CAPTURA MEDIAPIPE (já executado) ━━━━');
     console.log('📊 Entrada de dados:');
@@ -678,38 +689,50 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     }
 
     // Verificar se temos medidas REAIS do MediaPipe
-    const hasRealMeasurements = realChest && realWaist && realHip;
+    const hasRealMeasurements = [realChest, realWaist, realHip].every((value) =>
+      typeof value === 'number' && Number.isFinite(value) && value > 0
+    );
 
-    let bodyChest, bodyWaist, bodyHip, bodyShoulder;
+    let bodyChest, bodyWaist, bodyHip, bodyShoulder, bodyLengthReference;
 
     if (hasRealMeasurements) {
-      console.log('\n✅ MODO: MediaPipe + Perfil');
+      console.log('\n✅ MODO: Medidas reais do MediaPipe');
       console.log('📸 Medidas brutas (MediaPipe):');
       console.log('   Peito:', realChest.toFixed(1), 'cm');
       console.log('   Cintura:', realWaist.toFixed(1), 'cm');
       console.log('   Quadril:', realHip.toFixed(1), 'cm');
+      console.log('   Ombro:', realShoulder ? realShoulder.toFixed(1) + ' cm' : 'não detectado');
 
-      // Aplicar correção LEVE por perfil corporal
-      const chestWithProfile = realChest * selectedBodyType.chestFactor;
-      const waistWithProfile = realWaist * selectedBodyType.waistFactor;
-      const hipWithProfile = realHip * selectedBodyType.hipFactor;
+      // As medidas do MediaPipe já passaram por validação/normalização.
+      // Evitar aplicar perfil+IMC novamente para não introduzir viés (double correction).
+      bodyChest = realChest;
+      bodyWaist = realWaist;
+      bodyHip = realHip;
+      bodyShoulder = (typeof realShoulder === 'number' && Number.isFinite(realShoulder) && realShoulder > 0)
+        ? realShoulder
+        : (height * 0.25);
 
-      console.log('\n🎭 Após perfil corporal:');
-      console.log('   Peito:', chestWithProfile.toFixed(1), 'cm', `(×${selectedBodyType.chestFactor})`);
-      console.log('   Cintura:', waistWithProfile.toFixed(1), 'cm', `(×${selectedBodyType.waistFactor})`);
-      console.log('   Quadril:', hipWithProfile.toFixed(1), 'cm', `(×${selectedBodyType.hipFactor})`);
+      const headLength = height * 0.13;
+      const fallbackLegLength = gender === 'female' ? height * 0.49 : height * 0.47;
+      const legLength = (typeof realLegLength === 'number' && Number.isFinite(realLegLength) && realLegLength > 0)
+        ? realLegLength
+        : fallbackLegLength;
+      const trunkWithoutHead = Math.max(height - legLength - headLength, height * 0.30);
 
-      // Aplicar ajuste LEVE de coerência por IMC
-      bodyChest = chestWithProfile * bmiAdjustment;
-      bodyWaist = waistWithProfile * bmiAdjustment;
-      bodyHip = hipWithProfile * bmiAdjustment;
-      bodyShoulder = (realShoulder || (height * 0.25)) * selectedBodyType.shoulderFactor;
+      if (localCollectionType === 'lower') {
+        bodyLengthReference = legLength;
+      } else if (localCollectionType === 'upper') {
+        bodyLengthReference = trunkWithoutHead;
+      } else {
+        bodyLengthReference = height - headLength;
+      }
 
       console.log('\n✅ MODELO CORPORAL FINAL (sem fit):');
       console.log('   Peito:', bodyChest.toFixed(1), 'cm');
       console.log('   Cintura:', bodyWaist.toFixed(1), 'cm');
       console.log('   Quadril:', bodyHip.toFixed(1), 'cm');
       console.log('   Ombro:', bodyShoulder.toFixed(1), 'cm');
+      console.log('   Comprimento referência:', bodyLengthReference.toFixed(1), 'cm', `(coleção: ${localCollectionType || 'upper'})`);
     } else {
       console.log('\n📏 MODO: Estimativa por altura');
 
@@ -718,12 +741,24 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       bodyWaist = height * baseWaistRatio * selectedBodyType.waistFactor * bmiAdjustment;
       bodyHip = height * baseHipRatio * selectedBodyType.hipFactor * bmiAdjustment;
       bodyShoulder = height * 0.25 * selectedBodyType.shoulderFactor;
+      const estimatedLegLength = gender === 'female' ? height * 0.49 : height * 0.47;
+      const estimatedHeadLength = height * 0.13;
+      const estimatedTrunkWithoutHead = Math.max(height - estimatedLegLength - estimatedHeadLength, height * 0.30);
+
+      if (localCollectionType === 'lower') {
+        bodyLengthReference = estimatedLegLength;
+      } else if (localCollectionType === 'upper') {
+        bodyLengthReference = estimatedTrunkWithoutHead;
+      } else {
+        bodyLengthReference = height - estimatedHeadLength;
+      }
 
       console.log('✅ MODELO CORPORAL FINAL (sem fit):');
       console.log('   Peito:', bodyChest.toFixed(1), 'cm');
       console.log('   Cintura:', bodyWaist.toFixed(1), 'cm');
       console.log('   Quadril:', bodyHip.toFixed(1), 'cm');
       console.log('   Ombro:', bodyShoulder.toFixed(1), 'cm');
+      console.log('   Comprimento referência:', bodyLengthReference.toFixed(1), 'cm', `(coleção: ${localCollectionType || 'upper'})`);
     }
 
     // Armazenar medidas do modelo corporal final para GPT
@@ -849,12 +884,20 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     // Array para armazenar todos os scores
     const sizeScores: Array<{ size: string; score: number; details: string[] }> = [];
 
+    const parseMeasurementValue = (value: unknown): number => {
+      if (value === null || value === undefined) return 0;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const normalized = String(value).trim().replace(',', '.').replace(/[^0-9.-]/g, '');
+      const parsed = Number.parseFloat(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
     chart.forEach((sizeData, index) => {
-      const chest = parseFloat(sizeData.peito || sizeData.chest || sizeData.busto || '0');
-      const waist = parseFloat(sizeData.cintura || sizeData.waist || '0');
-      const hip = parseFloat(sizeData.quadril || sizeData.hip || '0');
-      const shoulder = parseFloat(sizeData.ombro || sizeData.shoulder || '0');
-      const length = parseFloat(sizeData.comprimento || sizeData.length || '0');
+      const chest = parseMeasurementValue(sizeData.peito || sizeData.chest || sizeData.busto);
+      const waist = parseMeasurementValue(sizeData.cintura || sizeData.waist);
+      const hip = parseMeasurementValue(sizeData.quadril || sizeData.hip);
+      const shoulder = parseMeasurementValue(sizeData.ombro || sizeData.shoulder);
+      const length = parseMeasurementValue(sizeData.comprimento || sizeData.length);
 
       // Construir diferenças ponderadas com FIT aplicado
       const weightedDifferences: number[] = [];
@@ -936,12 +979,26 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
       }
 
-      if (length > 0 && hip === 0) {
-        const expectedLength = height * 0.40;
-        const weight = hasWeights ? (normalizedWeights['Comprimento'] || 1.0) : 1.0;
-        const diff = Math.pow(expectedLength - length, 2) * weight;
+      if (length > 0 && bodyLengthReference > 0) {
+        const weight = hasWeights
+          ? (normalizedWeights['Comprimento'] || normalizedWeights['Length'] || 0.9)
+          : 0.9;
+        const bodyMeasurement = bodyLengthReference * fitMultiplier;
+        const rawDiff = Math.abs(bodyMeasurement - length);
+        const tolerance = toleranceProfile.length || (baseTolerance + 1.5);
+        let normalizedError = rawDiff / tolerance;
+
+        // Em comprimento, penalidade assimétrica mais suave do que busto/cintura
+        const isGarmentTooShort = bodyMeasurement > length;
+        if (isGarmentTooShort) {
+          normalizedError *= Math.max(1.0, asymmetricPenalty - 0.25);
+        }
+
+        const diff = Math.pow(normalizedError, 2) * weight;
         weightedDifferences.push(diff);
-        measurementsUsed.push(`comprimento (esperado: ${expectedLength.toFixed(1)}, peça: ${length}, peso: ${weight.toFixed(3)})`);
+        const penaltyMultiplier = Math.max(1.0, asymmetricPenalty - 0.25);
+        const penaltyLabel = isGarmentTooShort ? ` [CURTO ×${penaltyMultiplier.toFixed(2)}]` : '';
+        measurementsUsed.push(`comprimento (${localCollectionType || 'upper'} corpo: ${bodyMeasurement.toFixed(1)}, peça: ${length}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
       }
 
       if (weightedDifferences.length === 0) {
@@ -1546,7 +1603,10 @@ const handleSubmit = async () => {
           const measurements = calculateBodyMeasurements(
             detectedLandmarks,
             imgElement.width,
-            imgElement.height
+            imgElement.height,
+            sizeData?.height,
+            sizeData?.weight,
+            sizeData?.gender
           );
 
           detectedMeasurements = measurements;

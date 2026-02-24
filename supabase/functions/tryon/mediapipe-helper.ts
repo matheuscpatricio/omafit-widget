@@ -416,10 +416,11 @@ export async function extractBodyMeasurements(
 async function detectPoseLandmarks(imageBase64: string): Promise<PoseLandmark[]> {
   console.log('🔍 Detectando landmarks da pose com MediaPipe REAL...');
 
-  console.warn('⚠️ ATENÇÃO: Esta função é um fallback. O ideal é que os landmarks sejam detectados no FRONTEND usando MediaPipe.');
-  console.warn('⚠️ Para melhor precisão, certifique-se de que o frontend está enviando os landmarks.');
-  console.log('⚠️ Usando landmarks SIMULADOS (fallback)');
-  return generateMockLandmarks();
+  // Não usar landmarks mockados em produção: isso gera falsa precisão.
+  // Retornar vazio força o fluxo seguro de fallback para dados do usuário.
+  console.warn('⚠️ Fallback backend sem detector real disponível. Nenhum landmark será retornado.');
+  console.warn('⚠️ Para máxima precisão, envie pose_landmarks e detected_measurements do frontend.');
+  return [];
 }
 
 // Função auxiliar: converter formato Roboflow para MediaPipe

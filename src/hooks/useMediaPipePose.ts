@@ -19,6 +19,7 @@ export interface BodyMeasurements {
 }
 
 export function useMediaPipePose() {
+  const MIN_LANDMARK_VISIBILITY = 0.55;
   const workerRef = useRef<Worker | null>(null);
   const mainThreadPoseLandmarkerRef = useRef<PoseLandmarker | null>(null);
   const mainThreadInitPromiseRef = useRef<Promise<void> | null>(null);
@@ -108,7 +109,10 @@ export function useMediaPipePose() {
           delegate: 'CPU'
         },
         runningMode: 'IMAGE',
-        numPoses: 1
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.7,
+        minPosePresenceConfidence: 0.7,
+        minTrackingConfidence: 0.7
       });
       console.log('✅ [MainThreadFallback] MediaPipe pronto no main thread');
     })();
@@ -121,6 +125,22 @@ export function useMediaPipePose() {
       mainThreadInitPromiseRef.current = null;
       setIsLoading(false);
     }
+  }, []);
+
+  const hasGoodLandmarkVisibility = useCallback((landmarks: PoseLandmark[] | undefined): boolean => {
+    if (!landmarks || landmarks.length === 0) return false;
+
+    const keyPoints = [
+      landmarks[11], landmarks[12], // shoulders
+      landmarks[23], landmarks[24], // hips
+      landmarks[25], landmarks[26], // knees
+      landmarks[27], landmarks[28], // ankles
+    ].filter(Boolean);
+
+    if (keyPoints.length === 0) return false;
+
+    const avgVisibility = keyPoints.reduce((sum, point) => sum + (point.visibility ?? 0), 0) / keyPoints.length;
+    return avgVisibility >= MIN_LANDMARK_VISIBILITY;
   }, []);
 
   const initializePoseLandmarker = useCallback(async () => {
@@ -187,6 +207,10 @@ export function useMediaPipePose() {
         const result = mainThreadPoseLandmarkerRef.current?.detect(imageElement) || null;
         if (!result?.landmarks?.length) {
           console.warn('⚠️ [MainThreadFallback] Nenhuma pose detectada na imagem');
+          return null;
+        }
+        if (!hasGoodLandmarkVisibility(result.landmarks[0] as unknown as PoseLandmark[])) {
+          console.warn('⚠️ [MainThreadFallback] Pose detectada com baixa visibilidade. Ignorando para evitar medida imprecisa.');
           return null;
         }
         return result;
@@ -259,6 +283,11 @@ export function useMediaPipePose() {
             workerRef.current?.removeEventListener('message', handler);
             console.log('✅ Pose detectada com sucesso no Worker');
             console.log('   - Landmarks:', landmarks?.length || 0);
+              if (!hasGoodLandmarkVisibility(landmarks as PoseLandmark[])) {
+                console.warn('⚠️ Landmarks com baixa visibilidade. Resultado descartado para preservar precisão.');
+                reject(new Error('Low landmark visibility'));
+                return;
+              }
             resolve({ landmarks: [landmarks] } as PoseLandmarkerResult);
           } else if (type === 'error') {
             clearTimeout(timeout);

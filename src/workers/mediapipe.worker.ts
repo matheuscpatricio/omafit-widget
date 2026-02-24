@@ -57,7 +57,10 @@ async function initializeMediaPipe() {
         delegate: 'CPU'
       },
       runningMode: 'IMAGE',
-      numPoses: 1
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.7,
+      minPosePresenceConfidence: 0.7,
+      minTrackingConfidence: 0.7
     });
     console.log('[Worker] PoseLandmarker criado com sucesso');
 
