@@ -426,6 +426,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
       if (event.data.type === 'omafit-add-to-cart-result') {
         setIsAddingToCart(false);
+        const responsePayload = event.data?.payload && typeof event.data.payload === 'object'
+          ? event.data.payload
+          : event.data;
 
         const successMessages = {
           pt: 'Produto adicionado ao carrinho!',
@@ -439,12 +442,15 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           en: 'Could not add product to cart.'
         };
 
-        if (event.data.success) {
-          setAddToCartFeedback(event.data.message || successMessages[currentLanguage]);
+        const isSuccess = responsePayload?.success === true || responsePayload?.ok === true;
+        const responseMessage = responsePayload?.message;
+
+        if (isSuccess) {
+          setAddToCartFeedback(responseMessage || successMessages[currentLanguage]);
           return;
         }
 
-        setAddToCartFeedback(event.data.message || errorMessages[currentLanguage]);
+        setAddToCartFeedback(responseMessage || errorMessages[currentLanguage]);
       }
     };
 
