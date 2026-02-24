@@ -102,6 +102,8 @@ export const widgetTranslations = {
     sessionExpired: 'Sessão expirada. Por favor, tente novamente.',
     checkImageClear: 'Falha no processamento da imagem. Por favor, verifique se a imagem está clara e tente novamente.',
     requiredBodyData: 'Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios).',
+    addToCartSuccess: 'Produto adicionado ao carrinho!',
+    addToCartError: 'Não foi possível adicionar ao carrinho.',
   },
   es: {
     // Loading
@@ -206,6 +208,8 @@ export const widgetTranslations = {
     sessionExpired: 'Sesión expirada. Por favor, inténtalo de nuevo.',
     checkImageClear: 'Falla en el procesamiento de la imagen. Por favor, verifica que la imagen esté clara e inténtalo de nuevo.',
     requiredBodyData: 'Por favor, completa todos los datos del formulario (altura y peso son obligatorios).',
+    addToCartSuccess: 'Producto agregado al carrito!',
+    addToCartError: 'No se pudo agregar al carrito.',
   },
   en: {
     // Loading
@@ -310,6 +314,8 @@ export const widgetTranslations = {
     sessionExpired: 'Session expired. Please try again.',
     checkImageClear: 'Image processing failed. Please check that the image is clear and try again.',
     requiredBodyData: 'Please fill in all required form data (height and weight are mandatory).',
+    addToCartSuccess: 'Product added to cart!',
+    addToCartError: 'Could not add product to cart.',
   },
 };
 

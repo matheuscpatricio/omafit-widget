@@ -442,27 +442,14 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           ? event.data.payload
           : event.data;
 
-        const successMessages = {
-          pt: 'Produto adicionado ao carrinho!',
-          es: 'Producto agregado al carrito!',
-          en: 'Product added to cart!'
-        };
-
-        const errorMessages = {
-          pt: 'Não foi possível adicionar ao carrinho.',
-          es: 'No se pudo agregar al carrito.',
-          en: 'Could not add product to cart.'
-        };
-
         const isSuccess = responsePayload?.success === true || responsePayload?.ok === true;
-        const responseMessage = responsePayload?.message;
 
         if (isSuccess) {
-          setAddToCartFeedback(responseMessage || successMessages[currentLanguage]);
+          setAddToCartFeedback(t('addToCartSuccess'));
           return;
         }
 
-        setAddToCartFeedback(responseMessage || errorMessages[currentLanguage]);
+        setAddToCartFeedback(t('addToCartError'));
       }
     };
 
