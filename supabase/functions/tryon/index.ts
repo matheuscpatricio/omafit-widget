@@ -173,7 +173,7 @@ Deno.serve(async (req: Request) => {
         .replace(/\/.*$/, '');
     };
 
-    const resolvedShopDomain =
+    let resolvedShopDomain =
       normalizeShopDomain(shop_domain) ||
       normalizeShopDomain(widgetKeyData.shop_domain);
 
@@ -281,6 +281,35 @@ Deno.serve(async (req: Request) => {
 
       subscription = regularSubscription;
       console.log('✅ Regular subscription validated');
+    }
+
+    if (!resolvedShopDomain && effectiveUserId) {
+      try {
+        const { data: shopDomainByUser } = await supabaseClient
+          .from('shopify_shops')
+          .select('shop_domain')
+          .eq('user_id', effectiveUserId)
+          .not('shop_domain', 'is', null)
+          .limit(1)
+          .maybeSingle();
+
+        resolvedShopDomain = normalizeShopDomain(shopDomainByUser?.shop_domain);
+      } catch (_err) {
+        // non-blocking
+      }
+    }
+
+    if (!resolvedShopDomain && effectiveUserId) {
+      try {
+        const { data: shopifyStore } = await supabaseClient
+          .from('shopify_stores')
+          .select('store_url')
+          .eq('user_id', effectiveUserId)
+          .maybeSingle();
+        resolvedShopDomain = normalizeShopDomain(shopifyStore?.store_url);
+      } catch (_err) {
+        // non-blocking
+      }
     }
 
     const sessionStartTime = new Date().toISOString();
@@ -397,6 +426,32 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log('⚠️ Nenhuma medida de usuário foi fornecida');
+    }
+
+    try {
+      await supabaseClient.rpc('upsert_session_analytics_from_tryon_payload', {
+        payload: {
+          id: session.id,
+          user_id: effectiveUserId,
+          public_id: public_id,
+          shop_domain: resolvedShopDomain || null,
+          product_id: product_id,
+          product_name: product_name,
+          collection_handle: collection_handle || null,
+          recommended_size: resolvedRecommendedSize,
+          user_measurements: user_measurements
+            ? {
+                ...user_measurements,
+                recommended_size: resolvedRecommendedSize,
+                shop_domain: resolvedShopDomain || null
+              }
+            : null,
+          created_at: sessionStartTime
+        }
+      });
+      console.log('✅ upsert_session_analytics_from_tryon_payload executado');
+    } catch (analyticsUpsertError) {
+      console.warn('⚠️ Falha no upsert_session_analytics_from_tryon_payload:', analyticsUpsertError);
     }
 
     const falInput = {
