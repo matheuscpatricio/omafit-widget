@@ -34,8 +34,13 @@
   }
 
   // Obter só imagens de produto, usando várias fontes de dados Shopify
-  function getStoreLanguage() {
+  function getStoreLanguage(preferredLanguage) {
     try {
+      const preferred = String(preferredLanguage || '').toLowerCase().split('-')[0];
+      if (preferred === 'pt' || preferred === 'es' || preferred === 'en') {
+        return preferred;
+      }
+
       const fromShopify =
         (window.Shopify && (window.Shopify.locale || window.Shopify.shopLocale)) ||
         '';
@@ -369,6 +374,7 @@
           linkText: 'Experimentar virtualmente',
           storeName: '',
           storeLogo: '',
+          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -393,7 +399,7 @@
         'Content-Type': 'application/json'
       };
       let configResponse = await fetch(
-        `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,created_at,updated_at`,
+        `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,created_at,updated_at`,
         { headers: configHeaders }
       );
       if (!configResponse.ok) {
@@ -405,7 +411,7 @@
         if (missingExcludedColumn) {
           console.warn('⚠️ Coluna excluded_collections não encontrada no banco. Repetindo busca sem essa coluna.');
           configResponse = await fetch(
-            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,created_at,updated_at`,
+            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,admin_locale,created_at,updated_at`,
             { headers: configHeaders }
           );
         } else {
@@ -601,6 +607,7 @@
         linkText: config?.link_text || 'Experimentar virtualmente',
         storeName: config?.store_name || '',
         storeLogo: config?.store_logo || '',
+        adminLocale: config?.admin_locale || 'en',
         fontFamily: 'inherit', // Usar fonte da loja automaticamente
         colors: {
           primary: config?.primary_color || '#810707',
@@ -630,6 +637,7 @@
         linkText: 'Experimentar virtualmente',
         storeName: '',
         storeLogo: '',
+        adminLocale: 'en',
         fontFamily: 'inherit', // Usar fonte da loja automaticamente
         colors: {
           primary: '#810707',
@@ -908,6 +916,7 @@
             linkText: 'Experimentar virtualmente',
             storeName: '',
             storeLogo: '',
+            adminLocale: 'en',
             fontFamily: 'inherit',
             colors: {
               primary: '#810707',
@@ -926,6 +935,7 @@
           linkText: 'Experimentar virtualmente',
           storeName: '',
           storeLogo: '',
+          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -1023,7 +1033,7 @@
     const defaultGender = (rootEl && rootEl.dataset && rootEl.dataset.defaultGender) ? rootEl.dataset.defaultGender : '';
     const collectionType = await fetchCollectionType(shopDomain, collectionHandle);
     const collectionElasticity = await fetchCollectionElasticity(shopDomain, collectionHandle);
-    const storeLanguage = getStoreLanguage();
+    const storeLanguage = getStoreLanguage(OMAFIT_CONFIG.adminLocale);
     
     // Buscar produto complementar (usa coleção atual se houver; senão busca de qualquer coleção)
     const complementaryProduct = await getComplementaryProduct(collectionHandle);
@@ -1468,6 +1478,7 @@
       OMAFIT_CONFIG = {
         linkText: 'Experimentar virtualmente',
         colors: { primary: '#810707', text: '#810707' },
+        adminLocale: 'en',
         fontFamily: 'inherit',
         shopDomain: ''
       };
@@ -1656,6 +1667,7 @@
           linkText: 'Experimentar virtualmente',
           storeName: '',
           storeLogo: '',
+          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -1696,6 +1708,7 @@
             publicId: 'wgt_pub_default',
             linkText: 'Experimentar virtualmente',
             colors: { primary: '#810707', text: '#810707' },
+            adminLocale: 'en',
             fontFamily: 'inherit',
             shopDomain: '',
             widgetEnabled: true,

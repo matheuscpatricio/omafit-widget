@@ -367,7 +367,11 @@ Deno.serve(async (req: Request) => {
 
     const enrichedSessionAnalytics: Record<string, unknown> = {
       ...baseSessionAnalytics,
+      public_id: public_id || null,
       shop_domain: resolvedShopDomain || null,
+      product_id: product_id || null,
+      product_name: product_name || null,
+      collection_handle: collection_handle || null,
       gender: user_measurements?.gender || null,
       height: user_measurements?.height || null,
       weight: user_measurements?.weight || null,
@@ -379,14 +383,30 @@ Deno.serve(async (req: Request) => {
 
     let { error: analyticsError } = await supabaseClient
       .from('session_analytics')
-      .insert([enrichedSessionAnalytics]);
+      .upsert([enrichedSessionAnalytics], { onConflict: 'tryon_session_id' });
 
-    // Compatibilidade: se o schema não tiver algum campo enriquecido, salva ao menos o básico.
     if (analyticsError) {
-      console.warn('⚠️ Insert enriquecido em session_analytics falhou. Tentando fallback básico...', analyticsError);
+      console.warn('⚠️ Upsert enriquecido em session_analytics falhou. Tentando update por sessão...', analyticsError);
+      const updateResult = await supabaseClient
+        .from('session_analytics')
+        .update(enrichedSessionAnalytics)
+        .select('id')
+        .eq('tryon_session_id', session.id);
+      if (updateResult.error) {
+        analyticsError = updateResult.error;
+      } else if (!updateResult.data || updateResult.data.length === 0) {
+        analyticsError = new Error('Nenhuma linha atualizada em session_analytics');
+      } else {
+        analyticsError = null;
+      }
+    }
+
+    // Compatibilidade final: se schema antigo impedir update enriquecido, salva ao menos o básico.
+    if (analyticsError) {
+      console.warn('⚠️ Update enriquecido falhou. Tentando fallback básico...', analyticsError);
       const fallbackResult = await supabaseClient
         .from('session_analytics')
-        .insert([baseSessionAnalytics]);
+        .upsert([baseSessionAnalytics], { onConflict: 'tryon_session_id' });
       analyticsError = fallbackResult.error;
     }
 
