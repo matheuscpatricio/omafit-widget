@@ -163,6 +163,27 @@ Deno.serve(async (req: Request) => {
     const isShopifyWidget = !widgetKeyData.user_id && widgetKeyData.shop_domain;
     console.log('🏪 Widget type:', isShopifyWidget ? 'Shopify' : 'Regular', '| user_id:', widgetKeyData.user_id, '| shop_domain:', widgetKeyData.shop_domain);
 
+    const normalizeShopDomain = (value: string | null | undefined): string => {
+      if (!value) return '';
+      return value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '');
+    };
+
+    const resolvedShopDomain =
+      normalizeShopDomain(shop_domain) ||
+      normalizeShopDomain(widgetKeyData.shop_domain);
+
+    const resolvedRecommendedSize =
+      user_measurements?.recommended_size ||
+      user_measurements?.recommendedSize ||
+      user_measurements?.size_recommendation ||
+      user_measurements?.sizeRecommendation ||
+      null;
+
     const { data: globalApiConfig } = await supabaseClient
       .from('api_config')
       .select('key_value')
@@ -284,6 +305,7 @@ Deno.serve(async (req: Request) => {
     console.log('💾 Criando sessão no banco com dados:', {
       product_id: sessionData.product_id,
       user_id: sessionData.user_id,
+      shop_domain: resolvedShopDomain || 'não definido',
       shop_name: sessionData.shop_name || 'não definido',
       has_user_measurements: !!user_measurements
     });
@@ -316,10 +338,11 @@ Deno.serve(async (req: Request) => {
 
     const enrichedSessionAnalytics: Record<string, unknown> = {
       ...baseSessionAnalytics,
+      shop_domain: resolvedShopDomain || null,
       gender: user_measurements?.gender || null,
       height: user_measurements?.height || null,
       weight: user_measurements?.weight || null,
-      recommended_size: user_measurements?.recommended_size || null,
+      recommended_size: resolvedRecommendedSize,
       body_type_index: user_measurements?.body_type_index ?? null,
       fit_preference_index: user_measurements?.fit_preference_index ?? null,
       user_measurements: user_measurements || null,
@@ -350,7 +373,7 @@ Deno.serve(async (req: Request) => {
         gender: user_measurements.gender,
         height: user_measurements.height,
         weight: user_measurements.weight,
-        recommended_size: user_measurements.recommended_size
+        recommended_size: resolvedRecommendedSize
       });
 
       const { error: measurementsError } = await supabaseClient
@@ -363,7 +386,7 @@ Deno.serve(async (req: Request) => {
             weight: user_measurements.weight,
             body_type_index: user_measurements.body_type_index,
             fit_preference_index: user_measurements.fit_preference_index,
-            recommended_size: user_measurements.recommended_size
+            recommended_size: resolvedRecommendedSize
           }
         ]);
 

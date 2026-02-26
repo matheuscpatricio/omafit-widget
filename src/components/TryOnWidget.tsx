@@ -148,6 +148,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
+  const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
+  const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
@@ -321,6 +323,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     setLocalStoreName(resolved);
   }, [storeName, shopDomain]);
 
+  useEffect(() => {
+    if (shopDomain && shopDomain.trim()) {
+      setLocalShopDomain(shopDomain.trim());
+    }
+  }, [shopDomain]);
+
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
     if (step === 'result' && sizeData && chatMessages.length === 0 && !gptLoading) {
@@ -352,6 +360,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       if (event.data.type === 'omafit-context') {
         console.log('📥 Recebido omafit-context:', event.data);
 
+        const incomingShopDomain = (event.data.shopDomain || event.data.shop_domain || '').trim();
+        if (incomingShopDomain) {
+          setLocalShopDomain(incomingShopDomain);
+        }
+
         if (event.data.collectionType) {
           console.log('✅ Atualizando collectionType:', event.data.collectionType);
           setLocalCollectionType(event.data.collectionType);
@@ -379,6 +392,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       // Configuração completa (também pode incluir type + elasticity)
       if (event.data.type === 'omafit-config-update') {
         console.log('📥 Recebido omafit-config-update:', event.data);
+
+        const incomingShopDomain = (event.data.shopDomain || event.data.shop_domain || '').trim();
+        if (incomingShopDomain) {
+          setLocalShopDomain(incomingShopDomain);
+        }
 
         if (event.data.collectionType) {
           console.log('✅ Atualizando collectionType:', event.data.collectionType);
@@ -463,7 +481,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   // Buscar configurações do widget ao carregar
   useEffect(() => {
     const fetchWidgetConfig = async () => {
-      if (!shopDomain) {
+      if (!effectiveShopDomain) {
         console.log('⚠️ Não há shopDomain para buscar configurações');
         return;
       }
@@ -472,7 +490,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         const { data: configs, error } = await supabase
           .from('widget_configurations')
           .select('link_text, store_logo, primary_color, title, subtitle')
-          .eq('shop_domain', shopDomain)
+          .eq('shop_domain', effectiveShopDomain)
           .limit(1);
 
         if (error) {
@@ -499,7 +517,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     fetchWidgetConfig();
-  }, [shopDomain]);
+  }, [effectiveShopDomain]);
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
@@ -1233,7 +1251,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         return;
       }
 
-      if (!shopDomain) {
+      if (!effectiveShopDomain) {
         console.log('❌ BLOQUEADO: Não há shopDomain');
         return;
       }
@@ -1241,7 +1259,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       console.log('📊 Parâmetros de busca no TryOnWidget:');
       console.log('   - Gender escolhido pelo usuário (sizeData):', sizeData.gender);
       console.log('   - Default Gender (props, não usado na busca):', defaultGender);
-      console.log('   - Shop Domain:', shopDomain);
+      console.log('   - Shop Domain:', effectiveShopDomain);
       console.log('   - Collection ID (UUID interno):', collectionId || 'null');
       console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
       console.log('   - Product ID:', productId);
@@ -1261,12 +1279,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         if (collectionHandle && collectionHandle.trim() !== '') {
           console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
           console.log('   SELECT * FROM size_charts');
-          console.log('   WHERE shop_domain =', shopDomain);
+          console.log('   WHERE shop_domain =', effectiveShopDomain);
           console.log('   AND collection_handle =', collectionHandle);
           console.log('   AND gender =', searchGender);
 
           sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', shopDomain)
+            .eq('shop_domain', effectiveShopDomain)
             .eq('collection_handle', collectionHandle)
             .eq('gender', searchGender);
         }
@@ -1285,13 +1303,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         else {
           console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
           console.log('   SELECT * FROM size_charts');
-          console.log('   WHERE shop_domain =', shopDomain);
+          console.log('   WHERE shop_domain =', effectiveShopDomain);
           console.log('   AND collection_handle IS NULL');
           console.log('   AND collection_id IS NULL');
           console.log('   AND gender =', searchGender);
 
           sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', shopDomain)
+            .eq('shop_domain', effectiveShopDomain)
             .is('collection_handle', null)
             .is('collection_id', null)
             .eq('gender', searchGender);
@@ -1405,12 +1423,12 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           // Prioridade 1: collection_handle (vindo do Shopify)
           if (collectionHandle && collectionHandle.trim() !== '') {
             console.log('   SELECT * FROM size_charts');
-            console.log('   WHERE shop_domain =', shopDomain);
+            console.log('   WHERE shop_domain =', effectiveShopDomain);
             console.log('   AND collection_handle =', collectionHandle);
             console.log('   AND gender = unisex');
 
             fallbackQuery = fallbackQuery
-              .eq('shop_domain', shopDomain)
+              .eq('shop_domain', effectiveShopDomain)
               .eq('collection_handle', collectionHandle)
               .eq('gender', 'unisex');
           }
@@ -1427,13 +1445,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           // Prioridade 3: Tabela global
           else {
             console.log('   SELECT * FROM size_charts');
-            console.log('   WHERE shop_domain =', shopDomain);
+            console.log('   WHERE shop_domain =', effectiveShopDomain);
             console.log('   AND collection_handle IS NULL');
             console.log('   AND collection_id IS NULL');
             console.log('   AND gender = unisex');
 
             fallbackQuery = fallbackQuery
-              .eq('shop_domain', shopDomain)
+              .eq('shop_domain', effectiveShopDomain)
               .is('collection_handle', null)
               .is('collection_id', null)
               .eq('gender', 'unisex');
@@ -1485,7 +1503,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           console.log('⏳ Aguardando foto do usuário para calcular tamanho com MediaPipe...');
         } else {
           console.log('❌ PROBLEMA: Nenhum chart encontrado!');
-          console.log('   - Shop Domain:', shopDomain);
+          console.log('   - Shop Domain:', effectiveShopDomain);
           console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
           console.log('   - Collection ID (UUID):', collectionId || 'null');
           console.log('   - Gender:', searchGender);
@@ -1500,7 +1518,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, shopDomain, collectionId, collectionHandle]);
+  }, [sizeData?.gender, effectiveShopDomain, collectionId, collectionHandle]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -1763,7 +1781,7 @@ const handleSubmit = async () => {
     const provisionalSize =
       recommendedSize ||
       calculatedSize ||
-      (sizeChart.length > 0 ? calculateRecommendedSize(sizeData as any, sizeChart)?.size : null);
+      (sizeChart.length > 0 ? calculateRecommendedSize(sizeData as any, sizeChart)?.size : 'M');
 
     if (!recommendedSize && !calculatedSize && provisionalSize) {
       setRecommendedSize(provisionalSize);
@@ -1771,7 +1789,7 @@ const handleSubmit = async () => {
     }
 
     const payload = {
-      shop_domain: shopDomain,
+      shop_domain: effectiveShopDomain,
       model_image: modelImageDataUrl,
       garment_image: selectedProductImage || product.garment_image,
       product_name: product.name,
@@ -2218,7 +2236,7 @@ const handleSubmit = async () => {
         recommended_size: recommendedSize || calculatedSize || null
       },
       quantity: 1,
-      shop_domain: shopDomain,
+      shop_domain: effectiveShopDomain,
       metadata: {
         session_id: sessionId,
         language: currentLanguage

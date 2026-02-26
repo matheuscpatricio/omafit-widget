@@ -181,21 +181,28 @@ Deno.serve(async (req: Request) => {
             // Backfill de recommended_size no user_measurements se ainda estiver nulo.
             // Isso cobre cenários em que o frontend envia o tamanho após iniciar o polling.
             try {
-              const { data: measurementRow } = await supabase
-                .from('user_measurements')
-                .select('id, recommended_size')
-                .eq('tryon_session_id', sessionInfo.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+              if (sessionInfo?.id) {
+                const { data: measurementRow } = await supabase
+                  .from('user_measurements')
+                  .select('id, recommended_size')
+                  .eq('tryon_session_id', sessionInfo.id)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
 
-              if (measurementRow && !measurementRow.recommended_size) {
-                const fallbackSize = sessionInfo?.size_recommendation || null;
-                if (fallbackSize) {
-                  await supabase
-                    .from('user_measurements')
-                    .update({ recommended_size: fallbackSize })
-                    .eq('id', measurementRow.id);
+                if (measurementRow && !measurementRow.recommended_size) {
+                  const { data: sessionAnalyticsRow } = await supabase
+                    .from('session_analytics')
+                    .select('recommended_size')
+                    .eq('tryon_session_id', sessionInfo.id)
+                    .maybeSingle();
+                  const fallbackSize = sessionAnalyticsRow?.recommended_size || null;
+                  if (fallbackSize) {
+                    await supabase
+                      .from('user_measurements')
+                      .update({ recommended_size: fallbackSize })
+                      .eq('id', measurementRow.id);
+                  }
                 }
               }
             } catch (measurementUpdateError) {
