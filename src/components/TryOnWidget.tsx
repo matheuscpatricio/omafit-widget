@@ -505,8 +505,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       try {
         const { data: configs, error } = await supabase
           .from('widget_configurations')
-          .select('link_text, store_logo, primary_color, title, subtitle')
+          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at')
           .eq('shop_domain', effectiveShopDomain)
+          .order('updated_at', { ascending: false })
           .limit(1);
 
         if (error) {
@@ -525,6 +526,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           }
           if (config.primary_color) {
             setLocalPrimaryColor(config.primary_color);
+          }
+
+          // Fonte de verdade do idioma: admin_locale salvo no Supabase.
+          const adminLocale = normalizeWidgetLanguage(config.admin_locale);
+          if (adminLocale) {
+            console.log('🌍 Idioma definido via widget_configurations.admin_locale:', adminLocale);
+            setCurrentLanguage(adminLocale);
           }
         }
       } catch (error) {
