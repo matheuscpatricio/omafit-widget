@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
 
+const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
+  const raw = String(value || '').trim().toLowerCase().replace('_', '-');
+  if (!raw) return null;
+  const base = raw.split('-')[0];
+  if (base === 'pt' || base === 'es' || base === 'en') return base;
+  if (raw === 'portuguese' || raw === 'portugues') return 'pt';
+  if (raw === 'spanish' || raw === 'espanol' || raw === 'español') return 'es';
+  if (raw === 'english' || raw === 'ingles' || raw === 'inglês') return 'en';
+  return null;
+};
+
 export function WidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productImages, setProductImages] = useState<string[]>([]);
@@ -44,7 +55,12 @@ export function WidgetPage() {
     const recommendedProductNameParam = params.get('recommendedProductName');
     const recommendedProductUrlParam = params.get('recommendedProductUrl');
     const complementaryProductParam = params.get('complementaryProductUrl');
-    const languageParam = params.get('language') || params.get('lang') || params.get('storeLanguage');
+    const languageParam =
+      params.get('adminLocale') ||
+      params.get('admin_locale') ||
+      params.get('language') ||
+      params.get('lang') ||
+      params.get('storeLanguage');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - shopName/shop_name:', shopNameParam);
@@ -155,9 +171,10 @@ export function WidgetPage() {
         setRecommendedProductUrl(decodedUrl);
       }
 
-    if (languageParam && ['pt', 'es', 'en'].includes(languageParam.toLowerCase())) {
-      setStoreLanguage(languageParam.toLowerCase() as 'pt' | 'es' | 'en');
-      console.log('✅ Idioma da loja definido via URL:', languageParam.toLowerCase());
+    const normalizedLanguage = normalizeWidgetLanguage(languageParam);
+    if (normalizedLanguage) {
+      setStoreLanguage(normalizedLanguage);
+      console.log('✅ Idioma do widget definido via URL/adminLocale:', normalizedLanguage);
     }
     }
 
@@ -228,9 +245,10 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
-        if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
-          setStoreLanguage(String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en');
-          console.log('🌍 Idioma recebido via contexto:', String(event.data.language).toLowerCase());
+        const contextLanguage = normalizeWidgetLanguage(event.data.adminLocale || event.data.admin_locale || event.data.language);
+        if (contextLanguage) {
+          setStoreLanguage(contextLanguage);
+          console.log('🌍 Idioma recebido via contexto:', contextLanguage);
         }
         if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
           console.log('👕 Collection Type do contexto:', event.data.collectionType);
@@ -287,9 +305,10 @@ export function WidgetPage() {
           console.log('🧵 Collection Elasticity do config:', event.data.collectionElasticity);
           setCollectionElasticity(event.data.collectionElasticity);
         }
-        if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
-          setStoreLanguage(String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en');
-          console.log('🌍 Idioma recebido via config-update:', String(event.data.language).toLowerCase());
+        const configLanguage = normalizeWidgetLanguage(event.data.adminLocale || event.data.admin_locale || event.data.language);
+        if (configLanguage) {
+          setStoreLanguage(configLanguage);
+          console.log('🌍 Idioma recebido via config-update:', configLanguage);
         }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);

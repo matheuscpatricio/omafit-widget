@@ -34,11 +34,31 @@
   }
 
   // Obter só imagens de produto, usando várias fontes de dados Shopify
+  function normalizeWidgetLanguage(languageValue) {
+    const raw = String(languageValue || '').trim().toLowerCase().replace('_', '-');
+    if (!raw) return null;
+    const normalized = raw.split('-')[0];
+    if (normalized === 'pt' || normalized === 'es' || normalized === 'en') {
+      return normalized;
+    }
+    if (raw === 'portuguese' || raw === 'portugues') return 'pt';
+    if (raw === 'spanish' || raw === 'espanol' || raw === 'español') return 'es';
+    if (raw === 'english' || raw === 'ingles' || raw === 'inglês') return 'en';
+    return null;
+  }
+
   function getStoreLanguage(preferredLanguage) {
     try {
-      const preferred = String(preferredLanguage || '').toLowerCase().split('-')[0];
-      if (preferred === 'pt' || preferred === 'es' || preferred === 'en') {
-        return preferred;
+      const fromAdmin = normalizeWidgetLanguage(preferredLanguage);
+      if (fromAdmin) {
+        return fromAdmin;
+      }
+
+      // Regra principal: não cair para idioma da loja/site quando admin_locale existir
+      // mas estiver em formato inesperado. Nesses casos, usar inglês por segurança.
+      if (preferredLanguage) {
+        console.warn('⚠️ admin_locale inválido. Usando fallback "en":', preferredLanguage);
+        return 'en';
       }
 
       const fromShopify =
@@ -47,10 +67,9 @@
       const fromHtml = (document.documentElement && document.documentElement.lang) || '';
       const fromNavigator = (navigator.language || navigator.userLanguage || '') || '';
 
-      const raw = String(fromShopify || fromHtml || fromNavigator || 'en').toLowerCase();
-      const normalized = raw.split('-')[0];
-      if (normalized === 'pt' || normalized === 'es' || normalized === 'en') {
-        return normalized;
+      const detected = normalizeWidgetLanguage(fromShopify || fromHtml || fromNavigator || 'en');
+      if (detected) {
+        return detected;
       }
       return 'en';
     } catch (_error) {
@@ -1067,6 +1086,7 @@
       '&shopDomain=' + encodeURIComponent(shopDomain) +
       '&shop_domain=' + encodeURIComponent(shopDomain) +
       '&language=' + encodeURIComponent(storeLanguage) +
+      '&adminLocale=' + encodeURIComponent(storeLanguage) +
       '&shopName=' + encodeURIComponent(resolvedStoreName) +
       '&shop_name=' + encodeURIComponent(resolvedStoreName) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
@@ -1160,6 +1180,7 @@
           collectionType: typeof collectionType === 'string' ? collectionType : '',
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
           language: storeLanguage,
+          adminLocale: storeLanguage,
           complementaryProduct: complementaryProduct || null,
           recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
           recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
@@ -1233,6 +1254,7 @@
               storeLogo: OMAFIT_CONFIG.storeLogo, // Incluir logo na configuração também
               fontFamily: detectedFontFamily, // Enviar fonte detectada
               language: storeLanguage,
+              adminLocale: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
               defaultGender: defaultGender || '',
@@ -1267,6 +1289,7 @@
               storeName: OMAFIT_CONFIG.storeName || '',
               fontFamily: detectedFontFamily,
               language: storeLanguage,
+              adminLocale: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
               defaultGender: defaultGender || '',
@@ -1296,6 +1319,7 @@
             storeName: OMAFIT_CONFIG.storeName || '',
             fontFamily: detectedFontFamily,
             language: storeLanguage,
+            adminLocale: storeLanguage,
             shopDomain: shopDomain,
             collectionHandle: collectionHandle || '',
             defaultGender: defaultGender || '',

@@ -40,6 +40,17 @@ interface SizeChartEntry {
   length?: string;
 }
 
+const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
+  const raw = String(value || '').trim().toLowerCase().replace('_', '-');
+  if (!raw) return null;
+  const base = raw.split('-')[0];
+  if (base === 'pt' || base === 'es' || base === 'en') return base;
+  if (raw === 'portuguese' || raw === 'portugues') return 'pt';
+  if (raw === 'spanish' || raw === 'espanol' || raw === 'español') return 'es';
+  if (raw === 'english' || raw === 'ingles' || raw === 'inglês') return 'en';
+  return null;
+};
+
 export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl, language }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -349,8 +360,9 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (language && ['pt', 'es', 'en'].includes(language)) {
-      setCurrentLanguage(language);
+    const normalized = normalizeWidgetLanguage(language);
+    if (normalized) {
+      setCurrentLanguage(normalized);
     }
   }, [language]);
 
@@ -449,9 +461,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         }
       }
 
-      if (event.data.language && ['pt', 'es', 'en'].includes(String(event.data.language).toLowerCase())) {
-        const newLanguage = String(event.data.language).toLowerCase() as 'pt' | 'es' | 'en';
-        setCurrentLanguage(newLanguage);
+      if (event.data.type === 'omafit-context' || event.data.type === 'omafit-config-update') {
+        const eventLanguage = normalizeWidgetLanguage(
+          event.data.adminLocale || event.data.admin_locale || event.data.language
+        );
+        if (eventLanguage) {
+          setCurrentLanguage(eventLanguage);
+        }
       }
 
       if (event.data.type === 'omafit-add-to-cart-result') {
