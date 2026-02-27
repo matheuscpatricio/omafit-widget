@@ -131,7 +131,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: widgetKeyData, error: widgetKeyError } = await supabaseClient
       .from('widget_keys')
-      .select('id, user_id, status, usage_count, shop_domain')
+      .select('id, user_id, status, usage_count, shop_domain, domain')
       .eq('public_id', public_id)
       .maybeSingle();
 
@@ -159,10 +159,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('This widget has been deactivated. Please contact the store owner or generate a new widget.');
     }
 
-    // Verificar se é um widget Shopify (user_id null + shop_domain presente)
-    const isShopifyWidget = !widgetKeyData.user_id && widgetKeyData.shop_domain;
-    console.log('🏪 Widget type:', isShopifyWidget ? 'Shopify' : 'Regular', '| user_id:', widgetKeyData.user_id, '| shop_domain:', widgetKeyData.shop_domain);
-
     const normalizeShopDomain = (value: string | null | undefined): string => {
       if (!value) return '';
       return value
@@ -173,9 +169,36 @@ Deno.serve(async (req: Request) => {
         .replace(/\/.*$/, '');
     };
 
+    const widgetKeyShopDomain =
+      normalizeShopDomain(widgetKeyData.shop_domain) ||
+      normalizeShopDomain(widgetKeyData.domain);
+    // Verificar se é widget Shopify usando shop_domain moderno OU domain legado.
+    const isShopifyWidget = !widgetKeyData.user_id && !!widgetKeyShopDomain;
+    console.log('🏪 Widget type:', isShopifyWidget ? 'Shopify' : 'Regular', '| user_id:', widgetKeyData.user_id, '| shop_domain:', widgetKeyShopDomain || 'não definido');
+
+    const referer = req.headers.get('referer') || req.headers.get('referrer') || '';
+    let shopDomainFromReferer = '';
+    try {
+      if (referer) {
+        const refererUrl = new URL(referer);
+        shopDomainFromReferer =
+          refererUrl.searchParams.get('shopDomain') ||
+          refererUrl.searchParams.get('shop_domain') ||
+          '';
+      }
+    } catch (_error) {
+      // ignore invalid referer parsing
+    }
+
     let resolvedShopDomain =
       normalizeShopDomain(shop_domain) ||
-      normalizeShopDomain(widgetKeyData.shop_domain);
+      widgetKeyShopDomain;
+
+    if (!resolvedShopDomain) {
+      resolvedShopDomain =
+        normalizeShopDomain(widgetKeyData.domain) ||
+        normalizeShopDomain(shopDomainFromReferer);
+    }
 
     const resolvedRecommendedSize =
       user_measurements?.recommended_size ||
@@ -221,7 +244,7 @@ Deno.serve(async (req: Request) => {
       const { data: shopifyShop, error: shopifyError } = await supabaseClient
         .from('shopify_shops')
         .select('user_id, billing_status, images_used_month, images_included, billing_cycle_end')
-        .eq('shop_domain', widgetKeyData.shop_domain)
+        .eq('shop_domain', widgetKeyShopDomain)
         .maybeSingle();
 
       if (shopifyError) {
@@ -251,7 +274,7 @@ Deno.serve(async (req: Request) => {
       };
 
       effectiveUserId = shopifyShop.user_id;
-      console.log('✅ Shopify shop validated:', widgetKeyData.shop_domain);
+      console.log('✅ Shopify shop validated:', widgetKeyShopDomain);
     } else {
       // Para widgets regulares, verificar na tabela subscriptions
       const { data: regularSubscription, error: subscriptionError } = await supabaseClient
@@ -713,7 +736,7 @@ Deno.serve(async (req: Request) => {
           .update({
             images_used_month: subscription.images_used + 1
           })
-          .eq('shop_domain', widgetKeyData.shop_domain)
+          .eq('shop_domain', widgetKeyShopDomain)
       );
     } else {
       // Para widgets regulares, atualizar subscriptions
@@ -736,7 +759,7 @@ Deno.serve(async (req: Request) => {
 
       if (isShopifyWidget) {
         // Para Shopify widgets, usar o shop_domain diretamente
-        shopDomain = widgetKeyData.shop_domain;
+        shopDomain = widgetKeyShopDomain;
       } else {
         // Para widgets regulares, buscar shop_domain via shopify_stores
         const { data: shopifyStore } = await supabaseClient
