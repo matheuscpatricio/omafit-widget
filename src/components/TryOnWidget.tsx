@@ -61,6 +61,19 @@ const normalizeOptionList = (value: unknown): string[] => {
   return Array.from(unique);
 };
 
+const logProductCatalogDebug = (
+  source: string,
+  catalog: { sizes: string[]; colors: string[]; variants: any[] }
+) => {
+  console.log(`📦 [CATALOG:${source}] Resumo recebido no widget:`);
+  console.log('   • sizes:', catalog.sizes.length, catalog.sizes);
+  console.log('   • colors:', catalog.colors.length, catalog.colors);
+  console.log('   • variants:', catalog.variants.length);
+  if (catalog.variants.length > 0) {
+    console.log('   • sample variants:', catalog.variants.slice(0, 5));
+  }
+};
+
 export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl, language }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -417,11 +430,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
         if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
           const catalog = event.data.productCatalog;
-          setProductCatalog({
+          const normalizedCatalog = {
             sizes: normalizeOptionList(catalog.sizes),
             colors: normalizeOptionList(catalog.colors),
             variants: Array.isArray(catalog.variants) ? catalog.variants : [],
-          });
+          };
+          logProductCatalogDebug('omafit-context', normalizedCatalog);
+          setProductCatalog(normalizedCatalog);
         }
       }
 
@@ -478,11 +493,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
 
         if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
           const catalog = event.data.productCatalog;
-          setProductCatalog({
+          const normalizedCatalog = {
             sizes: normalizeOptionList(catalog.sizes),
             colors: normalizeOptionList(catalog.colors),
             variants: Array.isArray(catalog.variants) ? catalog.variants : [],
-          });
+          };
+          logProductCatalogDebug('omafit-config-update', normalizedCatalog);
+          setProductCatalog(normalizedCatalog);
         }
       }
 
@@ -526,6 +543,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       window.removeEventListener('message', handleMessage);
     };
   }, [currentLanguage]);
+
+  useEffect(() => {
+    console.log('📦 [CATALOG:state] Estado atual do catálogo no widget:');
+    console.log('   • sizes:', productCatalog.sizes.length, productCatalog.sizes);
+    console.log('   • colors:', productCatalog.colors.length, productCatalog.colors);
+    console.log('   • variants:', productCatalog.variants.length);
+  }, [productCatalog]);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -2214,6 +2238,13 @@ const handleSubmit = async () => {
         variant_catalog: productCatalog.variants.slice(0, 100),
         complementary_product: complementaryProduct,
       };
+
+      console.log('🤖 [GPT PAYLOAD] Catálogo enviado para validate-size:');
+      console.log('   • available_sizes:', payload.available_sizes?.length || 0, payload.available_sizes);
+      console.log('   • available_colors:', payload.available_colors?.length || 0, payload.available_colors);
+      console.log('   • variant_catalog:', payload.variant_catalog?.length || 0);
+      console.log('   • selected_color:', payload.selected_color || 'não definido');
+      console.log('   • selected_image:', payload.selected_image ? `${String(payload.selected_image).substring(0, 120)}...` : 'não definido');
 
       console.log('📤 Enviando payload para validate-size:', payload);
 

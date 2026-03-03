@@ -313,6 +313,43 @@ IMPORTANT: base recommendation and sales message on these real sizes/colors from
 IMPORTANTE: baseie a recomendação e a fala comercial nesses tamanhos/cores reais do produto atual.`;
 }
 
+function buildCatalogHardRules(data: ValidateSizeRequest, language: string): string {
+  const sizes = (data.available_sizes || []).filter(Boolean);
+  const colors = (data.available_colors || []).filter(Boolean);
+  const hasCatalog = sizes.length > 0 || colors.length > 0;
+
+  if (language === 'es') {
+    if (hasCatalog) {
+      return `REGLA CRÍTICA DE CATÁLOGO:
+- Ya tienes datos reales de catálogo (tallas/colores). Úsalos de forma explícita en la respuesta.
+- NO digas frases como "no tenemos información exacta" o similares.
+- Si el usuario pregunta por colores/tallas, cita las opciones disponibles del catálogo recibido.`;
+    }
+    return `REGLA DE CATÁLOGO:
+- Si no hay tallas/colores en el payload, informa de forma breve que esa información no vino en el catálogo de esta solicitud, sin inventar datos.`;
+  }
+
+  if (language === 'en') {
+    if (hasCatalog) {
+      return `CRITICAL CATALOG RULE:
+- You already have real catalog data (sizes/colors). Use it explicitly in your answer.
+- DO NOT say phrases like "we don't have exact information" or similar.
+- If user asks about colors/sizes, list the available options from the received catalog.`;
+    }
+    return `CATALOG RULE:
+- If sizes/colors are missing in payload, briefly state that this information was not provided in this request catalog, and do not invent data.`;
+  }
+
+  if (hasCatalog) {
+    return `REGRA CRÍTICA DE CATÁLOGO:
+- Você já tem dados reais de catálogo (tamanhos/cores). Use-os explicitamente na resposta.
+- NÃO diga frases como "não temos informação exata" ou similares.
+- Se o usuário perguntar sobre cores/tamanhos, cite as opções disponíveis do catálogo recebido.`;
+  }
+  return `REGRA DE CATÁLOGO:
+- Se não houver tamanhos/cores no payload, informe brevemente que essa informação não veio no catálogo desta requisição, sem inventar dados.`;
+}
+
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
   const validationPrompt = {
     pt: `Analise a seguinte mensagem do usuário e determine se é apropriada para um contexto de compra de roupas:
@@ -408,6 +445,7 @@ function buildCustomMessagePrompt(data: ValidateSizeRequest, language: string): 
   const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
   const productDesc = data.product_description ? `\n- Descrição do produto: ${data.product_description}` : '';
   const productCatalogContext = buildProductCatalogContext(data, language);
+  const catalogHardRules = buildCatalogHardRules(data, language);
 
   const messages: Record<string, string> = {
     pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}:
@@ -428,6 +466,7 @@ REGRAS IMPORTANTES:
 5. Responda de forma útil, persuasiva mas MUITO breve (máximo 2-3 linhas)
 6. Sempre induza à compra de forma sutil ao final
 7. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
+8. ${catalogHardRules}
 
 Retorne no formato JSON:
 {
@@ -451,6 +490,7 @@ REGLAS IMPORTANTES:
 2. Después continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante)` : ''}
 3. Responde de forma útil, profesional y breve (máximo 3-4 líneas)
 4. Mantén el foco en ayudar al usuario a tomar la decisión de compra
+5. ${catalogHardRules}
 
 Retorna en formato JSON:
 {
@@ -474,6 +514,7 @@ IMPORTANT RULES:
 2. Then continue naturally WITHOUT repeating the size${data.shop_name ? ` (you can mention the store "${data.shop_name}" naturally if relevant)` : ''}
 3. Answer in a helpful, professional and brief way (max 3-4 lines)
 4. Keep focus on helping the user make the purchase decision
+5. ${catalogHardRules}
 
 Return in JSON format:
 {
@@ -621,6 +662,14 @@ Deno.serve(async (req: Request) => {
     console.log('   • language:', data.language || 'pt');
     console.log('   • session_id:', data.session_id || 'não fornecido');
     console.log('   • interaction_count:', data.interaction_count || 0);
+    console.log('   • available_sizes:', Array.isArray(data.available_sizes) ? data.available_sizes.length : 0, data.available_sizes || []);
+    console.log('   • available_colors:', Array.isArray(data.available_colors) ? data.available_colors.length : 0, data.available_colors || []);
+    console.log('   • variant_catalog:', Array.isArray(data.variant_catalog) ? data.variant_catalog.length : 0);
+    if (Array.isArray(data.variant_catalog) && data.variant_catalog.length > 0) {
+      console.log('   • variant_catalog sample (first 5):', data.variant_catalog.slice(0, 5));
+    }
+    console.log('   • selected_color:', data.selected_color || 'não fornecido');
+    console.log('   • selected_image:', data.selected_image ? `${String(data.selected_image).substring(0, 120)}...` : 'não fornecido');
 
     // Validar dados obrigatórios
     if (!data.altura_cm || !data.peso_kg || !data.tamanho_calculado_algoritmo) {
@@ -664,6 +713,7 @@ Deno.serve(async (req: Request) => {
     // Construir prompt baseado na intenção
     let userPrompt: string;
     const language = data.language || 'pt';
+    console.log('🧠 Prompt language:', language);
 
     // Se for mensagem customizada, validar conteúdo antes
     if (data.intencao_usuario === "custom_message" && data.custom_message) {
@@ -700,6 +750,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Chamar OpenAI
+    console.log('🚀 Enviando prompt para OpenAI. Intenção:', data.intencao_usuario || 'validar_tamanho');
     const gptResponse = await callOpenAI(userPrompt, language);
 
     return new Response(
