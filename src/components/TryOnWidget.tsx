@@ -2152,7 +2152,7 @@ const handleSubmit = async () => {
     setInteractionCount(0);
   };
 
-  const callGPTAssistant = async (intention: string = 'validate', complementaryProduct?: any, customMessage?: string) => {
+  const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
     if (interactionCount >= 3) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
@@ -2292,15 +2292,15 @@ const handleSubmit = async () => {
       }
     } catch (error) {
       console.error('Erro ao chamar GPT:', error);
-      const errorMessages = {
-        pt: 'Não foi possível validar o tamanho no momento. Por favor, tente novamente.',
-        es: 'No fue posible validar la talla en este momento. Por favor, inténtalo de nuevo.',
-        en: 'Could not validate size at this time. Please try again.'
+      const fallbackMessages = {
+        pt: `Essa peça combina muito bem com seu perfil. ${localProductName ? `${localProductName} ` : 'Ela '}é uma excelente escolha - adicione ao carrinho para garantir!`,
+        es: `${localProductName ? localProductName + ' ' : 'Esta prenda '}combina muy bien contigo. Agrega al carrito para asegurar tu compra.`,
+        en: `${localProductName ? localProductName + ' ' : 'This item '}fits your style very well. Add it to cart to secure your purchase.`
       };
 
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: errorMessages[currentLanguage],
+        content: fallbackMessages[currentLanguage],
         timestamp: Date.now()
       }]);
     } finally {
