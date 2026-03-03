@@ -26,6 +26,18 @@ interface ValidateSizeRequest {
   custom_message?: string;
   product_name?: string;
   product_description?: string;
+  available_sizes?: string[];
+  available_colors?: string[];
+  selected_image?: string;
+  selected_color?: string;
+  variant_catalog?: Array<{
+    id?: string | number;
+    title?: string;
+    available?: boolean;
+    size?: string | null;
+    color?: string | null;
+    options?: string[];
+  }>;
   complementary_product?: {
     name: string;
     category: string;
@@ -221,6 +233,7 @@ async function callOpenAI(userPrompt: string, language: string = 'pt'): Promise<
 }
 
 function buildValidationPrompt(data: ValidateSizeRequest): string {
+  const productCatalogContext = buildProductCatalogContext(data, 'pt');
   return `Analise as seguintes medidas corporais e valide o tamanho recomendado:
 
 Altura: ${data.altura_cm} cm
@@ -232,22 +245,26 @@ Quadril: ${data.quadril_cm} cm
 Categoria da peça: ${data.categoria}
 Elasticidade: ${data.elasticidade}
 Tamanho calculado pelo algoritmo: ${data.tamanho_calculado_algoritmo}
+${productCatalogContext}
 
 Valide a coerência das medidas e confirme ou ajuste o tamanho recomendado.`;
 }
 
-function buildComplementaryPrompt(data: ValidateSizeRequest): string {
+function buildComplementaryPrompt(data: ValidateSizeRequest, language: string): string {
   const product = data.complementary_product;
   const storeContext = data.shop_name ? ` da ${data.shop_name}` : '';
+  const productCatalogContext = buildProductCatalogContext(data, language);
 
   if (!product) {
-    return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira um tipo de peça complementar${storeContext} que combinaria bem e explique brevemente o porquê da combinação.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}`;
+    return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira um tipo de peça complementar${storeContext} que combinaria bem e explique brevemente o porquê da combinação.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}
+${productCatalogContext}`;
   }
 
   return `Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo} em ${data.categoria}), analise esta peça complementar${storeContext}:
 
 Produto: ${product.name}
 Categoria: ${product.category}
+${productCatalogContext}
 
 Explique em poucas palavras por que esta peça combina bem com o perfil do usuário e crie um texto persuasivo mas profissional para incentivá-lo a conhecer o produto.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}
 
@@ -258,6 +275,42 @@ Retorne no formato JSON:
   "coerencia": "alta",
   "confianca": 0.95
 }`;
+}
+
+function buildProductCatalogContext(data: ValidateSizeRequest, language: string): string {
+  const sizes = (data.available_sizes || []).filter(Boolean);
+  const colors = (data.available_colors || []).filter(Boolean);
+  const selectedColor = data.selected_color || '';
+  const variantCount = Array.isArray(data.variant_catalog) ? data.variant_catalog.length : 0;
+
+  const sizeText = sizes.length > 0 ? sizes.join(', ') : (language === 'es' ? 'no informado' : language === 'en' ? 'not informed' : 'não informado');
+  const colorText = colors.length > 0 ? colors.join(', ') : (language === 'es' ? 'no informado' : language === 'en' ? 'not informed' : 'não informado');
+  const selectedColorText = selectedColor || (language === 'es' ? 'no informado' : language === 'en' ? 'not informed' : 'não informado');
+
+  if (language === 'es') {
+    return `Catálogo del producto visto:
+- Tallas disponibles: ${sizeText}
+- Colores disponibles: ${colorText}
+- Color seleccionado en el try-on: ${selectedColorText}
+- Variantes recibidas: ${variantCount}
+IMPORTANTE: basea la recomendación y el discurso comercial en estas tallas/colores reales del producto actual.`;
+  }
+
+  if (language === 'en') {
+    return `Catalog of current product:
+- Available sizes: ${sizeText}
+- Available colors: ${colorText}
+- Color selected in try-on: ${selectedColorText}
+- Variants received: ${variantCount}
+IMPORTANT: base recommendation and sales message on these real sizes/colors from the current product.`;
+  }
+
+  return `Catálogo do produto visualizado:
+- Tamanhos disponíveis: ${sizeText}
+- Cores disponíveis: ${colorText}
+- Cor selecionada no try-on: ${selectedColorText}
+- Variantes recebidas: ${variantCount}
+IMPORTANTE: baseie a recomendação e a fala comercial nesses tamanhos/cores reais do produto atual.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -354,6 +407,7 @@ function buildCustomMessagePrompt(data: ValidateSizeRequest, language: string): 
   const storeContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
   const productDesc = data.product_description ? `\n- Descrição do produto: ${data.product_description}` : '';
+  const productCatalogContext = buildProductCatalogContext(data, language);
 
   const messages: Record<string, string> = {
     pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}:
@@ -364,6 +418,7 @@ Contexto:
 - Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
 - Categoria: ${data.categoria}
 - Elasticidade: ${data.elasticidade}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}${productInfo}${productDesc}
+${productCatalogContext}
 
 REGRAS IMPORTANTES:
 1. Se a pergunta for sobre o produto/descrição, use as informações acima para responder de forma útil
@@ -389,6 +444,7 @@ Contexto:
 - Talla recomendada: ${data.tamanho_calculado_algoritmo}
 - Categoría: ${data.categoria}
 - Elasticidad: ${data.elasticidade}${data.shop_name ? `\n- Tienda: ${data.shop_name}` : ''}
+${productCatalogContext}
 
 REGLAS IMPORTANTES:
 1. Si mencionas la talla, hazlo SOLO UNA VEZ al inicio de la respuesta
@@ -411,6 +467,7 @@ Context:
 - Recommended size: ${data.tamanho_calculado_algoritmo}
 - Category: ${data.categoria}
 - Elasticity: ${data.elasticidade}${data.shop_name ? `\n- Store: ${data.shop_name}` : ''}
+${productCatalogContext}
 
 IMPORTANT RULES:
 1. If you mention the size, do it ONLY ONCE at the beginning of your response
@@ -434,6 +491,7 @@ function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): stri
   const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
   const productDesc = data.product_description ? `\n- Descrição: ${data.product_description}` : '';
+  const productCatalogContext = buildProductCatalogContext(data, language);
 
   const messages: Record<string, string> = {
     pt: `Você precisa criar uma mensagem persuasiva incentivando o usuário a adicionar o produto${storeNameContext} ao carrinho.
@@ -451,6 +509,7 @@ CONTEXTO DO PRODUTO:
 - Tamanho recomendado: ${data.tamanho_calculado_algoritmo}
 - Categoria: ${data.categoria}
 - Elasticidade: ${data.elasticidade}${productInfo}${productDesc}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}
+${productCatalogContext}
 
 ESTRUTURA DA MENSAGEM (OBRIGATÓRIA):
 1ª FRASE: Confirme o tamanho ideal e explique BREVEMENTE o motivo baseado nas medidas/corpo
@@ -483,6 +542,7 @@ Retorne no formato JSON:
 
 CONTEXTO:
 - Talla recomendada: ${data.tamanho_calculado_algoritmo}
+${productCatalogContext}
 
 REGLAS CRÍTICAS (¡NO IGNORES!):
 1. La palabra "talla" o el valor "${data.tamanho_calculado_algoritmo}" debe aparecer SOLO UNA VEZ en todo el mensaje
@@ -510,6 +570,7 @@ Retorna en formato JSON:
 
 CONTEXT:
 - Recommended size: ${data.tamanho_calculado_algoritmo}
+${productCatalogContext}
 
 CRITICAL RULES (DO NOT IGNORE!):
 1. The word "size" or the value "${data.tamanho_calculado_algoritmo}" must appear ONLY ONCE in the entire message
@@ -631,7 +692,7 @@ Deno.serve(async (req: Request) => {
       // Se for apropriado, construir prompt para responder a pergunta
       userPrompt = buildCustomMessagePrompt(data, language);
     } else if (data.intencao_usuario === "sugerir_combinacoes") {
-      userPrompt = buildComplementaryPrompt(data);
+      userPrompt = buildComplementaryPrompt(data, language);
     } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
       userPrompt = buildAddToCartPrompt(data, language);
     } else {

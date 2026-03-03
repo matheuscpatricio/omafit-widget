@@ -249,6 +249,104 @@
     return { productId, productName, productHandle, productDescription };
   }
 
+  function normalizeOptionValue(value) {
+    return String(value || '').trim();
+  }
+
+  function dedupeOptionList(values) {
+    const unique = [];
+    const seen = {};
+    (values || []).forEach(function (raw) {
+      const value = normalizeOptionValue(raw);
+      const key = value.toLowerCase();
+      if (!value || seen[key]) return;
+      seen[key] = true;
+      unique.push(value);
+    });
+    return unique;
+  }
+
+  function detectOptionKind(name) {
+    const normalized = String(name || '').toLowerCase();
+    if (/size|tamanho|talla|taille|größe|grosse/.test(normalized)) return 'size';
+    if (/color|cor|colour|couleur|farbe/.test(normalized)) return 'color';
+    return 'other';
+  }
+
+  function extractProductCatalog(productData) {
+    if (!productData || !Array.isArray(productData.variants)) {
+      return { sizes: [], colors: [], variants: [] };
+    }
+
+    const optionNames = Array.isArray(productData.options)
+      ? productData.options.map(function (option) {
+          if (typeof option === 'string') return option;
+          return option && option.name ? option.name : '';
+        })
+      : [];
+
+    const sizes = [];
+    const colors = [];
+    const variants = productData.variants.map(function (variant) {
+      const variantOptions = [variant.option1, variant.option2, variant.option3].map(normalizeOptionValue);
+      let size = '';
+      let color = '';
+
+      variantOptions.forEach(function (optionValue, index) {
+        const optionName = optionNames[index] || '';
+        const kind = detectOptionKind(optionName);
+        if (kind === 'size' && optionValue) size = optionValue;
+        if (kind === 'color' && optionValue) color = optionValue;
+      });
+
+      // Fallback leve quando não há nome de opção padronizado
+      if (!size) {
+        const inferredSize = variantOptions.find(function (optionValue) {
+          return /^(xxs|xs|s|m|l|xl|xxl|xxxl|[0-9]{2,3})$/i.test(optionValue);
+        });
+        if (inferredSize) size = inferredSize;
+      }
+
+      if (size) sizes.push(size);
+      if (color) colors.push(color);
+
+      return {
+        id: variant.id,
+        title: variant.title || '',
+        available: variant.available !== false,
+        size: size || null,
+        color: color || null,
+        options: variantOptions.filter(Boolean),
+      };
+    });
+
+    return {
+      sizes: dedupeOptionList(sizes),
+      colors: dedupeOptionList(colors),
+      variants: variants,
+    };
+  }
+
+  async function getProductCatalog(productHandle) {
+    try {
+      if (window.meta && window.meta.product && Array.isArray(window.meta.product.variants)) {
+        return extractProductCatalog(window.meta.product);
+      }
+
+      if (productHandle) {
+        const response = await fetch('/products/' + productHandle + '.js');
+        if (response.ok) {
+          const productData = await response.json();
+          return extractProductCatalog(productData);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Não foi possível obter catálogo de variantes do produto:', error);
+    }
+
+    return { sizes: [], colors: [], variants: [] };
+  }
+
   // Buscar um produto complementar de uma coleção (diferente da atual, ou qualquer se não houver atual)
   async function getComplementaryProduct(currentCollectionHandle) {
     try {
@@ -982,6 +1080,7 @@
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
 
     const productInfo = getProductInfo();
+    const productCatalog = await getProductCatalog(productInfo.productHandle);
     const isMobile = window.innerWidth <= 768;
 
     const overlay = document.createElement('div');
@@ -1071,6 +1170,11 @@
       limitedImages: limitedImages.length,
       primaryColor: config.primaryColor,
       storeName: config.storeName
+    });
+    console.log('🎨 Catálogo de variantes do produto:', {
+      sizes: productCatalog.sizes.length,
+      colors: productCatalog.colors.length,
+      variants: productCatalog.variants.length
     });
 
     // Construir URL apenas com dados essenciais (evitar 414 URI Too Long)
@@ -1187,7 +1291,8 @@
           productName: productInfo.productName || '',
           product_name: productInfo.productName || '',
           productDescription: productInfo.productDescription || '',
-          product_description: productInfo.productDescription || ''
+          product_description: productInfo.productDescription || '',
+          productCatalog: productCatalog
         }, 'https://omafit.netlify.app');
 
         // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
@@ -1266,7 +1371,8 @@
               productName: productInfo.productName || '',
               product_name: productInfo.productName || '',
               productDescription: productInfo.productDescription || '',
-              product_description: productInfo.productDescription || ''
+              product_description: productInfo.productDescription || '',
+              productCatalog: productCatalog
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (com logo):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1301,7 +1407,8 @@
               productName: productInfo.productName || '',
               product_name: productInfo.productName || '',
               productDescription: productInfo.productDescription || '',
-              product_description: productInfo.productDescription || ''
+              product_description: productInfo.productDescription || '',
+              productCatalog: productCatalog
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (sem logo - inválido):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1331,7 +1438,8 @@
             productName: productInfo.productName || '',
             product_name: productInfo.productName || '',
             productDescription: productInfo.productDescription || '',
-            product_description: productInfo.productDescription || ''
+            product_description: productInfo.productDescription || '',
+            productCatalog: productCatalog
           }, 'https://omafit.netlify.app');
           console.log('📤 Configuração enviada via postMessage (sem logo):', {
             primaryColor: OMAFIT_CONFIG.colors?.primary,

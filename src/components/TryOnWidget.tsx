@@ -51,6 +51,16 @@ const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   return null;
 };
 
+const normalizeOptionList = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const item of value) {
+    const normalized = String(item || '').trim();
+    if (normalized) unique.add(normalized);
+  }
+  return Array.from(unique);
+};
+
 export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl, language }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -126,6 +136,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [selectedColorHex, setSelectedColorHex] = useState<string>(primaryColor);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addToCartFeedback, setAddToCartFeedback] = useState('');
+  const [productCatalog, setProductCatalog] = useState<{ sizes: string[]; colors: string[]; variants: any[] }>({
+    sizes: [],
+    colors: [],
+    variants: [],
+  });
   const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
 
@@ -399,6 +414,15 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           console.log('✅ Atualizando productDescription:', description.substring(0, 100) + '...');
           setLocalProductDescription(description);
         }
+
+        if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
+          const catalog = event.data.productCatalog;
+          setProductCatalog({
+            sizes: normalizeOptionList(catalog.sizes),
+            colors: normalizeOptionList(catalog.colors),
+            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
+          });
+        }
       }
 
       // Configuração completa (também pode incluir type + elasticity)
@@ -451,6 +475,15 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
           console.log('✅ Atualizando productDescription:', description.substring(0, 100) + '...');
           setLocalProductDescription(description);
         }
+
+        if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
+          const catalog = event.data.productCatalog;
+          setProductCatalog({
+            sizes: normalizeOptionList(catalog.sizes),
+            colors: normalizeOptionList(catalog.colors),
+            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
+          });
+        }
       }
 
       // Logo
@@ -492,7 +525,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [currentLanguage]);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -2174,6 +2207,11 @@ const handleSubmit = async () => {
         language: currentLanguage,
         product_name: localProductName,
         product_description: localProductDescription,
+        available_sizes: productCatalog.sizes,
+        available_colors: productCatalog.colors,
+        selected_image: selectedProductImage,
+        selected_color: selectedColorHex,
+        variant_catalog: productCatalog.variants.slice(0, 100),
         complementary_product: complementaryProduct,
       };
 
