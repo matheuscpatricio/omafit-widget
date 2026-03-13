@@ -6,25 +6,67 @@ interface PricingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectPlan: (priceId: string) => void;
+  locale?: 'pt' | 'en' | 'es';
 }
 
-export function PricingModal({ isOpen, onClose, onSelectPlan }: PricingModalProps) {
+export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: PricingModalProps) {
   if (!isOpen) return null;
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('pt-BR', {
+    const localeMap = {
+      pt: 'pt-BR',
+      en: 'en-US',
+      es: 'es-ES',
+    };
+    return new Intl.NumberFormat(localeMap[locale], {
       style: 'currency',
       currency: currency === 'USD' ? 'USD' : 'BRL',
     }).format(price);
   };
+
+  const t = {
+    pt: {
+      title: 'Escolha seu Plano',
+      subtitle: 'Selecione o plano ideal para seu negócio',
+      popular: 'MAIS POPULAR',
+      month: '/mês',
+      aiTryon: 'Provador virtual com IA',
+      shopify: 'Integração Shopify',
+      support: 'Suporte técnico',
+      analytics: 'Análises detalhadas',
+      selectPlan: 'Selecionar Plano',
+    },
+    en: {
+      title: 'Choose Your Plan',
+      subtitle: 'Select the ideal plan for your business',
+      popular: 'MOST POPULAR',
+      month: '/month',
+      aiTryon: 'AI virtual fitting room',
+      shopify: 'Shopify integration',
+      support: 'Technical support',
+      analytics: 'Detailed analytics',
+      selectPlan: 'Select Plan',
+    },
+    es: {
+      title: 'Elige tu Plan',
+      subtitle: 'Selecciona el plan ideal para tu negocio',
+      popular: 'MÁS POPULAR',
+      month: '/mes',
+      aiTryon: 'Probador virtual con IA',
+      shopify: 'Integración Shopify',
+      support: 'Soporte técnico',
+      analytics: 'Analíticas detalladas',
+      selectPlan: 'Seleccionar Plan',
+    }
+  }[locale];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto animate-scale-in">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Escolha seu Plano</h2>
-            <p className="text-gray-600 text-sm mt-1">Selecione o plano ideal para seu negócio</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t.title}</h2>
+            <p className="text-gray-600 text-sm mt-1">{t.subtitle}</p>
           </div>
           <button
             onClick={onClose}
@@ -51,7 +93,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan }: PricingModalProp
                   {isPopular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                       <span className="bg-gradient-to-r from-[#810707] to-red-700 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg">
-                        MAIS POPULAR
+                        {t.popular}
                       </span>
                     </div>
                   )}
@@ -70,7 +112,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan }: PricingModalProp
                       <div className="text-3xl font-bold text-gray-900">
                         {formatPrice(product.price, product.currency)}
                         {product.mode === 'subscription' && (
-                          <span className="text-base font-normal text-gray-600">/mês</span>
+                          <span className="text-base font-normal text-gray-600">{t.month}</span>
                         )}
                       </div>
                     </div>
@@ -78,19 +120,19 @@ export function PricingModal({ isOpen, onClose, onSelectPlan }: PricingModalProp
                     <div className="space-y-3 mb-6">
                       <div className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700 text-sm">Provador virtual com IA</span>
+                        <span className="text-gray-700 text-sm">{t.aiTryon}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700 text-sm">Integração Shopify</span>
+                        <span className="text-gray-700 text-sm">{t.shopify}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700 text-sm">Suporte técnico</span>
+                        <span className="text-gray-700 text-sm">{t.support}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700 text-sm">Análises detalhadas</span>
+                        <span className="text-gray-700 text-sm">{t.analytics}</span>
                       </div>
                     </div>
 
@@ -102,7 +144,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan }: PricingModalProp
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                       }`}
                     >
-                      Selecionar Plano
+                      {t.selectPlan}
                     </button>
                   </div>
                 </div>

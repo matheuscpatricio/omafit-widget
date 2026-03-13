@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
-import { fal } from "npm:@fal-ai/client";
+import { getTryOnStatus, resolveTryOnProvider } from '../_shared/tryon-provider.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,79 +79,61 @@ Deno.serve(async (req: Request) => {
 
     const userId = productData?.user_id;
 
-    const { data: globalApiConfig } = await supabase
-      .from('api_config')
-      .select('key_value')
-      .eq('key_name', 'global_fal_api_key')
-      .maybeSingle();
+    const tryOnProvider = resolveTryOnProvider();
+    let falApiKey: string | null = null;
 
-    let falApiKey = globalApiConfig?.key_value;
-
-    if (!falApiKey) {
-      const { data: userApiConfigs } = await supabase
+    if (tryOnProvider === 'fal') {
+      const { data: globalApiConfig } = await supabase
         .from('api_config')
         .select('key_value')
-        .eq('user_id', userId)
-        .in('key_name', ['fal_api_key', 'fashn_api_key'])
+        .eq('key_name', 'global_fal_api_key')
         .maybeSingle();
 
-      falApiKey = userApiConfigs?.key_value;
+      falApiKey = globalApiConfig?.key_value ?? null;
+
+      if (!falApiKey) {
+        const { data: userApiConfigs } = await supabase
+          .from('api_config')
+          .select('key_value')
+          .eq('user_id', userId)
+          .in('key_name', ['fal_api_key', 'fashn_api_key'])
+          .maybeSingle();
+
+        falApiKey = userApiConfigs?.key_value ?? null;
+      }
+
+      if (!falApiKey) {
+        console.error('❌ FAL API key not configured');
+        return new Response(JSON.stringify({
+          error: 'FAL API key not configured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      console.log('✅ FAL API key configured');
+    } else {
+      console.log('✅ Self-hosted try-on provider enabled');
     }
-
-    if (!falApiKey) {
-      console.error('❌ FAL API key not configured');
-      return new Response(JSON.stringify({
-        error: 'FAL API key not configured'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    fal.config({
-      credentials: falApiKey
-    });
-
-    console.log('✅ FAL API key configured');
 
     try {
-      const statusResult = await fal.queue.status("fal-ai/fashn/tryon/v1.6", {
+      const statusResult = await getTryOnStatus({
+        provider: tryOnProvider,
         requestId: predictionId,
-        logs: true
+        providerApiKey: falApiKey,
       });
 
-      console.log('📡 Fal.ai/fashn status response:', {
-        status: statusResult.status,
-        hasOutput: !!(statusResult as any).output,
+      console.log('📡 Try-on status response:', {
+        provider: tryOnProvider,
+        status: statusResult.providerStatus,
+        hasOutput: !!statusResult.output,
       });
 
-      let dbStatus = 'processing';
-      let resultImage = null;
+      let dbStatus = statusResult.dbStatus;
+      let resultImage = statusResult.output?.[0] || null;
 
-      if (statusResult.status === 'COMPLETED') {
-        console.log('🔄 Fetching full result from fal.ai/fashn...');
-        const result = await fal.queue.result("fal-ai/fashn/tryon/v1.6", {
-          requestId: predictionId
-        });
-
-        console.log('📦 Full result from fal.ai/fashn:', {
-          hasData: !!result.data,
-          requestId: result.requestId,
-          dataKeys: result.data ? Object.keys(result.data) : []
-        });
-
-        if (result.data && result.data.image && result.data.image.url) {
-          dbStatus = 'completed';
-          resultImage = result.data.image.url;
-          console.log('✅ Image URL found:', resultImage);
-        } else if (result.data && result.data.images && result.data.images.length > 0 && result.data.images[0].url) {
-          dbStatus = 'completed';
-          resultImage = result.data.images[0].url;
-          console.log('✅ Image URL found in array:', resultImage);
-        } else {
-          console.log('⚠️ Result structure:', JSON.stringify(result.data, null, 2));
-        }
-
+      if (dbStatus === 'completed') {
         if (resultImage) {
           console.log('✅ Try-on completed, updating database');
 
@@ -232,10 +214,10 @@ Deno.serve(async (req: Request) => {
         } else {
           console.log('⚠️ No result image found in output');
         }
-      } else if (statusResult.status === 'IN_PROGRESS') {
+      } else if (dbStatus === 'processing') {
         dbStatus = 'processing';
         console.log('⏳ Still processing...');
-      } else if (statusResult.status === 'FAILED') {
+      } else if (dbStatus === 'failed') {
         dbStatus = 'failed';
         console.log('❌ Processing failed');
 
@@ -251,7 +233,7 @@ Deno.serve(async (req: Request) => {
         prediction_id: predictionId,
         status: dbStatus,
         output: resultImage ? [resultImage] : null,
-        fal_status: statusResult.status
+        fal_status: statusResult.providerStatus
       };
       console.log('📤 Returning response:', responseData);
 
@@ -288,7 +270,7 @@ Deno.serve(async (req: Request) => {
         status: errorStatus,
         error: errorMessage
       }), {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

@@ -1,7 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { fal } from "npm:@fal-ai/client";
 import { extractBodyMeasurements } from './mediapipe-helper.ts';
+import {
+  inferTryOnCategory,
+  resolveTryOnProvider,
+  submitTryOnJob,
+} from '../_shared/tryon-provider.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -207,34 +211,38 @@ Deno.serve(async (req: Request) => {
       user_measurements?.sizeRecommendation ||
       null;
 
-    const { data: globalApiConfig } = await supabaseClient
-      .from('api_config')
-      .select('key_value')
-      .eq('key_name', 'global_fal_api_key')
-      .maybeSingle();
+    const tryOnProvider = resolveTryOnProvider();
+    const tryOnCategory = inferTryOnCategory(collection_handle);
+    let falApiKey: string | null = null;
 
-    let falApiKey = globalApiConfig?.key_value;
-
-    if (!falApiKey) {
-      const { data: userApiConfigs } = await supabaseClient
+    if (tryOnProvider === 'fal') {
+      const { data: globalApiConfig } = await supabaseClient
         .from('api_config')
         .select('key_value')
-        .eq('user_id', widgetKeyData.user_id)
-        .eq('key_name', 'fal_api_key')
+        .eq('key_name', 'global_fal_api_key')
         .maybeSingle();
 
-      falApiKey = userApiConfigs?.key_value;
+      falApiKey = globalApiConfig?.key_value ?? null;
+
+      if (!falApiKey) {
+        const { data: userApiConfigs } = await supabaseClient
+          .from('api_config')
+          .select('key_value')
+          .eq('user_id', widgetKeyData.user_id)
+          .in('key_name', ['fal_api_key', 'fashn_api_key'])
+          .maybeSingle();
+
+        falApiKey = userApiConfigs?.key_value ?? null;
+      }
+
+      if (!falApiKey) {
+        throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
+      }
+
+      console.log('✅ FAL API key configured');
+    } else {
+      console.log('✅ Self-hosted try-on provider enabled');
     }
-
-    if (!falApiKey) {
-      throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
-    }
-
-    fal.config({
-      credentials: falApiKey
-    });
-
-    console.log('✅ FAL API key configured');
 
     let subscription: any = null;
     let effectiveUserId: string | null = widgetKeyData.user_id;
@@ -497,30 +505,18 @@ Deno.serve(async (req: Request) => {
       console.warn('⚠️ Falha no upsert_session_analytics_from_tryon_payload:', analyticsUpsertError);
     }
 
-    const falInput = {
-      model_image: modelImageUrl,
-      garment_image: garmentImageUrl,
-      category: "auto",
-      mode: "performance",
-      garment_photo_type: "auto",
-      moderation_level: "none",
-      num_samples: 1,
-      segmentation_free: true,
-      output_format: "png"
-    };
-
-    console.log('🚀 Submitting to fal.ai/fashn/tryon/v1.6 with input:', {
+    console.log('🚀 Submitting try-on job with provider:', {
+      provider: tryOnProvider,
       model_image: modelImageUrl.substring(0, 80) + '...',
       garment_image: garmentImageUrl.substring(0, 80) + '...',
-      category: "auto",
-      mode: "performance"
+      category: tryOnCategory,
     });
 
     // 🎯 PROCESSAMENTO PARALELO: FASHN + MediaPipe
     console.log('🔄 Iniciando processamento PARALELO...');
 
-    let request_id;
-    let mediapipeMeasurements = null;
+    let request_id: string | null = null;
+    let mediapipeMeasurements: any = null;
     let debugInfo = {
       mediapipe_status: 'unknown',
       mediapipe_returned: false,
@@ -533,9 +529,15 @@ Deno.serve(async (req: Request) => {
     try {
       // Iniciar AMBOS em paralelo
       const [fashnResult, mediapipeResult] = await Promise.allSettled([
-        // 1️⃣ FASHN API (30-40s)
-        fal.queue.submit("fal-ai/fashn/tryon/v1.6", {
-          input: falInput
+        // 1️⃣ TRY-ON PROVIDER
+        submitTryOnJob({
+          provider: tryOnProvider,
+          providerApiKey: falApiKey,
+          modelImageUrl,
+          garmentImageUrl,
+          category: tryOnCategory,
+          sessionId: session.id,
+          publicId: public_id,
         }),
 
         // 2️⃣ MediaPipe Pose Landmarker (2-3s) ⚡
@@ -543,6 +545,7 @@ Deno.serve(async (req: Request) => {
           console.log('═══════════════════════════════════════════════════════');
           console.log('🤖 MEDIAPIPE: Iniciando análise de pose...');
           console.log('═══════════════════════════════════════════════════════');
+          const startTime = Date.now();
 
           try {
             // 🔹 DEBUG: Ver exatamente o que chegou
@@ -586,8 +589,6 @@ Deno.serve(async (req: Request) => {
             console.log('   • 🎯 Landmarks do frontend:', pose_landmarks ? `presente (${pose_landmarks.length} landmarks)` : '❌ não fornecido');
             console.log('   • 📐 Medidas detectadas no frontend:', detected_measurements ? 'presentes' : '❌ não fornecido');
             console.log('');
-
-            const startTime = Date.now();
 
             // Extrair medidas corporais reais da imagem usando MediaPipe
             // Se landmarks foram detectados no frontend, usa eles diretamente
@@ -668,11 +669,11 @@ Deno.serve(async (req: Request) => {
 
       // Processar resultado do FASHN
       if (fashnResult.status === 'fulfilled') {
-        request_id = fashnResult.value.request_id;
-        console.log('✅ FASHN submitted, request_id:', request_id);
+        request_id = fashnResult.value.requestId;
+        console.log('✅ TRY-ON submitted, request_id:', request_id, '| provider_status:', fashnResult.value.providerStatus);
       } else {
-        console.error('❌ FASHN submission error:', fashnResult.reason);
-        throw new Error(`Failed to submit to fal.ai: ${fashnResult.reason.message}`);
+        console.error('❌ TRY-ON submission error:', fashnResult.reason);
+        throw new Error(`Failed to submit try-on job: ${fashnResult.reason.message}`);
       }
 
       // Processar resultado do MediaPipe
@@ -755,7 +756,7 @@ Deno.serve(async (req: Request) => {
 
     // ✅ BILLING SHOPIFY: Registrar uso de imagem e cobrar se necessário
     try {
-      let shopDomain = null;
+      let shopDomain: string | null = null;
 
       if (isShopifyWidget) {
         // Para Shopify widgets, usar o shop_domain diretamente
@@ -815,7 +816,11 @@ Deno.serve(async (req: Request) => {
         fal_request_id: request_id,
         credits_remaining: subscription.images_limit === -1 ? 'unlimited' : subscription.images_limit - subscription.images_used - 1,
         body_measurements: mediapipeMeasurements || null,
-        debug: debugInfo  // ← ADICIONAR DEBUG INFO
+        debug: {
+          ...debugInfo,
+          provider: tryOnProvider,
+          category: tryOnCategory,
+        }
       }),
       {
         headers: {

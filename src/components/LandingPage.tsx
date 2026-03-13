@@ -13,7 +13,230 @@ interface LandingPageProps {
   onLogin: () => void;
 }
 
-function VideoText() {
+type LandingLocale = 'pt' | 'en' | 'es';
+
+const landingTranslations: Record<LandingLocale, Record<string, string>> = {
+  pt: {
+    immersiveExperience: 'experiência envolvente',
+    heroTitleTop: 'Encante seus clientes com uma',
+    heroSubtitle: 'When techno meets fashion.',
+    heroTitleBottom: 'Um assistente inteligente',
+    heroTitleBottomLine2: 'de vendas para sua marca',
+    navFeatures: 'Recursos',
+    navBenefits: 'Benefícios',
+    navPlans: 'Planos',
+    contactButton: 'Entrar em contato',
+    statConversion: 'Aumento na Conversão',
+    statReturns: 'Redução em Devoluções',
+    statSatisfaction: 'Satisfação do Cliente',
+    statIntegrationTime: 'Tempo de Integração',
+    quote1: 'As pessoas acreditam no que conseguem visualizar.',
+    quote2: 'A incerteza é emocionalmente custosa.',
+    quote3: 'Marcas fortes reduzem a ansiedade na decisão.',
+    techTaglinePrefix: 'Dê a experiência aos seus clientes de ver a roupa da sua loja no',
+    techTaglineHighlight: 'próprio corpo',
+    altMeasurementPrecision: 'Precisão na medição',
+    altAdvancedAnalytics: 'Analytics avançado',
+    altRealtimeData: 'Dados em tempo real',
+    altFashionTech: 'Moda e tecnologia',
+    altIntuitiveDashboard: 'Dashboard intuitivo',
+    altAccurateMeasurements: 'Medidas precisas',
+    altDetailedReports: 'Relatórios detalhados',
+    card1Title: 'Calculadora de Medidas de Alta Precisão',
+    card1Desc: 'Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas. O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.',
+    card1Badge: '98% de acurácia na recomendação de tamanhos',
+    card2Title: 'Analytics que Transformam Dados em Decisões',
+    card2Desc: 'Tenha acesso a insights profundos sobre o comportamento dos seus clientes. Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.',
+    card2Badge: 'Dashboard em tempo real com ROI transparente',
+    card3Title: 'Personalização Total do Provador Virtual',
+    card3Desc: 'Customize cada detalhe do provador virtual para refletir a identidade da sua marca. Cores, fontes, layout e muito mais podem ser ajustados para criar uma experiência única e memorável.',
+    card3Badge: 'Fortalece o branding e reconhecimento da marca',
+    card4Title: 'Assistente Inteligente com ChatGPT',
+    card4Desc: 'Integração com ChatGPT para responder dúvidas dos clientes sobre produtos e marca em tempo real. Ofereça suporte personalizado e aumente a confiança na compra com respostas instantâneas e precisas.',
+    card4Badge: 'Respostas inteligentes 24/7 sobre produtos',
+    pricingTitle: 'O plano para sua marca',
+    pricingSubtitle: 'Escolha o plano ideal para o tamanho do seu negócio',
+    platformsTitle: 'Plataformas',
+    platformsSubtitle: 'Clique e integre facilmente com as principais plataformas de e-commerce',
+    comingSoon: 'Em Breve',
+    platformShopifyDesc: 'Integração nativa e fácil configuração em poucos cliques',
+    platformShopifyBadge: 'Configuração em 5 minutos',
+    platformNuvemshopDesc: 'Perfeita integração com a maior plataforma da América Latina',
+    platformNuvemshopBadge: 'Suporte em português',
+    platformWooDesc: 'Integração perfeita com a plataforma WordPress de e-commerce',
+    platformWooBadge: 'Plugin WordPress',
+    platformYampiDesc: 'Plataforma completa de e-commerce brasileira com todas as ferramentas',
+    platformYampiBadge: 'Plataforma nacional',
+    prevPlatform: 'Plataforma anterior',
+    nextPlatform: 'Próxima plataforma',
+    goToPlatform: 'Ir para plataforma',
+    ctaTitle: 'Entre em contato conosco e aplique agora o Omafit na sua marca',
+    ctaSubtitle: 'Junte-se a marcas que pensam à frente e usam o Omafit',
+    closeVideo: 'Fechar vídeo',
+    footerDescription: 'Revolucionando o e-commerce com try-on virtual powered by IA.',
+    footerProduct: 'Produto',
+    footerPricing: 'Preços',
+    footerIntegrations: 'Integrações',
+    footerSupport: 'Suporte',
+    footerDocumentation: 'Documentação',
+    footerTutorials: 'Tutoriais',
+    footerCompany: 'Empresa',
+    footerAbout: 'Sobre',
+    footerPrivacy: 'Privacidade',
+    instagramLabel: 'Instagram do Omafit',
+    rightsReserved: 'Todos os direitos reservados.',
+  },
+  en: {
+    immersiveExperience: 'immersive experience',
+    heroTitleTop: 'Delight your customers with an',
+    heroSubtitle: 'When techno meets fashion.',
+    heroTitleBottom: 'An intelligent sales assistant',
+    heroTitleBottomLine2: 'for your brand',
+    navFeatures: 'Features',
+    navBenefits: 'Benefits',
+    navPlans: 'Plans',
+    contactButton: 'Get in touch',
+    statConversion: 'Conversion Increase',
+    statReturns: 'Return Reduction',
+    statSatisfaction: 'Customer Satisfaction',
+    statIntegrationTime: 'Integration Time',
+    quote1: 'People believe what they can visualize.',
+    quote2: 'Uncertainty is emotionally costly.',
+    quote3: 'Strong brands reduce decision anxiety.',
+    techTaglinePrefix: 'Give your customers the experience of seeing your store clothing on their',
+    techTaglineHighlight: 'own body',
+    altMeasurementPrecision: 'Measurement precision',
+    altAdvancedAnalytics: 'Advanced analytics',
+    altRealtimeData: 'Real-time data',
+    altFashionTech: 'Fashion and technology',
+    altIntuitiveDashboard: 'Intuitive dashboard',
+    altAccurateMeasurements: 'Accurate measurements',
+    altDetailedReports: 'Detailed reports',
+    card1Title: 'High-Precision Measurement Calculator',
+    card1Desc: 'Our AI technology analyzes over 50 body points to ensure precise measurements. The algorithm continuously learns from each use, improving accuracy every day.',
+    card1Badge: '98% accuracy in size recommendations',
+    card2Title: 'Analytics That Turn Data Into Decisions',
+    card2Desc: 'Get deep insights into your customers behavior. Understand usage patterns, size preferences and much more to optimize inventory and strategy.',
+    card2Badge: 'Real-time dashboard with transparent ROI',
+    card3Title: 'Total Virtual Fitting Room Customization',
+    card3Desc: 'Customize every detail of the virtual fitting room to reflect your brand identity. Colors, fonts, layout and more can be adjusted to create a unique experience.',
+    card3Badge: 'Strengthens branding and brand recognition',
+    card4Title: 'Intelligent Assistant with ChatGPT',
+    card4Desc: 'ChatGPT integration to answer customer questions about products and brand in real time. Offer personalized support and increase purchase confidence.',
+    card4Badge: 'Smart product answers 24/7',
+    pricingTitle: 'The plan for your brand',
+    pricingSubtitle: 'Choose the ideal plan for your business size',
+    platformsTitle: 'Platforms',
+    platformsSubtitle: 'Click and integrate easily with the main e-commerce platforms',
+    comingSoon: 'Coming Soon',
+    platformShopifyDesc: 'Native integration and easy setup in just a few clicks',
+    platformShopifyBadge: 'Setup in 5 minutes',
+    platformNuvemshopDesc: 'Perfect integration with Latin Americas leading platform',
+    platformNuvemshopBadge: 'Portuguese support',
+    platformWooDesc: 'Seamless integration with the WordPress e-commerce platform',
+    platformWooBadge: 'WordPress plugin',
+    platformYampiDesc: 'Complete Brazilian e-commerce platform with all tools',
+    platformYampiBadge: 'Local platform',
+    prevPlatform: 'Previous platform',
+    nextPlatform: 'Next platform',
+    goToPlatform: 'Go to platform',
+    ctaTitle: 'Get in touch and apply Omafit to your brand now',
+    ctaSubtitle: 'Join forward-thinking brands that use Omafit',
+    closeVideo: 'Close video',
+    footerDescription: 'Revolutionizing e-commerce with AI-powered virtual try-on.',
+    footerProduct: 'Product',
+    footerPricing: 'Pricing',
+    footerIntegrations: 'Integrations',
+    footerSupport: 'Support',
+    footerDocumentation: 'Documentation',
+    footerTutorials: 'Tutorials',
+    footerCompany: 'Company',
+    footerAbout: 'About',
+    footerPrivacy: 'Privacy',
+    instagramLabel: 'Omafit Instagram',
+    rightsReserved: 'All rights reserved.',
+  },
+  es: {
+    immersiveExperience: 'experiencia envolvente',
+    heroTitleTop: 'Encanta a tus clientes con una',
+    heroSubtitle: 'When techno meets fashion.',
+    heroTitleBottom: 'Un asistente inteligente',
+    heroTitleBottomLine2: 'de ventas para tu marca',
+    navFeatures: 'Recursos',
+    navBenefits: 'Beneficios',
+    navPlans: 'Planes',
+    contactButton: 'Contactar',
+    statConversion: 'Aumento en Conversión',
+    statReturns: 'Reducción de Devoluciones',
+    statSatisfaction: 'Satisfacción del Cliente',
+    statIntegrationTime: 'Tiempo de Integración',
+    quote1: 'Las personas creen en lo que pueden visualizar.',
+    quote2: 'La incertidumbre es emocionalmente costosa.',
+    quote3: 'Las marcas fuertes reducen la ansiedad en la decisión.',
+    techTaglinePrefix: 'Ofrece a tus clientes la experiencia de ver la ropa de tu tienda en su',
+    techTaglineHighlight: 'propio cuerpo',
+    altMeasurementPrecision: 'Precisión de medición',
+    altAdvancedAnalytics: 'Analítica avanzada',
+    altRealtimeData: 'Datos en tiempo real',
+    altFashionTech: 'Moda y tecnología',
+    altIntuitiveDashboard: 'Panel intuitivo',
+    altAccurateMeasurements: 'Medidas precisas',
+    altDetailedReports: 'Informes detallados',
+    card1Title: 'Calculadora de Medidas de Alta Precisión',
+    card1Desc: 'Nuestra tecnología de IA analiza más de 50 puntos corporales para garantizar medidas precisas. El algoritmo aprende continuamente con cada uso.',
+    card1Badge: '98% de precisión en recomendación de tallas',
+    card2Title: 'Analítica que Convierte Datos en Decisiones',
+    card2Desc: 'Accede a insights profundos sobre el comportamiento de tus clientes. Entiende patrones de uso y preferencias de talla para optimizar tu inventario.',
+    card2Badge: 'Panel en tiempo real con ROI transparente',
+    card3Title: 'Personalización Total del Probador Virtual',
+    card3Desc: 'Personaliza cada detalle del probador virtual para reflejar la identidad de tu marca. Colores, fuentes y layout para crear una experiencia única.',
+    card3Badge: 'Fortalece el branding y reconocimiento de marca',
+    card4Title: 'Asistente Inteligente con ChatGPT',
+    card4Desc: 'Integración con ChatGPT para responder dudas de clientes sobre productos y marca en tiempo real. Ofrece soporte personalizado.',
+    card4Badge: 'Respuestas inteligentes 24/7 sobre productos',
+    pricingTitle: 'El plan para tu marca',
+    pricingSubtitle: 'Elige el plan ideal para el tamaño de tu negocio',
+    platformsTitle: 'Plataformas',
+    platformsSubtitle: 'Haz clic e integra fácilmente con las principales plataformas de e-commerce',
+    comingSoon: 'Próximamente',
+    platformShopifyDesc: 'Integración nativa y configuración fácil en pocos clics',
+    platformShopifyBadge: 'Configuración en 5 minutos',
+    platformNuvemshopDesc: 'Integración perfecta con la mayor plataforma de América Latina',
+    platformNuvemshopBadge: 'Soporte en portugués',
+    platformWooDesc: 'Integración perfecta con la plataforma WordPress de e-commerce',
+    platformWooBadge: 'Plugin de WordPress',
+    platformYampiDesc: 'Plataforma completa de e-commerce brasileña con todas las herramientas',
+    platformYampiBadge: 'Plataforma nacional',
+    prevPlatform: 'Plataforma anterior',
+    nextPlatform: 'Siguiente plataforma',
+    goToPlatform: 'Ir a plataforma',
+    ctaTitle: 'Contáctanos y aplica Omafit ahora en tu marca',
+    ctaSubtitle: 'Únete a marcas innovadoras que ya usan Omafit',
+    closeVideo: 'Cerrar video',
+    footerDescription: 'Revolucionando el e-commerce con probador virtual impulsado por IA.',
+    footerProduct: 'Producto',
+    footerPricing: 'Precios',
+    footerIntegrations: 'Integraciones',
+    footerSupport: 'Soporte',
+    footerDocumentation: 'Documentación',
+    footerTutorials: 'Tutoriales',
+    footerCompany: 'Empresa',
+    footerAbout: 'Sobre',
+    footerPrivacy: 'Privacidad',
+    instagramLabel: 'Instagram de Omafit',
+    rightsReserved: 'Todos los derechos reservados.',
+  }
+};
+
+const detectLandingLocale = (): LandingLocale => {
+  if (typeof window === 'undefined') return 'pt';
+  const raw = (navigator.language || '').toLowerCase();
+  if (raw.startsWith('es')) return 'es';
+  if (raw.startsWith('en')) return 'en';
+  return 'pt';
+};
+
+function VideoText({ immersiveExperience }: { immersiveExperience: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -37,7 +260,7 @@ function VideoText() {
         ctx.font = 'bold italic 120px "Playfair Display", serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('experiência envolvente', canvas.width / 2, canvas.height / 2);
+        ctx.fillText(immersiveExperience, canvas.width / 2, canvas.height / 2);
         ctx.globalCompositeOperation = 'source-over';
       }
       animationFrameId = requestAnimationFrame(renderFrame);
@@ -59,7 +282,7 @@ function VideoText() {
       }
       video.removeEventListener('loadeddata', handleVideoReady);
     };
-  }, []);
+  }, [immersiveExperience]);
 
   return (
     <div className="relative inline-block">
@@ -74,7 +297,7 @@ function VideoText() {
       />
       {!isVideoReady && (
         <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic', fontWeight: 'bold' }}>
-          experiência envolvente
+          {immersiveExperience}
         </span>
       )}
       <video
@@ -92,7 +315,7 @@ function VideoText() {
   );
 }
 
-function HeroZoomParallax() {
+function HeroZoomParallax({ t }: { t: Record<string, string> }) {
   const container = useRef(null);
   const { scrollYProgress } = useScroll({
     target: container,
@@ -114,12 +337,12 @@ function HeroZoomParallax() {
               className="space-y-4"
             >
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                Encante seus clientes com uma
+                {t.heroTitleTop}
                 <br />
-                <VideoText />
+                <VideoText immersiveExperience={t.immersiveExperience} />
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                When techno meets fashion.
+                {t.heroSubtitle}
               </p>
             </motion.div>
 
@@ -128,9 +351,9 @@ function HeroZoomParallax() {
               className="absolute inset-0 flex items-center justify-center px-4"
             >
               <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl leading-tight" style={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 500 }}>
-                Um assistente inteligente
+                {t.heroTitleBottom}
                 <br />
-                de vendas para sua marca
+                {t.heroTitleBottomLine2}
               </h2>
             </motion.div>
           </div>
@@ -142,6 +365,8 @@ function HeroZoomParallax() {
 
 export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
   const navigate = useNavigate();
+  const [locale] = useState<LandingLocale>(() => detectLandingLocale());
+  const t = landingTranslations[locale];
   const [scrollY, setScrollY] = useState(0);
   const [showHeader, setShowHeader] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -290,15 +515,15 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
                 <div className="flex items-center gap-8">
                   <nav className="hidden md:flex space-x-8">
-                    <a href="#features" className="text-gray-900 hover:text-gray-600 transition-colors">Recursos</a>
-                    <a href="#benefits" className="text-gray-900 hover:text-gray-600 transition-colors">Benefícios</a>
-                    <a href="#pricing" className="text-gray-900 hover:text-gray-600 transition-colors">Planos</a>
+                    <a href="#features" className="text-gray-900 hover:text-gray-600 transition-colors">{t.navFeatures}</a>
+                    <a href="#benefits" className="text-gray-900 hover:text-gray-600 transition-colors">{t.navBenefits}</a>
+                    <a href="#pricing" className="text-gray-900 hover:text-gray-600 transition-colors">{t.navPlans}</a>
                   </nav>
                   <a
                     href="mailto:contato@omafit.co"
                     className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-4 py-2 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-medium"
                   >
-                    Entrar em contato
+                    {t.contactButton}
                   </a>
                 </div>
               </div>
@@ -306,7 +531,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           </header>
 
           {/* Hero Section - Zoom Parallax */}
-          <HeroZoomParallax />
+          <HeroZoomParallax t={t} />
 
           {/* Stats Section */}
           <section className="py-12 sm:py-16" data-animate="stats">
@@ -314,19 +539,19 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
                 <div className="text-center" data-animate="stat-1">
                   <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">Aumento na Conversão</div>
+                  <div className="text-gray-600 text-sm sm:text-base">{t.statConversion}</div>
                 </div>
                 <div className="text-center" data-animate="stat-2">
                   <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">Redução em Devoluções</div>
+                  <div className="text-gray-600 text-sm sm:text-base">{t.statReturns}</div>
                 </div>
                 <div className="text-center" data-animate="stat-3">
                   <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">Satisfação do Cliente</div>
+                  <div className="text-gray-600 text-sm sm:text-base">{t.statSatisfaction}</div>
                 </div>
                 <div className="text-center" data-animate="stat-4">
                   <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
-                  <div className="text-gray-600 text-sm sm:text-base">Tempo de Integração</div>
+                  <div className="text-gray-600 text-sm sm:text-base">{t.statIntegrationTime}</div>
                 </div>
               </div>
             </div>
@@ -338,7 +563,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
                   <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    As pessoas acreditam no que conseguem visualizar.
+                    {t.quote1}
                   </p>
                   <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Donald Norman
@@ -347,7 +572,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
                   <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    A incerteza é emocionalmente custosa.
+                    {t.quote2}
                   </p>
                   <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Daniel Kahneman
@@ -356,7 +581,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
                 <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
                   <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    Marcas fortes reduzem a ansiedade na decisão.
+                    {t.quote3}
                   </p>
                   <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
                     - Marty Neumeier
@@ -391,9 +616,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 }}
               >
                 <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-                  Dê a experiência aos seus clientes de ver a roupa da sua loja no{' '}
+                  {t.techTaglinePrefix}{' '}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#810707] to-red-700">
-                    próprio corpo
+                    {t.techTaglineHighlight}
                   </span>
                 </h3>
               </div>
@@ -407,31 +632,31 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               images={[
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
-                  alt: 'Precisão na medição',
+                  alt: t.altMeasurementPrecision,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/818977cf-5249-4b75-a269-58101c30c9ac.jpeg',
-                  alt: 'Analytics avançado',
+                  alt: t.altAdvancedAnalytics,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/790e602d-8e3e-492e-b6b5-89c917c449d2.png',
-                  alt: 'Dados em tempo real',
+                  alt: t.altRealtimeData,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
-                  alt: 'Moda e tecnologia',
+                  alt: t.altFashionTech,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fc6a657-bb77-4bd2-9774-1dbb316e4b5a.jpeg',
-                  alt: 'Dashboard intuitivo',
+                  alt: t.altIntuitiveDashboard,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/eee28427-629f-4b81-bcff-0b6204b61e27.png',
-                  alt: 'Medidas precisas',
+                  alt: t.altAccurateMeasurements,
                 },
                 {
                   src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/f6eed9b9-aa98-4845-84ef-cc8fcd1650fc.jpeg',
-                  alt: 'Relatórios detalhados',
+                  alt: t.altDetailedReports,
                 },
               ]}
             />
@@ -455,15 +680,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <Ruler className="w-7 h-7 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  Calculadora de Medidas de Alta Precisão
+                  {t.card1Title}
                 </h3>
                 <p className="text-gray-600 leading-relaxed mb-4">
-                  Nossa tecnologia de IA analisa mais de 50 pontos corporais para garantir medidas precisas.
-                  O algoritmo aprende continuamente com cada uso, melhorando a precisão a cada dia.
+                  {t.card1Desc}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Check className="w-4 h-4 text-[#810707]" />
-                  <span>98% de acurácia na recomendação de tamanhos</span>
+                  <span>{t.card1Badge}</span>
                 </div>
               </div>
             </motion.div>
@@ -482,15 +706,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <BarChart3 className="w-7 h-7 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  Analytics que Transformam Dados em Decisões
+                  {t.card2Title}
                 </h3>
                 <p className="text-gray-600 leading-relaxed mb-4">
-                  Tenha acesso a insights profundos sobre o comportamento dos seus clientes.
-                  Entenda padrões de uso, preferências de tamanho e muito mais para otimizar seu inventário e estratégia.
+                  {t.card2Desc}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Check className="w-4 h-4 text-[#810707]" />
-                  <span>Dashboard em tempo real com ROI transparente</span>
+                  <span>{t.card2Badge}</span>
                 </div>
               </div>
             </motion.div>
@@ -509,15 +732,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <Package className="w-7 h-7 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  Personalização Total do Provador Virtual
+                  {t.card3Title}
                 </h3>
                 <p className="text-gray-600 leading-relaxed mb-4">
-                  Customize cada detalhe do provador virtual para refletir a identidade da sua marca.
-                  Cores, fontes, layout e muito mais podem ser ajustados para criar uma experiência única e memorável.
+                  {t.card3Desc}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Check className="w-4 h-4 text-[#810707]" />
-                  <span>Fortalece o branding e reconhecimento da marca</span>
+                  <span>{t.card3Badge}</span>
                 </div>
               </div>
             </motion.div>
@@ -536,15 +758,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <Zap className="w-7 h-7 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  Assistente Inteligente com ChatGPT
+                  {t.card4Title}
                 </h3>
                 <p className="text-gray-600 leading-relaxed mb-4">
-                  Integração com ChatGPT para responder dúvidas dos clientes sobre produtos e marca em tempo real.
-                  Ofereça suporte personalizado e aumente a confiança na compra com respostas instantâneas e precisas.
+                  {t.card4Desc}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Check className="w-4 h-4 text-[#810707]" />
-                  <span>Respostas inteligentes 24/7 sobre produtos</span>
+                  <span>{t.card4Badge}</span>
                 </div>
               </div>
             </motion.div>
@@ -558,15 +779,15 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center mb-12 sm:mb-16">
                 <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-                  O plano para sua marca
+                  {t.pricingTitle}
                 </h2>
                 <p className="text-lg sm:text-xl text-gray-600">
-                  Escolha o plano ideal para o tamanho do seu negócio
+                  {t.pricingSubtitle}
                 </p>
               </div>
 
               {/* Plan Calculator */}
-              <PlanCalculator />
+              <PlanCalculator locale={locale} />
             </div>
           </section>
 
@@ -575,10 +796,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center mb-12">
                 <h2 className="landing-title text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-                  Plataformas
+                  {t.platformsTitle}
                 </h2>
                 <p className="text-lg sm:text-xl text-gray-600">
-                  Clique e integre facilmente com as principais plataformas de e-commerce
+                  {t.platformsSubtitle}
                 </p>
               </div>
 
@@ -609,11 +830,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shopify</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
-                        Integração nativa e fácil configuração em poucos cliques
+                        {t.platformShopifyDesc}
                       </p>
                       <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
                         <Check className="w-5 h-5 text-green-500" />
-                        <span>Configuração em 5 minutos</span>
+                        <span>{t.platformShopifyBadge}</span>
                       </div>
                     </div>
                   </a>
@@ -624,7 +845,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
                     <div className="absolute top-4 right-4">
                       <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                        Em Breve
+                        {t.comingSoon}
                       </div>
                     </div>
                     <div className="flex flex-col items-center text-center opacity-75">
@@ -637,11 +858,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Nuvemshop</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
-                        Perfeita integração com a maior plataforma da América Latina
+                        {t.platformNuvemshopDesc}
                       </p>
                       <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
                         <Check className="w-5 h-5 text-gray-400" />
-                        <span>Suporte em português</span>
+                        <span>{t.platformNuvemshopBadge}</span>
                       </div>
                     </div>
                   </div>
@@ -652,7 +873,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
                     <div className="absolute top-4 right-4">
                       <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                        Em Breve
+                        {t.comingSoon}
                       </div>
                     </div>
                     <div className="flex flex-col items-center text-center opacity-75">
@@ -665,11 +886,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">WooCommerce</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
-                        Integração perfeita com a plataforma WordPress de e-commerce
+                        {t.platformWooDesc}
                       </p>
                       <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
                         <Check className="w-5 h-5 text-gray-400" />
-                        <span>Plugin WordPress</span>
+                        <span>{t.platformWooBadge}</span>
                       </div>
                     </div>
                   </div>
@@ -680,7 +901,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-[#810707] w-full max-w-md relative overflow-hidden">
                     <div className="absolute top-4 right-4">
                       <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                        Em Breve
+                        {t.comingSoon}
                       </div>
                     </div>
                     <div className="flex flex-col items-center text-center opacity-75">
@@ -693,11 +914,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       </div>
                       <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Yampi</h3>
                       <p className="text-base sm:text-lg text-gray-600 mb-4">
-                        Plataforma completa de e-commerce brasileira com todas as ferramentas
+                        {t.platformYampiDesc}
                       </p>
                       <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
                         <Check className="w-5 h-5 text-gray-400" />
-                        <span>Plataforma nacional</span>
+                        <span>{t.platformYampiBadge}</span>
                       </div>
                     </div>
                   </div>
@@ -709,7 +930,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <button
               onClick={() => setCurrentPlatformSlide((prev) => (prev > 0 ? prev - 1 : 3))}
               className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all z-10"
-              aria-label="Plataforma anterior"
+              aria-label={t.prevPlatform}
             >
               <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -718,7 +939,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <button
               onClick={() => setCurrentPlatformSlide((prev) => (prev < 3 ? prev + 1 : 0))}
               className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all z-10"
-              aria-label="Próxima plataforma"
+              aria-label={t.nextPlatform}
             >
               <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -736,7 +957,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       ? 'bg-[#810707] w-8'
                       : 'bg-gray-300 hover:bg-gray-400'
                   }`}
-                  aria-label={`Ir para plataforma ${index + 1}`}
+                  aria-label={`${t.goToPlatform} ${index + 1}`}
                 />
               ))}
               </div>
@@ -748,16 +969,16 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <section className="py-16 sm:py-20">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
               <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-6 animate-swipe-up">
-                Entre em contato conosco e aplique agora o Omafit na sua marca
+                {t.ctaTitle}
               </h2>
               <p className="text-lg sm:text-xl text-gray-600 mb-8 animate-swipe-up-delay-1">
-                Junte-se a marcas que pensam à frente e usam o Omafit
+                {t.ctaSubtitle}
               </p>
               <a
                 href="mailto:contato@omafit.co"
                 className="bg-gradient-to-r from-[#810707] to-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-bold text-lg inline-flex items-center gap-2 animate-swipe-up-delay-2"
               >
-                Entrar em contato
+                {t.contactButton}
                 <Mail className="w-5 h-5" />
               </a>
             </div>
@@ -777,7 +998,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <button
               onClick={() => setShowVideoModal(false)}
               className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors text-4xl font-light w-10 h-10 flex items-center justify-center"
-              aria-label="Fechar vídeo"
+              aria-label={t.closeVideo}
             >
               ×
             </button>
@@ -827,37 +1048,37 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <span className="text-xl font-bold" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
               </div>
               <p className="text-gray-400">
-                Revolucionando o e-commerce com try-on virtual powered by IA.
+                {t.footerDescription}
               </p>
             </div>
 
             <div>
-              <h3 className="font-bold mb-4">Produto</h3>
+              <h3 className="font-bold mb-4">{t.footerProduct}</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Recursos</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Preços</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrações</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.navFeatures}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.footerPricing}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.footerIntegrations}</a></li>
                 
               </ul>
             </div>
 
             <div>
-              <h3 className="font-bold mb-4">Suporte</h3>
+              <h3 className="font-bold mb-4">{t.footerSupport}</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Documentação</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Tutoriais</a></li>
-                <li><a href="/contato" className="hover:text-white transition-colors">Contato</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.footerDocumentation}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.footerTutorials}</a></li>
+                <li><a href="/contato" className="hover:text-white transition-colors">{t.contactButton}</a></li>
 
               </ul>
             </div>
 
             <div>
-              <h3 className="font-bold mb-4">Empresa</h3>
+              <h3 className="font-bold mb-4">{t.footerCompany}</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Sobre</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t.footerAbout}</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
 
-                <li><a href="/privacidade" className="hover:text-white transition-colors">Privacidade</a></li>
+                <li><a href="/privacidade" className="hover:text-white transition-colors">{t.footerPrivacy}</a></li>
               </ul>
             </div>
           </div>
@@ -869,7 +1090,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Instagram do Omafit"
+                aria-label={t.instagramLabel}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -887,7 +1108,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
                 </svg>
               </a>
-              <p className="text-gray-400">&copy; 2025 Omafit. Todos os direitos reservados.</p>
+              <p className="text-gray-400">&copy; 2025 Omafit. {t.rightsReserved}</p>
             </div>
           </div>
         </div>
@@ -897,6 +1118,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
         isOpen={showPricingModal}
         onClose={() => setShowPricingModal(false)}
         onSelectPlan={handleSelectPlan}
+        locale={locale}
       />
     </div>
   );

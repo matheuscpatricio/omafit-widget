@@ -11,37 +11,157 @@ interface Plan {
   additionalImagePrice: number | null;
 }
 
-const plans: Plan[] = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 30,
-    tryons: 100,
-    maxVisits: 60000,
-    description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
-    additionalImagePrice: 0.18
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    price: 120,
-    tryons: 500,
-    maxVisits: 250000,
-    description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
-    additionalImagePrice: 0.16
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 220,
-    tryons: 1000,
-    maxVisits: 750000,
-    description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
-    additionalImagePrice: 0.14
-  }
-];
+type LandingLocale = 'pt' | 'en' | 'es';
 
-export function PlanCalculator() {
+const plansByLocale: Record<LandingLocale, Plan[]> = {
+  pt: [
+    {
+      id: 'starter',
+      name: 'Starter',
+      price: 30,
+      tryons: 100,
+      maxVisits: 60000,
+      description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
+      additionalImagePrice: 0.18
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      price: 120,
+      tryons: 500,
+      maxVisits: 250000,
+      description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
+      additionalImagePrice: 0.16
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 220,
+      tryons: 1000,
+      maxVisits: 750000,
+      description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
+      additionalImagePrice: 0.14
+    }
+  ],
+  en: [
+    {
+      id: 'starter',
+      name: 'Starter',
+      price: 30,
+      tryons: 100,
+      maxVisits: 60000,
+      description: 'Ideal for early-stage stores that want to start using AI to increase conversions.',
+      additionalImagePrice: 0.18
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      price: 120,
+      tryons: 500,
+      maxVisits: 250000,
+      description: 'Perfect for growing e-commerce brands that want to scale sales with technology.',
+      additionalImagePrice: 0.16
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 220,
+      tryons: 1000,
+      maxVisits: 750000,
+      description: 'For established stores with high volume that need advanced capacity.',
+      additionalImagePrice: 0.14
+    }
+  ],
+  es: [
+    {
+      id: 'starter',
+      name: 'Starter',
+      price: 30,
+      tryons: 100,
+      maxVisits: 60000,
+      description: 'Ideal para tiendas en etapa inicial que quieren empezar a usar IA para aumentar conversiones.',
+      additionalImagePrice: 0.18
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      price: 120,
+      tryons: 500,
+      maxVisits: 250000,
+      description: 'Perfecto para e-commerce en crecimiento que quieren escalar ventas con tecnología.',
+      additionalImagePrice: 0.16
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 220,
+      tryons: 1000,
+      maxVisits: 750000,
+      description: 'Para tiendas consolidadas con alto volumen que necesitan capacidad avanzada.',
+      additionalImagePrice: 0.14
+    }
+  ]
+};
+
+const uiByLocale: Record<LandingLocale, Record<string, string>> = {
+  pt: {
+    title: 'O plano para seu e-commerce',
+    subtitle: 'Arraste o controle para informar quantas visitas mensais sua loja recebe',
+    monthlyVisits: 'Visitas Mensais',
+    plan: 'Plano',
+    recommended: 'Recomendado',
+    monthlyPrice: 'Preço mensal',
+    includedImages: 'Imagens incluídas',
+    imageCost: 'Custo por imagem',
+    additionalImages: 'Imagens adicionais',
+    monthSuffix: '/mês',
+    specialist: 'Falar com Especialista',
+    footnote: 'Em média, 1 em cada 4 visitantes usa o try-on virtual. Ajuste o valor acima de acordo com seu tráfego real.',
+  },
+  en: {
+    title: 'The right plan for your e-commerce',
+    subtitle: 'Drag the control to inform how many monthly visits your store gets',
+    monthlyVisits: 'Monthly Visits',
+    plan: 'Plan',
+    recommended: 'Recommended',
+    monthlyPrice: 'Monthly price',
+    includedImages: 'Included images',
+    imageCost: 'Cost per image',
+    additionalImages: 'Additional images',
+    monthSuffix: '/month',
+    specialist: 'Talk to a Specialist',
+    footnote: 'On average, 1 in 4 visitors uses virtual try-on. Adjust the value above according to your real traffic.',
+  },
+  es: {
+    title: 'El plan para tu e-commerce',
+    subtitle: 'Arrastra el control para informar cuántas visitas mensuales recibe tu tienda',
+    monthlyVisits: 'Visitas mensuales',
+    plan: 'Plan',
+    recommended: 'Recomendado',
+    monthlyPrice: 'Precio mensual',
+    includedImages: 'Imágenes incluidas',
+    imageCost: 'Costo por imagen',
+    additionalImages: 'Imágenes adicionales',
+    monthSuffix: '/mes',
+    specialist: 'Hablar con un especialista',
+    footnote: 'En promedio, 1 de cada 4 visitantes usa el try-on virtual. Ajusta el valor según tu tráfico real.',
+  }
+};
+
+interface PlanCalculatorProps {
+  locale?: LandingLocale;
+}
+
+export function PlanCalculator({ locale = 'pt' }: PlanCalculatorProps) {
+  const plans = plansByLocale[locale] || plansByLocale.pt;
+  const ui = uiByLocale[locale] || uiByLocale.pt;
+
+  const numberLocale = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es-ES' : 'en-US';
+  const currencyLocale = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es-ES' : 'en-US';
+  const currencyCode = locale === 'pt' ? 'BRL' : 'USD';
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat(currencyLocale, { style: 'currency', currency: currencyCode }).format(value);
   const [monthlyVisits, setMonthlyVisits] = useState(1000);
 
   const getRecommendedPlan = (): Plan => {
@@ -54,8 +174,6 @@ export function PlanCalculator() {
   };
 
   const recommendedPlan = getRecommendedPlan();
-  const estimatedTryons = Math.round(monthlyVisits / 4);
-
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMonthlyVisits(parseInt(e.target.value));
   };
@@ -64,11 +182,9 @@ export function PlanCalculator() {
     <div className="bg-gradient-to-br from-[#810707] to-red-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 mb-8 sm:mb-12 md:mb-16 text-white animate-swipe-up">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-6 sm:mb-8">
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-3">
-             O plano para seu e-commerce
-          </h3>
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-3">{ui.title}</h3>
           <p className="text-red-100 text-xs sm:text-sm md:text-base">
-            Arraste o controle para informar quantas visitas mensais sua loja recebe
+            {ui.subtitle}
           </p>
         </div>
 
@@ -79,8 +195,8 @@ export function PlanCalculator() {
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-red-100">Visitas Mensais</p>
-                <p className="text-2xl sm:text-3xl font-bold">{monthlyVisits.toLocaleString('pt-BR')}</p>
+                  <p className="text-xs sm:text-sm text-red-100">{ui.monthlyVisits}</p>
+                  <p className="text-2xl sm:text-3xl font-bold">{monthlyVisits.toLocaleString(numberLocale)}</p>
               </div>
             </div>
             
@@ -117,36 +233,36 @@ export function PlanCalculator() {
             <div className="flex-1 w-full">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
                 <h4 className="text-xl sm:text-2xl font-bold text-[#810707]">
-                  Plano {recommendedPlan.name}
+                  {ui.plan} {recommendedPlan.name}
                 </h4>
                 <span className="bg-green-100 text-green-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold inline-flex self-start">
-                  Recomendado
+                  {ui.recommended}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
                 <div>
-                  <p className="text-xs sm:text-sm text-gray-600">Preço mensal</p>
+                  <p className="text-xs sm:text-sm text-gray-600">{ui.monthlyPrice}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-[#810707]">
-                    ${recommendedPlan.price.toLocaleString('en-US')}
+                    {formatCurrency(recommendedPlan.price)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm text-gray-600">Imagens incluídas</p>
+                  <p className="text-xs sm:text-sm text-gray-600">{ui.includedImages}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {recommendedPlan.tryons.toLocaleString('pt-BR')}/mês
+                    {recommendedPlan.tryons.toLocaleString(numberLocale)}{ui.monthSuffix}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm text-gray-600">Custo por imagem</p>
+                  <p className="text-xs sm:text-sm text-gray-600">{ui.imageCost}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    ${(recommendedPlan.price / recommendedPlan.tryons).toFixed(2)}
+                    {formatCurrency(recommendedPlan.price / recommendedPlan.tryons)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm text-gray-600">Imagens adicionais</p>
+                  <p className="text-xs sm:text-sm text-gray-600">{ui.additionalImages}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    ${recommendedPlan.additionalImagePrice?.toFixed(2)}
+                    {formatCurrency(recommendedPlan.additionalImagePrice || 0)}
                   </p>
                 </div>
               </div>
@@ -162,7 +278,7 @@ export function PlanCalculator() {
                   rel="noopener noreferrer"
                   className="bg-[#810707] text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg hover:bg-red-800 transition-all font-semibold text-center text-sm sm:text-base"
                 >
-                  Falar com Especialista
+                  {ui.specialist}
                 </a>
               </div>
             </div>
@@ -170,10 +286,7 @@ export function PlanCalculator() {
         </div>
 
         <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-red-100">
-          <p>
-            Em média, 1 em cada 4 visitantes usa o try-on virtual.
-            Ajuste o valor acima de acordo com seu tráfego real.
-          </p>
+          <p>{ui.footnote}</p>
         </div>
       </div>
 

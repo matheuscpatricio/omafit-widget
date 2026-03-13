@@ -2,8 +2,143 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, MessageSquare, Send, CheckCircle, Phone, MapPin } from 'lucide-react';
 
+type PublicLocale = 'pt' | 'en' | 'es';
+
+const detectPublicLocale = (): PublicLocale => {
+  if (typeof window === 'undefined') return 'pt';
+  const raw = (navigator.language || '').toLowerCase();
+  if (raw.startsWith('es')) return 'es';
+  if (raw.startsWith('en')) return 'en';
+  return 'pt';
+};
+
+const contactTranslations: Record<PublicLocale, Record<string, string>> = {
+  pt: {
+    back: 'Voltar',
+    title: 'Entre em Contato',
+    subtitle: 'Estamos aqui para ajudar você',
+    email: 'E-mail',
+    support: 'Suporte',
+    supportDesc: 'Respondemos em até 24 horas',
+    enterprise: 'Enterprise',
+    enterpriseDesc: 'Para planos Enterprise, entre em contato diretamente',
+    faqTitle: 'Perguntas Frequentes',
+    faq1: 'Como funciona a integração?',
+    faq2: 'Qual o tempo de setup?',
+    faq3: 'Existe período de teste?',
+    faq4: 'Como funciona o suporte?',
+    faqFooter: 'Envie sua pergunta e responderemos o mais rápido possível!',
+    sentTitle: 'Mensagem Enviada!',
+    sentDesc: 'Obrigado por entrar em contato. Responderemos em breve.',
+    formTitle: 'Envie sua Mensagem',
+    storeName: 'Nome da Loja *',
+    storeNamePlaceholder: 'Nome da sua loja',
+    emailLabel: 'E-mail *',
+    emailPlaceholder: 'seu@email.com',
+    subject: 'Assunto *',
+    subjectPlaceholder: 'Selecione um assunto',
+    subjectTechnical: 'Suporte Técnico',
+    subjectPlans: 'Dúvidas sobre Planos',
+    subjectIntegration: 'Integração',
+    subjectEnterprise: 'Plano Enterprise',
+    subjectPartnership: 'Parceria',
+    subjectOther: 'Outro',
+    message: 'Mensagem *',
+    messagePlaceholder: 'Como podemos ajudar você?',
+    sending: 'Enviando...',
+    send: 'Enviar Mensagem',
+    privacyPrefix: 'Ao enviar, você concorda com nossa',
+    privacyLink: 'Política de Privacidade',
+    mailBodyStoreName: 'Nome da Loja',
+    mailBodyEmail: 'E-mail',
+    mailBodyMessage: 'Mensagem',
+  },
+  en: {
+    back: 'Back',
+    title: 'Get in Touch',
+    subtitle: 'We are here to help you',
+    email: 'Email',
+    support: 'Support',
+    supportDesc: 'We reply within 24 hours',
+    enterprise: 'Enterprise',
+    enterpriseDesc: 'For Enterprise plans, contact us directly',
+    faqTitle: 'Frequently Asked Questions',
+    faq1: 'How does the integration work?',
+    faq2: 'What is the setup time?',
+    faq3: 'Is there a trial period?',
+    faq4: 'How does support work?',
+    faqFooter: 'Send your question and we will reply as soon as possible!',
+    sentTitle: 'Message Sent!',
+    sentDesc: 'Thanks for contacting us. We will reply soon.',
+    formTitle: 'Send your Message',
+    storeName: 'Store Name *',
+    storeNamePlaceholder: 'Your store name',
+    emailLabel: 'Email *',
+    emailPlaceholder: 'you@email.com',
+    subject: 'Subject *',
+    subjectPlaceholder: 'Select a subject',
+    subjectTechnical: 'Technical Support',
+    subjectPlans: 'Pricing Questions',
+    subjectIntegration: 'Integration',
+    subjectEnterprise: 'Enterprise Plan',
+    subjectPartnership: 'Partnership',
+    subjectOther: 'Other',
+    message: 'Message *',
+    messagePlaceholder: 'How can we help you?',
+    sending: 'Sending...',
+    send: 'Send Message',
+    privacyPrefix: 'By sending, you agree with our',
+    privacyLink: 'Privacy Policy',
+    mailBodyStoreName: 'Store Name',
+    mailBodyEmail: 'Email',
+    mailBodyMessage: 'Message',
+  },
+  es: {
+    back: 'Volver',
+    title: 'Ponte en Contacto',
+    subtitle: 'Estamos aquí para ayudarte',
+    email: 'Correo',
+    support: 'Soporte',
+    supportDesc: 'Respondemos en hasta 24 horas',
+    enterprise: 'Enterprise',
+    enterpriseDesc: 'Para planes Enterprise, contáctanos directamente',
+    faqTitle: 'Preguntas Frecuentes',
+    faq1: '¿Cómo funciona la integración?',
+    faq2: '¿Cuál es el tiempo de configuración?',
+    faq3: '¿Existe período de prueba?',
+    faq4: '¿Cómo funciona el soporte?',
+    faqFooter: 'Envía tu pregunta y responderemos lo antes posible.',
+    sentTitle: '¡Mensaje enviado!',
+    sentDesc: 'Gracias por contactarnos. Responderemos pronto.',
+    formTitle: 'Envía tu Mensaje',
+    storeName: 'Nombre de la Tienda *',
+    storeNamePlaceholder: 'Nombre de tu tienda',
+    emailLabel: 'Correo *',
+    emailPlaceholder: 'tu@email.com',
+    subject: 'Asunto *',
+    subjectPlaceholder: 'Selecciona un asunto',
+    subjectTechnical: 'Soporte Técnico',
+    subjectPlans: 'Dudas sobre Planes',
+    subjectIntegration: 'Integración',
+    subjectEnterprise: 'Plan Enterprise',
+    subjectPartnership: 'Alianza',
+    subjectOther: 'Otro',
+    message: 'Mensaje *',
+    messagePlaceholder: '¿Cómo podemos ayudarte?',
+    sending: 'Enviando...',
+    send: 'Enviar Mensaje',
+    privacyPrefix: 'Al enviar, aceptas nuestra',
+    privacyLink: 'Política de Privacidad',
+    mailBodyStoreName: 'Nombre de la Tienda',
+    mailBodyEmail: 'Correo',
+    mailBodyMessage: 'Mensaje',
+  }
+};
+
 export function ContactPage() {
   const navigate = useNavigate();
+  const locale = detectPublicLocale();
+  const t = contactTranslations[locale];
   const [formData, setFormData] = useState({
     storeName: '',
     email: '',
@@ -18,7 +153,7 @@ export function ContactPage() {
     setIsSubmitting(true);
 
     const mailtoLink = `mailto:contato@omafit.co?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(
-      `Nome da Loja: ${formData.storeName}\nE-mail: ${formData.email}\n\nMensagem:\n${formData.message}`
+      `${t.mailBodyStoreName}: ${formData.storeName}\n${t.mailBodyEmail}: ${formData.email}\n\n${t.mailBodyMessage}:\n${formData.message}`
     )}`;
 
     window.location.href = mailtoLink;
@@ -51,15 +186,15 @@ export function ContactPage() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Voltar</span>
+            <span>{t.back}</span>
           </button>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-[#810707] to-red-700 rounded-xl flex items-center justify-center">
               <Mail className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Entre em Contato</h1>
-              <p className="text-gray-600">Estamos aqui para ajudar você</p>
+              <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
+              <p className="text-gray-600">{t.subtitle}</p>
             </div>
           </div>
         </div>
@@ -79,7 +214,7 @@ export function ContactPage() {
                   <Mail className="w-6 h-6 text-[#810707]" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">E-mail</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">{t.email}</h3>
                   <a href="mailto:contato@omafit.co" className="text-gray-600 hover:text-[#810707] transition-colors">
                     contato@omafit.co
                   </a>
@@ -91,9 +226,9 @@ export function ContactPage() {
                   <MessageSquare className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Suporte</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">{t.support}</h3>
                   <p className="text-gray-600">
-                    Respondemos em até 24 horas
+                    {t.supportDesc}
                   </p>
                 </div>
               </div>
@@ -103,9 +238,9 @@ export function ContactPage() {
                   <Phone className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Enterprise</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">{t.enterprise}</h3>
                   <p className="text-gray-600 text-sm">
-                    Para planos Enterprise, entre em contato diretamente
+                    {t.enterpriseDesc}
                   </p>
                 </div>
               </div>
@@ -113,27 +248,27 @@ export function ContactPage() {
 
             {/* Quick Info */}
             <div className="bg-gradient-to-br from-[#810707] to-red-700 rounded-xl shadow-sm p-6 text-white">
-              <h3 className="text-xl font-bold mb-4">Perguntas Frequentes</h3>
+              <h3 className="text-xl font-bold mb-4">{t.faqTitle}</h3>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-400 mt-1">•</span>
-                  <span>Como funciona a integração?</span>
+                  <span>{t.faq1}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-400 mt-1">•</span>
-                  <span>Qual o tempo de setup?</span>
+                  <span>{t.faq2}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-400 mt-1">•</span>
-                  <span>Existe período de teste?</span>
+                  <span>{t.faq3}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-400 mt-1">•</span>
-                  <span>Como funciona o suporte?</span>
+                  <span>{t.faq4}</span>
                 </li>
               </ul>
               <p className="text-sm mt-4 text-red-100">
-                Envie sua pergunta e responderemos o mais rápido possível!
+                {t.faqFooter}
               </p>
             </div>
 
@@ -147,20 +282,20 @@ export function ContactPage() {
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-12 h-12 text-green-600" />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Mensagem Enviada!</h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.sentTitle}</h3>
                   <p className="text-gray-600">
-                    Obrigado por entrar em contato. Responderemos em breve.
+                    {t.sentDesc}
                   </p>
                 </div>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Envie sua Mensagem</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">{t.formTitle}</h2>
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div>
                         <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-2">
-                          Nome da Loja *
+                          {t.storeName}
                         </label>
                         <input
                           type="text"
@@ -170,13 +305,13 @@ export function ContactPage() {
                           value={formData.storeName}
                           onChange={handleChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
-                          placeholder="Nome da sua loja"
+                          placeholder={t.storeNamePlaceholder}
                         />
                       </div>
 
                       <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                          E-mail *
+                          {t.emailLabel}
                         </label>
                         <input
                           type="email"
@@ -186,14 +321,14 @@ export function ContactPage() {
                           value={formData.email}
                           onChange={handleChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
-                          placeholder="seu@email.com"
+                          placeholder={t.emailPlaceholder}
                         />
                       </div>
                     </div>
 
                     <div>
                       <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                        Assunto *
+                        {t.subject}
                       </label>
                       <select
                         id="subject"
@@ -203,19 +338,19 @@ export function ContactPage() {
                         onChange={handleChange}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
                       >
-                        <option value="">Selecione um assunto</option>
-                        <option value="Suporte Técnico">Suporte Técnico</option>
-                        <option value="Dúvidas sobre Planos">Dúvidas sobre Planos</option>
-                        <option value="Integração">Integração</option>
-                        <option value="Enterprise">Plano Enterprise</option>
-                        <option value="Parceria">Parceria</option>
-                        <option value="Outro">Outro</option>
+                        <option value="">{t.subjectPlaceholder}</option>
+                        <option value={t.subjectTechnical}>{t.subjectTechnical}</option>
+                        <option value={t.subjectPlans}>{t.subjectPlans}</option>
+                        <option value={t.subjectIntegration}>{t.subjectIntegration}</option>
+                        <option value={t.subjectEnterprise}>{t.subjectEnterprise}</option>
+                        <option value={t.subjectPartnership}>{t.subjectPartnership}</option>
+                        <option value={t.subjectOther}>{t.subjectOther}</option>
                       </select>
                     </div>
 
                     <div>
                       <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                        Mensagem *
+                        {t.message}
                       </label>
                       <textarea
                         id="message"
@@ -225,7 +360,7 @@ export function ContactPage() {
                         onChange={handleChange}
                         rows={6}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all resize-none"
-                        placeholder="Como podemos ajudar você?"
+                        placeholder={t.messagePlaceholder}
                       />
                     </div>
 
@@ -237,20 +372,20 @@ export function ContactPage() {
                       {isSubmitting ? (
                         <>
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Enviando...
+                          {t.sending}
                         </>
                       ) : (
                         <>
                           <Send className="w-5 h-5" />
-                          Enviar Mensagem
+                          {t.send}
                         </>
                       )}
                     </button>
 
                     <p className="text-sm text-gray-500 text-center">
-                      Ao enviar, você concorda com nossa{' '}
+                      {t.privacyPrefix}{' '}
                       <a href="/privacidade" className="text-[#810707] hover:underline">
-                        Política de Privacidade
+                        {t.privacyLink}
                       </a>
                     </p>
                   </form>
