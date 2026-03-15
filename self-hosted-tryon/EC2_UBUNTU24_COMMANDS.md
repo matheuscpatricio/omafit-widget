@@ -178,7 +178,9 @@ Com backend `supabase`, a resposta deve incluir:
 {"ok":true,"queue":"tryon","output_storage_backend":"supabase",...}
 ```
 
-## 12. Subir Nginx
+## 12. Subir Nginx (obrigatório para o widget acessar a API)
+
+**Importante:** sem este passo, o Nginx retorna 404 e o widget não consegue usar o try-on self-hosted.
 
 ```bash
 sudo apt install -y nginx
@@ -251,22 +253,40 @@ Para ver onde o tempo vai: o `timings` da resposta traz `download_seconds` e `in
 NUM_TIMESTEPS=18
 ```
 
-## 16. Configurar Supabase Functions
+## 16. Configurar Supabase Functions (obrigatório para o widget usar self-hosted)
 
-Defina no ambiente das edge functions:
+**1. Definir secrets no Supabase:**
 
-```env
-TRYON_PROVIDER=self_hosted
-SELF_HOSTED_TRYON_URL=https://tryon.omafit.co
-SELF_HOSTED_TRYON_TOKEN=troque-esse-token
+Use a URL base da sua API (onde responde `GET /health`). Exemplos:
+- `https://tryon.omafit.co` — exige registro DNS (A record) apontando para o IP da EC2
+- `https://omafit.co` — se a API estiver no mesmo domínio (ex.: proxy reverso em `/api/tryon`)
+
+```bash
+npx supabase secrets set TRYON_PROVIDER=self_hosted
+npx supabase secrets set SELF_HOSTED_TRYON_URL=https://omafit.co
+npx supabase secrets set SELF_HOSTED_TRYON_TOKEN=seu-token-do-env
 ```
+
+**Se usar subdomínio (tryon.omafit.co):** crie um registro A no DNS apontando para o IP público da EC2.
+
+**2. Fazer deploy das Edge Functions** (obrigatório para aplicar os secrets):
+
+```bash
+cd /caminho/do/omafit-widget
+npx supabase functions deploy tryon
+npx supabase functions deploy tryon-status
+```
+
+Sem o deploy, as secrets não são aplicadas e o widget continua usando fal.ai.
+
+**3. Conferir nos logs:** Supabase → Edge Functions → tryon → Logs. Deve aparecer `Try-on provider: self_hosted`.
 
 ## 17. Rollback rápido
 
-Se precisar voltar:
+Se precisar voltar para fal.ai:
 
-```env
-TRYON_PROVIDER=fal
+```bash
+npx supabase secrets set TRYON_PROVIDER=fal
+npx supabase functions deploy tryon
+npx supabase functions deploy tryon-status
 ```
-
-Depois faça o redeploy das edge functions.

@@ -212,6 +212,7 @@ Deno.serve(async (req: Request) => {
       null;
 
     const tryOnProvider = resolveTryOnProvider();
+    console.log('🔧 Try-on provider:', tryOnProvider, '(TRYON_PROVIDER=' + (Deno.env.get("TRYON_PROVIDER") || "unset") + ', SELF_HOSTED_TRYON_URL=' + (Deno.env.get("SELF_HOSTED_TRYON_URL") ? "set" : "unset") + ')');
     const tryOnCategory = inferTryOnCategory(collection_handle);
     let falApiKey: string | null = null;
 

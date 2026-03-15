@@ -29,7 +29,7 @@ export interface TryOnStatusResult {
 const FAL_MODEL_ID = "fal-ai/fashn/tryon/v1.6";
 
 function getSelfHostedConfig() {
-  const baseUrl = (Deno.env.get("SELF_HOSTED_TRYON_URL") || "").replace(/\/$/, "");
+  const baseUrl = (Deno.env.get("SELF_HOSTED_TRYON_URL") || "").trim().replace(/\/$/, "");
   const authToken = Deno.env.get("SELF_HOSTED_TRYON_TOKEN") || "";
 
   if (!baseUrl) {
@@ -48,8 +48,16 @@ function getAuthHeaders(authToken: string): HeadersInit {
 }
 
 export function resolveTryOnProvider(): TryOnProviderName {
-  const provider = (Deno.env.get("TRYON_PROVIDER") || "fal").toLowerCase();
-  return provider === "self_hosted" ? "self_hosted" : "fal";
+  const provider = (Deno.env.get("TRYON_PROVIDER") || "").toLowerCase().replace(/-/g, "_");
+  const selfHostedUrl = (Deno.env.get("SELF_HOSTED_TRYON_URL") || "").trim();
+
+  // fal explícito sempre vence
+  if (provider === "fal") return "fal";
+
+  // self_hosted: TRYON_PROVIDER=self_hosted (ou self-hosted) OU SELF_HOSTED_TRYON_URL configurado
+  if (provider === "self_hosted" || selfHostedUrl) return "self_hosted";
+
+  return "fal";
 }
 
 export function inferTryOnCategory(collectionHandle?: string | null): TryOnCategory {

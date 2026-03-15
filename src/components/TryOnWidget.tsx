@@ -40,6 +40,8 @@ interface SizeChartEntry {
   length?: string;
 }
 
+const GPT_INTERACTION_LIMIT = 5;
+
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
   if (!raw) return null;
@@ -2153,7 +2155,7 @@ const handleSubmit = async () => {
   };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
-    if (interactionCount >= 3) {
+    if (interactionCount >= GPT_INTERACTION_LIMIT) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
         es: 'Has alcanzado el límite de interacciones por sesión.',
@@ -2568,7 +2570,7 @@ const handleSubmit = async () => {
           </div>
 
           {/* Input Area */}
-          {interactionCount < 3 && chatMessages.length > 0 && !gptLoading && (
+          {interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
               <button
                 type="button"
@@ -2646,7 +2648,7 @@ const handleSubmit = async () => {
           )}
 
           {/* Mensagem de agradecimento quando limite for atingido */}
-          {interactionCount >= 3 && chatMessages.length > 0 && !gptLoading && (
+          {interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <div className="p-4 border-t bg-gray-50">
               <p className="text-sm text-gray-600 text-center">
                 {currentLanguage === 'pt' && `Obrigado por usar o assistente da ${localStoreName}! Clique no X e adicione o produto ao carrinho.`}
