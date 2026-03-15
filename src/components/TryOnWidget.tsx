@@ -1975,27 +1975,32 @@ const handleSubmit = async () => {
       setPredictionId(result.fal_request_id);
       setProcessingMessage(t('generating'));
 
-      // Se temos medidas do MediaPipe, calcular tamanho recomendado com elas
-      // MAS APENAS se a confiança do MediaPipe > 0 (não são dados mockados)
-      const mediaPipeConfidence = result.body_measurements?.confidence || 0;
-      const isMediaPipeMocked = mediaPipeConfidence === 0;
+      const bm = result.body_measurements;
+      const source = bm?.source || '';
+      const mediaPipeConfidence = bm?.confidence || 0;
+      const isUserInput = source === 'user_input' || source === 'user_input_fallback';
+      const userRecommendedSize = bm?.userInput?.recommended_size;
 
-      if (result.body_measurements && sizeChart.length > 0 && !isMediaPipeMocked) {
+      if (isUserInput && userRecommendedSize) {
+        setRecommendedSize(userRecommendedSize);
+        setCalculatedSize(userRecommendedSize);
+        console.log('');
+        console.log('✅ TAMANHO do formulário (user_input):', userRecommendedSize);
+      } else if (bm && sizeChart.length > 0 && mediaPipeConfidence > 0) {
         console.log('');
         console.log('🧮 CALCULANDO TAMANHO com medidas REAIS do MediaPipe...');
         console.log('   Confiança:', (mediaPipeConfidence * 100).toFixed(1) + '%');
 
         const realMeasurements = {
-          height: result.body_measurements.bodyHeight,
+          height: bm.bodyHeight,
           weight: sizeData?.weight || 70,
           bodyTypeIndex: sizeData?.bodyTypeIndex || 0,
           fitIndex: sizeData?.fitIndex || 0,
           gender: sizeData?.gender || 'unisex',
-          // Medidas REAIS detectadas
-          chest: result.body_measurements.chestCircumference,
-          waist: result.body_measurements.waistCircumference,
-          hip: result.body_measurements.hipCircumference,
-          shoulder: result.body_measurements.shoulderWidth
+          chest: bm.chestCircumference,
+          waist: bm.waistCircumference,
+          hip: bm.hipCircumference,
+          shoulder: bm.shoulderWidth
         };
 
         const sizeResult = calculateRecommendedSize(realMeasurements as any, sizeChart);
@@ -2007,14 +2012,11 @@ const handleSubmit = async () => {
           console.log('   Match score:', sizeResult.matchScore?.toFixed(1) + '%');
         } else {
           console.log('❌ ERRO: calculateRecommendedSize retornou null');
-          console.log('   Verifique se o size chart está correto');
         }
-      } else if (isMediaPipeMocked) {
+      } else if (!isUserInput && mediaPipeConfidence === 0) {
         console.log('');
-        console.log('⚠️ MEDIAPIPE: Dados MOCKADOS detectados (confiança = 0)');
-        console.log('   → Ignorando medidas do MediaPipe');
-        console.log('   → Nenhum cálculo de tamanho será feito');
-      } else if (!result.body_measurements) {
+        console.log('⚠️ MEDIAPIPE: Dados sem confiança (confiança = 0)');
+      } else if (!bm) {
         console.log('');
         console.log('⚠️ MEDIAPIPE: Nenhuma medida retornada');
       }
