@@ -35,6 +35,10 @@ function LandingPageWrapper() {
   return (
     <LandingPage
       onGetStarted={(priceId) => {
+        if (priceId === 'free') {
+          window.open('https://apps.shopify.com/omafit', '_blank');
+          return;
+        }
         if (priceId) {
           navigate(`/auth?mode=register&priceId=${priceId}`);
         } else {

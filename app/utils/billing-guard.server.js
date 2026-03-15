@@ -130,18 +130,17 @@ export async function checkImageLimit(shopDomain) {
   }
 
   const used = shop.images_used_month || 0;
-  const included = shop.images_included || 0;
-  const remaining = Math.max(0, included - used);
+  const included = shop.images_included ?? 0;
+  const initialFree = shop.initial_free_images ?? 0;
+  const effectiveIncluded = (included === 0 && initialFree > 0) ? initialFree : included;
+  const remaining = effectiveIncluded > 0 ? Math.max(0, effectiveIncluded - used) : 0;
 
-  // Verificar se está dentro do limite
-  // Nota: Não bloqueamos se ultrapassar, apenas informamos
-  // O billing por uso cobrará automaticamente pelas extras
   return {
-    withinLimit: used <= included,
+    withinLimit: effectiveIncluded <= 0 || used <= effectiveIncluded,
     used,
-    included,
+    included: effectiveIncluded,
     remaining,
-    percentage: Math.min(100, Math.round((used / included) * 100))
+    percentage: effectiveIncluded > 0 ? Math.min(100, Math.round((used / effectiveIncluded) * 100)) : 0
   };
 }
 

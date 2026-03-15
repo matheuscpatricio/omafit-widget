@@ -10,40 +10,22 @@ export interface Product {
 
 export const products: Product[] = [
   {
-    id: 'prod_100images',
-    priceId: 'price_1SL4RkHmxK0nVXtdMMKHgpCD',
-    name: 'Basic',
-    description: '100 imagens por mês',
+    id: 'prod_free',
+    priceId: 'free',
+    name: 'Free',
+    description: 'Grátis para instalar. 50 imagens gratuitas (uma vez) + US$ 0,18 por imagem adicional',
     mode: 'subscription',
-    price: 130.00,
-    currency: 'BRL'
+    price: 0,
+    currency: 'USD'
   },
   {
-    id: 'prod_500images',
-    priceId: 'price_1SL4RkHmxK0nVXtdgkZXUalu',
-    name: 'Starter',
-    description: '500 imagens por mês',
+    id: 'prod_pro',
+    priceId: 'price_PRO_3000_IMAGES', // TODO: Criar produto $300/mês no Stripe e colar o price_id aqui
+    name: 'Pro',
+    description: '3.000 imagens/mês. Adicionais a US$ 0,08',
     mode: 'subscription',
-    price: 550.00,
-    currency: 'BRL'
-  },
-  {
-    id: 'prod_1000images',
-    priceId: 'price_1SL4RkHmxK0nVXtdvywZ4buS',
-    name: 'Growth',
-    description: '1000 imagens por mês',
-    mode: 'subscription',
-    price: 975.00,
-    currency: 'BRL'
-  },
-  {
-    id: 'prod_3000images',
-    priceId: 'price_1SL4RkHmxK0nVXtdaIluRwms',
-    name: 'Scale',
-    description: '3000 imagens por mês',
-    mode: 'subscription',
-    price: 2400.00,
-    currency: 'BRL'
+    price: 300,
+    currency: 'USD'
   }
 ];
 

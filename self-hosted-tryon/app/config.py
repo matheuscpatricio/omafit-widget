@@ -36,7 +36,7 @@ def load_settings() -> Settings:
     outputs_dir.mkdir(parents=True, exist_ok=True)
     weights_dir.mkdir(parents=True, exist_ok=True)
 
-    num_timesteps = int(os.getenv("NUM_TIMESTEPS", "20"))
+    num_timesteps = int(os.getenv("NUM_TIMESTEPS", "18"))
     if num_timesteps < 15:
         num_timesteps = 15
     elif num_timesteps > 50:

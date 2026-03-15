@@ -99,17 +99,19 @@ export default function DashboardPage() {
       }
 
       const imagesUsed = shopData.images_used_month || 0;
-      const imagesIncluded = shopData.images_included || 0;
-      const remaining = Math.max(0, imagesIncluded - imagesUsed);
-      const percentage = imagesIncluded > 0
-        ? Math.min(100, Math.round((imagesUsed / imagesIncluded) * 100))
+      const imagesIncluded = shopData.images_included ?? 0;
+      const initialFree = shopData.initial_free_images ?? 0;
+      const effectiveIncluded = (imagesIncluded === 0 && initialFree > 0) ? initialFree : imagesIncluded;
+      const remaining = Math.max(0, effectiveIncluded - imagesUsed);
+      const percentage = effectiveIncluded > 0
+        ? Math.min(100, Math.round((imagesUsed / effectiveIncluded) * 100))
         : 0;
 
       setDashboardData({
         shop: shopData.shop_domain,
         currentPlan: shopData.plan,
         billingStatus: shopData.billing_status,
-        imagesIncluded,
+        imagesIncluded: effectiveIncluded,
         imagesUsed,
         pricePerExtra: shopData.price_per_extra_image || 0,
         currency: shopData.currency || 'USD',

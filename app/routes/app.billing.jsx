@@ -43,15 +43,19 @@ export default function BillingPage() {
           shop: shopDomain,
           currentPlan: shop?.plan || null,
           billingStatus: shop?.billing_status || null,
-          usage: shop ? {
-            used: shop.images_used_month || 0,
-            included: shop.images_included || 0,
-            remaining: Math.max(0, (shop.images_included || 0) - (shop.images_used_month || 0)),
-            percentage: shop.images_included > 0
-              ? Math.min(100, ((shop.images_used_month || 0) / shop.images_included) * 100)
-              : 0,
-            withinLimit: (shop.images_used_month || 0) <= (shop.images_included || 0)
-          } : null
+          usage: shop ? (() => {
+            const used = shop.images_used_month || 0;
+            const included = shop.images_included ?? 0;
+            const initialFree = shop.initial_free_images ?? 0;
+            const effectiveIncluded = (included === 0 && initialFree > 0) ? initialFree : included;
+            return {
+              used,
+              included: effectiveIncluded,
+              remaining: Math.max(0, effectiveIncluded - used),
+              percentage: effectiveIncluded > 0 ? Math.min(100, (used / effectiveIncluded) * 100) : 0,
+              withinLimit: used <= effectiveIncluded
+            };
+          })() : null
         });
       }
     } catch (error) {

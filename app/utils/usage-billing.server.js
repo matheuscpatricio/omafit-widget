@@ -94,8 +94,12 @@ export async function registerImageUsageAndBill(shopDomain, imagesCount = 1, adm
         message: 'Ainda dentro do limite incluído',
         usage: {
           used: updatedShop.images_used_month,
-          included: updatedShop.images_included,
-          remaining: Math.max(0, updatedShop.images_included - updatedShop.images_used_month)
+          included: (updatedShop.images_included === 0 && (updatedShop.initial_free_images || 0) > 0)
+            ? updatedShop.initial_free_images
+            : updatedShop.images_included,
+          remaining: Math.max(0, ((updatedShop.images_included === 0 && (updatedShop.initial_free_images || 0) > 0)
+            ? updatedShop.initial_free_images
+            : updatedShop.images_included) - updatedShop.images_used_month)
         }
       };
     }
@@ -113,7 +117,9 @@ export async function registerImageUsageAndBill(shopDomain, imagesCount = 1, adm
         message: 'Uso registrado. Cobrança será processada quando a assinatura for ativada.',
         usage: {
           used: updatedShop.images_used_month,
-          included: updatedShop.images_included,
+          included: (updatedShop.images_included === 0 && (updatedShop.initial_free_images || 0) > 0)
+            ? updatedShop.initial_free_images
+            : updatedShop.images_included,
           extraImages: billing.extraImages
         }
       };
@@ -129,7 +135,9 @@ export async function registerImageUsageAndBill(shopDomain, imagesCount = 1, adm
         message: 'Uso registrado. Cobrança será processada no próximo ciclo.',
         usage: {
           used: updatedShop.images_used_month,
-          included: updatedShop.images_included,
+          included: (updatedShop.images_included === 0 && (updatedShop.initial_free_images || 0) > 0)
+            ? updatedShop.initial_free_images
+            : updatedShop.images_included,
           extraImages: billing.extraImages,
           pendingAmount: billing.amount
         }
@@ -234,18 +242,22 @@ export async function getImageUsageInfo(shopDomain) {
   }
 
   const used = shop.images_used_month || 0;
-  const included = shop.images_included || 0;
-  const remaining = Math.max(0, included - used);
-  const extra = Math.max(0, used - included);
+  const included = shop.images_included ?? 0;
+  const initialFree = shop.initial_free_images ?? 0;
+  // Plano free: 50 imagens grátis (uma vez) + 0 recorrente
+  const effectiveIncluded = (included === 0 && initialFree > 0) ? initialFree : included;
+  const remaining = effectiveIncluded > 0 ? Math.max(0, effectiveIncluded - used) : 0;
+  const extra = effectiveIncluded > 0 ? Math.max(0, used - effectiveIncluded) : used;
 
   return {
     plan: shop.plan,
     used,
-    included,
+    included: effectiveIncluded,
+    initialFreeImages: initialFree,
     remaining,
     extra,
-    percentage: Math.min(100, Math.round((used / included) * 100)),
-    withinLimit: used <= included,
+    percentage: effectiveIncluded > 0 ? Math.min(100, Math.round((used / effectiveIncluded) * 100)) : 0,
+    withinLimit: effectiveIncluded <= 0 || used <= effectiveIncluded,
     billingStatus: shop.billing_status
   };
 }

@@ -84,7 +84,7 @@ export const startBillingSubscription = async (plan, shopDomain = null) => {
       throw new Error('Plan not specified');
     }
 
-    if (!['starter', 'pro', 'enterprise'].includes(plan)) {
+    if (!['free', 'starter', 'pro', 'enterprise'].includes(plan)) {
       throw new Error('Invalid plan');
     }
 

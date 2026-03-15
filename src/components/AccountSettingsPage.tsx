@@ -17,59 +17,35 @@ interface SubscriptionPlan {
 
 const plans: SubscriptionPlan[] = [
   {
-    id: 'basic',
-    name: 'Basic',
-    price: 130,
+    id: 'free',
+    name: 'Free',
+    price: 0,
     interval: 'mês',
-    tryonLimit: 100,
+    tryonLimit: 0,
     features: [
-      '100 imagens geradas/mês',
+      'Grátis para instalar',
+      '50 imagens gratuitas (uma vez na criação)',
+      'US$ 0,18 por imagem adicional',
       'Integração Shopify',
       'Dashboard analytics',
       'Suporte por e-mail'
     ]
   },
   {
-    id: 'starter',
-    name: 'Starter',
-    price: 550,
-    interval: 'mês',
-    tryonLimit: 500,
-    features: [
-      '500 imagens geradas/mês',
-      'Integração Shopify',
-      'Dashboard analytics',
-      'Suporte por e-mail'
-    ]
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    price: 975,
-    interval: 'mês',
-    tryonLimit: 1000,
-    features: [
-      '1.000 imagens geradas/mês',
-      'Tudo do plano Starter',
-      'Analytics avançado',
-      'Suporte prioritário',
-      'API personalizada'
-    ],
-    recommended: true
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    price: 2400,
+    id: 'pro',
+    name: 'Pro',
+    price: 300,
     interval: 'mês',
     tryonLimit: 3000,
     features: [
       '3.000 imagens geradas/mês',
-      'Tudo do plano Growth',
-      'Suporte 24/7',
-      'Gerente de conta',
-      'Webhooks avançados'
-    ]
+      'US$ 0,08 por imagem adicional',
+      'Integração Shopify',
+      'Dashboard analytics',
+      'Suporte prioritário',
+      'API personalizada'
+    ],
+    recommended: true
   },
   {
     id: 'enterprise',
@@ -79,7 +55,7 @@ const plans: SubscriptionPlan[] = [
     tryonLimit: -1,
     features: [
       'Imagens ilimitadas',
-      'Tudo do plano Scale',
+      'Tudo do plano Pro',
       'SLA garantido',
       'Infraestrutura dedicada',
       'Desenvolvimento customizado'
@@ -90,7 +66,7 @@ const plans: SubscriptionPlan[] = [
 export function AccountSettingsPage() {
   const { user } = useAuth();
   const { createCheckoutSession } = useCheckout();
-  const [currentPlan, setCurrentPlan] = useState<string>('basic');
+  const [currentPlan, setCurrentPlan] = useState<string>('free');
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
 
@@ -115,14 +91,14 @@ export function AccountSettingsPage() {
 
       if (error) throw error;
 
-      if (data && data.images_limit) {
-        let planId = 'basic';
-        if (data.images_limit === 100) planId = 'basic';
-        else if (data.images_limit === 500) planId = 'starter';
-        else if (data.images_limit === 1000) planId = 'growth';
-        else if (data.images_limit === 3000) planId = 'scale';
+      if (data && data.plan_id) {
+        setCurrentPlan(data.plan_id);
+      } else if (data && data.images_limit !== undefined) {
+        let planId = 'free';
+        if (data.images_limit === 0) planId = 'free';
+        else if (data.images_limit === 3000) planId = 'pro';
         else if (data.images_limit === -1) planId = 'enterprise';
-
+        else planId = 'free';
         setCurrentPlan(planId);
       }
     } catch (error) {
@@ -143,23 +119,17 @@ export function AccountSettingsPage() {
       return;
     }
 
+    if (planId === 'free') {
+      window.open('https://apps.shopify.com/omafit', '_blank');
+      return;
+    }
+
     setUpgrading(planId);
 
     try {
-      // Map plan to Stripe product
-      let priceId: string | undefined;
+      const priceId = products.find(p => p.name === 'Pro')?.priceId;
 
-      if (planId === 'basic') {
-        priceId = products.find(p => p.name === 'Basic')?.priceId;
-      } else if (planId === 'starter') {
-        priceId = products.find(p => p.name === 'Starter')?.priceId;
-      } else if (planId === 'growth') {
-        priceId = products.find(p => p.name === 'Growth')?.priceId;
-      } else if (planId === 'scale') {
-        priceId = products.find(p => p.name === 'Scale')?.priceId;
-      }
-
-      if (!priceId) {
+      if (!priceId || priceId === 'free') {
         throw new Error('Price ID not found for plan');
       }
 
@@ -179,12 +149,10 @@ export function AccountSettingsPage() {
 
   const getPlanIcon = (planId: string) => {
     switch (planId) {
-      case 'basic':
-      case 'starter':
+      case 'free':
         return Zap;
-      case 'growth':
+      case 'pro':
         return TrendingUp;
-      case 'scale':
       case 'enterprise':
         return Crown;
       default:

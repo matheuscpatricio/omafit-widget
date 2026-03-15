@@ -15,14 +15,15 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
   // Definição dos planos (também pode vir de uma API)
   const plans = [
     {
-      name: 'starter',
-      displayName: 'Starter',
-      monthlyPrice: 25,
-      imagesIncluded: 100,
-      pricePerExtraImage: 0.17,
+      name: 'free',
+      displayName: 'Free',
+      monthlyPrice: 0,
+      imagesIncluded: 0,
+      pricePerExtraImage: 0.18,
       features: [
-        '100 imagens virtuais/mês',
-        'US$ 0.17 por imagem adicional',
+        'Grátis para instalar',
+        '50 imagens gratuitas (uma vez na criação)',
+        'US$ 0,18 por imagem adicional',
         'Widget customizável',
         'Analytics básico',
         'Suporte via email'
@@ -32,12 +33,12 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
     {
       name: 'pro',
       displayName: 'Pro',
-      monthlyPrice: 100,
-      imagesIncluded: 500,
-      pricePerExtraImage: 0.15,
+      monthlyPrice: 300,
+      imagesIncluded: 3000,
+      pricePerExtraImage: 0.08,
       features: [
-        '500 imagens virtuais/mês',
-        'US$ 0.15 por imagem adicional',
+        '3.000 imagens virtuais/mês',
+        'US$ 0,08 por imagem adicional',
         'Widget totalmente customizável',
         'Analytics avançado',
         'Suporte prioritário',
@@ -144,10 +145,10 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
                   {plan.monthlyPrice !== null ? (
                     <BlockStack gap="100">
                       <Text variant="heading2xl" as="p">
-                        US$ {plan.monthlyPrice}
+                        {plan.monthlyPrice === 0 ? 'Grátis' : `US$ ${plan.monthlyPrice}`}
                       </Text>
                       <Text variant="bodyMd" tone="subdued">
-                        por mês
+                        {plan.monthlyPrice === 0 ? '50 imagens grátis (uma vez) + US$ 0,18/imagem' : 'por mês'}
                       </Text>
                     </BlockStack>
                   ) : (
@@ -174,7 +175,7 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
 
                 {/* Botão */}
                 <Button
-                  variant={plan.name === 'pro' ? 'primary' : 'secondary'}
+                    variant={plan.name === 'pro' ? 'primary' : 'secondary'}
                   fullWidth
                   onClick={() => handleSelectPlan(plan.name)}
                   loading={isLoading}
@@ -184,6 +185,8 @@ export function BillingPlans({ currentPlan = null, onSelectPlan }) {
                     ? 'Plano Atual'
                     : plan.name === 'enterprise'
                     ? 'Fale Conosco'
+                    : plan.name === 'free'
+                    ? 'Usar Grátis'
                     : 'Assinar'}
                 </Button>
               </BlockStack>

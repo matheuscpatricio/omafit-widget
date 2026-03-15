@@ -35,6 +35,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
       support: 'Suporte técnico',
       analytics: 'Análises detalhadas',
       selectPlan: 'Selecionar Plano',
+      installShopify: 'Instalar no Shopify',
     },
     en: {
       title: 'Choose Your Plan',
@@ -46,6 +47,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
       support: 'Technical support',
       analytics: 'Detailed analytics',
       selectPlan: 'Select Plan',
+      installShopify: 'Install on Shopify',
     },
     es: {
       title: 'Elige tu Plan',
@@ -57,6 +59,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
       support: 'Soporte técnico',
       analytics: 'Analíticas detalladas',
       selectPlan: 'Seleccionar Plan',
+      installShopify: 'Instalar en Shopify',
     }
   }[locale];
 
@@ -77,9 +80,9 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {products.map((product, index) => {
-              const isPopular = index === 2;
+              const isPopular = product.id === 'prod_pro';
 
               return (
                 <div
@@ -110,8 +113,10 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
                       <h3 className="text-xl font-bold text-gray-900 mb-1">{product.name}</h3>
                       <p className="text-gray-600 text-sm mb-4">{product.description}</p>
                       <div className="text-3xl font-bold text-gray-900">
-                        {formatPrice(product.price, product.currency)}
-                        {product.mode === 'subscription' && (
+                        {product.price === 0
+                          ? 'Grátis'
+                          : formatPrice(product.price, product.currency)}
+                        {product.mode === 'subscription' && product.price > 0 && (
                           <span className="text-base font-normal text-gray-600">{t.month}</span>
                         )}
                       </div>
@@ -144,7 +149,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                       }`}
                     >
-                      {t.selectPlan}
+                      {product.priceId === 'free' ? t.installShopify : t.selectPlan}
                     </button>
                   </div>
                 </div>

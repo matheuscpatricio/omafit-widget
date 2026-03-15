@@ -59,10 +59,11 @@ def _load_pipeline():
         import torch
         from fashn_vton import TryOnPipeline
 
-        # TF32 acelera matmuls em GPUs Ampere+ (A10G, etc.)
+        # Otimizações GPU (sem perda de qualidade)
         if torch.cuda.is_available():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
+            torch.backends.cudnn.benchmark = True  # escolhe algoritmos mais rápidos
 
         _PIPELINE = TryOnPipeline(weights_dir=str(settings.weights_dir))
     return _PIPELINE

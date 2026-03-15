@@ -110,7 +110,10 @@ SUPABASE_URL=https://SEU-PROJETO.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=SUA_SERVICE_ROLE
 SUPABASE_OUTPUT_BUCKET=tryon-images
 SUPABASE_OUTPUT_PREFIX=self-hosted-results
+NUM_TIMESTEPS=18
 ```
+
+**URLs públicas:** o bucket `tryon-images` precisa estar **público**. No Supabase Dashboard: Storage → tryon-images → ⋮ → Edit bucket → marque **Public bucket**. A URL retornada será `https://SEU-PROJETO.supabase.co/storage/v1/object/public/tryon-images/self-hosted-results/xxx.png`.
 
 ### Exemplo usando S3
 
@@ -142,10 +145,16 @@ mkdir -p outputs weights
 
 ## 9. Baixar pesos do modelo
 
-O projeto já prevê `weights/`. Depois de obter os pesos do `FASHN VTON v1.5`, coloque-os em:
+```bash
+cd ~/omafit-widget/self-hosted-tryon
+docker compose run --rm worker bash -c "cd /opt/fashn-vton && python3 scripts/download_weights.py --weights-dir /app/weights"
+```
+
+Aguarde o download (~2 GB). Depois confira:
 
 ```bash
-~/omafit-widget/self-hosted-tryon/weights
+ls -la weights/
+ls -la weights/dwpose/
 ```
 
 ## 10. Subir a stack
@@ -228,15 +237,18 @@ curl -H "Authorization: Bearer troque-esse-token" \
 
 ## 15. Otimizações de latência (opcional)
 
-Para reduzir o tempo total (~36s → ~20–25s):
+Para reduzir o tempo total sem perder qualidade:
 
 - **Download paralelo**: pessoa e roupa já são baixadas em paralelo.
-- **num_timesteps**: padrão 20 (mais rápido). Para mais qualidade, use `NUM_TIMESTEPS=30` no `.env`.
-- **TF32**: habilitado automaticamente em GPUs Ampere+ (A10G).
+- **TF32 + cuDNN benchmark**: habilitados automaticamente na GPU.
+- **num_timesteps**: padrão 18. Para mais velocidade (leve perda de qualidade), use `NUM_TIMESTEPS=15`; para máxima qualidade, `NUM_TIMESTEPS=30`.
 - **Região**: EC2 e bucket Supabase na mesma região (ex.: `us-east-1`) reduzem latência de download.
+- **Roupa no Supabase**: se a roupa vier do Shopify CDN, o download pode ser mais lento. Hospedar no Supabase (mesma região) acelera.
+
+Para ver onde o tempo vai: o `timings` da resposta traz `download_seconds` e `inference_seconds`. Se download > 10s, priorize região e URLs próximas. Se inference > 15s, considere instância maior (g5.2xlarge).
 
 ```env
-NUM_TIMESTEPS=20
+NUM_TIMESTEPS=18
 ```
 
 ## 16. Configurar Supabase Functions

@@ -16,89 +16,62 @@ type LandingLocale = 'pt' | 'en' | 'es';
 const plansByLocale: Record<LandingLocale, Plan[]> = {
   pt: [
     {
-      id: 'starter',
-      name: 'Starter',
-      price: 30,
-      tryons: 100,
-      maxVisits: 60000,
-      description: 'Ideal para lojas iniciantes que querem começar a usar IA para aumentar conversões.',
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      tryons: 0,
+      maxVisits: 50000,
+      description: 'Grátis para instalar. 50 imagens gratuitas (uma vez) + US$ 0,18 por imagem adicional.',
       additionalImagePrice: 0.18
-    },
-    {
-      id: 'growth',
-      name: 'Growth',
-      price: 120,
-      tryons: 500,
-      maxVisits: 250000,
-      description: 'Perfeito para e-commerces em crescimento que desejam escalar suas vendas com tecnologia.',
-      additionalImagePrice: 0.16
     },
     {
       id: 'pro',
       name: 'Pro',
-      price: 220,
-      tryons: 1000,
-      maxVisits: 750000,
-      description: 'Para lojas estabelecidas com alto volume que precisam de capacidade avançada.',
-      additionalImagePrice: 0.14
+      price: 300,
+      tryons: 3000,
+      maxVisits: 999999,
+      description: 'US$ 300/mês com 3.000 imagens incluídas. Imagens adicionais a US$ 0,08.',
+      additionalImagePrice: 0.08
     }
   ],
   en: [
     {
-      id: 'starter',
-      name: 'Starter',
-      price: 30,
-      tryons: 100,
-      maxVisits: 60000,
-      description: 'Ideal for early-stage stores that want to start using AI to increase conversions.',
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      tryons: 0,
+      maxVisits: 50000,
+      description: 'Free to install. 50 free images (one-time) + $0.18 per additional image.',
       additionalImagePrice: 0.18
-    },
-    {
-      id: 'growth',
-      name: 'Growth',
-      price: 120,
-      tryons: 500,
-      maxVisits: 250000,
-      description: 'Perfect for growing e-commerce brands that want to scale sales with technology.',
-      additionalImagePrice: 0.16
     },
     {
       id: 'pro',
       name: 'Pro',
-      price: 220,
-      tryons: 1000,
-      maxVisits: 750000,
-      description: 'For established stores with high volume that need advanced capacity.',
-      additionalImagePrice: 0.14
+      price: 300,
+      tryons: 3000,
+      maxVisits: 999999,
+      description: '$300/month with 3,000 images included. Additional images at $0.08 each.',
+      additionalImagePrice: 0.08
     }
   ],
   es: [
     {
-      id: 'starter',
-      name: 'Starter',
-      price: 30,
-      tryons: 100,
-      maxVisits: 60000,
-      description: 'Ideal para tiendas en etapa inicial que quieren empezar a usar IA para aumentar conversiones.',
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      tryons: 0,
+      maxVisits: 50000,
+      description: 'Gratis para instalar. 50 imagenes gratuitas (una vez) + US$ 0,18 por imagen adicional.',
       additionalImagePrice: 0.18
-    },
-    {
-      id: 'growth',
-      name: 'Growth',
-      price: 120,
-      tryons: 500,
-      maxVisits: 250000,
-      description: 'Perfecto para e-commerce en crecimiento que quieren escalar ventas con tecnología.',
-      additionalImagePrice: 0.16
     },
     {
       id: 'pro',
       name: 'Pro',
-      price: 220,
-      tryons: 1000,
-      maxVisits: 750000,
-      description: 'Para tiendas consolidadas con alto volumen que necesitan capacidad avanzada.',
-      additionalImagePrice: 0.14
+      price: 300,
+      tryons: 3000,
+      maxVisits: 999999,
+      description: 'US$ 300/mes con 3.000 imagenes incluidas. Imagenes adicionales a US$ 0,08.',
+      additionalImagePrice: 0.08
     }
   ]
 };
@@ -250,13 +223,17 @@ export function PlanCalculator({ locale = 'pt' }: PlanCalculatorProps) {
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">{ui.includedImages}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {recommendedPlan.tryons.toLocaleString(numberLocale)}{ui.monthSuffix}
+                    {recommendedPlan.tryons > 0
+                      ? `${recommendedPlan.tryons.toLocaleString(numberLocale)}${ui.monthSuffix}`
+                      : (locale === 'pt' ? 'On-demand' : locale === 'es' ? 'Bajo demanda' : 'On-demand')}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">{ui.imageCost}</p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                    {formatCurrency(recommendedPlan.price / recommendedPlan.tryons)}
+                    {recommendedPlan.tryons > 0
+                      ? formatCurrency(recommendedPlan.price / recommendedPlan.tryons)
+                      : formatCurrency(recommendedPlan.additionalImagePrice || 0)}
                   </p>
                 </div>
                 <div>

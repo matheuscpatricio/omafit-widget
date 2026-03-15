@@ -93,6 +93,12 @@ export async function upsertShopBilling({
     shopData.shopify_usage_line_item_id = usageLineItemId;
   }
 
+  // Plano free: 50 imagens gratuitas (uma única vez) na criação da conta
+  const existingShop = await getShopBilling(shopDomain);
+  if (!existingShop && plan === 'free') {
+    shopData.initial_free_images = 50;
+  }
+
   // Tenta fazer upsert (insert ou update)
   const { data, error } = await supabase
     .from('shopify_shops')
@@ -194,11 +200,16 @@ export async function incrementImageUsage(shopDomain, count = 1) {
  */
 export function calculateExtraImagesBilling(shop) {
   const imagesUsed = shop.images_used_month || 0;
-  const imagesIncluded = shop.images_included || 0;
+  const imagesIncluded = shop.images_included ?? 0;
+  const initialFree = shop.initial_free_images ?? 0;
   const lastBilled = shop.last_billed_images || 0;
 
+  // Plano free: imagens incluídas = 50 (uma única vez) + 0 recorrente
+  // Imagens "incluídas" efetivas = initial_free_images para free, senão images_included
+  const effectiveIncluded = (imagesIncluded === 0 && initialFree > 0) ? initialFree : imagesIncluded;
+
   // Calcular quantas imagens extras temos (acima do limite incluído)
-  const totalExtraImages = Math.max(0, imagesUsed - imagesIncluded);
+  const totalExtraImages = Math.max(0, imagesUsed - effectiveIncluded);
 
   // Calcular quantas imagens extras ainda não foram cobradas
   const unbilledExtraImages = Math.max(0, totalExtraImages - lastBilled);
