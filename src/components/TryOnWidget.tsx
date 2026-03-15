@@ -299,9 +299,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('================================');
   }, [step, imagePreview, selectedProductImage, modelImage]);
 
-  // MediaPipe Pose Detection - só carrega quando usuário chega no calculator (preserva velocidade inicial)
-  const needsMediaPipe = ['calculator', 'photo', 'confirm', 'processing', 'result'].includes(step);
-  const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose({ enabled: needsMediaPipe });
+  // MediaPipe Pose Detection (carrega ao montar para estar pronto quando usuário enviar foto)
+  const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose();
 
   useEffect(() => {
     if (mediapipeLoading) {
