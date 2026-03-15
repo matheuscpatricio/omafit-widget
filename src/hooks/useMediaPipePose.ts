@@ -123,7 +123,7 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
         minTrackingConfidence: 0.5
       });
       mainThreadPoseLandmarkerRef.current = {
-        detect: (img: HTMLImageElement) => landmarker.detectForImage(img),
+        detect: (img: HTMLImageElement) => landmarker.detect(img),
         close: () => landmarker.close()
       };
       console.log('✅ [MainThreadFallback] MediaPipe pronto no main thread');
