@@ -53,14 +53,14 @@ async function initializeMediaPipe() {
     console.log('[Worker] Criando PoseLandmarker...');
     poseLandmarkerInstance = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: '/models/pose_landmarker_lite.task',
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
         delegate: 'CPU'
       },
       runningMode: 'IMAGE',
       numPoses: 1,
-      minPoseDetectionConfidence: 0.4,
-      minPosePresenceConfidence: 0.4,
-      minTrackingConfidence: 0.4
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
     console.log('[Worker] PoseLandmarker criado com sucesso');
 

@@ -25,7 +25,7 @@ export interface UseMediaPipePoseOptions {
 
 export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
   const enabled = options?.enabled ?? true;
-  const MIN_LANDMARK_VISIBILITY = 0.55;
+  const MIN_LANDMARK_VISIBILITY = 0.3;
   const workerRef = useRef<Worker | null>(null);
   const mainThreadPoseLandmarkerRef = useRef<{ detect: (img: HTMLImageElement) => Promise<PoseLandmarkerResult>; close: () => void } | null>(null);
   const mainThreadInitPromiseRef = useRef<Promise<void> | null>(null);
@@ -113,14 +113,14 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
 
       const landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: '/models/pose_landmarker_lite.task',
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
           delegate: 'CPU'
         },
         runningMode: 'IMAGE',
         numPoses: 1,
-        minPoseDetectionConfidence: 0.4,
-        minPosePresenceConfidence: 0.4,
-        minTrackingConfidence: 0.4
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
       mainThreadPoseLandmarkerRef.current = {
         detect: (img: HTMLImageElement) => landmarker.detectForImage(img),
