@@ -1639,7 +1639,7 @@ const validatePhotoForCollection = (
   collectionTypeToValidate: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
 ): { valid: boolean; message?: string } => {
   const getPoint = (index: number) => landmarks[index];
-  const hasPoint = (index: number, minVisibility: number = 0.55) =>
+  const hasPoint = (index: number, minVisibility: number = 0.25) =>
     !!getPoint(index) && (getPoint(index).visibility ?? 0) >= minVisibility;
 
   const noPoseMessage = {
@@ -1687,45 +1687,45 @@ const validatePhotoForCollection = (
 
   if (collectionTypeToValidate === 'upper') {
     const requiredPointsVisible =
-      hasPoint(0, 0.45) &&
-      hasPoint(11) &&
-      hasPoint(12) &&
-      hasPoint(23, 0.45) &&
-      hasPoint(24, 0.45);
+      hasPoint(0, 0.2) &&
+      hasPoint(11, 0.2) &&
+      hasPoint(12, 0.2) &&
+      hasPoint(23, 0.2) &&
+      hasPoint(24, 0.2);
 
     const torsoSpan = avgHipY - avgShoulderY;
-    const torsoLooksValid = torsoSpan > 0.12 && avgShoulderY < avgHipY;
+    const torsoLooksValid = torsoSpan > 0.05 && avgShoulderY < avgHipY + 0.1;
 
     if (!requiredPointsVisible || !torsoLooksValid) {
       return { valid: false, message: messagesByType.upper[currentLanguage] };
     }
   } else if (collectionTypeToValidate === 'lower') {
     const requiredPointsVisible =
-      hasPoint(23, 0.45) &&
-      hasPoint(24, 0.45) &&
-      hasPoint(25, 0.45) &&
-      hasPoint(26, 0.45) &&
-      hasPoint(27, 0.45) &&
-      hasPoint(28, 0.45);
+      hasPoint(23, 0.2) &&
+      hasPoint(24, 0.2) &&
+      hasPoint(25, 0.2) &&
+      hasPoint(26, 0.2) &&
+      hasPoint(27, 0.2) &&
+      hasPoint(28, 0.2);
 
     const legSpan = avgAnkleY - avgHipY;
-    const legLooksValid = legSpan > 0.20 && avgHipY < avgKneeY && avgKneeY < avgAnkleY;
+    const legLooksValid = legSpan > 0.10 && avgHipY < avgAnkleY + 0.15;
 
     if (!requiredPointsVisible || !legLooksValid) {
       return { valid: false, message: messagesByType.lower[currentLanguage] };
     }
   } else {
     const requiredPointsVisible =
-      hasPoint(0, 0.45) &&
-      hasPoint(11) &&
-      hasPoint(12) &&
-      hasPoint(23, 0.45) &&
-      hasPoint(24, 0.45) &&
-      hasPoint(27, 0.45) &&
-      hasPoint(28, 0.45);
+      hasPoint(0, 0.2) &&
+      hasPoint(11, 0.2) &&
+      hasPoint(12, 0.2) &&
+      hasPoint(23, 0.2) &&
+      hasPoint(24, 0.2) &&
+      hasPoint(27, 0.2) &&
+      hasPoint(28, 0.2);
 
     const fullSpan = avgAnkleY - (nose?.y ?? 0);
-    const fullBodyLooksValid = fullSpan > 0.45 && (nose?.y ?? 1) < avgShoulderY && avgShoulderY < avgHipY && avgHipY < avgAnkleY;
+    const fullBodyLooksValid = fullSpan > 0.30 && (nose?.y ?? 1) < avgAnkleY + 0.2;
 
     if (!requiredPointsVisible || !fullBodyLooksValid) {
       return { valid: false, message: messagesByType.full[currentLanguage] };
@@ -1828,16 +1828,9 @@ const handleSubmit = async () => {
 
           console.log('✅ Medidas calculadas pelo MediaPipe:', measurements);
         } else {
-          console.warn('⚠️ MediaPipe não detectou poses na imagem');
-          const noPoseMessage = {
-            pt: 'Não conseguimos detectar seu corpo na foto. Envie outra imagem frontal com melhor iluminação.',
-            es: 'No pudimos detectar tu cuerpo en la foto. Envía otra imagen frontal con mejor iluminación.',
-            en: 'We could not detect your body in the photo. Please upload another front-facing image with better lighting.'
-          };
-          setError(noPoseMessage[currentLanguage]);
-          setLoading(false);
-          setStep('confirm');
-          return;
+          console.warn('⚠️ MediaPipe não detectou poses na imagem - continuando com medidas do formulário');
+          detectedLandmarks = null;
+          detectedMeasurements = null;
         }
       } catch (err) {
         console.error('❌ Erro ao detectar landmarks no frontend:', err);

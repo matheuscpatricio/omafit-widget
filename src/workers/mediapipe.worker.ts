@@ -58,9 +58,9 @@ async function initializeMediaPipe() {
       },
       runningMode: 'IMAGE',
       numPoses: 1,
-      minPoseDetectionConfidence: 0.7,
-      minPosePresenceConfidence: 0.7,
-      minTrackingConfidence: 0.7
+      minPoseDetectionConfidence: 0.4,
+      minPosePresenceConfidence: 0.4,
+      minTrackingConfidence: 0.4
     });
     console.log('[Worker] PoseLandmarker criado com sucesso');
 
