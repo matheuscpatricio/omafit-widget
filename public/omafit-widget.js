@@ -1,28 +1,38 @@
 // Omafit - Widget oficial adaptado para Theme App Extension
 (function () {
-  // Log imediato para confirmar que script está carregando
-  console.log('✅ Script omafit-widget.js carregado e executando...');
-  
   // Configuração global (será preenchida pela API)
   let OMAFIT_CONFIG = null;
+  let fontsLoaded = false;
 
-  // Carregar fontes do Google Fonts
-  const fontsToLoad = [
-    'Outfit:wght@100..900',
-    'Playfair+Display:wght@400..900',
-    'Raleway:wght@100..900',
-    'Inter:opsz,wght@14..32,100..900'
-  ];
+  // Carregar fontes do Google Fonts APENAS quando o modal for aberto (preserva velocidade do site)
+  function loadFontsWhenNeeded() {
+    if (fontsLoaded) return;
+    fontsLoaded = true;
+    const fontsToLoad = [
+      'Outfit:wght@100..900',
+      'Playfair+Display:wght@400..900',
+      'Raleway:wght@100..900',
+      'Inter:opsz,wght@14..32,100..900'
+    ];
+    fontsToLoad.forEach((font) => {
+      const fontName = font.split(':')[0];
+      if (!document.querySelector('link[href*="' + fontName + '"]')) {
+        const link = document.createElement('link');
+        link.href = 'https://fonts.googleapis.com/css2?family=' + font + '&display=swap';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+    });
+  }
 
-  fontsToLoad.forEach((font) => {
-    const fontName = font.split(':')[0];
-    if (!document.querySelector('link[href*="' + fontName + '"]')) {
-      const link = document.createElement('link');
-      link.href = 'https://fonts.googleapis.com/css2?family=' + font + '&display=swap';
-      link.rel = 'stylesheet';
-      document.head.appendChild(link);
-    }
-  });
+  // Preconnect para acelerar abertura do modal (executado no hover do link)
+  function preconnectWidget() {
+    if (document.querySelector('link[rel="preconnect"][href="https://omafit.netlify.app"]')) return;
+    const preconnect = document.createElement('link');
+    preconnect.rel = 'preconnect';
+    preconnect.href = 'https://omafit.netlify.app';
+    document.head.appendChild(preconnect);
+  }
 
   // Normalizar URLs
   function normalizeUrl(url) {
@@ -1020,6 +1030,7 @@
 
   // Função que abre o modal do Omafit
   window.openOmafitModal = async function () {
+    loadFontsWhenNeeded();
     // Se configuração não estiver carregada, tentar carregar agora
     if (!OMAFIT_CONFIG) {
       console.warn('⚠️ Omafit: configuração não carregada, tentando carregar agora...');
@@ -1586,6 +1597,7 @@
     link.addEventListener('mouseenter', function () {
       this.style.opacity = '0.7';
       this.style.textDecorationThickness = '2px';
+      preconnectWidget();
     });
     link.addEventListener('mouseleave', function () {
       this.style.opacity = '1';
@@ -1857,26 +1869,22 @@
     }
   }
 
-  // Inicializar widget
+  // Inicializar widget (defer para preservar velocidade do site)
   function startInit() {
-    console.log('🚀 Omafit: Iniciando widget...');
-    console.log('📋 Estado do documento:', document.readyState);
-    console.log('🏪 Shopify disponível:', !!window.Shopify);
-    
-    if (document.readyState === 'loading') {
-      console.log('⏳ Aguardando DOMContentLoaded...');
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('✅ DOMContentLoaded disparado');
-        initOmafit();
-      });
-    } else {
-      console.log('✅ DOM já está pronto, inicializando imediatamente');
-      // Aguardar um pouco para garantir que elementos estão renderizados
-      setTimeout(initOmafit, 100);
+    function runInit() {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runInit);
+        return;
+      }
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(initOmafit, { timeout: 2500 });
+      } else {
+        setTimeout(initOmafit, 150);
+      }
     }
+    runInit();
   }
 
-  // Tentar múltiplas vezes se necessário (para SPAs)
   startInit();
   
   // Também tentar após um delay (para temas que carregam conteúdo dinamicamente)

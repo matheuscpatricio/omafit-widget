@@ -1,23 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LandingPage } from './components/LandingPage';
-import { DashboardPage } from './components/DashboardPage';
-import { AdvancedAnalytics } from './components/AdvancedAnalytics';
-import { ShopifyConfigPage } from './components/ShopifyConfigPage';
-import { WidgetGeneratorPage } from './components/WidgetGeneratorPage';
-import { AccountSettingsPage } from './components/AccountSettingsPage';
-import { SizeChartManagerNew } from './components/SizeChartManagerNew';
 import { WidgetPage } from './components/WidgetPage';
 import { AuthForm } from './components/AuthForm';
-import { FeedbackPage } from './components/FeedbackPage';
-import CollectionsPage from './components/CollectionsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { ContactPage } from './components/ContactPage';
-import { PricingPage } from './components/PricingPage';
 import { supabase } from './lib/supabase';
+
+const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const AdvancedAnalytics = lazy(() => import('./components/AdvancedAnalytics').then(m => ({ default: m.AdvancedAnalytics })));
+const ShopifyConfigPage = lazy(() => import('./components/ShopifyConfigPage').then(m => ({ default: m.ShopifyConfigPage })));
+const WidgetGeneratorPage = lazy(() => import('./components/WidgetGeneratorPage').then(m => ({ default: m.WidgetGeneratorPage })));
+const AccountSettingsPage = lazy(() => import('./components/AccountSettingsPage').then(m => ({ default: m.AccountSettingsPage })));
+const SizeChartManagerNew = lazy(() => import('./components/SizeChartManagerNew').then(m => ({ default: m.SizeChartManagerNew })));
+const FeedbackPage = lazy(() => import('./components/FeedbackPage').then(m => ({ default: m.FeedbackPage })));
+const CollectionsPage = lazy(() => import('./components/CollectionsPage'));
+const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 
 function DashboardWrapper() {
   const navigate = useNavigate();
@@ -102,6 +103,7 @@ function App() {
   return (
     <Router>
       <OAuthRedirectHandler />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707]" /></div>}>
       <Routes>
         <Route path="/" element={<LandingPageWrapper />} />
         <Route path="/auth" element={<AuthWrapper />} />
@@ -181,6 +183,7 @@ function App() {
         />
         <Route path="/widget" element={<WidgetPage />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 }

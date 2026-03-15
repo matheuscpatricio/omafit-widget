@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import { FilesetResolver, PoseLandmarker, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface PoseLandmark {
   x: number;
@@ -18,10 +18,16 @@ export interface BodyMeasurements {
   legLength: number;
 }
 
-export function useMediaPipePose() {
+export interface UseMediaPipePoseOptions {
+  /** Só inicializa MediaPipe quando true. Use false para adiar carregamento até o usuário precisar (ex: step photo). */
+  enabled?: boolean;
+}
+
+export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
+  const enabled = options?.enabled ?? true;
   const MIN_LANDMARK_VISIBILITY = 0.55;
   const workerRef = useRef<Worker | null>(null);
-  const mainThreadPoseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  const mainThreadPoseLandmarkerRef = useRef<{ detect: (img: HTMLImageElement) => Promise<PoseLandmarkerResult>; close: () => void } | null>(null);
   const mainThreadInitPromiseRef = useRef<Promise<void> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +36,7 @@ export function useMediaPipePose() {
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     console.log('🔧 [useMediaPipePose] Criando Worker...');
     try {
       workerRef.current = new Worker(
@@ -87,7 +94,7 @@ export function useMediaPipePose() {
       workerRef.current?.terminate();
       mainThreadPoseLandmarkerRef.current?.close?.();
     };
-  }, []);
+  }, [enabled]);
 
   const initializeMainThreadPoseLandmarker = useCallback(async () => {
     if (mainThreadPoseLandmarkerRef.current) return;
@@ -99,11 +106,12 @@ export function useMediaPipePose() {
     setIsLoading(true);
     const initPromise = (async () => {
       console.log('🔧 [MainThreadFallback] Inicializando MediaPipe no main thread...');
+      const { FilesetResolver, PoseLandmarker } = await import('@mediapipe/tasks-vision');
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
       );
 
-      mainThreadPoseLandmarkerRef.current = await PoseLandmarker.createFromOptions(vision, {
+      const landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: '/models/pose_landmarker_lite.task',
           delegate: 'CPU'
@@ -114,6 +122,10 @@ export function useMediaPipePose() {
         minPosePresenceConfidence: 0.7,
         minTrackingConfidence: 0.7
       });
+      mainThreadPoseLandmarkerRef.current = {
+        detect: (img: HTMLImageElement) => landmarker.detectForImage(img),
+        close: () => landmarker.close()
+      };
       console.log('✅ [MainThreadFallback] MediaPipe pronto no main thread');
     })();
 
