@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, TrendingUp, RefreshCw, Users, ShoppingBag, Star, Check, Mail, DollarSign, Package, Ruler, BarChart3 } from 'lucide-react';
+import { Zap, Check, Mail } from 'lucide-react';
 import { PlanCalculator } from './PlanCalculator';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
+import { Timeline } from './ui/timeline';
 import Lenis from '@studio-freight/lenis';
 import { motion, useScroll, useTransform } from 'framer-motion';
 
@@ -54,6 +55,10 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     card4Title: 'Assistente Inteligente com ChatGPT',
     card4Desc: 'Integração com ChatGPT para responder dúvidas dos clientes sobre produtos e marca em tempo real. Ofereça suporte personalizado e aumente a confiança na compra com respostas instantâneas e precisas.',
     card4Badge: 'Respostas inteligentes 24/7 sobre produtos',
+    timelineTitle: 'Benefícios do Omafit',
+    timelineSubtitle: 'Descubra como nossa tecnologia transforma a experiência de compra da sua marca.',
+    featuresTimelineTitle: 'Recursos',
+    featuresTimelineSubtitle: 'Tecnologia e ferramentas que impulsionam sua marca.',
     pricingTitle: 'O plano para sua marca',
     pricingSubtitle: 'Escolha o plano ideal para o tamanho do seu negócio',
     platformsTitle: 'Plataformas',
@@ -124,6 +129,10 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     card4Title: 'Intelligent Assistant with ChatGPT',
     card4Desc: 'ChatGPT integration to answer customer questions about products and brand in real time. Offer personalized support and increase purchase confidence.',
     card4Badge: 'Smart product answers 24/7',
+    timelineTitle: 'Omafit Benefits',
+    timelineSubtitle: 'Discover how our technology transforms your brand\'s shopping experience.',
+    featuresTimelineTitle: 'Features',
+    featuresTimelineSubtitle: 'Technology and tools that power your brand.',
     pricingTitle: 'The plan for your brand',
     pricingSubtitle: 'Choose the ideal plan for your business size',
     platformsTitle: 'Platforms',
@@ -194,6 +203,10 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     card4Title: 'Asistente Inteligente con ChatGPT',
     card4Desc: 'Integración con ChatGPT para responder dudas de clientes sobre productos y marca en tiempo real. Ofrece soporte personalizado.',
     card4Badge: 'Respuestas inteligentes 24/7 sobre productos',
+    timelineTitle: 'Beneficios de Omafit',
+    timelineSubtitle: 'Descubre cómo nuestra tecnología transforma la experiencia de compra de tu marca.',
+    featuresTimelineTitle: 'Recursos',
+    featuresTimelineSubtitle: 'Tecnología y herramientas que impulsan tu marca.',
     pricingTitle: 'El plan para tu marca',
     pricingSubtitle: 'Elige el plan ideal para el tamaño de tu negocio',
     platformsTitle: 'Plataformas',
@@ -449,13 +462,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % 3);
-    }, 7000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
       setCurrentPlatformSlide((prev) => (prev + 1) % 4);
     }, 5000);
     return () => clearInterval(interval);
@@ -557,38 +563,17 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </section>
 
-          {/* Benefits Section */}
-          <section className="py-16 sm:py-20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
-                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-1">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    {t.quote1}
-                  </p>
-                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                    - Donald Norman
-                  </p>
-                </div>
-
-                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-2">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    {t.quote2}
-                  </p>
-                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                    - Daniel Kahneman
-                  </p>
-                </div>
-
-                <div className="text-center p-8 rounded-2xl hover:scale-105 transition-transform duration-300" data-animate="benefit-3">
-                  <p className="landing-title text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed text-gray-900">
-                    {t.quote3}
-                  </p>
-                  <p className="mt-4 text-lg text-gray-600" style={{ fontFamily: '"Playfair Display", serif' }}>
-                    - Marty Neumeier
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Benefits Section - Timeline */}
+          <section id="benefits" className="py-16 sm:py-20">
+            <Timeline
+              title={t.timelineTitle}
+              subtitle={t.timelineSubtitle}
+              data={[
+                { title: t.quote1, content: <p className="text-gray-600">— Donald Norman</p> },
+                { title: t.quote2, content: <p className="text-gray-600">— Daniel Kahneman</p> },
+                { title: t.quote3, content: <p className="text-gray-600">— Marty Neumeier</p> },
+              ]}
+            />
           </section>
 
           {/* Features Section */}
@@ -662,116 +647,67 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             />
           </section>
 
-          {/* Features Cards */}
+          {/* Features Timeline */}
           <section className="py-20 -mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-            {/* Card 1 - Calculadora de Medidas */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#810707]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-gradient-to-br from-[#810707] to-[#a00909] rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <Ruler className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  {t.card1Title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  {t.card1Desc}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Check className="w-4 h-4 text-[#810707]" />
-                  <span>{t.card1Badge}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 2 - Analytics */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#810707]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-gradient-to-br from-[#810707] to-[#a00909] rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <BarChart3 className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  {t.card2Title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  {t.card2Desc}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Check className="w-4 h-4 text-[#810707]" />
-                  <span>{t.card2Badge}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 3 - Personalização */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#810707]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-gradient-to-br from-[#810707] to-[#a00909] rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <Package className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  {t.card3Title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  {t.card3Desc}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Check className="w-4 h-4 text-[#810707]" />
-                  <span>{t.card3Badge}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 4 - ChatGPT */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="group relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#810707]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-gradient-to-br from-[#810707] to-[#a00909] rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <Zap className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#810707] transition-colors duration-300">
-                  {t.card4Title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  {t.card4Desc}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Check className="w-4 h-4 text-[#810707]" />
-                  <span>{t.card4Badge}</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+            <Timeline
+              title={t.featuresTimelineTitle}
+              subtitle={t.featuresTimelineSubtitle}
+              data={[
+                {
+                  title: t.card1Title,
+                  content: (
+                    <div>
+                      <p className="text-gray-800 dark:text-neutral-200 text-xs md:text-sm font-normal mb-4">
+                        {t.card1Desc}
+                      </p>
+                      <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
+                        {t.card1Badge}
+                      </p>
+                    </div>
+                  ),
+                },
+                {
+                  title: t.card2Title,
+                  content: (
+                    <div>
+                      <p className="text-gray-800 dark:text-neutral-200 text-xs md:text-sm font-normal mb-4">
+                        {t.card2Desc}
+                      </p>
+                      <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
+                        {t.card2Badge}
+                      </p>
+                    </div>
+                  ),
+                },
+                {
+                  title: t.card3Title,
+                  content: (
+                    <div>
+                      <p className="text-gray-800 dark:text-neutral-200 text-xs md:text-sm font-normal mb-4">
+                        {t.card3Desc}
+                      </p>
+                      <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
+                        {t.card3Badge}
+                      </p>
+                    </div>
+                  ),
+                },
+                {
+                  title: t.card4Title,
+                  content: (
+                    <div>
+                      <p className="text-gray-800 dark:text-neutral-200 text-xs md:text-sm font-normal mb-4">
+                        {t.card4Desc}
+                      </p>
+                      <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
+                        {t.card4Badge}
+                      </p>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </section>
 
 
           {/* Pricing Section */}
