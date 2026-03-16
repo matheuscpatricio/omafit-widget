@@ -304,28 +304,10 @@ function calculateSizeScores(
 
 function applyBoundaryZone(
   sortedScores: SizeScore[],
-  fitMultiplier: number
+  _fitMultiplier: number
 ): string {
-  if (sortedScores.length < 2) {
-    return sortedScores[0].size;
-  }
-
-  const best = sortedScores[0];
-  const second = sortedScores[1];
-
-  const relativeDiff = (second.score - best.score) / Math.max(best.score, 0.5);
-
-  const threshold = 0.20;
-
-  if (relativeDiff < threshold) {
-    if (fitMultiplier < 1.0) {
-      return second.score < best.score * 1.3 ? second.size : best.size;
-    } else if (fitMultiplier > 1.0) {
-      return best.size;
-    }
-  }
-
-  return best.size;
+  if (sortedScores.length === 0) return '';
+  return sortedScores[0].size;
 }
 
 function calculateConfidence(

@@ -1125,23 +1125,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
       return null;
     }
 
-    // Função helper para comparar tamanhos
-    const compareSizes = (size1: string, size2: string): number => {
-      // Ordem padrão de tamanhos brasileiros
-      const sizeOrder: { [key: string]: number } = {
-        'XPP': 0, 'PP': 1, 'XP': 2, 'P': 3, 'M': 4, 'G': 5, 'GG': 6, 'XG': 7, '3G': 7, 'XXG': 8, '4G': 8,
-        // Tamanhos numéricos (comum em roupas infantis/internacionais)
-        '2': 2, '4': 3, '6': 4, '8': 5, '10': 6, '12': 7, '14': 8, '16': 9,
-        // Tamanhos internacionais
-        'XXS': 0, 'XS': 1, 'S': 2, 'L': 5, 'XL': 6, 'XXL': 7, '3XL': 8, '4XL': 9
-      };
-
-      const order1 = sizeOrder[size1.toUpperCase()] ?? 999;
-      const order2 = sizeOrder[size2.toUpperCase()] ?? 999;
-      return order1 - order2; // negativo se size1 < size2, positivo se size1 > size2
-    };
-
-    // Ordenar por score
+    // Ordenar por score (menor = melhor) — sempre escolher o tamanho com menor soma de pesos
     sizeScores.sort((a, b) => a.score - b.score);
 
     const bestMatch = sizeScores[0];
@@ -1150,64 +1134,6 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('🥇 Melhor match:', bestMatch.size, '(score:', bestMatch.score.toFixed(2) + ')');
     if (secondBest) {
       console.log('🥈 Segundo melhor:', secondBest.size, '(score:', secondBest.score.toFixed(2) + ')');
-
-      const scoreDifference = Math.abs(bestMatch.score - secondBest.score);
-
-      // Zona limítrofe RELATIVA: 20% de diferença
-      // Importante: usar diferença relativa ao invés de absoluta
-      // Score 0.5 vs 0.7 é muito diferente de 4.5 vs 4.7
-      // PISO de 0.5 evita distorção quando score é extremamente baixo
-      const scoreFloor = Math.max(bestMatch.score, 0.5);
-      const relativeDifference = scoreDifference / scoreFloor;
-      const relativeThreshold = 0.20; // 20% de diferença
-
-      console.log('📊 Diferença absoluta:', scoreDifference.toFixed(2));
-      console.log('📊 Score com piso:', scoreFloor.toFixed(2));
-      console.log('📊 Diferença relativa:', (relativeDifference * 100).toFixed(1) + '%');
-
-      if (relativeDifference < relativeThreshold) {
-        console.log('⚠️ ZONA LIMÍTROFE detectada! (diferença relativa:', (relativeDifference * 100).toFixed(1) + '% < threshold:', (relativeThreshold * 100) + '%)');
-        console.log('   Preferência de fit usada como desempate:', fitNames[fitIndex]);
-
-        // Determinar qual tamanho é efetivamente MAIOR
-        const sizeComparison = compareSizes(bestMatch.size, secondBest.size);
-        const largerSize = sizeComparison > 0 ? bestMatch : secondBest;
-        const smallerSize = sizeComparison > 0 ? secondBest : bestMatch;
-
-        console.log('   📏 Comparação:', smallerSize.size, '<', largerSize.size);
-
-        // Desempate: se usuário quer justa, escolhe o menor
-        // Se quer solta, escolhe o maior
-        if (fitIndex === 0) {
-          // Fit justa: escolher o menor
-          console.log('   → Escolhendo tamanho menor (fit justa):', smallerSize.size);
-          console.log('\n✅ RECOMENDAÇÃO FINAL:', smallerSize.size);
-          return {
-            size: smallerSize.size,
-            measurements: {
-              chest: bodyChest,
-              waist: bodyWaist,
-              hip: bodyHip,
-              shoulder: bodyShoulder
-            }
-          };
-        } else if (fitIndex === 2) {
-          // Fit solta: escolher o maior
-          console.log('   → Escolhendo tamanho maior (fit solta):', largerSize.size);
-          console.log('\n✅ RECOMENDAÇÃO FINAL:', largerSize.size);
-          return {
-            size: largerSize.size,
-            measurements: {
-              chest: bodyChest,
-              waist: bodyWaist,
-              hip: bodyHip,
-              shoulder: bodyShoulder
-            }
-          };
-        }
-      } else {
-        console.log('✅ Diferença significativa - mantendo melhor match');
-      }
     }
 
     // ═══════════════════════════════════════════════════════════════════
