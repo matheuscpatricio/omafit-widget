@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Check, Mail } from 'lucide-react';
-import { PlanCalculator } from './PlanCalculator';
+import { SquishyPricing } from './ui/squishy-pricing';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
 import { Timeline } from './ui/timeline';
+import { TechSplineSection } from './ui/tech-spline-section';
 import Lenis from '@studio-freight/lenis';
 import { motion, useScroll, useTransform } from 'framer-motion';
 
@@ -36,6 +37,8 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     quote3: 'Marcas fortes reduzem a ansiedade na decisão.',
     techTaglinePrefix: 'Dê a experiência aos seus clientes de ver a roupa da sua loja no',
     techTaglineHighlight: 'próprio corpo',
+    techSectionTitle: 'Provador virtual com IA',
+    techSectionDesc: 'Nossa tecnologia analisa mais de 50 pontos corporais para recomendações precisas de tamanho. Crie experiências imersivas que capturam a atenção dos clientes e aumentam a conversão da sua loja.',
     altMeasurementPrecision: 'Precisão na medição',
     altAdvancedAnalytics: 'Analytics avançado',
     altRealtimeData: 'Dados em tempo real',
@@ -110,6 +113,8 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     quote3: 'Strong brands reduce decision anxiety.',
     techTaglinePrefix: 'Give your customers the experience of seeing your store clothing on their',
     techTaglineHighlight: 'own body',
+    techSectionTitle: 'AI virtual fitting room',
+    techSectionDesc: 'Our technology analyzes over 50 body points for precise size recommendations. Create immersive experiences that capture customer attention and boost your store conversion.',
     altMeasurementPrecision: 'Measurement precision',
     altAdvancedAnalytics: 'Advanced analytics',
     altRealtimeData: 'Real-time data',
@@ -184,6 +189,8 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     quote3: 'Las marcas fuertes reducen la ansiedad en la decisión.',
     techTaglinePrefix: 'Ofrece a tus clientes la experiencia de ver la ropa de tu tienda en su',
     techTaglineHighlight: 'propio cuerpo',
+    techSectionTitle: 'Probador virtual con IA',
+    techSectionDesc: 'Nuestra tecnología analiza más de 50 puntos corporales para recomendaciones precisas de talla. Crea experiencias inmersivas que captan la atención y aumentan la conversión.',
     altMeasurementPrecision: 'Precisión de medición',
     altAdvancedAnalytics: 'Analítica avanzada',
     altRealtimeData: 'Datos en tiempo real',
@@ -539,35 +546,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           {/* Hero Section - Zoom Parallax */}
           <HeroZoomParallax t={t} />
 
-          {/* Stats Section */}
-          <section className="py-12 sm:py-16" data-animate="stats">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                <div className="text-center" data-animate="stat-1">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>40%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">{t.statConversion}</div>
-                </div>
-                <div className="text-center" data-animate="stat-2">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>64%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">{t.statReturns}</div>
-                </div>
-                <div className="text-center" data-animate="stat-3">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>95%</div>
-                  <div className="text-gray-600 text-sm sm:text-base">{t.statSatisfaction}</div>
-                </div>
-                <div className="text-center" data-animate="stat-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Jost", sans-serif', fontStyle: 'italic' }}>5min</div>
-                  <div className="text-gray-600 text-sm sm:text-base">{t.statIntegrationTime}</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* Benefits Section - Timeline */}
           <section id="benefits" className="py-16 sm:py-20">
             <Timeline
-              title={t.timelineTitle}
-              subtitle={t.timelineSubtitle}
               data={[
                 { title: t.quote1, content: <p className="text-gray-600">— Donald Norman</p> },
                 { title: t.quote2, content: <p className="text-gray-600">— Daniel Kahneman</p> },
@@ -576,7 +557,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             />
           </section>
 
-          {/* Features Section */}
+          {/* Features Section - YouTube + tagline */}
           <section id="features" className="py-16 sm:py-20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-black" style={{ minHeight: '600px' }}>
@@ -610,41 +591,14 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </section>
 
-          {/* ZoomParallax Section - Precision & Analytics */}
-          <section className="relative">
-            <ZoomParallax
-              videoUrl="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/video_1760123751873.mp4"
-              images={[
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/c141f6e7-4c08-441a-b1c8-b57a0b7dc909.png',
-                  alt: t.altMeasurementPrecision,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/818977cf-5249-4b75-a269-58101c30c9ac.jpeg',
-                  alt: t.altAdvancedAnalytics,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/790e602d-8e3e-492e-b6b5-89c917c449d2.png',
-                  alt: t.altRealtimeData,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/e40e36fe-3890-47bf-a4d8-a298c9d991e4.jpeg',
-                  alt: t.altFashionTech,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/3fc6a657-bb77-4bd2-9774-1dbb316e4b5a.jpeg',
-                  alt: t.altIntuitiveDashboard,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/eee28427-629f-4b81-bcff-0b6204b61e27.png',
-                  alt: t.altAccurateMeasurements,
-                },
-                {
-                  src: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/f6eed9b9-aa98-4845-84ef-cc8fcd1650fc.jpeg',
-                  alt: t.altDetailedReports,
-                },
-              ]}
-            />
+          {/* Tech Spline Section - substitui ZoomParallax (vídeo) */}
+          <section className="py-16 sm:py-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <TechSplineSection
+                title={t.techSectionTitle}
+                description={t.techSectionDesc}
+              />
+            </div>
           </section>
 
           {/* Features Timeline */}
@@ -722,8 +676,13 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 </p>
               </div>
 
-              {/* Plan Calculator */}
-              <PlanCalculator locale={locale} />
+              {/* Squishy Pricing Cards */}
+              <SquishyPricing
+                locale={locale}
+                onSelectPlan={(planId) => {
+                  if (planId !== 'enterprise') setShowPricingModal(true);
+                }}
+              />
             </div>
           </section>
 
