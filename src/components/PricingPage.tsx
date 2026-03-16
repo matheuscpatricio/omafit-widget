@@ -42,7 +42,7 @@ export function PricingPage() {
       <div className="text-center">
         <h2 className="text-3xl font-bold text-gray-800 mb-4">Escolha seu Plano</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          Transforme sua loja com nossa tecnologia de provador virtual com IA
+          Transforme sua loja com nossa tecnologia de assistente inteligente
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export function PricingPage() {
                 <div className="space-y-4 mb-8">
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-green-500" />
-                    <span className="text-gray-700">Provador virtual com IA</span>
+                    <span className="text-gray-700">Assistente inteligente</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-green-500" />

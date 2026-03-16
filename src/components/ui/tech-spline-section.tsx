@@ -16,16 +16,16 @@ export function TechSplineSection({
   scene = DEFAULT_SCENE,
 }: TechSplineSectionProps) {
   return (
-    <Card className="w-full h-[500px] bg-black/[0.96] relative overflow-hidden border-0">
-      <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="white" />
+    <Card className="w-full h-[500px] bg-white relative overflow-hidden border border-gray-200">
+      <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="#e5e5e5" />
 
       <div className="flex h-full flex-col md:flex-row">
         {/* Left content */}
         <div className="flex-1 p-8 relative z-10 flex flex-col justify-center">
-          <h2 className="text-3xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400">
+          <h2 className="text-3xl md:text-5xl font-bold text-gray-900">
             {title}
           </h2>
-          <p className="mt-4 text-neutral-300 max-w-lg">{description}</p>
+          <p className="mt-4 text-gray-700 max-w-lg">{description}</p>
         </div>
 
         {/* Right content - Spline */}
