@@ -5,10 +5,11 @@ import { SquishyPricing } from './ui/squishy-pricing';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
+import DisplayCards from './ui/display-cards';
+import { Sparkles } from 'lucide-react';
 import { Timeline } from './ui/timeline';
 import { TechSplineSection } from './ui/tech-spline-section';
 import Lenis from '@studio-freight/lenis';
-import { motion, useScroll, useTransform } from 'framer-motion';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -24,6 +25,9 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     heroSubtitle: 'When techno meets fashion.',
     heroTitleBottom: 'Um assistente inteligente',
     heroTitleBottomLine2: 'de vendas para sua marca',
+    heroCard1: 'Você viu?',
+    heroCard2: 'O que?',
+    heroCard3: 'As marcas do futuro usando Omafit',
     navFeatures: 'Recursos',
     navBenefits: 'Benefícios',
     navPlans: 'Planos',
@@ -100,6 +104,9 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     heroSubtitle: 'When techno meets fashion.',
     heroTitleBottom: 'An intelligent sales assistant',
     heroTitleBottomLine2: 'for your brand',
+    heroCard1: 'Did you see?',
+    heroCard2: 'What?',
+    heroCard3: 'The brands of the future using Omafit',
     navFeatures: 'Features',
     navBenefits: 'Benefits',
     navPlans: 'Plans',
@@ -176,6 +183,9 @@ const landingTranslations: Record<LandingLocale, Record<string, string>> = {
     heroSubtitle: 'When techno meets fashion.',
     heroTitleBottom: 'Un asistente inteligente',
     heroTitleBottomLine2: 'de ventas para tu marca',
+    heroCard1: '¿Viste?',
+    heroCard2: '¿Qué?',
+    heroCard3: 'Las marcas del futuro usando Omafit',
     navFeatures: 'Recursos',
     navBenefits: 'Beneficios',
     navPlans: 'Planes',
@@ -335,49 +345,44 @@ function VideoText({ immersiveExperience }: { immersiveExperience: string }) {
   );
 }
 
-function HeroZoomParallax({ t }: { t: Record<string, string> }) {
-  const container = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: container,
-    offset: ['start start', 'end end'],
-  });
-
-  const scale1 = useTransform(scrollYProgress, [0, 0.5], [1, 3.5]);
-  const scale2 = useTransform(scrollYProgress, [0.5, 1], [1, 2.5]);
-  const opacity1 = useTransform(scrollYProgress, [0, 0.3, 0.5], [1, 1, 0]);
-  const opacity2 = useTransform(scrollYProgress, [0.5, 0.65, 0.95], [0, 1, 1]);
+function HeroDisplayCards({ t }: { t: Record<string, string> }) {
+  const cards = [
+    {
+      icon: <Sparkles className="size-4 text-red-200" />,
+      title: t.heroCard1,
+      description: '',
+      date: '',
+      iconClassName: 'text-[#810707]',
+      titleClassName: 'text-[#810707] font-bold',
+      className:
+        "[grid-area:stack] hover:-translate-y-10 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-[#810707]/20 before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-white/50 grayscale-[100%] hover:grayscale-0 before:opacity-0 hover:before:opacity-0 before:transition-opacity before:duration-700 before:left-0 before:top-0",
+    },
+    {
+      icon: <Sparkles className="size-4 text-red-200" />,
+      title: t.heroCard2,
+      description: '',
+      date: '',
+      iconClassName: 'text-[#810707]',
+      titleClassName: 'text-[#810707] font-bold',
+      className:
+        "[grid-area:stack] translate-x-12 sm:translate-x-16 translate-y-10 hover:-translate-y-1 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-[#810707]/20 before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-white/50 grayscale-[100%] hover:grayscale-0 before:opacity-0 hover:before:opacity-0 before:transition-opacity before:duration-700 before:left-0 before:top-0",
+    },
+    {
+      icon: <Sparkles className="size-4 text-red-200" />,
+      title: t.heroCard3,
+      description: '',
+      date: '',
+      iconClassName: 'text-[#810707]',
+      titleClassName: 'text-[#810707] font-bold text-base sm:text-lg',
+      className:
+        "[grid-area:stack] translate-x-24 sm:translate-x-32 translate-y-20 hover:translate-y-10",
+    },
+  ];
 
   return (
-    <div ref={container} className="relative h-[300vh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100">
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="w-full px-4 max-w-7xl text-center">
-            <motion.div
-              style={{ scale: scale1, opacity: opacity1 }}
-              className="space-y-4"
-            >
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                {t.heroTitleTop}
-                <br />
-                <VideoText immersiveExperience={t.immersiveExperience} />
-              </h1>
-              <p className="text-lg sm:text-xl md:text-2xl text-gray-700" style={{ fontFamily: '"Elms Sans", sans-serif' }}>
-                {t.heroSubtitle}
-              </p>
-            </motion.div>
-
-            <motion.div
-              style={{ scale: scale2, opacity: opacity2 }}
-              className="absolute inset-0 flex items-center justify-center px-4"
-            >
-              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 max-w-5xl leading-tight" style={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 500 }}>
-                {t.heroTitleBottom}
-                <br />
-                {t.heroTitleBottomLine2}
-              </h2>
-            </motion.div>
-          </div>
-        </div>
+    <div className="flex min-h-[400px] w-full items-center justify-center py-20 bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      <div className="w-full max-w-3xl px-4">
+        <DisplayCards cards={cards} />
       </div>
     </div>
   );
@@ -543,8 +548,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </header>
 
-          {/* Hero Section - Zoom Parallax */}
-          <HeroZoomParallax t={t} />
+          {/* Hero Section - Display Cards */}
+          <HeroDisplayCards t={t} />
 
           {/* Benefits Section - Timeline */}
           <section id="benefits" className="py-16 sm:py-20">
