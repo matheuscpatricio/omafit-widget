@@ -104,18 +104,7 @@ export const MinimalistHero = ({
       )}
 
       <div className="relative grid w-full max-w-7xl flex-grow grid-cols-1 items-center gap-8">
-        {mainText && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="z-20 order-1 text-center"
-          >
-            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 italic">{mainText}</p>
-          </motion.div>
-        )}
-
-        <div className="relative order-2 flex justify-center items-center h-full min-h-[320px]">
+        <div className="relative order-1 flex justify-center items-center h-full min-h-[320px]">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -125,7 +114,7 @@ export const MinimalistHero = ({
           <motion.img
             src={imageSrc}
             alt={imageAlt}
-            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[1500px] xl:w-[1800px]"
+            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[550px] xl:w-[650px]"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
@@ -137,6 +126,17 @@ export const MinimalistHero = ({
           />
         </div>
 
+        {mainText && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="z-20 order-2 text-center"
+          >
+            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 italic">{mainText}</p>
+          </motion.div>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,7 +144,7 @@ export const MinimalistHero = ({
           className="z-20 order-3 flex items-center justify-center text-center"
         >
           <h1
-            className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-tight"
+            className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-3xl md:whitespace-nowrap lg:text-4xl xl:text-5xl leading-tight"
           >
             <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part1}</span>
             <br className="md:hidden" />
