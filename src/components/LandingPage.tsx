@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
 import { Timeline } from './ui/timeline';
 import { TechSplineSection } from './ui/tech-spline-section';
-import { GLSLHills } from './ui/glsl-hills';
+import { MinimalistHero } from './ui/minimalist-hero';
 import Lenis from '@studio-freight/lenis';
 
 interface LandingPageProps {
@@ -344,33 +344,21 @@ function VideoText({ immersiveExperience }: { immersiveExperience: string }) {
   );
 }
 
-function HeroGLSLHills() {
+function HeroMinimalist() {
   return (
-    <section className="relative w-full h-[520px] sm:h-[650px] overflow-hidden bg-white">
-      <GLSLHills
-        className="absolute inset-0"
-        height="100%"
-        width="100%"
-        speed={0.55}
-        cameraZ={125}
-      />
-
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-center">
-          <div className="text-center space-y-5">
-            <h1
-              className="text-4xl sm:text-6xl md:text-7xl text-gray-900 leading-tight"
-              style={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 500 }}
-            >
-              proporcione uma{' '}
-              <span className="crimson-text-bold-italic">experiência extraordinária</span>{' '}
-              na sua loja
-            </h1>
-            <div className="h-1 w-24 mx-auto rounded-full bg-gradient-to-r from-[#810707] to-red-700" />
-          </div>
-        </div>
-      </div>
-    </section>
+    <MinimalistHero
+      showHeader={false}
+      showFooter={false}
+      mainText="When techno meets fashion."
+      readMoreLink="#features"
+      imageSrc="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80"
+      imageAlt="Moda e tecnologia"
+      overlayText={{
+        part1: 'proporcione uma',
+        part2: 'experiência extraordinária',
+        part3: ' na sua loja',
+      }}
+    />
   );
 }
 
@@ -534,8 +522,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </header>
 
-          {/* Hero Section - GLSL Hills */}
-          <HeroGLSLHills />
+          {/* Hero Section - Minimalist */}
+          <HeroMinimalist />
 
           {/* Benefits Section - Timeline */}
           <section id="benefits" className="py-16 sm:py-20">

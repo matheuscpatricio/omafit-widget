@@ -12,9 +12,12 @@
     font-family: 'Elms Sans', sans-serif;
   }
 
-  /* Admin logo */
-  .admin-logo {
-    font-family: 'BBH Sans Hegarty', sans-serif;
+  /* OMAFIT logo - Bungee */
+  .admin-logo,
+  .bungee-regular {
+    font-family: 'Bungee', sans-serif;
+    font-weight: 400;
+    font-style: normal;
   }
 }
 
