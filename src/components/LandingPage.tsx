@@ -351,8 +351,8 @@ function HeroMinimalist() {
       showFooter={false}
       mainText="When techno meets fashion."
       readMoreLink="#features"
-      imageSrc="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80"
-      imageAlt="Moda e tecnologia"
+      imageSrc="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/WooCommerce-Symbol-1.png"
+      imageAlt="Omafit"
       overlayText={{
         part1: 'proporcione uma',
         part2: 'experiência extraordinária',
@@ -502,7 +502,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center">
-                  <span className="admin-logo text-2xl font-bold text-gray-900">OMAFIT</span>
+                  <span className="admin-logo text-2xl text-gray-900" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
                 </div>
 
                 <div className="flex items-center gap-8">
@@ -919,7 +919,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <div className="bg-gradient-to-r from-[#810707] to-red-700 text-white rounded-lg w-8 h-8 flex items-center justify-center mr-3">
                   <Zap className="w-5 h-5" />
                 </div>
-                <span className="admin-logo text-xl font-bold">OMAFIT</span>
+                <span className="admin-logo text-xl" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
               </div>
               <p className="text-gray-400">
                 {t.footerDescription}
