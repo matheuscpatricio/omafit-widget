@@ -144,14 +144,14 @@ export const MinimalistHero = ({
           className="z-20 order-3 flex items-center justify-center text-center"
         >
           <h1
-            className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-3xl md:whitespace-nowrap lg:text-4xl xl:text-5xl leading-tight"
+            className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-3xl md:whitespace-nowrap md:text-center lg:text-4xl xl:text-5xl leading-tight"
           >
             <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part1}</span>
             <br className="md:hidden" />
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className="inline-block w-[14ch] align-baseline text-left">
+                <span className="inline-block align-baseline text-left" style={{ width: `${rotatingWords[wordIndex].length}ch` }}>
                   <motion.span
                     key={wordIndex}
                     initial={{ opacity: 0 }}
@@ -162,6 +162,7 @@ export const MinimalistHero = ({
                     {rotatingWords[wordIndex]}
                   </motion.span>
                 </span>
+                <br className="md:hidden" />
                 {overlayText.part3 && <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part3}</span>}
               </>
             ) : (
