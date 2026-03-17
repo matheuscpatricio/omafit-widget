@@ -158,8 +158,8 @@ export function GLSLHills({
               varying vec3 vPosition;
 
               void main(void) {
-                float opacity = (96.0 - length(vPosition)) / 256.0 * 0.6;
-                vec3 color = vec3(0.50, 0.03, 0.03); // Omafit-ish tint
+                float opacity = (120.0 - length(vPosition)) / 256.0 * 0.95;
+                vec3 color = vec3(0.505, 0.027, 0.027); // #810707-ish tint
                 gl_FragColor = vec4(color, opacity);
               }
             `,

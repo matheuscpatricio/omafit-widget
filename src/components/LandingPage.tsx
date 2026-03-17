@@ -346,14 +346,25 @@ function VideoText({ immersiveExperience }: { immersiveExperience: string }) {
 
 function HeroGLSLHills() {
   return (
-    <section className="relative w-full min-h-[520px] sm:min-h-[650px] overflow-hidden bg-white">
-      <GLSLHills className="absolute inset-0" height="100%" width="100%" speed={0.55} cameraZ={125} />
+    <section className="relative w-full h-[520px] sm:h-[650px] overflow-hidden bg-white">
+      <GLSLHills
+        className="absolute inset-0"
+        height="100%"
+        width="100%"
+        speed={0.55}
+        cameraZ={125}
+      />
 
       <div className="absolute inset-0 z-10 pointer-events-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-center">
           <div className="text-center space-y-5">
-            <h1 className="crimson-text-bold-italic text-4xl sm:text-6xl md:text-7xl text-gray-900">
-              proporcione uma experiência extraordinária na sua loja
+            <h1
+              className="text-4xl sm:text-6xl md:text-7xl text-gray-900 leading-tight"
+              style={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 500 }}
+            >
+              proporcione uma{' '}
+              <span className="crimson-text-bold-italic">experiência extraordinária</span>{' '}
+              na sua loja
             </h1>
             <div className="h-1 w-24 mx-auto rounded-full bg-gradient-to-r from-[#810707] to-red-700" />
           </div>
@@ -503,7 +514,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center">
-                  <span className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+                  <span className="admin-logo text-2xl font-bold text-gray-900">OMAFIT</span>
                 </div>
 
                 <div className="flex items-center gap-8">
@@ -920,7 +931,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <div className="bg-gradient-to-r from-[#810707] to-red-700 text-white rounded-lg w-8 h-8 flex items-center justify-center mr-3">
                   <Zap className="w-5 h-5" />
                 </div>
-                <span className="text-xl font-bold" style={{ fontFamily: '"BBH Sans Hegarty", sans-serif' }}>OMAFIT</span>
+                <span className="admin-logo text-xl font-bold">OMAFIT</span>
               </div>
               <p className="text-gray-400">
                 {t.footerDescription}
