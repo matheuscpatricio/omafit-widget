@@ -151,12 +151,12 @@ export const MinimalistHero = ({
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className="relative inline-block w-[14ch] overflow-hidden align-baseline leading-tight">
-                  <span className="invisible crimson-text-bold-italic leading-tight" aria-hidden="true">{rotatingWords[0]}</span>
+                <span className="relative inline-block overflow-hidden align-baseline leading-none" style={{ width: `${rotatingWords[wordIndex].length}ch` }}>
+                  <span className="invisible crimson-text-bold-italic leading-none" aria-hidden="true">{rotatingWords[wordIndex]}</span>
                   {rotatingWords.map((word, index) => (
                     <motion.span
                       key={index}
-                      className="absolute left-0 bottom-0 leading-tight crimson-text-bold-italic text-[#810707]"
+                      className="absolute left-0 top-0 leading-none crimson-text-bold-italic text-[#810707]"
                       initial={{ opacity: 0, y: '-100%' }}
                       transition={{ type: 'spring', stiffness: 50 }}
                       animate={
