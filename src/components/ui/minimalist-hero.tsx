@@ -135,7 +135,7 @@ export const MinimalistHero = ({
           className="z-20 order-3 flex items-center justify-center text-center md:justify-start"
         >
           <h1
-            className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl leading-tight"
+            className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-tight"
             style={{ fontFamily: '"DM Sans", sans-serif' }}
           >
             {overlayText.part1}
