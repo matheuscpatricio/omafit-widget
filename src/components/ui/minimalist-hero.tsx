@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -15,6 +15,8 @@ interface MinimalistHeroProps {
     part2: string;
     part3?: string;
   };
+  /** Palavras que alternam no lugar de part2 (ex: ["extraordinária", "única"]). part2 vira o prefixo antes da palavra rotativa. */
+  rotatingWords?: string[];
   socialLinks?: { icon: LucideIcon; href: string }[];
   locationText?: string;
   showHeader?: boolean;
@@ -45,12 +47,24 @@ export const MinimalistHero = ({
   imageSrc,
   imageAlt,
   overlayText,
+  rotatingWords,
   socialLinks = [],
   locationText,
   showHeader = false,
   showFooter = false,
   className,
 }: MinimalistHeroProps) => {
+  const [wordIndex, setWordIndex] = useState(0);
+  const words = rotatingWords ?? [];
+
+  useEffect(() => {
+    if (words.length <= 1) return;
+    const id = setTimeout(() => {
+      setWordIndex((i) => (i === words.length - 1 ? 0 : i + 1));
+    }, 2000);
+    return () => clearTimeout(id);
+  }, [wordIndex, words.length]);
+
   return (
     <div
       className={cn(
@@ -139,8 +153,35 @@ export const MinimalistHero = ({
           >
             <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part1}</span>
             <br />
-            <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-            {overlayText.part3 && <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part3}</span>}
+            {rotatingWords && rotatingWords.length > 0 ? (
+              <>
+                <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
+                <span className="relative inline-block min-w-[14ch] overflow-hidden align-top">
+                  &nbsp;
+                  {rotatingWords.map((word, index) => (
+                    <motion.span
+                      key={index}
+                      className="absolute left-0 top-0 crimson-text-bold-italic text-[#810707]"
+                      initial={{ opacity: 0, y: '-100%' }}
+                      transition={{ type: 'spring', stiffness: 50 }}
+                      animate={
+                        wordIndex === index
+                          ? { y: 0, opacity: 1 }
+                          : { y: wordIndex > index ? -150 : 150, opacity: 0 }
+                      }
+                    >
+                      {word}
+                    </motion.span>
+                  ))}
+                </span>
+                {overlayText.part3 && <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part3}</span>}
+              </>
+            ) : (
+              <>
+                <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
+                {overlayText.part3 && <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part3}</span>}
+              </>
+            )}
           </h1>
         </motion.div>
       </div>

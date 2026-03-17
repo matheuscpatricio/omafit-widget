@@ -355,9 +355,10 @@ function HeroMinimalist() {
       imageAlt="Omafit"
       overlayText={{
         part1: 'proporcione uma',
-        part2: 'experiência extraordinária',
+        part2: 'experiência ',
         part3: ' na sua loja',
       }}
+      rotatingWords={['extraordinária', 'única']}
     />
   );
 }
