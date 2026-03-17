@@ -136,12 +136,11 @@ export const MinimalistHero = ({
         >
           <h1
             className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-tight"
-            style={{ fontFamily: '"DM Sans", sans-serif' }}
           >
-            {overlayText.part1}
+            <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part1}</span>
             <br />
             <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-            {overlayText.part3 && <>{overlayText.part3}</>}
+            {overlayText.part3 && <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part3}</span>}
           </h1>
         </motion.div>
       </div>
