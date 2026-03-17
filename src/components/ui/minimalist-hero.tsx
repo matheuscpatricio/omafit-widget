@@ -116,7 +116,7 @@ export const MinimalistHero = ({
           <motion.img
             src={imageSrc}
             alt={imageAlt}
-            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[780px] xl:w-[920px]"
+            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[1100px] xl:w-[1300px]"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
