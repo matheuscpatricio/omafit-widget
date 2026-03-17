@@ -106,17 +106,17 @@ export const MinimalistHero = ({
           </motion.div>
         )}
 
-        <div className="relative order-1 md:order-2 flex justify-center items-center h-full min-h-[280px]">
+        <div className="relative order-1 md:order-2 flex justify-center items-center h-full min-h-[360px]">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-            className="absolute z-0 h-[280px] w-[280px] rounded-full bg-[#810707]/20 md:h-[350px] md:w-[350px] lg:h-[420px] lg:w-[420px]"
+            className="absolute z-0 h-[360px] w-[360px] rounded-full bg-[#810707]/20 md:h-[450px] md:w-[450px] lg:h-[520px] lg:w-[520px] xl:h-[600px] xl:w-[600px]"
           />
           <motion.img
             src={imageSrc}
             alt={imageAlt}
-            className="relative z-10 h-auto w-48 object-cover md:w-56 scale-150 lg:w-64"
+            className="relative z-10 h-auto w-72 object-cover md:w-96 lg:w-[420px] xl:w-[500px] scale-[1.15]"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
