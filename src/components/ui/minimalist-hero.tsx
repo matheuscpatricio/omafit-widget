@@ -103,24 +103,19 @@ export const MinimalistHero = ({
         </header>
       )}
 
-      <div className="relative grid w-full max-w-7xl flex-grow grid-cols-1 items-center md:grid-cols-3">
+      <div className="relative grid w-full max-w-7xl flex-grow grid-cols-1 items-center gap-8">
         {mainText && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="z-20 order-2 md:order-1 text-center md:text-left"
+            className="z-20 order-1 text-center"
           >
-            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 md:mx-0">{mainText}</p>
-            {readMoreLink && (
-              <a href={readMoreLink} className="mt-4 inline-block text-sm font-medium text-[#810707] underline decoration-from-font hover:text-red-800">
-                Saiba mais
-              </a>
-            )}
+            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 italic">{mainText}</p>
           </motion.div>
         )}
 
-        <div className="relative order-1 md:order-2 flex justify-center items-center h-full min-h-[320px]">
+        <div className="relative order-2 flex justify-center items-center h-full min-h-[320px]">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -130,7 +125,7 @@ export const MinimalistHero = ({
           <motion.img
             src={imageSrc}
             alt={imageAlt}
-            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[1100px] xl:w-[1300px]"
+            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[1500px] xl:w-[1800px]"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
@@ -146,18 +141,18 @@ export const MinimalistHero = ({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="z-20 order-3 flex items-center justify-center text-center md:justify-start"
+          className="z-20 order-3 flex items-center justify-center text-center"
         >
           <h1
             className="text-2xl font-extrabold text-gray-900 sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-tight"
           >
             <span style={{ fontFamily: '"Outfit", sans-serif' }}>{overlayText.part1}</span>
-            <br />
+            <br className="md:hidden" />
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className="relative inline-block min-w-[14ch] overflow-hidden align-top">
-                  &nbsp;
+                <span className="relative inline-block min-w-[14ch] overflow-hidden align-baseline">
+                  <span className="invisible crimson-text-bold-italic" aria-hidden="true">{rotatingWords[0]}</span>
                   {rotatingWords.map((word, index) => (
                     <motion.span
                       key={index}

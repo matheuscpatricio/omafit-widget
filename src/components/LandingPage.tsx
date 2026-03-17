@@ -350,7 +350,6 @@ function HeroMinimalist() {
       showHeader={false}
       showFooter={false}
       mainText="When techno meets fashion."
-      readMoreLink="#features"
       imageSrc="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/5843da9a-f798-468c-8d55-0b3e25d55856-Photoroom.png"
       imageAlt="Omafit"
       overlayText={{
