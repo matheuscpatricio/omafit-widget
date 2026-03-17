@@ -45,7 +45,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
             <Zap className="w-5 h-5 text-[#810707]" />
           </div>
-          <h1 className="admin-logo text-lg font-bold text-white">OMAFIT</h1>
+          <h1 className="admin-logo font-bungee text-lg font-bold text-white">OMAFIT</h1>
         </div>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -82,7 +82,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
               <Zap className="w-5 h-5 text-[#810707]" />
             </div>
             {!sidebarCollapsed && (
-              <h1 className="admin-logo text-xl font-bold text-white whitespace-nowrap">OMAFIT</h1>
+              <h1 className="admin-logo font-bungee text-xl font-bold text-white whitespace-nowrap">OMAFIT</h1>
             )}
           </div>
         </div>

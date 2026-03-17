@@ -15,6 +15,7 @@ export default {
       fontFamily: {
         'heading': ['BBH Sans Bartle', 'sans-serif'],
         'body': ['Rubik', 'sans-serif'],
+        'bungee': ['Bungee', 'sans-serif'],
       },
     },
   },

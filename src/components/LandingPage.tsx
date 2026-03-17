@@ -351,7 +351,7 @@ function HeroMinimalist() {
       showFooter={false}
       mainText="When techno meets fashion."
       readMoreLink="#features"
-      imageSrc="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/WooCommerce-Symbol-1.png"
+      imageSrc="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/5843da9a-f798-468c-8d55-0b3e25d55856-Photoroom.png"
       imageAlt="Omafit"
       overlayText={{
         part1: 'proporcione uma',
@@ -502,7 +502,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center">
-                  <span className="admin-logo text-2xl text-gray-900" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
+                  <span className="admin-logo font-bungee text-2xl text-gray-900" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
                 </div>
 
                 <div className="flex items-center gap-8">
@@ -919,7 +919,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                 <div className="bg-gradient-to-r from-[#810707] to-red-700 text-white rounded-lg w-8 h-8 flex items-center justify-center mr-3">
                   <Zap className="w-5 h-5" />
                 </div>
-                <span className="admin-logo text-xl" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
+                <span className="admin-logo font-bungee text-xl" style={{ fontFamily: '"Bungee", sans-serif', fontWeight: 400 }}>OMAFIT</span>
               </div>
               <p className="text-gray-400">
                 {t.footerDescription}

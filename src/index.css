@@ -12,13 +12,15 @@
     font-family: 'Elms Sans', sans-serif;
   }
 
-  /* OMAFIT logo - Bungee */
-  .admin-logo,
-  .bungee-regular {
-    font-family: 'Bungee', sans-serif !important;
-    font-weight: 400 !important;
-    font-style: normal;
-  }
+}
+
+/* OMAFIT logo - Bungee (fora do @layer para maior especificidade sobre Tailwind) */
+.admin-logo,
+.bungee-regular,
+.font-bungee {
+  font-family: 'Bungee', sans-serif !important;
+  font-weight: 400 !important;
+  font-style: normal;
 }
 
 @layer utilities {
