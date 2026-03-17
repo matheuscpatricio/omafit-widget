@@ -510,7 +510,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
 
   return (
-    <div className="min-h-screen relative bg-white">
+    <div className="min-h-screen relative bg-white" style={{ colorScheme: 'light' }}>
         <div className="relative z-10">
           {/* Header - Visible at top or when scrolling up */}
           <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
@@ -602,7 +602,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           </section>
 
           {/* Features Timeline */}
-          <section className="py-20 -mt-20">
+          <section className="py-20 -mt-20 bg-white">
             <Timeline
               title={t.featuresTimelineTitle}
               subtitle={t.featuresTimelineSubtitle}
@@ -665,8 +665,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
 
           {/* Pricing Section */}
-          <section id="pricing" className="py-16 sm:py-20" data-animate="pricing">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <section id="pricing" className="py-16 sm:py-20 bg-white" data-animate="pricing">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
               <div className="text-center mb-12 sm:mb-16">
                 <h2 className="landing-title text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                   {t.pricingTitle}

@@ -37,13 +37,13 @@ const PricingCard = ({
           initial={{ scale: 0.85 }}
           variants={{ hover: { scale: 1 } }}
           transition={{ duration: 1, ease: 'backInOut' }}
-          className="my-2 block origin-top-left font-mono text-6xl font-black leading-[1.2]"
+          className="my-2 block origin-top-left font-mono text-4xl sm:text-6xl font-black leading-[1.2]"
         >
           {monthlyPrice}
           <br />
           {priceSuffix}
         </motion.span>
-        <p className="text-lg text-white/90">{description}</p>
+        <p className="text-sm sm:text-lg text-white/90">{description}</p>
       </div>
       {isLink ? (
         <a
@@ -72,7 +72,7 @@ const PricingCard = ({
       whileHover="hover"
       transition={{ duration: 1, ease: 'backInOut' }}
       variants={{ hover: { scale: 1.05 } }}
-      className={`relative h-96 w-80 shrink-0 overflow-hidden rounded-xl p-8 ${background} shadow-lg hover:shadow-xl transition-shadow`}
+      className={`relative min-h-[384px] h-96 w-full min-w-0 max-w-[320px] sm:w-80 shrink-0 overflow-hidden rounded-xl p-6 sm:p-8 ${background} shadow-lg hover:shadow-xl transition-shadow self-center`}
     >
       {content}
     </motion.div>
@@ -292,9 +292,9 @@ const pricingByLocale: Record<
 };
 
 const backgrounds = [
-  'bg-[#810707] dark:bg-[#a00909]',
-  'bg-[#a00909] dark:bg-[#6b0505]',
-  'bg-[#6b0505] dark:bg-[#810707]',
+  'bg-[#810707]',
+  'bg-[#a00909]',
+  'bg-[#6b0505]',
 ];
 
 const bgComponents = [BGComponent1, BGComponent2, BGComponent3];
@@ -303,8 +303,8 @@ export function SquishyPricing({ locale = 'pt', onSelectPlan }: SquishyPricingPr
   const plans = pricingByLocale[locale] || pricingByLocale.pt;
 
   return (
-    <section className="bg-white dark:bg-neutral-950 px-4 py-12 min-h-[500px] transition-colors">
-      <div className="mx-auto flex w-fit flex-wrap justify-center gap-4">
+    <section className="bg-white px-4 py-12 min-h-[500px] transition-colors">
+      <div className="mx-auto flex flex-col sm:flex-row flex-wrap justify-center items-center gap-4 sm:w-fit">
         {plans.map((plan, index) => (
           <PricingCard
             key={plan.planId}
