@@ -353,7 +353,7 @@ function HeroMinimalist() {
       imageSrc="https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/5843da9a-f798-468c-8d55-0b3e25d55856-Photoroom.png"
       imageAlt="Omafit"
       overlayText={{
-        part1: 'proporcione uma',
+        part1: 'proporcione uma ',
         part2: 'experiência ',
         part3: ' na sua loja',
       }}

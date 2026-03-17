@@ -114,7 +114,7 @@ export const MinimalistHero = ({
           <motion.img
             src={imageSrc}
             alt={imageAlt}
-            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[550px] xl:w-[650px]"
+            className="relative z-10 h-auto w-[380px] object-cover md:w-[480px] lg:w-[480px] xl:w-[560px]"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
@@ -151,12 +151,18 @@ export const MinimalistHero = ({
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className="relative inline-block min-w-[14ch] overflow-hidden align-baseline">
-                  <span className="invisible crimson-text-bold-italic" aria-hidden="true">{rotatingWords[0]}</span>
+                <span className={cn(
+                  'relative inline-block w-[14ch] overflow-hidden align-baseline leading-tight',
+                  wordIndex === 1 && 'text-right'
+                )}>
+                  <span className="invisible crimson-text-bold-italic leading-tight" aria-hidden="true">{rotatingWords[0]}</span>
                   {rotatingWords.map((word, index) => (
                     <motion.span
                       key={index}
-                      className="absolute left-0 top-0 crimson-text-bold-italic text-[#810707]"
+                      className={cn(
+                        'absolute top-0 leading-tight crimson-text-bold-italic text-[#810707]',
+                        index === 0 ? 'left-0' : 'right-0 left-auto'
+                      )}
                       initial={{ opacity: 0, y: '-100%' }}
                       transition={{ type: 'spring', stiffness: 50 }}
                       animate={
