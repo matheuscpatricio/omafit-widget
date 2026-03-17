@@ -104,7 +104,18 @@ export const MinimalistHero = ({
       )}
 
       <div className="relative grid w-full max-w-7xl flex-grow grid-cols-1 items-center gap-8">
-        <div className="relative order-1 flex justify-center items-center h-full min-h-[320px]">
+        {mainText && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="z-20 order-1 text-center"
+          >
+            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 italic">{mainText}</p>
+          </motion.div>
+        )}
+
+        <div className="relative order-2 flex justify-center items-center h-full min-h-[320px]">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -126,17 +137,6 @@ export const MinimalistHero = ({
           />
         </div>
 
-        {mainText && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="z-20 order-2 text-center"
-          >
-            <p className="mx-auto max-w-xs text-sm leading-relaxed text-gray-600 italic">{mainText}</p>
-          </motion.div>
-        )}
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -151,18 +151,12 @@ export const MinimalistHero = ({
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className={cn(
-                  'relative inline-block w-[14ch] overflow-hidden align-baseline leading-tight',
-                  wordIndex === 1 && 'text-right'
-                )}>
+                <span className="relative inline-block w-[14ch] overflow-hidden align-baseline leading-tight">
                   <span className="invisible crimson-text-bold-italic leading-tight" aria-hidden="true">{rotatingWords[0]}</span>
                   {rotatingWords.map((word, index) => (
                     <motion.span
                       key={index}
-                      className={cn(
-                        'absolute top-0 leading-tight crimson-text-bold-italic text-[#810707]',
-                        index === 0 ? 'left-0' : 'right-0 left-auto'
-                      )}
+                      className="absolute left-0 bottom-0 leading-tight crimson-text-bold-italic text-[#810707]"
                       initial={{ opacity: 0, y: '-100%' }}
                       transition={{ type: 'spring', stiffness: 50 }}
                       animate={
