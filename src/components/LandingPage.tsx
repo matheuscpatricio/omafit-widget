@@ -5,10 +5,9 @@ import { SquishyPricing } from './ui/squishy-pricing';
 import { PricingModal } from './PricingModal';
 import { supabase } from '../lib/supabase';
 import { ZoomParallax } from './ui/zoom-parallax';
-import DisplayCards from './ui/display-cards';
-import { Sparkles } from 'lucide-react';
 import { Timeline } from './ui/timeline';
 import { TechSplineSection } from './ui/tech-spline-section';
+import { GLSLHills } from './ui/glsl-hills';
 import Lenis from '@studio-freight/lenis';
 
 interface LandingPageProps {
@@ -345,46 +344,22 @@ function VideoText({ immersiveExperience }: { immersiveExperience: string }) {
   );
 }
 
-function HeroDisplayCards({ t }: { t: Record<string, string> }) {
-  const cards = [
-    {
-      icon: <Sparkles className="size-4 text-red-200" />,
-      title: t.heroCard1,
-      description: '',
-      date: '',
-      iconClassName: 'text-[#810707]',
-      titleClassName: 'text-[#810707] font-bold',
-      className:
-        "[grid-area:stack] hover:-translate-y-10 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-[#810707]/20 before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-white/50 grayscale-[100%] hover:grayscale-0 before:opacity-0 hover:before:opacity-0 before:transition-opacity before:duration-700 before:left-0 before:top-0",
-    },
-    {
-      icon: <Sparkles className="size-4 text-red-200" />,
-      title: t.heroCard2,
-      description: '',
-      date: '',
-      iconClassName: 'text-[#810707]',
-      titleClassName: 'text-[#810707] font-bold',
-      className:
-        "[grid-area:stack] translate-x-12 sm:translate-x-16 translate-y-10 hover:-translate-y-1 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-[#810707]/20 before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-white/50 grayscale-[100%] hover:grayscale-0 before:opacity-0 hover:before:opacity-0 before:transition-opacity before:duration-700 before:left-0 before:top-0",
-    },
-    {
-      icon: <Sparkles className="size-4 text-red-200" />,
-      title: t.heroCard3,
-      description: '',
-      date: '',
-      iconClassName: 'text-[#810707]',
-      titleClassName: 'text-[#810707] font-bold text-base sm:text-lg',
-      className:
-        "[grid-area:stack] translate-x-24 sm:translate-x-32 translate-y-20 hover:translate-y-10",
-    },
-  ];
-
+function HeroGLSLHills() {
   return (
-    <div className="flex min-h-[400px] w-full items-center justify-center py-20 bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      <div className="w-full max-w-3xl px-4">
-        <DisplayCards cards={cards} />
+    <section className="relative w-full min-h-[520px] sm:min-h-[650px] overflow-hidden bg-white">
+      <GLSLHills className="absolute inset-0" height="100%" width="100%" speed={0.55} cameraZ={125} />
+
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-center">
+          <div className="text-center space-y-5">
+            <h1 className="crimson-text-bold-italic text-4xl sm:text-6xl md:text-7xl text-gray-900">
+              proporcione uma experiência extraordinária na sua loja
+            </h1>
+            <div className="h-1 w-24 mx-auto rounded-full bg-gradient-to-r from-[#810707] to-red-700" />
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -548,8 +523,8 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
             </div>
           </header>
 
-          {/* Hero Section - Display Cards */}
-          <HeroDisplayCards t={t} />
+          {/* Hero Section - GLSL Hills */}
+          <HeroGLSLHills />
 
           {/* Benefits Section - Timeline */}
           <section id="benefits" className="py-16 sm:py-20">
@@ -622,7 +597,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
                         {t.card1Badge}
                       </p>
-                    </div>
+                </div>
                   ),
                 },
                 {
@@ -635,7 +610,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
                         {t.card2Badge}
                       </p>
-                    </div>
+                </div>
                   ),
                 },
                 {
@@ -648,7 +623,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
                         {t.card3Badge}
                       </p>
-                    </div>
+                </div>
                   ),
                 },
                 {
@@ -661,12 +636,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                       <p className="text-gray-600 dark:text-neutral-400 text-xs md:text-sm font-medium">
                         {t.card4Badge}
                       </p>
-                    </div>
+                </div>
                   ),
                 },
               ]}
             />
-          </section>
+      </section>
 
 
           {/* Pricing Section */}

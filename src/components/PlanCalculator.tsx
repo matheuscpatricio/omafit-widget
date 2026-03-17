@@ -42,9 +42,9 @@ const plansByLocale: Record<LandingLocale, Plan[]> = {
       tryons: 0,
       maxVisits: 50000,
       description: 'Free to install. 50 free images (one-time) + $0.18 per additional image.',
-      additionalImagePrice: 0.18
-    },
-    {
+    additionalImagePrice: 0.18
+  },
+  {
       id: 'pro',
       name: 'Pro',
       price: 300,
@@ -63,10 +63,10 @@ const plansByLocale: Record<LandingLocale, Plan[]> = {
       maxVisits: 50000,
       description: 'Gratis para instalar. 50 imagenes gratuitas (una vez) + US$ 0,18 por imagen adicional.',
       additionalImagePrice: 0.18
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
       price: 300,
       tryons: 3000,
       maxVisits: 999999,
