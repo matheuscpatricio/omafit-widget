@@ -151,7 +151,7 @@ export const MinimalistHero = ({
             {rotatingWords && rotatingWords.length > 0 ? (
               <>
                 <span className="crimson-text-bold-italic text-[#810707]">{overlayText.part2}</span>
-                <span className="inline-block w-[14ch] align-baseline text-left">
+                <span className="inline align-baseline">
                   <motion.span
                     key={wordIndex}
                     initial={{ opacity: 0 }}
