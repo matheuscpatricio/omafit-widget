@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowRight,
   Box,
   Camera,
   Footprints,
@@ -67,8 +68,11 @@ const copy = {
     sizeResultTitle: 'Número recomendado',
     sizeResultBody: 'Com base na análise do pé, este é o tamanho mais indicado para você.',
     sizeAssistantPrefix: 'Assistente Omafit',
+    chatPrompt: 'Restou alguma dúvida sobre este calçado? Pergunte abaixo',
+    chatPlaceholder: 'Digite sua mensagem...',
     addToCart: 'Adicionar ao carrinho',
     addingToCart: 'Adicionando ao carrinho...',
+    processingTitle: 'Analisando suas medidas',
     arIntroTitle: 'Veja como fica no seu pé',
     arIntroBody:
       'Abra a câmera em um ambiente bem iluminado, aponte para seus pés e mova o celular lentamente para o AR ancorar o calçado.',
@@ -116,8 +120,11 @@ const copy = {
     sizeResultTitle: 'Talla recomendada',
     sizeResultBody: 'Segun el analisis del pie, esta es la talla mas indicada para ti.',
     sizeAssistantPrefix: 'Asistente Omafit',
+    chatPrompt: '¿Quedó alguna duda sobre este calzado? Pregunta abajo',
+    chatPlaceholder: 'Escribe tu mensaje...',
     addToCart: 'Agregar al carrito',
     addingToCart: 'Agregando al carrito...',
+    processingTitle: 'Analizando tus medidas',
     arIntroTitle: 'Mira como queda en tu pie',
     arIntroBody:
       'Abre la camara en un ambiente bien iluminado, apunta a tus pies y mueve el telefono lentamente para que el AR ancle el calzado.',
@@ -165,8 +172,11 @@ const copy = {
     sizeResultTitle: 'Recommended size',
     sizeResultBody: 'Based on the foot analysis, this is the size recommended for you.',
     sizeAssistantPrefix: 'Omafit Assistant',
+    chatPrompt: 'Any questions about this footwear? Ask below',
+    chatPlaceholder: 'Type your message...',
     addToCart: 'Add to cart',
     addingToCart: 'Adding to cart...',
+    processingTitle: 'Analyzing your measurements',
     arIntroTitle: 'See how it looks on your foot',
     arIntroBody:
       'Open the camera in a well lit place, point it at your feet and move your phone slowly so AR can anchor the footwear.',
@@ -186,7 +196,12 @@ const copy = {
 } as const;
 
 type ShoeWidgetCopy = typeof copy.pt;
-type Step = 'info' | 'measure-capture' | 'measure-result' | 'ar-info' | 'ar-viewer';
+type Step = 'info' | 'measure-capture' | 'processing' | 'measure-result' | 'ar-info' | 'ar-viewer';
+type ShoeChatMessage = {
+  role: 'assistant' | 'user';
+  content: string;
+  timestamp: number;
+};
 
 function hexToRgba(hex: string, alpha: number) {
   const cleaned = hex.replace('#', '');
@@ -350,15 +365,21 @@ export function ShoeARWidget({
   const [recommendedSizeLabel, setRecommendedSizeLabel] = useState<string | null>(null);
   const [assistantMessage, setAssistantMessage] = useState('');
   const [analysisNote, setAnalysisNote] = useState('');
+  const [latestMeasuredFootLength, setLatestMeasuredFootLength] = useState<number | null>(null);
+  const [usedChartRecommendation, setUsedChartRecommendation] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ShoeChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addToCartFeedback, setAddToCartFeedback] = useState('');
   const [sizeChart, setSizeChart] = useState<ShoeSizeChartEntry[]>([]);
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const { detectPose } = useMediaPipePose({
     enabled: step === 'measure-capture' || isAnalyzing,
     useWorker: false,
+    silentNoPose: true,
   });
 
   useEffect(() => {
@@ -483,6 +504,64 @@ export function ShoeARWidget({
   const borderTint = useMemo(() => hexToRgba(primaryColor, 0.2), [primaryColor]);
   const buttonTextColor = useMemo(() => getContrastTextColor(primaryColor), [primaryColor]);
 
+  useEffect(() => {
+    if (step === 'measure-result') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [step, chatMessages]);
+
+  const buildAssistantMessage = (
+    resolvedSizeLabel: string,
+    footLengthCm: number,
+    chartRecommendation: { size: string; measuredLength: number } | null
+  ) =>
+    `${t.sizeAssistantPrefix}: o tamanho mais indicado para ${productName || 'este calçado'} é ${resolvedSizeLabel}. ` +
+    `Estimativa de pé: ${footLengthCm.toFixed(1)} cm.` +
+    (chartRecommendation ? ` Tabela correspondente: ${chartRecommendation.measuredLength.toFixed(1)} cm.` : '');
+
+  useEffect(() => {
+    if (latestMeasuredFootLength === null) return;
+    if (!sizeChart.length) return;
+    if (usedChartRecommendation) return;
+
+    const chartRecommendation = calculateRecommendedShoeSizeFromChart(latestMeasuredFootLength, sizeChart);
+    if (!chartRecommendation) return;
+
+    const resolvedSizeLabel = chartRecommendation.size;
+    const nextAssistantMessage = buildAssistantMessage(
+      resolvedSizeLabel,
+      latestMeasuredFootLength,
+      chartRecommendation
+    );
+
+    setRecommendedSize(null);
+    setRecommendedSizeLabel(resolvedSizeLabel);
+    setAssistantMessage(nextAssistantMessage);
+    setUsedChartRecommendation(true);
+    setChatMessages((prev) => {
+      if (!prev.length) {
+        return [
+          {
+            role: 'assistant',
+            content: nextAssistantMessage,
+            timestamp: Date.now(),
+          },
+        ];
+      }
+
+      const [firstMessage, ...rest] = prev;
+      if (firstMessage.role !== 'assistant') return prev;
+
+      return [
+        {
+          ...firstMessage,
+          content: nextAssistantMessage,
+        },
+        ...rest,
+      ];
+    });
+  }, [latestMeasuredFootLength, sizeChart, usedChartRecommendation]);
+
   const modelViewer = React.createElement('model-viewer', {
     src: shoeModelUrl,
     'ios-src': shoeModelIosUrl || undefined,
@@ -519,6 +598,10 @@ export function ShoeARWidget({
     setRecommendedSizeLabel(null);
     setAssistantMessage('');
     setAnalysisNote('');
+    setLatestMeasuredFootLength(null);
+    setUsedChartRecommendation(false);
+    setChatMessages([]);
+    setChatInput('');
     setAddToCartFeedback('');
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -533,6 +616,7 @@ export function ShoeARWidget({
   const runFootAnalysis = async (photoPreview = footPhotoPreview) => {
     if (!photoPreview) return;
 
+    setStep('processing');
     setIsAnalyzing(true);
     setAddToCartFeedback('');
 
@@ -546,32 +630,73 @@ export function ShoeARWidget({
       const resolvedSizeLabel = chartRecommendation?.size ?? `BR ${fallbackSize}`;
 
       setEstimatedFootLength(Number(footLengthCm.toFixed(1)));
+      setLatestMeasuredFootLength(Number(footLengthCm.toFixed(1)));
       setRecommendedSize(chartRecommendation ? null : fallbackSize);
       setRecommendedSizeLabel(resolvedSizeLabel);
+      setUsedChartRecommendation(Boolean(chartRecommendation));
       setAnalysisNote(t.mediaPipeFallback);
-      setAssistantMessage(
-        `${t.sizeAssistantPrefix}: o tamanho mais indicado para ${productName || 'este calçado'} é ${resolvedSizeLabel}. ` +
-          `Estimativa de pé: ${footLengthCm.toFixed(1)} cm.` +
-          (chartRecommendation
-            ? ` Tabela correspondente: ${chartRecommendation.measuredLength.toFixed(1)} cm.`
-            : '')
+      const nextAssistantMessage = buildAssistantMessage(
+        resolvedSizeLabel,
+        footLengthCm,
+        chartRecommendation
       );
+      setAssistantMessage(nextAssistantMessage);
+      setChatMessages([
+        {
+          role: 'assistant',
+          content: nextAssistantMessage,
+          timestamp: Date.now(),
+        },
+      ]);
       setStep('measure-result');
     } catch (error) {
       console.error('Erro ao analisar pé com MediaPipe:', error);
       const fallbackLength = 25.2;
       const fallbackSize = footLengthToBrSize(fallbackLength);
       setEstimatedFootLength(fallbackLength);
+      setLatestMeasuredFootLength(fallbackLength);
       setRecommendedSize(fallbackSize);
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
+      setUsedChartRecommendation(false);
       setAnalysisNote(t.mediaPipeFallback);
-      setAssistantMessage(
-        `${t.sizeAssistantPrefix}: recomendamos BR ${fallbackSize} para ${productName || 'este calçado'}.`
-      );
+      const nextAssistantMessage = `${t.sizeAssistantPrefix}: recomendamos BR ${fallbackSize} para ${productName || 'este calçado'}.`;
+      setAssistantMessage(nextAssistantMessage);
+      setChatMessages([
+        {
+          role: 'assistant',
+          content: nextAssistantMessage,
+          timestamp: Date.now(),
+        },
+      ]);
       setStep('measure-result');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleSendChatMessage = () => {
+    const trimmedMessage = chatInput.trim();
+    if (!trimmedMessage) return;
+
+    const userMessage: ShoeChatMessage = {
+      role: 'user',
+      content: trimmedMessage,
+      timestamp: Date.now(),
+    };
+
+    const assistantReply: ShoeChatMessage = {
+      role: 'assistant',
+      content:
+        language === 'pt'
+          ? `Com base na análise do seu pé, seguimos recomendando ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'o tamanho indicado')}. Se quiser, você pode adicionar ao carrinho ou ver como fica no seu pé em AR.`
+          : language === 'es'
+            ? `Según el análisis de tu pie, seguimos recomendando ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'la talla indicada')}. Si quieres, puedes agregar al carrito o ver cómo queda en tu pie con AR.`
+            : `Based on your foot analysis, we still recommend ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'the recommended size')}. If you want, you can add it to cart or see how it looks on your foot in AR.`,
+      timestamp: Date.now() + 1,
+    };
+
+    setChatMessages((prev) => [...prev, userMessage, assistantReply]);
+    setChatInput('');
   };
 
   const handleAddToCart = () => {
@@ -622,6 +747,7 @@ export function ShoeARWidget({
 
   const goBack = () => {
     if (step === 'measure-capture') setStep('info');
+    else if (step === 'processing') setStep('measure-capture');
     else if (step === 'measure-result') setStep('measure-capture');
     else if (step === 'ar-info') setStep('measure-result');
     else if (step === 'ar-viewer') setStep('ar-info');
@@ -639,7 +765,7 @@ export function ShoeARWidget({
       `}</style>
 
       <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: primaryColor }}>
-        {step !== 'info' ? (
+        {step !== 'info' && step !== 'processing' ? (
           <button
             type="button"
             onClick={goBack}
@@ -797,6 +923,30 @@ export function ShoeARWidget({
         </div>
       )}
 
+      {step === 'processing' && (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <h3 className="text-2xl md:text-3xl font-semibold mb-4" style={{ color: primaryColor }}>
+              {t.processingTitle}
+            </h3>
+            <div className="flex items-center justify-center gap-2">
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{ backgroundColor: primaryColor, animationDelay: '0ms', animationDuration: '1.4s' }}
+              />
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{ backgroundColor: primaryColor, animationDelay: '200ms', animationDuration: '1.4s' }}
+              />
+              <span
+                className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
+                style={{ backgroundColor: primaryColor, animationDelay: '400ms', animationDuration: '1.4s' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {step === 'measure-result' && (
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="flex justify-start">
@@ -826,14 +976,40 @@ export function ShoeARWidget({
               </div>
             )}
             <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100 text-gray-900">
-              <p className="text-sm md:text-base whitespace-pre-line">
-                {`${t.sizeResultTitle}: ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : '--')}`}
-                {estimatedFootLength ? `\n${estimatedFootLength.toFixed(1)} cm` : ''}
-                {assistantMessage ? `\n\n${assistantMessage}` : ''}
-                {analysisNote ? `\n\n${analysisNote}` : ''}
-              </p>
+              <p className="text-sm md:text-base whitespace-pre-line">{`${t.sizeResultTitle}: ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : '--')}`}</p>
+              {estimatedFootLength ? (
+                <p className="mt-2 text-sm md:text-base text-gray-700">{estimatedFootLength.toFixed(1)} cm</p>
+              ) : null}
+              {analysisNote ? (
+                <p className="mt-3 text-sm md:text-base whitespace-pre-line text-gray-700">{analysisNote}</p>
+              ) : null}
             </div>
           </div>
+
+          {chatMessages.map((message, index) => (
+            <div
+              key={`${message.timestamp}-${index}`}
+              className={`flex gap-2 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+            >
+              {message.role === 'assistant' && storeLogo && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
+                  <img src={storeLogo} alt={storeName} className="w-full h-full object-contain" />
+                </div>
+              )}
+              <div
+                className={`max-w-[80%] rounded-2xl p-4 ${
+                  message.role === 'assistant'
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-white'
+                }`}
+                style={message.role === 'user' ? { backgroundColor: primaryColor } : {}}
+              >
+                <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+              </div>
+            </div>
+          ))}
+
+          <div ref={chatEndRef} />
 
           <div className="p-4 border-t bg-gray-50 -mx-4 mt-2">
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -866,6 +1042,33 @@ export function ShoeARWidget({
             {addToCartFeedback && (
               <p className="text-xs text-center text-gray-600 mt-3">{addToCartFeedback}</p>
             )}
+
+            {chatMessages.length > 0 && (
+              <p className="text-sm text-gray-600 text-center mt-3 mb-3">{t.chatPrompt}</p>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={t.chatPlaceholder}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSendChatMessage();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md"
+                style={{ backgroundColor: primaryColor }}
+                onClick={handleSendChatMessage}
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

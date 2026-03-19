@@ -23,11 +23,14 @@ export interface UseMediaPipePoseOptions {
   enabled?: boolean;
   /** Quando false, ignora o Worker e inicializa direto no main thread. */
   useWorker?: boolean;
+  /** Quando true, não registra aviso se nenhuma pose for detectada. */
+  silentNoPose?: boolean;
 }
 
 export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
   const enabled = options?.enabled ?? true;
   const useWorker = options?.useWorker ?? true;
+  const silentNoPose = options?.silentNoPose ?? false;
   const MIN_LANDMARK_VISIBILITY = 0.3;
   const workerRef = useRef<Worker | null>(null);
   const mainThreadPoseLandmarkerRef = useRef<{ detect: (img: HTMLImageElement) => Promise<PoseLandmarkerResult>; close: () => void } | null>(null);
@@ -228,7 +231,9 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
         await initializeMainThreadPoseLandmarker();
         const result = mainThreadPoseLandmarkerRef.current?.detect(imageElement) || null;
         if (!result?.landmarks?.length) {
-          console.warn('⚠️ [MainThreadFallback] Nenhuma pose detectada na imagem');
+          if (!silentNoPose) {
+            console.warn('⚠️ [MainThreadFallback] Nenhuma pose detectada na imagem');
+          }
           return null;
         }
         if (!hasGoodLandmarkVisibility(result.landmarks[0] as unknown as PoseLandmark[])) {
