@@ -21,10 +21,13 @@ export interface BodyMeasurements {
 export interface UseMediaPipePoseOptions {
   /** Só inicializa MediaPipe quando true. Use false para adiar carregamento até o usuário precisar (ex: step photo). */
   enabled?: boolean;
+  /** Quando false, ignora o Worker e inicializa direto no main thread. */
+  useWorker?: boolean;
 }
 
 export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
   const enabled = options?.enabled ?? true;
+  const useWorker = options?.useWorker ?? true;
   const MIN_LANDMARK_VISIBILITY = 0.3;
   const workerRef = useRef<Worker | null>(null);
   const mainThreadPoseLandmarkerRef = useRef<{ detect: (img: HTMLImageElement) => Promise<PoseLandmarkerResult>; close: () => void } | null>(null);
@@ -37,6 +40,13 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
 
   useEffect(() => {
     if (!enabled) return;
+    if (!useWorker) {
+      setUseMainThreadFallback(true);
+      isInitializedRef.current = false;
+      return () => {
+        mainThreadPoseLandmarkerRef.current?.close?.();
+      };
+    }
     console.log('🔧 [useMediaPipePose] Criando Worker...');
     try {
       workerRef.current = new Worker(
@@ -94,7 +104,7 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
       workerRef.current?.terminate();
       mainThreadPoseLandmarkerRef.current?.close?.();
     };
-  }, [enabled]);
+  }, [enabled, useWorker]);
 
   const initializeMainThreadPoseLandmarker = useCallback(async () => {
     if (mainThreadPoseLandmarkerRef.current) return;

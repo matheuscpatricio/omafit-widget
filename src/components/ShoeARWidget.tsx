@@ -37,12 +37,12 @@ const DEFAULT_SHOE_MODEL_URL =
 
 const copy = {
   pt: {
-    badge: 'Novo widget AR para calcados',
-    title: 'Widget de calcados com medicao e AR',
+    badge: 'Novo widget AR para calçados',
+    title: 'Widget de calçados com medição e AR',
     subtitle:
-      'Fluxo dedicado para calcados, reutilizando a identidade da loja sem alterar o widget atual.',
-    viewerTitle: 'Visualizacao AR do calcado',
-    viewerNote: 'Use o botao de AR em dispositivos compativeis. Em desktop, o modelo permanece interativo em 3D.',
+      'Fluxo dedicado para calçados, reutilizando a identidade da loja sem alterar o widget atual.',
+    viewerTitle: 'Visualização AR do calçado',
+    viewerNote: 'Use o botão de AR em dispositivos compatíveis. Em desktop, o modelo permanece interativo em 3D.',
     productLabel: 'Produto',
     productIdLabel: 'ID do produto',
     brandLabel: 'Marca',
@@ -51,39 +51,39 @@ const copy = {
     feature3: 'Fluxo isolado, sem alterar o widget atual',
     infoTitle: 'Como funciona',
     infoBody:
-      'Escolha entre descobrir seu numero ideal ou visualizar como o calcado fica no seu pe com AR.',
-    sizeButton: 'Descobrir meu numero na {storeName}',
-    arButton: 'Ver como fica no meu pe',
-    measureTitle: 'Descubra seu numero ideal',
+      'Escolha entre descobrir seu número ideal ou visualizar como o calçado fica no seu pé com AR.',
+    sizeButton: 'Descobrir meu número na {storeName}',
+    arButton: 'Ver como fica no meu pé',
+    measureTitle: 'Descubra seu número ideal',
     measureBody:
-      'Para um resultado melhor, fotografe um pe por vez, de cima para baixo, com boa luz e com uma folha A4 ou objeto reto ao lado para referencia.',
+      'Para um resultado melhor, fotografe um pé por vez, de cima para baixo, com boa luz e com uma folha A4 ou objeto reto ao lado para referência.',
     measureTipsTitle: 'Dicas para melhor resultado',
-    measureTip1: 'Posicione o pe inteiro dentro da foto.',
-    measureTip2: 'Use fundo simples e boa iluminacao.',
-    measureTip3: 'Evite sombras fortes e angulos inclinados.',
-    captureButton: 'Tirar foto do pe',
+    measureTip1: 'Posicione o pé inteiro dentro da foto.',
+    measureTip2: 'Use fundo simples e boa iluminação.',
+    measureTip3: 'Evite sombras fortes e ângulos inclinados.',
+    captureButton: 'Tirar foto do pé',
     analyzeButton: 'Analisar com MediaPipe',
-    analyzing: 'Analisando pe com MediaPipe...',
-    sizeResultTitle: 'Numero recomendado',
-    sizeResultBody: 'Com base na analise do pe, este e o tamanho mais indicado para voce.',
+    analyzing: 'Analisando pé com MediaPipe...',
+    sizeResultTitle: 'Número recomendado',
+    sizeResultBody: 'Com base na análise do pé, este é o tamanho mais indicado para você.',
     sizeAssistantPrefix: 'Assistente Omafit',
     addToCart: 'Adicionar ao carrinho',
     addingToCart: 'Adicionando ao carrinho...',
-    arIntroTitle: 'Veja como fica no seu pe',
+    arIntroTitle: 'Veja como fica no seu pé',
     arIntroBody:
-      'Abra a camera em um ambiente bem iluminado, aponte para seus pes e mova o celular lentamente para o AR ancorar o calcado.',
-    arTip1: 'Mostre os dois pes ou o pe principal por completo.',
+      'Abra a câmera em um ambiente bem iluminado, aponte para seus pés e mova o celular lentamente para o AR ancorar o calçado.',
+    arTip1: 'Mostre os dois pés ou o pé principal por completo.',
     arTip2: 'Evite ambientes escuros e reflexos fortes.',
-    arTip3: 'Mantenha o celular estavel por alguns segundos.',
-    openCamera: 'Camera',
+    arTip3: 'Mantenha o celular estável por alguns segundos.',
+    openCamera: 'Câmera',
     back: 'Voltar',
     uploadOther: 'Escolher outra foto',
-    cartSuccess: 'Solicitacao enviada para o carrinho.',
+    cartSuccess: 'Solicitação enviada para o carrinho.',
     cartPending: 'Ainda processando o carrinho... tente novamente em instantes.',
-    footPhotoLabel: 'Foto do pe',
-    shoeArLabel: 'AR do calcado',
+    footPhotoLabel: 'Foto do pé',
+    shoeArLabel: 'AR do calçado',
     mediaPipeFallback:
-      'A analise visual foi concluida com apoio do fluxo de visao computacional. Se quiser mais precisao, envie uma foto mais reta e bem iluminada.',
+      'A análise visual foi concluída com apoio do fluxo de visão computacional. Se quiser mais precisão, envie uma foto mais reta e bem iluminada.',
   },
   es: {
     badge: 'Nuevo widget AR para calzado',
@@ -328,7 +328,7 @@ function calculateRecommendedShoeSizeFromChart(
 
 export function ShoeARWidget({
   productImage,
-  productName = 'Calcado em destaque',
+  productName = 'Calçado em destaque',
   productId = 'unknown',
   storeName = 'Omafit',
   storeLogo,
@@ -356,7 +356,10 @@ export function ShoeARWidget({
   const [sizeChart, setSizeChart] = useState<ShoeSizeChartEntry[]>([]);
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { detectPose } = useMediaPipePose({ enabled: step === 'measure-capture' || isAnalyzing });
+  const { detectPose } = useMediaPipePose({
+    enabled: step === 'measure-capture' || isAnalyzing,
+    useWorker: false,
+  });
 
   useEffect(() => {
     if (customElements.get('model-viewer')) return;
@@ -408,7 +411,7 @@ export function ShoeARWidget({
         let { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
 
         if (chartError) {
-          console.error('Erro ao buscar size_chart para calcados:', chartError);
+          console.error('Erro ao buscar size_chart para calçados:', chartError);
           return;
         }
 
@@ -450,7 +453,7 @@ export function ShoeARWidget({
           .order('order', { ascending: true });
 
         if (entriesError) {
-          console.error('Erro ao buscar size_chart_entries para calcados:', entriesError);
+          console.error('Erro ao buscar size_chart_entries para calçados:', entriesError);
           return;
         }
 
@@ -469,7 +472,7 @@ export function ShoeARWidget({
 
         setSizeChart(mappedEntries);
       } catch (error) {
-        console.error('Erro crítico ao carregar size chart do widget de calcados:', error);
+        console.error('Erro crítico ao carregar size chart do widget de calçados:', error);
       }
     };
 
@@ -547,15 +550,15 @@ export function ShoeARWidget({
       setRecommendedSizeLabel(resolvedSizeLabel);
       setAnalysisNote(t.mediaPipeFallback);
       setAssistantMessage(
-        `${t.sizeAssistantPrefix}: o tamanho mais indicado para ${productName || 'este calcado'} e ${resolvedSizeLabel}. ` +
-          `Estimativa de pe: ${footLengthCm.toFixed(1)} cm.` +
+        `${t.sizeAssistantPrefix}: o tamanho mais indicado para ${productName || 'este calçado'} é ${resolvedSizeLabel}. ` +
+          `Estimativa de pé: ${footLengthCm.toFixed(1)} cm.` +
           (chartRecommendation
             ? ` Tabela correspondente: ${chartRecommendation.measuredLength.toFixed(1)} cm.`
             : '')
       );
       setStep('measure-result');
     } catch (error) {
-      console.error('Erro ao analisar pe com MediaPipe:', error);
+      console.error('Erro ao analisar pé com MediaPipe:', error);
       const fallbackLength = 25.2;
       const fallbackSize = footLengthToBrSize(fallbackLength);
       setEstimatedFootLength(fallbackLength);
@@ -563,7 +566,7 @@ export function ShoeARWidget({
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
       setAnalysisNote(t.mediaPipeFallback);
       setAssistantMessage(
-        `${t.sizeAssistantPrefix}: recomendamos BR ${fallbackSize} para ${productName || 'este calcado'}.`
+        `${t.sizeAssistantPrefix}: recomendamos BR ${fallbackSize} para ${productName || 'este calçado'}.`
       );
       setStep('measure-result');
     } finally {
@@ -585,7 +588,7 @@ export function ShoeARWidget({
         source: 'omafit-shoe-widget',
         product: {
           id: productId || 'unknown',
-          name: productName || 'Calcado',
+          name: productName || 'Calçado',
         },
         selection: {
           image_url: productImage || '',
@@ -625,8 +628,10 @@ export function ShoeARWidget({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out">
+    <div className="omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out">
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
+
         .omafit-shoe-widget-root,
         .omafit-shoe-widget-root * {
           font-family: '${fontFamily}', sans-serif !important;

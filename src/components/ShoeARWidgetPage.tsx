@@ -32,7 +32,7 @@ const normalizeFootwearCollectionType = (value: unknown): boolean => {
 export function ShoeARWidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
-  const [productName, setProductName] = useState<string>('Calcado em destaque');
+  const [productName, setProductName] = useState<string>('Calçado em destaque');
   const [storeName, setStoreName] = useState<string>('Omafit');
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
@@ -45,6 +45,7 @@ export function ShoeARWidgetPage() {
   const [collectionHandle, setCollectionHandle] = useState<string>('');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [isFootwearCollection, setIsFootwearCollection] = useState<boolean>(false);
+  const [collectionTypeResolved, setCollectionTypeResolved] = useState<boolean>(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -76,6 +77,7 @@ export function ShoeARWidgetPage() {
     if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
     if (defaultGenderParam) setDefaultGender(defaultGenderParam);
     if (collectionTypeParam !== null) {
+      setCollectionTypeResolved(true);
       setIsFootwearCollection(normalizeFootwearCollectionType(collectionTypeParam));
     }
     if (shopNameParam) setStoreName(decodeURIComponent(shopNameParam));
@@ -97,6 +99,7 @@ export function ShoeARWidgetPage() {
         if (config.collectionHandle && !collectionHandleParam) setCollectionHandle(config.collectionHandle);
         if (config.defaultGender && !defaultGenderParam) setDefaultGender(config.defaultGender);
         if (config.collectionType !== undefined) {
+          setCollectionTypeResolved(true);
           setIsFootwearCollection(
             normalizeFootwearCollectionType(config.collectionType)
           );
@@ -109,7 +112,7 @@ export function ShoeARWidgetPage() {
         );
         if (configLanguage) setStoreLanguage(configLanguage);
       } catch (error) {
-        console.error('Erro ao parsear config do widget de calcados:', error);
+        console.error('Erro ao parsear config do widget de calçados:', error);
       }
     }
 
@@ -127,6 +130,7 @@ export function ShoeARWidgetPage() {
         if (event.data.collectionHandle !== undefined) setCollectionHandle(event.data.collectionHandle || '');
         if (event.data.defaultGender) setDefaultGender(event.data.defaultGender);
         if (event.data.collectionType !== undefined) {
+          setCollectionTypeResolved(true);
           setIsFootwearCollection(
             normalizeFootwearCollectionType(event.data.collectionType)
           );
@@ -151,7 +155,11 @@ export function ShoeARWidgetPage() {
       style={{ fontFamily: fontFamily || 'inherit' }}
     >
       <div className="w-full sm:max-w-6xl max-h-[92vh] overflow-auto">
-        {isFootwearCollection ? (
+        {!collectionTypeResolved ? (
+          <div className="min-h-[240px] flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-[#810707]" />
+          </div>
+        ) : isFootwearCollection ? (
           <ShoeARWidget
             productImage={productImage}
             productId={productId}
@@ -170,9 +178,9 @@ export function ShoeARWidgetPage() {
           />
         ) : (
           <div className="rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">
-            <h2 className="text-2xl font-semibold text-slate-900">Widget indisponivel</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">Widget indisponível</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              O widget de calcados so pode ser exibido quando a colecao recebida for de calcados.
+              O widget de calçados só pode ser exibido quando a coleção recebida for de calçados.
             </p>
           </div>
         )}
