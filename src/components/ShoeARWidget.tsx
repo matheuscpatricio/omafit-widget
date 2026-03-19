@@ -4,12 +4,7 @@ import {
   Box,
   Camera,
   Footprints,
-  Info,
-  Ruler,
-  ScanSearch,
-  ShieldCheck,
   ShoppingCart,
-  Sparkles,
 } from 'lucide-react';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { supabase } from '../lib/supabase';
@@ -191,7 +186,7 @@ const copy = {
 } as const;
 
 type ShoeWidgetCopy = typeof copy.pt;
-type Step = 'info' | 'measure-info' | 'measure-capture' | 'measure-result' | 'ar-info' | 'ar-viewer';
+type Step = 'info' | 'measure-capture' | 'measure-result' | 'ar-info' | 'ar-viewer';
 
 function hexToRgba(hex: string, alpha: number) {
   const cleaned = hex.replace('#', '');
@@ -349,7 +344,6 @@ export function ShoeARWidget({
 }: ShoeARWidgetProps) {
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
   const [step, setStep] = useState<Step>('info');
-  const [footPhotoFile, setFootPhotoFile] = useState<File | null>(null);
   const [footPhotoPreview, setFootPhotoPreview] = useState<string>('');
   const [estimatedFootLength, setEstimatedFootLength] = useState<number | null>(null);
   const [recommendedSize, setRecommendedSize] = useState<number | null>(null);
@@ -517,22 +511,30 @@ export function ShoeARWidget({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setFootPhotoFile(file);
+    setEstimatedFootLength(null);
+    setRecommendedSize(null);
+    setRecommendedSizeLabel(null);
+    setAssistantMessage('');
+    setAnalysisNote('');
+    setAddToCartFeedback('');
     const reader = new FileReader();
     reader.onloadend = () => {
-      setFootPhotoPreview(String(reader.result || ''));
+      const preview = String(reader.result || '');
+      setFootPhotoPreview(preview);
+      void runFootAnalysis(preview);
     };
     reader.readAsDataURL(file);
+    event.target.value = '';
   };
 
-  const runFootAnalysis = async () => {
-    if (!footPhotoPreview) return;
+  const runFootAnalysis = async (photoPreview = footPhotoPreview) => {
+    if (!photoPreview) return;
 
     setIsAnalyzing(true);
     setAddToCartFeedback('');
 
     try {
-      const image = await loadImage(footPhotoPreview);
+      const image = await loadImage(photoPreview);
       const poseResult = await detectPose(image);
       const hasLandmarks = Boolean(poseResult?.landmarks?.length);
       const footLengthCm = estimateFootLengthCm(image, hasLandmarks);
@@ -613,294 +615,259 @@ export function ShoeARWidget({
     setAddToCartFeedback(t.cartSuccess);
   };
 
-  const renderHeader = (
-    <div className="mb-6 flex flex-col gap-4 border-b pb-5 md:flex-row md:items-center md:justify-between" style={{ borderColor: borderTint }}>
-      <div className="flex items-center gap-3">
-        {storeLogo ? (
-          <img src={storeLogo} alt={storeName} className="h-12 w-auto max-w-[140px] object-contain" />
-        ) : (
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl text-white"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Footprints className="h-6 w-6" />
-          </div>
-        )}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: primaryColor }}>
-            {t.badge}
-          </p>
-          <h2 className="text-xl font-semibold text-slate-900">{storeName}</h2>
-        </div>
-      </div>
+  const displayImage = productImage || footPhotoPreview;
 
-      <div className="inline-flex items-center gap-2 self-start rounded-full px-3 py-1 text-xs font-medium text-slate-700" style={{ backgroundColor: surfaceTint }}>
-        <ShieldCheck className="h-4 w-4" style={{ color: primaryColor }} />
-        <span>{t.feature2}</span>
-      </div>
-    </div>
-  );
+  const goBack = () => {
+    if (step === 'measure-capture') setStep('info');
+    else if (step === 'measure-result') setStep('measure-capture');
+    else if (step === 'ar-info') setStep('measure-result');
+    else if (step === 'ar-viewer') setStep('ar-info');
+  };
 
   return (
-    <div
-      className="w-full rounded-[32px] border bg-white p-4 shadow-2xl sm:p-6"
-      style={{ borderColor: borderTint, fontFamily: fontFamily || 'inherit' }}
-    >
-      {renderHeader}
+    <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out">
+      <style>{`
+        .omafit-shoe-widget-root,
+        .omafit-shoe-widget-root * {
+          font-family: '${fontFamily}', sans-serif !important;
+        }
+      `}</style>
+
+      <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: primaryColor }}>
+        {step !== 'info' ? (
+          <button
+            type="button"
+            onClick={goBack}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        ) : (
+          <div className="w-6" />
+        )}
+
+        <div className="flex-1 flex justify-center">
+          {storeLogo ? (
+            <img src={storeLogo} alt={storeName} className="h-12 w-auto object-contain" />
+          ) : (
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
+              style={{ backgroundColor: primaryColor }}
+            >
+              <Footprints className="h-5 w-5" />
+            </div>
+          )}
+        </div>
+
+        <div className="w-6" />
+      </div>
+
+      <div
+        className="omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden"
+        style={{ fontFamily: fontFamily || 'inherit' }}
+      >
 
       {step === 'info' && (
-        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="overflow-hidden rounded-[28px] border bg-slate-50" style={{ borderColor: borderTint }}>
-            {productImage ? (
-              <img src={productImage} alt={productName} className="h-full min-h-[320px] w-full object-cover" />
-            ) : (
-              <div className="flex min-h-[320px] items-center justify-center text-slate-400">
-                <Box className="h-12 w-12" />
+        <>
+          <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
+            <div className="w-full flex items-center justify-center">
+              <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
+                {productImage ? (
+                  <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
+                ) : (
+                  <div className="flex min-h-[420px] items-center justify-center text-gray-400">
+                    <Box className="h-12 w-12" />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
-          <div className="space-y-5">
-            <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
-                {t.infoTitle}
-              </p>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">{t.title}</h1>
-              <p className="mt-3 text-sm leading-6 text-slate-600 md:text-base">{t.subtitle}</p>
-            </div>
-
-            <div className="rounded-[28px] border p-5" style={{ borderColor: borderTint }}>
-              <div className="mb-4 flex items-start gap-4">
-                <div className="rounded-2xl p-3" style={{ backgroundColor: surfaceTint }}>
-                  <Info className="h-6 w-6" style={{ color: primaryColor }} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{productName}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{t.infoBody}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-                {[
-                  { icon: ScanSearch, text: t.feature1 },
-                  { icon: Footprints, text: t.feature2 },
-                  { icon: ShieldCheck, text: t.feature3 },
-                ].map(({ icon: Icon, text }) => (
-                  <div key={text} className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: borderTint }}>
-                    <div className="mt-0.5 rounded-xl p-2" style={{ backgroundColor: surfaceTint }}>
-                      <Icon className="h-5 w-5" style={{ color: primaryColor }} />
+          <div className="flex-1 p-2 md:p-4 overflow-y-auto">
+            <div className="space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in">
+              <div className="md:hidden bg-gray-50 rounded-xl p-3">
+                <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
+                  {productImage ? (
+                    <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
+                  ) : (
+                    <div className="flex min-h-[280px] items-center justify-center text-gray-400">
+                      <Box className="h-10 w-10" />
                     </div>
-                    <p className="text-sm leading-6 text-slate-700">{text}</p>
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-3">
+              <div className="text-center">
+                <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
+                  {productName}
+                </h3>
+                <p className="text-gray-700 text-lg md:text-xl">{t.infoBody}</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
+                <div className="text-center">
+                  <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">{t.measureTipsTitle}</h4>
+                  <p className="text-base md:text-lg text-blue-700">
+                    {t.measureTip1} {t.measureTip2} {t.measureTip3}
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setStep('measure-info')}
-                className="rounded-2xl px-5 py-4 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90"
+                onClick={() => setStep('measure-capture')}
+                className="w-full py-3.5 md:py-4 rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl"
                 style={{ backgroundColor: primaryColor, color: buttonTextColor }}
               >
                 {replaceStoreName(t.sizeButton, storeName)}
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {step === 'measure-info' && (
-        <div className="mx-auto max-w-3xl space-y-6">
-          <button type="button" onClick={() => setStep('info')} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-            {t.back}
-          </button>
-
-          <div className="rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-            <div className="flex items-start gap-4">
-              <div className="rounded-2xl p-3" style={{ backgroundColor: surfaceTint }}>
-                <Ruler className="h-6 w-6" style={{ color: primaryColor }} />
-              </div>
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900">{t.measureTitle}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{t.measureBody}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl p-5" style={{ backgroundColor: surfaceTint }}>
-              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em]" style={{ color: primaryColor }}>
-                {t.measureTipsTitle}
-              </p>
-              <ul className="space-y-2 text-sm leading-6 text-slate-700">
-                <li>• {t.measureTip1}</li>
-                <li>• {t.measureTip2}</li>
-                <li>• {t.measureTip3}</li>
-              </ul>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setStep('measure-capture')}
-                className="flex-1 rounded-2xl px-5 py-4 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90"
-                style={{ backgroundColor: primaryColor, color: buttonTextColor }}
-              >
-                {t.captureButton}
-              </button>
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
       {step === 'measure-capture' && (
-        <div className="mx-auto max-w-3xl space-y-6">
-          <button type="button" onClick={() => setStep('measure-info')} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-            {t.back}
-          </button>
+        <div className="flex-1 p-2 md:p-4 overflow-y-auto">
+          <div className="mx-auto max-w-5xl animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="order-2 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+                <h3 className="text-2xl font-semibold text-slate-900">{t.measureTitle}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{t.measureBody}</p>
 
-          <div className="rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-            <h3 className="text-2xl font-semibold text-slate-900">{t.footPhotoLabel}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{t.measureBody}</p>
-
-            <div className="mt-6">
-              {footPhotoPreview ? (
-                <div className="overflow-hidden rounded-[28px] border" style={{ borderColor: borderTint }}>
-                  <img src={footPhotoPreview} alt={t.footPhotoLabel} className="h-[360px] w-full object-cover" />
+                <div className="mt-6 rounded-2xl p-5" style={{ backgroundColor: surfaceTint }}>
+                  <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em]" style={{ color: primaryColor }}>
+                    {t.measureTipsTitle}
+                  </p>
+                  <ul className="space-y-2 text-sm leading-6 text-slate-700">
+                    <li>• {t.measureTip1}</li>
+                    <li>• {t.measureTip2}</li>
+                    <li>• {t.measureTip3}</li>
+                  </ul>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex min-h-[280px] w-full flex-col items-center justify-center rounded-[28px] border-2 border-dashed text-slate-500 transition-colors hover:bg-slate-50"
-                  style={{ borderColor: borderTint }}
-                >
-                  <Camera className="mb-3 h-10 w-10" />
-                  <span className="text-sm font-medium">{t.captureButton}</span>
-                </button>
-              )}
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleSelectFootPhoto}
-                className="hidden"
-              />
-            </div>
+                {isAnalyzing && (
+                  <div className="mt-6 rounded-2xl p-4 text-sm font-medium text-slate-700" style={{ backgroundColor: surfaceTint }}>
+                    {t.analyzing}
+                  </div>
+                )}
+              </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 rounded-2xl border px-5 py-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                style={{ borderColor: borderTint }}
-              >
-                {footPhotoPreview ? t.uploadOther : t.captureButton}
-              </button>
-              <button
-                type="button"
-                onClick={runFootAnalysis}
-                disabled={!footPhotoPreview || isAnalyzing}
-                className="flex-1 rounded-2xl px-5 py-4 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                style={{ backgroundColor: primaryColor, color: buttonTextColor }}
-              >
-                {isAnalyzing ? t.analyzing : t.analyzeButton}
-              </button>
+              <div className="order-1 md:order-2 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+                <h3 className="text-2xl font-semibold text-slate-900">{t.footPhotoLabel}</h3>
+
+                <div className="mt-6">
+                  {footPhotoPreview ? (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full overflow-hidden rounded-[28px] border transition-colors hover:bg-slate-50"
+                      style={{ borderColor: borderTint }}
+                    >
+                      <img src={footPhotoPreview} alt={t.footPhotoLabel} className="h-[360px] w-full object-cover" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-[28px] border-2 border-dashed text-slate-500 transition-colors hover:bg-slate-50"
+                      style={{ borderColor: borderTint }}
+                    >
+                      <Camera className="mb-3 h-10 w-10" />
+                      <span className="text-sm font-medium">{t.captureButton}</span>
+                    </button>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleSelectFootPhoto}
+                    className="hidden"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {step === 'measure-result' && (
-        <div className="mx-auto max-w-4xl space-y-6">
-          <button type="button" onClick={() => setStep('measure-capture')} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-            {t.back}
-          </button>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex justify-start">
+            <div className="max-w-[65%] md:max-w-[30%]">
+              {footPhotoPreview ? (
+                <img
+                  src={footPhotoPreview}
+                  alt={t.footPhotoLabel}
+                  className="w-full rounded-2xl shadow-md"
+                />
+              ) : (
+                <div className="flex h-[240px] w-full items-center justify-center rounded-2xl bg-slate-100 text-slate-400 shadow-md">
+                  <Footprints className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+          </div>
 
-          <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-            <div className="rounded-[28px] border p-5" style={{ borderColor: borderTint }}>
-              <div className="mb-4 overflow-hidden rounded-2xl bg-slate-50">
-                {footPhotoPreview ? (
-                  <img src={footPhotoPreview} alt={t.footPhotoLabel} className="h-[280px] w-full object-cover" />
-                ) : (
-                  <div className="flex h-[280px] items-center justify-center text-slate-400">
-                    <Footprints className="h-10 w-10" />
-                  </div>
-                )}
+          <div className="flex gap-2 justify-start">
+            {storeLogo && (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
+                <img
+                  src={storeLogo}
+                  alt={storeName}
+                  className="w-full h-full object-contain"
+                />
               </div>
+            )}
+            <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100 text-gray-900">
+              <p className="text-sm md:text-base whitespace-pre-line">
+                {`${t.sizeResultTitle}: ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : '--')}`}
+                {estimatedFootLength ? `\n${estimatedFootLength.toFixed(1)} cm` : ''}
+                {assistantMessage ? `\n\n${assistantMessage}` : ''}
+                {analysisNote ? `\n\n${analysisNote}` : ''}
+              </p>
+            </div>
+          </div>
 
-              <div className="rounded-2xl p-4" style={{ backgroundColor: surfaceTint }}>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: primaryColor }}>
-                  {t.sizeResultTitle}
-                </p>
-                <p className="mt-2 text-4xl font-semibold text-slate-900">
-                  {recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : '--')}
-                </p>
-                {estimatedFootLength && (
-                  <p className="mt-2 text-sm text-slate-600">{estimatedFootLength.toFixed(1)} cm</p>
-                )}
-              </div>
+          <div className="p-4 border-t bg-gray-50 -mx-4 mt-2">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAddingToCart}
+                className="w-full sm:flex-1 px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: primaryColor,
+                  color: buttonTextColor,
+                }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  {isAddingToCart ? t.addingToCart : t.addToCart}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep('ar-info')}
+                className="w-full sm:flex-1 px-4 py-3 rounded-xl font-semibold transition-all border"
+                style={{ borderColor: borderTint, color: primaryColor, backgroundColor: '#ffffff' }}
+              >
+                {t.arButton}
+              </button>
             </div>
 
-            <div className="rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-              <div className="flex items-start gap-4">
-                <div className="rounded-2xl p-3" style={{ backgroundColor: surfaceTint }}>
-                  <Sparkles className="h-6 w-6" style={{ color: primaryColor }} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-semibold text-slate-900">{t.sizeResultTitle}</h3>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{t.sizeResultBody}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl bg-slate-50 p-5">
-                <p className="whitespace-pre-line text-sm leading-7 text-slate-700">{assistantMessage}</p>
-              </div>
-
-              <div className="mt-4 rounded-2xl p-4 text-sm leading-6 text-slate-600" style={{ backgroundColor: surfaceTint }}>
-                {analysisNote}
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  disabled={isAddingToCart}
-                  className="flex-1 rounded-2xl px-5 py-4 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ backgroundColor: primaryColor, color: buttonTextColor }}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4" />
-                    {isAddingToCart ? t.addingToCart : t.addToCart}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep('ar-info')}
-                  className="flex-1 rounded-2xl border px-5 py-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                  style={{ borderColor: borderTint }}
-                >
-                  {t.arButton}
-                </button>
-              </div>
-
-              {addToCartFeedback && <p className="mt-3 text-sm text-slate-500">{addToCartFeedback}</p>}
-            </div>
+            {addToCartFeedback && (
+              <p className="text-xs text-center text-gray-600 mt-3">{addToCartFeedback}</p>
+            )}
           </div>
         </div>
       )}
 
       {step === 'ar-info' && (
-        <div className="mx-auto max-w-3xl space-y-6">
-          <button type="button" onClick={() => setStep('info')} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-            {t.back}
-          </button>
-
+        <div className="flex-1 p-2 md:p-4 overflow-y-auto">
+          <div className="mx-auto max-w-3xl space-y-6">
           <div className="rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
             <div className="flex items-start gap-4">
               <div className="rounded-2xl p-3" style={{ backgroundColor: surfaceTint }}>
@@ -932,15 +899,12 @@ export function ShoeARWidget({
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {step === 'ar-viewer' && (
-        <div className="space-y-5">
-          <button type="button" onClick={() => setStep('ar-info')} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-            {t.back}
-          </button>
-
+        <div className="flex-1 p-2 md:p-4 overflow-y-auto">
+          <div className="space-y-5">
           <div>
             <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
               {t.shoeArLabel}
@@ -953,7 +917,9 @@ export function ShoeARWidget({
             {modelViewer}
           </div>
         </div>
+        </div>
       )}
+      </div>
     </div>
   );
 }

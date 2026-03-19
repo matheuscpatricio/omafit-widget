@@ -217,30 +217,30 @@ Deno.serve(async (req: Request) => {
     let falApiKey: string | null = null;
 
     if (tryOnProvider === 'fal') {
-      const { data: globalApiConfig } = await supabaseClient
-        .from('api_config')
-        .select('key_value')
-        .eq('key_name', 'global_fal_api_key')
-        .maybeSingle();
+    const { data: globalApiConfig } = await supabaseClient
+      .from('api_config')
+      .select('key_value')
+      .eq('key_name', 'global_fal_api_key')
+      .maybeSingle();
 
       falApiKey = globalApiConfig?.key_value ?? null;
 
-      if (!falApiKey) {
-        const { data: userApiConfigs } = await supabaseClient
-          .from('api_config')
-          .select('key_value')
-          .eq('user_id', widgetKeyData.user_id)
+    if (!falApiKey) {
+      const { data: userApiConfigs } = await supabaseClient
+        .from('api_config')
+        .select('key_value')
+        .eq('user_id', widgetKeyData.user_id)
           .in('key_name', ['fal_api_key', 'fashn_api_key'])
-          .maybeSingle();
+        .maybeSingle();
 
         falApiKey = userApiConfigs?.key_value ?? null;
-      }
+    }
 
-      if (!falApiKey) {
-        throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
-      }
+    if (!falApiKey) {
+      throw new Error('FAL API key not configured. Please configure your API key in the dashboard settings.');
+    }
 
-      console.log('✅ FAL API key configured');
+    console.log('✅ FAL API key configured');
     } else {
       console.log('✅ Self-hosted try-on provider enabled');
     }
@@ -388,13 +388,13 @@ Deno.serve(async (req: Request) => {
     // Fallback automático para schema antigo sem colunas enriquecidas.
     console.log('💾 Criando analytics da sessão...');
     const baseSessionAnalytics: Record<string, unknown> = {
-      tryon_session_id: session.id,
-      user_id: effectiveUserId,
-      duration_seconds: 0,
-      completed: false,
-      shared: false,
-      processing_time_seconds: 0,
-      images_processed: 1,
+          tryon_session_id: session.id,
+          user_id: effectiveUserId,
+          duration_seconds: 0,
+          completed: false,
+          shared: false,
+          processing_time_seconds: 0,
+          images_processed: 1,
     };
 
     const enrichedSessionAnalytics: Record<string, unknown> = {
