@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import { Layout } from './components/Layout';
 import { LandingPage } from './components/LandingPage';
 import { WidgetPage } from './components/WidgetPage';
+import { ShoeARWidgetPage } from './components/ShoeARWidgetPage';
 import { AuthForm } from './components/AuthForm';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
@@ -182,6 +183,7 @@ function App() {
           }
         />
         <Route path="/widget" element={<WidgetPage />} />
+        <Route path="/widget-shoes" element={<ShoeARWidgetPage />} />
       </Routes>
       </Suspense>
     </Router>
