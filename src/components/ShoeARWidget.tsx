@@ -260,6 +260,15 @@ function replaceStoreName(template: string, storeName: string) {
   return template.replace('{storeName}', storeName || 'Omafit');
 }
 
+function normalizeGender(value: unknown) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw || raw === '(vazio)' || raw === 'null' || raw === 'undefined') return 'unisex';
+  if (raw === 'male' || raw === 'masculino' || raw === 'man' || raw === 'men') return 'male';
+  if (raw === 'female' || raw === 'feminino' || raw === 'woman' || raw === 'women') return 'female';
+  if (raw === 'unisex') return 'unisex';
+  return raw;
+}
+
 function parseMeasurementValue(value: unknown): number {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   if (value === null || value === undefined) return 0;
@@ -445,7 +454,7 @@ export function ShoeARWidget({
       const effectiveShopDomain = shopDomain?.trim();
       if (!effectiveShopDomain) return;
 
-      const searchGender = defaultGender || 'unisex';
+      const searchGender = normalizeGender(defaultGender);
 
       const fetchGlobalChartRecord = async (genderToFetch: string) => {
         const { data: nullHandleChart, error: nullHandleChartError } = await supabase

@@ -29,6 +29,15 @@ const normalizeFootwearCollectionType = (value: unknown): boolean => {
   return ['shoes', 'shoe', 'sapatos', 'sapato', 'calcados', 'calcado', 'footwear'].includes(raw);
 };
 
+const normalizeDefaultGender = (value: unknown): string => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw || raw === '(vazio)' || raw === 'null' || raw === 'undefined') return 'unisex';
+  if (raw === 'male' || raw === 'masculino' || raw === 'man' || raw === 'men') return 'male';
+  if (raw === 'female' || raw === 'feminino' || raw === 'woman' || raw === 'women') return 'female';
+  if (raw === 'unisex') return 'unisex';
+  return raw;
+};
+
 export function ShoeARWidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
@@ -75,7 +84,7 @@ export function ShoeARWidgetPage() {
     if (shopDomainParam) setShopDomain(decodeURIComponent(shopDomainParam));
     if (collectionIdParam) setCollectionId(collectionIdParam);
     if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
-    if (defaultGenderParam) setDefaultGender(defaultGenderParam);
+    if (defaultGenderParam !== null) setDefaultGender(normalizeDefaultGender(defaultGenderParam));
     if (collectionTypeParam !== null) {
       setCollectionTypeResolved(true);
       setIsFootwearCollection(normalizeFootwearCollectionType(collectionTypeParam));
@@ -97,7 +106,9 @@ export function ShoeARWidgetPage() {
         if (config.fontFamily) setFontFamily(config.fontFamily);
         if (config.collectionId && !collectionIdParam) setCollectionId(config.collectionId);
         if (config.collectionHandle && !collectionHandleParam) setCollectionHandle(config.collectionHandle);
-        if (config.defaultGender && !defaultGenderParam) setDefaultGender(config.defaultGender);
+        if (config.defaultGender !== undefined && !defaultGenderParam) {
+          setDefaultGender(normalizeDefaultGender(config.defaultGender));
+        }
         if (config.collectionType !== undefined) {
           setCollectionTypeResolved(true);
           setIsFootwearCollection(
@@ -128,7 +139,9 @@ export function ShoeARWidgetPage() {
         if (event.data.shopDomain) setShopDomain(event.data.shopDomain);
         if (event.data.collectionId) setCollectionId(event.data.collectionId);
         if (event.data.collectionHandle !== undefined) setCollectionHandle(event.data.collectionHandle || '');
-        if (event.data.defaultGender) setDefaultGender(event.data.defaultGender);
+        if (event.data.defaultGender !== undefined) {
+          setDefaultGender(normalizeDefaultGender(event.data.defaultGender));
+        }
         if (event.data.collectionType !== undefined) {
           setCollectionTypeResolved(true);
           setIsFootwearCollection(
