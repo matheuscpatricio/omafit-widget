@@ -13,6 +13,7 @@ interface ShoeARWidgetProps {
   productImage?: string;
   productName?: string;
   productDescription?: string;
+  publicId?: string;
   productId?: string;
   storeName?: string;
   storeLogo?: string;
@@ -50,21 +51,31 @@ const copy = {
     feature1: 'Modelo 3D de calcado pronto para AR',
     feature2: 'Mesmas personalizacoes de logo, cores e fonte',
     feature3: 'Fluxo isolado, sem alterar o widget atual',
-    infoTitle: 'Como funciona',
+    infoTitle: 'Como funciona?',
     infoBody:
-      'Escolha entre descobrir seu número ideal ou visualizar como o calçado fica no seu pé com AR.',
+      'Vou te ajudar a descobrir o número ideal para este calçado e a entender melhor o produto antes de adicionar ao carrinho.',
     sizeButton: 'Descobrir meu número na {storeName}',
     arButton: 'Ver como fica no meu pé',
     measureTitle: 'Descubra seu número ideal',
     measureBody:
-      'Para um resultado melhor, fotografe um pé por vez, de cima para baixo, mantendo a câmera reta, com boa luz e distância constante.',
-    measureTipsTitle: 'Dicas para melhor resultado',
-    measureTip1: 'Posicione o pé inteiro dentro da foto.',
-    measureTip2: 'Mantenha o celular acima do pé, sem inclinar a câmera.',
-    measureTip3: 'Tire a foto a uma distância parecida em todas as tentativas, com boa iluminação.',
-    captureButton: 'Tirar foto do pé',
+      'Para indicar o número ideal deste calçado, preciso de uma foto do seu pé seguindo as instruções abaixo.',
+    betterResults: 'Para melhores resultados, siga as instruções',
+    photoInstructions: 'Instruções para a foto do pé:',
+    importantBadge: 'IMPORTANTE',
+    measureTipsTitle: 'Como funciona?',
+    measureTip1: 'Ângulo de cima',
+    measureTip2: 'Um palmo abaixo do joelho',
+    measureTip3: 'Pé descalço',
+    measureTip4: 'Boa iluminação',
+    measureTip1Desc: 'foto feita de cima para baixo',
+    measureTip2Desc: 'mostrando a perna e o pé no enquadramento',
+    measureTip3Desc: 'sem meia e sem nada cobrindo o pé',
+    measureTip4Desc: 'ambiente bem iluminado',
+    photoInstructionWarning: 'Fotos que não seguem estas instruções podem gerar erros ou resultados inadequados.',
+    captureButton: 'Clique para enviar a foto do pé',
+    imageFormats: 'JPG, PNG ou WEBP (máx. 5MB)',
     analyzeButton: 'Analisar com MediaPipe',
-    analyzing: 'Analisando pé com MediaPipe...',
+    analyzing: 'Analisando sua foto...',
     sizeResultTitle: 'Número recomendado',
     sizeResultBody: 'Com base na análise do pé, este é o tamanho mais indicado para você.',
     sizeAssistantPrefix: 'Assistente Omafit',
@@ -72,7 +83,7 @@ const copy = {
     chatPlaceholder: 'Digite sua mensagem...',
     addToCart: 'Adicionar ao carrinho',
     addingToCart: 'Adicionando ao carrinho...',
-    processingTitle: 'Analisando suas medidas',
+    processingTitle: 'Analisando sua foto',
     arIntroTitle: 'Veja como fica no seu pé',
     arIntroBody:
       'Abra a câmera em um ambiente bem iluminado, aponte para seus pés e mova o celular lentamente para o AR ancorar o calçado.',
@@ -102,21 +113,31 @@ const copy = {
     feature1: 'Modelo 3D de calzado listo para AR',
     feature2: 'Mismas personalizaciones de logo, colores y tipografia',
     feature3: 'Flujo aislado, sin alterar el widget actual',
-    infoTitle: 'Como funciona',
+    infoTitle: '¿Cómo funciona?',
     infoBody:
-      'Elige entre descubrir tu talla ideal o ver como queda el calzado en tu pie con AR.',
+      'Voy a ayudarte a descubrir la talla ideal para este calzado y a conocer mejor el producto antes de agregarlo al carrito.',
     sizeButton: 'Descubrir mi talla en {storeName}',
     arButton: 'Ver como queda en mi pie',
     measureTitle: 'Descubre tu talla ideal',
     measureBody:
-      'Para un mejor resultado, fotografia un pie por vez, de arriba hacia abajo, manteniendo la cámara recta, con buena luz y distancia constante.',
-    measureTipsTitle: 'Consejos para mejor resultado',
-    measureTip1: 'Coloca el pie completo dentro de la foto.',
-    measureTip2: 'Mantén el móvil por encima del pie, sin inclinar la cámara.',
-    measureTip3: 'Toma la foto a una distancia parecida en cada intento, con buena iluminación.',
-    captureButton: 'Tomar foto del pie',
+      'Para indicar la talla ideal de este calzado, necesito una foto de tu pie siguiendo las instrucciones de abajo.',
+    betterResults: 'Para mejores resultados, sigue las instrucciones',
+    photoInstructions: 'Instrucciones para la foto del pie:',
+    importantBadge: 'IMPORTANTE',
+    measureTipsTitle: '¿Cómo funciona?',
+    measureTip1: 'Ángulo superior',
+    measureTip2: 'Un palmo debajo de la rodilla',
+    measureTip3: 'Pie descalzo',
+    measureTip4: 'Buena iluminación',
+    measureTip1Desc: 'foto tomada de arriba hacia abajo',
+    measureTip2Desc: 'mostrando la pierna y el pie en el encuadre',
+    measureTip3Desc: 'sin media y sin nada cubriendo el pie',
+    measureTip4Desc: 'ambiente bien iluminado',
+    photoInstructionWarning: 'Las fotos que no sigan estas instrucciones pueden generar errores o resultados inadecuados.',
+    captureButton: 'Haz clic para subir la foto del pie',
+    imageFormats: 'JPG, PNG o WEBP (máx. 5MB)',
     analyzeButton: 'Analizar con MediaPipe',
-    analyzing: 'Analizando pie con MediaPipe...',
+    analyzing: 'Analizando tu foto...',
     sizeResultTitle: 'Talla recomendada',
     sizeResultBody: 'Segun el analisis del pie, esta es la talla mas indicada para ti.',
     sizeAssistantPrefix: 'Asistente Omafit',
@@ -124,7 +145,7 @@ const copy = {
     chatPlaceholder: 'Escribe tu mensaje...',
     addToCart: 'Agregar al carrito',
     addingToCart: 'Agregando al carrito...',
-    processingTitle: 'Analizando tus medidas',
+    processingTitle: 'Analizando tu foto',
     arIntroTitle: 'Mira como queda en tu pie',
     arIntroBody:
       'Abre la camara en un ambiente bien iluminado, apunta a tus pies y mueve el telefono lentamente para que el AR ancle el calzado.',
@@ -154,21 +175,31 @@ const copy = {
     feature1: '3D footwear model ready for AR',
     feature2: 'Same logo, color and font personalization',
     feature3: 'Isolated flow, without changing the current widget',
-    infoTitle: 'How it works',
+    infoTitle: 'How does it work?',
     infoBody:
-      'Choose between discovering your ideal size or seeing how the footwear looks on your foot with AR.',
+      'I will help you find the ideal size for this footwear and understand the product better before adding it to cart.',
     sizeButton: 'Find my size at {storeName}',
     arButton: 'See how it looks on my foot',
     measureTitle: 'Find your ideal size',
     measureBody:
-      'For better results, photograph one foot at a time from above, keeping the camera straight, with good lighting and a consistent distance.',
-    measureTipsTitle: 'Tips for better results',
-    measureTip1: 'Keep the full foot inside the frame.',
-    measureTip2: 'Keep the phone above the foot without tilting the camera.',
-    measureTip3: 'Capture from a similar distance on each try, with good lighting.',
-    captureButton: 'Take foot photo',
+      'To recommend the ideal size for this footwear, I need a photo of your foot following the instructions below.',
+    betterResults: 'For best results, follow the instructions',
+    photoInstructions: 'Foot photo instructions:',
+    importantBadge: 'IMPORTANT',
+    measureTipsTitle: 'How does it work?',
+    measureTip1: 'Top angle',
+    measureTip2: 'One palm below the knee',
+    measureTip3: 'Barefoot',
+    measureTip4: 'Good lighting',
+    measureTip1Desc: 'take the photo from above',
+    measureTip2Desc: 'showing the leg and foot in the frame',
+    measureTip3Desc: 'without socks and with nothing covering the foot',
+    measureTip4Desc: 'well-lit environment',
+    photoInstructionWarning: 'Photos that do not follow these instructions may lead to errors or poor results.',
+    captureButton: 'Click to upload the foot photo',
+    imageFormats: 'JPG, PNG or WEBP (max. 5MB)',
     analyzeButton: 'Analyze with MediaPipe',
-    analyzing: 'Analyzing foot with MediaPipe...',
+    analyzing: 'Analyzing your photo...',
     sizeResultTitle: 'Recommended size',
     sizeResultBody: 'Based on the foot analysis, this is the size recommended for you.',
     sizeAssistantPrefix: 'Omafit Assistant',
@@ -176,7 +207,7 @@ const copy = {
     chatPlaceholder: 'Type your message...',
     addToCart: 'Add to cart',
     addingToCart: 'Adding to cart...',
-    processingTitle: 'Analyzing your measurements',
+    processingTitle: 'Analyzing your photo',
     arIntroTitle: 'See how it looks on your foot',
     arIntroBody:
       'Open the camera in a well lit place, point it at your feet and move your phone slowly so AR can anchor the footwear.',
@@ -559,6 +590,7 @@ export function ShoeARWidget({
   productImage,
   productName = 'Calçado em destaque',
   productDescription = '',
+  publicId = '',
   productId = 'unknown',
   storeName = 'Omafit',
   storeLogo,
@@ -584,6 +616,7 @@ export function ShoeARWidget({
   const [addToCartFeedback, setAddToCartFeedback] = useState('');
   const [sizeChart, setSizeChart] = useState<ShoeSizeChartEntry[]>([]);
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
+  const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const {
@@ -789,14 +822,84 @@ export function ShoeARWidget({
     return 'A variante selecionada está esgotada.';
   };
 
-  const getRecommendedSizeForCart = () => {
-    const rawSize = recommendedSizeLabel || (recommendedSize ? String(recommendedSize) : null);
-    if (!rawSize) return null;
+  const getResolvedRecommendedSize = () =>
+    recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : null);
 
-    return rawSize
-      .replace(/^br\s*/i, '')
-      .trim();
+  const syncMeasurementResult = async (
+    resolvedSize: string,
+    previewImage?: string,
+    trackUsage = true
+  ) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!publicId || !supabaseUrl || !supabaseAnonKey) {
+      console.warn('⚠️ Não foi possível sincronizar a medição do calçado. Contexto incompleto.', {
+        publicIdPresent: Boolean(publicId),
+        supabaseUrlPresent: Boolean(supabaseUrl),
+        supabaseAnonKeyPresent: Boolean(supabaseAnonKey),
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/functions/v1/track-footwear-tryon`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          session_id: analyticsSessionId,
+          track_usage: trackUsage,
+          public_id: publicId,
+          shop_domain: shopDomain || null,
+          shop_name: storeName || null,
+          product_id: productId || null,
+          product_name: productName || null,
+          collection_handle: collectionHandle || null,
+          model_image: previewImage || footPhotoPreview || productImage || 'shoe-widget-measurement',
+          user_measurements: {
+            recommended_size: resolvedSize,
+            foot_length_cm: latestMeasuredFootLength,
+            measurement_type: 'footwear',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Falha ao sincronizar medição de calçados');
+      }
+
+      const result = await response.json();
+      if (result?.session_id) {
+        setAnalyticsSessionId(result.session_id);
+      }
+
+      console.log('✅ Medição do calçado sincronizada com o Supabase:', {
+        recommendedSize: resolvedSize,
+        sessionId: result?.session_id || analyticsSessionId,
+        usageTracked: trackUsage,
+      });
+    } catch (error) {
+      console.error('Erro ao sincronizar medição do widget de calçados:', error);
+    }
   };
+
+  useEffect(() => {
+    if (!analyticsSessionId) return;
+    if (latestMeasuredFootLength === null) return;
+    if (!sizeChart.length) return;
+
+    const chartRecommendation = calculateRecommendedShoeSizeFromChart(latestMeasuredFootLength, sizeChart);
+    if (!chartRecommendation) return;
+
+    const resolvedSize = chartRecommendation.size;
+    if (resolvedSize !== recommendedSizeLabel) return;
+
+    void syncMeasurementResult(resolvedSize, undefined, false);
+  }, [analyticsSessionId, latestMeasuredFootLength, sizeChart, recommendedSizeLabel]);
 
   const resolveAddToCartFeedback = (payload: any) => {
     const isSuccess = payload?.success === true || payload?.ok === true;
@@ -917,6 +1020,7 @@ export function ShoeARWidget({
     setRecommendedSizeLabel(null);
     setLatestMeasuredFootLength(null);
     setUsedChartRecommendation(false);
+    setAnalyticsSessionId(null);
     setChatMessages([]);
     setChatInput('');
     setAddToCartFeedback('');
@@ -950,6 +1054,7 @@ export function ShoeARWidget({
       setRecommendedSize(chartRecommendation ? null : fallbackSize);
       setRecommendedSizeLabel(resolvedSizeLabel);
       setUsedChartRecommendation(Boolean(chartRecommendation));
+      void syncMeasurementResult(resolvedSizeLabel, photoPreview, true);
       const nextAssistantMessage = buildAssistantMessage(resolvedSizeLabel);
       setChatMessages([
         {
@@ -967,6 +1072,7 @@ export function ShoeARWidget({
       setRecommendedSize(fallbackSize);
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
       setUsedChartRecommendation(false);
+      void syncMeasurementResult(`BR ${fallbackSize}`, photoPreview, true);
       const nextAssistantMessage = buildAssistantMessage(`BR ${fallbackSize}`);
       setChatMessages([
         {
@@ -1044,7 +1150,7 @@ export function ShoeARWidget({
       selection: {
         image_url: productImage || '',
         color_hex: '',
-        recommended_size: getRecommendedSizeForCart(),
+          recommended_size: getResolvedRecommendedSize(),
       },
       quantity: 1,
       shop_domain: shopDomain,
@@ -1075,10 +1181,25 @@ export function ShoeARWidget({
     }, 8000);
   };
 
+  const resetFootMeasurementFlow = () => {
+    setFootPhotoPreview('');
+    setRecommendedSize(null);
+    setRecommendedSizeLabel(null);
+    setLatestMeasuredFootLength(null);
+    setUsedChartRecommendation(false);
+    setAnalyticsSessionId(null);
+    setChatMessages([]);
+    setChatInput('');
+    setAddToCartFeedback('');
+  };
+
   const goBack = () => {
     if (step === 'measure-capture') setStep('info');
     else if (step === 'processing') setStep('measure-capture');
-    else if (step === 'measure-result') setStep('measure-capture');
+    else if (step === 'measure-result') {
+      resetFootMeasurementFlow();
+      setStep('measure-capture');
+    }
     else if (step === 'ar-info') setStep('measure-result');
     else if (step === 'ar-viewer') setStep('ar-info');
   };
@@ -1191,19 +1312,36 @@ export function ShoeARWidget({
         <div className="flex-1 p-2 md:p-4 overflow-y-auto">
           <div className="mx-auto max-w-5xl animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="order-2 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-                <h3 className="text-2xl font-semibold text-slate-900">{t.measureTitle}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{t.measureBody}</p>
-
-                <div className="mt-6 rounded-2xl p-5" style={{ backgroundColor: surfaceTint }}>
-                  <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em]" style={{ color: primaryColor }}>
-                    {t.measureTipsTitle}
+              <div className="order-1 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+                <div className="text-center mb-3">
+                  <h3 className="text-2xl font-semibold mb-2" style={{ color: primaryColor }}>
+                    {t.footPhotoLabel}
+                  </h3>
+                  <p className="text-gray-700 text-base">
+                    {t.betterResults}
                   </p>
-                  <ul className="space-y-2 text-sm leading-6 text-slate-700">
-                    <li>• {t.measureTip1}</li>
-                    <li>• {t.measureTip2}</li>
-                    <li>• {t.measureTip3}</li>
-                  </ul>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md">
+                  <div>
+                    <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
+                      {t.photoInstructions}
+                      <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
+                        {t.importantBadge}
+                      </span>
+                    </h4>
+                    <ul className="text-base text-blue-900 space-y-1.5 mb-3">
+                      <li>• <strong>{t.measureTip1}</strong> - {t.measureTip1Desc}</li>
+                      <li>• <strong>{t.measureTip2}</strong> - {t.measureTip2Desc}</li>
+                      <li>• <strong>{t.measureTip3}</strong> - {t.measureTip3Desc}</li>
+                      <li>• <strong>{t.measureTip4}</strong> - {t.measureTip4Desc}</li>
+                    </ul>
+                    <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
+                      <p className="text-sm text-blue-900 font-semibold">
+                        {t.photoInstructionWarning}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {isAnalyzing && (
@@ -1213,7 +1351,7 @@ export function ShoeARWidget({
                 )}
               </div>
 
-              <div className="order-1 md:order-2 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+              <div className="order-2 md:order-2 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
                 <h3 className="text-2xl font-semibold text-slate-900">{t.footPhotoLabel}</h3>
 
                 <div className="mt-6">
@@ -1230,11 +1368,11 @@ export function ShoeARWidget({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-[28px] border-2 border-dashed text-slate-500 transition-colors hover:bg-slate-50"
-                      style={{ borderColor: borderTint }}
+                      className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-center cursor-pointer transition-all duration-300 ease-in-out hover:bg-slate-50"
                     >
                       <Camera className="mb-3 h-10 w-10" />
-                      <span className="text-sm font-medium">{t.captureButton}</span>
+                      <span className="text-gray-700 mb-2 text-lg">{t.captureButton}</span>
+                      <span className="text-base text-gray-500">{t.imageFormats}</span>
                     </button>
                   )}
 

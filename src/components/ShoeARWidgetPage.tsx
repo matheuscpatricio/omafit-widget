@@ -50,6 +50,7 @@ export function ShoeARWidgetPage() {
   const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>('pt');
   const [shoeModelUrl, setShoeModelUrl] = useState<string>(DEFAULT_SHOE_MODEL_URL);
   const [shoeModelIosUrl, setShoeModelIosUrl] = useState<string>('');
+  const [publicId, setPublicId] = useState<string>('');
   const [shopDomain, setShopDomain] = useState<string>('');
   const [collectionId, setCollectionId] = useState<string>('');
   const [collectionHandle, setCollectionHandle] = useState<string>('');
@@ -64,6 +65,7 @@ export function ShoeARWidgetPage() {
     const id = params.get('productId');
     const name = params.get('productName');
     const description = params.get('productDescription') || params.get('product_description');
+    const publicIdParam = params.get('publicId') || params.get('public_id');
     const shopDomainParam = params.get('shopDomain');
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
@@ -84,6 +86,7 @@ export function ShoeARWidgetPage() {
     if (id) setProductId(id);
     if (name) setProductName(decodeURIComponent(name));
     if (description) setProductDescription(decodeURIComponent(description));
+    if (publicIdParam) setPublicId(decodeURIComponent(publicIdParam));
     if (shopDomainParam) setShopDomain(decodeURIComponent(shopDomainParam));
     if (collectionIdParam) setCollectionId(collectionIdParam);
     if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
@@ -112,6 +115,9 @@ export function ShoeARWidgetPage() {
         }
         if (config.productDescription || config.product_description) {
           setProductDescription(config.productDescription || config.product_description);
+        }
+        if (config.publicId || config.public_id) {
+          setPublicId(config.publicId || config.public_id);
         }
         if (config.collectionId && !collectionIdParam) setCollectionId(config.collectionId);
         if (config.collectionHandle && !collectionHandleParam) setCollectionHandle(config.collectionHandle);
@@ -148,6 +154,9 @@ export function ShoeARWidgetPage() {
         }
         if (event.data.productDescription || event.data.product_description) {
           setProductDescription(event.data.productDescription || event.data.product_description);
+        }
+        if (event.data.publicId || event.data.public_id) {
+          setPublicId(event.data.publicId || event.data.public_id);
         }
         if (event.data.productId) setProductId(event.data.productId);
         if (event.data.shopDomain) setShopDomain(event.data.shopDomain);
@@ -192,6 +201,7 @@ export function ShoeARWidgetPage() {
             productId={productId}
             productName={productName}
             productDescription={productDescription}
+            publicId={publicId}
             storeName={storeName}
             storeLogo={storeLogo}
             primaryColor={primaryColor}
