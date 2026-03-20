@@ -57,11 +57,11 @@ const copy = {
     arButton: 'Ver como fica no meu pé',
     measureTitle: 'Descubra seu número ideal',
     measureBody:
-      'Para um resultado melhor, fotografe um pé por vez, de cima para baixo, com boa luz e com uma folha A4 ou objeto reto ao lado para referência.',
+      'Para um resultado melhor, fotografe um pé por vez, de cima para baixo, mantendo a câmera reta, com boa luz e distância constante.',
     measureTipsTitle: 'Dicas para melhor resultado',
     measureTip1: 'Posicione o pé inteiro dentro da foto.',
-    measureTip2: 'Use fundo simples e boa iluminação.',
-    measureTip3: 'Evite sombras fortes e ângulos inclinados.',
+    measureTip2: 'Mantenha o celular acima do pé, sem inclinar a câmera.',
+    measureTip3: 'Tire a foto a uma distância parecida em todas as tentativas, com boa iluminação.',
     captureButton: 'Tirar foto do pé',
     analyzeButton: 'Analisar com MediaPipe',
     analyzing: 'Analisando pé com MediaPipe...',
@@ -109,11 +109,11 @@ const copy = {
     arButton: 'Ver como queda en mi pie',
     measureTitle: 'Descubre tu talla ideal',
     measureBody:
-      'Para un mejor resultado, fotografia un pie por vez, de arriba hacia abajo, con buena luz y una hoja A4 u objeto recto al lado como referencia.',
+      'Para un mejor resultado, fotografia un pie por vez, de arriba hacia abajo, manteniendo la cámara recta, con buena luz y distancia constante.',
     measureTipsTitle: 'Consejos para mejor resultado',
     measureTip1: 'Coloca el pie completo dentro de la foto.',
-    measureTip2: 'Usa fondo simple y buena iluminacion.',
-    measureTip3: 'Evita sombras fuertes y angulos inclinados.',
+    measureTip2: 'Mantén el móvil por encima del pie, sin inclinar la cámara.',
+    measureTip3: 'Toma la foto a una distancia parecida en cada intento, con buena iluminación.',
     captureButton: 'Tomar foto del pie',
     analyzeButton: 'Analizar con MediaPipe',
     analyzing: 'Analizando pie con MediaPipe...',
@@ -161,11 +161,11 @@ const copy = {
     arButton: 'See how it looks on my foot',
     measureTitle: 'Find your ideal size',
     measureBody:
-      'For better results, photograph one foot at a time from above, with good lighting and an A4 sheet or straight object nearby as reference.',
+      'For better results, photograph one foot at a time from above, keeping the camera straight, with good lighting and a consistent distance.',
     measureTipsTitle: 'Tips for better results',
     measureTip1: 'Keep the full foot inside the frame.',
-    measureTip2: 'Use a plain background and good lighting.',
-    measureTip3: 'Avoid heavy shadows and tilted angles.',
+    measureTip2: 'Keep the phone above the foot without tilting the camera.',
+    measureTip3: 'Capture from a similar distance on each try, with good lighting.',
     captureButton: 'Take foot photo',
     analyzeButton: 'Analyze with MediaPipe',
     analyzing: 'Analyzing foot with MediaPipe...',
@@ -245,7 +245,195 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function estimateFootLengthCm(image: HTMLImageElement, hasLandmarks: boolean) {
+function getChartLengthBounds(sizeChart: ShoeSizeChartEntry[]) {
+  const lengths = sizeChart
+    .map((entry) => getShoeLengthCmFromEntry(entry))
+    .filter((value) => value > 0)
+    .sort((a, b) => a - b);
+
+  if (!lengths.length) return null;
+
+  return {
+    min: lengths[0],
+    max: lengths[lengths.length - 1],
+  };
+}
+
+function detectFootShapeMetrics(image: HTMLImageElement) {
+  const maxDimension = 640;
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight, 1));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(image, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+
+  const sampleBorder = () => {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let count = 0;
+    const step = Math.max(1, Math.floor(Math.min(width, height) / 40));
+
+    const addPixel = (x: number, y: number) => {
+      const idx = (y * width + x) * 4;
+      r += pixels[idx];
+      g += pixels[idx + 1];
+      b += pixels[idx + 2];
+      count += 1;
+    };
+
+    for (let x = 0; x < width; x += step) {
+      addPixel(x, 0);
+      addPixel(x, height - 1);
+    }
+    for (let y = 0; y < height; y += step) {
+      addPixel(0, y);
+      addPixel(width - 1, y);
+    }
+
+    if (!count) return { r: 240, g: 240, b: 240 };
+
+    return {
+      r: r / count,
+      g: g / count,
+      b: b / count,
+    };
+  };
+
+  const background = sampleBorder();
+  const visited = new Uint8Array(width * height);
+
+  type Component = {
+    area: number;
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  };
+
+  const isForeground = (x: number, y: number) => {
+    const idx = (y * width + x) * 4;
+    const r = pixels[idx];
+    const g = pixels[idx + 1];
+    const b = pixels[idx + 2];
+    const colorDistance = Math.sqrt(
+      Math.pow(r - background.r, 2) +
+      Math.pow(g - background.g, 2) +
+      Math.pow(b - background.b, 2)
+    );
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    const backgroundLuminance = 0.299 * background.r + 0.587 * background.g + 0.114 * background.b;
+    return colorDistance > 42 || Math.abs(luminance - backgroundLuminance) > 28;
+  };
+
+  let bestComponent: Component | null = null;
+  const queueX = new Int32Array(width * height);
+  const queueY = new Int32Array(width * height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const startIndex = y * width + x;
+      if (visited[startIndex]) continue;
+      visited[startIndex] = 1;
+      if (!isForeground(x, y)) continue;
+
+      let head = 0;
+      let tail = 0;
+      queueX[tail] = x;
+      queueY[tail] = y;
+      tail += 1;
+
+      const component: Component = {
+        area: 0,
+        minX: x,
+        minY: y,
+        maxX: x,
+        maxY: y,
+      };
+
+      while (head < tail) {
+        const currentX = queueX[head];
+        const currentY = queueY[head];
+        head += 1;
+
+        component.area += 1;
+        component.minX = Math.min(component.minX, currentX);
+        component.minY = Math.min(component.minY, currentY);
+        component.maxX = Math.max(component.maxX, currentX);
+        component.maxY = Math.max(component.maxY, currentY);
+
+        const neighbors = [
+          [currentX + 1, currentY],
+          [currentX - 1, currentY],
+          [currentX, currentY + 1],
+          [currentX, currentY - 1],
+        ];
+
+        for (const [nextX, nextY] of neighbors) {
+          if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) continue;
+          const nextIndex = nextY * width + nextX;
+          if (visited[nextIndex]) continue;
+          visited[nextIndex] = 1;
+          if (!isForeground(nextX, nextY)) continue;
+          queueX[tail] = nextX;
+          queueY[tail] = nextY;
+          tail += 1;
+        }
+      }
+
+      if (!bestComponent || component.area > bestComponent.area) {
+        bestComponent = component;
+      }
+    }
+  }
+
+  if (!bestComponent) return null;
+
+  const boxWidth = bestComponent.maxX - bestComponent.minX + 1;
+  const boxHeight = bestComponent.maxY - bestComponent.minY + 1;
+  const longestSide = Math.max(boxWidth, boxHeight);
+  const shortestSide = Math.max(1, Math.min(boxWidth, boxHeight));
+  const fillRatio = bestComponent.area / Math.max(1, boxWidth * boxHeight);
+
+  if (bestComponent.area < width * height * 0.015) return null;
+
+  return {
+    longestSideRatio: longestSide / Math.max(width, height),
+    aspectRatio: longestSide / shortestSide,
+    fillRatio,
+  };
+}
+
+function estimateFootLengthCm(
+  image: HTMLImageElement,
+  sizeChart: ShoeSizeChartEntry[],
+  hasLandmarks: boolean
+) {
+  const contour = detectFootShapeMetrics(image);
+  const chartBounds = getChartLengthBounds(sizeChart);
+
+  if (contour && chartBounds) {
+    const normalizedCoverage = clamp((contour.longestSideRatio - 0.35) / 0.45, 0, 1);
+    const coverageEstimate = chartBounds.min + normalizedCoverage * (chartBounds.max - chartBounds.min);
+    const shapeAdjustment = clamp((contour.aspectRatio - 2.4) * 0.35, -0.5, 0.7);
+    const fillAdjustment = clamp((contour.fillRatio - 0.45) * 1.5, -0.4, 0.4);
+    const landmarkAdjustment = hasLandmarks ? -0.15 : 0;
+
+    return clamp(
+      coverageEstimate + shapeAdjustment + fillAdjustment + landmarkAdjustment,
+      chartBounds.min - 0.6,
+      chartBounds.max + 0.6
+    );
+  }
+
   const aspectRatio = image.naturalWidth / Math.max(image.naturalHeight, 1);
   const coverageBase = hasLandmarks ? 24.8 : 25.4;
   const aspectAdjustment = clamp((aspectRatio - 0.7) * 4.5, -1.2, 1.4);
@@ -649,7 +837,7 @@ export function ShoeARWidget({
       const image = await loadImage(photoPreview);
       const poseResult = await detectPose(image);
       const hasLandmarks = Boolean(poseResult?.landmarks?.length);
-      const footLengthCm = estimateFootLengthCm(image, hasLandmarks);
+      const footLengthCm = estimateFootLengthCm(image, sizeChart, hasLandmarks);
       const chartRecommendation = calculateRecommendedShoeSizeFromChart(footLengthCm, sizeChart);
       const fallbackSize = footLengthToBrSize(footLengthCm);
       const resolvedSizeLabel = chartRecommendation?.size ?? `BR ${fallbackSize}`;
