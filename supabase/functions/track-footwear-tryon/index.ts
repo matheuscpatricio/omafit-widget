@@ -27,7 +27,58 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  if (req.method === "GET") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Use POST with a JSON body to track a footwear measurement.",
+      }),
+      {
+        status: 405,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Method not allowed. Use POST.",
+      }),
+      {
+        status: 405,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
   try {
+    let requestBody: any = null;
+    try {
+      requestBody = await req.json();
+    } catch (_jsonError) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid or empty JSON body.",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const {
       session_id,
       track_usage = true,
@@ -39,7 +90,7 @@ Deno.serve(async (req: Request) => {
       collection_handle,
       model_image,
       user_measurements,
-    } = await req.json();
+    } = requestBody;
 
     if (!public_id) {
       throw new Error('public_id is required');
