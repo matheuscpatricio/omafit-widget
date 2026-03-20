@@ -573,10 +573,8 @@ export function ShoeARWidget({
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
   const [step, setStep] = useState<Step>('info');
   const [footPhotoPreview, setFootPhotoPreview] = useState<string>('');
-  const [estimatedFootLength, setEstimatedFootLength] = useState<number | null>(null);
   const [recommendedSize, setRecommendedSize] = useState<number | null>(null);
   const [recommendedSizeLabel, setRecommendedSizeLabel] = useState<string | null>(null);
-  const [analysisNote, setAnalysisNote] = useState('');
   const [latestMeasuredFootLength, setLatestMeasuredFootLength] = useState<number | null>(null);
   const [usedChartRecommendation, setUsedChartRecommendation] = useState(false);
   const [chatMessages, setChatMessages] = useState<ShoeChatMessage[]>([]);
@@ -763,14 +761,14 @@ export function ShoeARWidget({
     const brandName = storeName || 'Omafit';
 
     if (language === 'es') {
-      return `${brandName} recomienda ${resolvedSizeLabel} para ${itemName}. Agrégalo al carrito para continuar con tu compra.`;
+      return `Separei ${resolvedSizeLabel} para ${itemName} de ${brandName}. Creo que va a quedar muy bien. Agrégalo al carrito para continuar con tu compra.`;
     }
 
     if (language === 'en') {
-      return `${brandName} recommends ${resolvedSizeLabel} for ${itemName}. Add it to cart to continue your purchase.`;
+      return `I picked ${resolvedSizeLabel} for ${itemName} from ${brandName}. It should fit really well. Add it to cart to continue your purchase.`;
     }
 
-    return `${brandName} recomenda ${resolvedSizeLabel} para ${itemName}. Adicione ao carrinho para continuar sua compra.`;
+    return `Separei o ${resolvedSizeLabel} para ${itemName} da ${brandName}. A chance de vestir muito bem é ótima. Adicione ao carrinho para continuar sua compra.`;
   };
 
   const getCartSuccessMessage = () => {
@@ -789,6 +787,15 @@ export function ShoeARWidget({
     if (language === 'es') return 'La variante seleccionada está agotada.';
     if (language === 'en') return 'The selected variant is sold out.';
     return 'A variante selecionada está esgotada.';
+  };
+
+  const getRecommendedSizeForCart = () => {
+    const rawSize = recommendedSizeLabel || (recommendedSize ? String(recommendedSize) : null);
+    if (!rawSize) return null;
+
+    return rawSize
+      .replace(/^br\s*/i, '')
+      .trim();
   };
 
   const resolveAddToCartFeedback = (payload: any) => {
@@ -906,10 +913,8 @@ export function ShoeARWidget({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setEstimatedFootLength(null);
     setRecommendedSize(null);
     setRecommendedSizeLabel(null);
-    setAnalysisNote('');
     setLatestMeasuredFootLength(null);
     setUsedChartRecommendation(false);
     setChatMessages([]);
@@ -941,12 +946,10 @@ export function ShoeARWidget({
       const fallbackSize = footLengthToBrSize(footLengthCm);
       const resolvedSizeLabel = chartRecommendation?.size ?? `BR ${fallbackSize}`;
 
-      setEstimatedFootLength(Number(footLengthCm.toFixed(1)));
       setLatestMeasuredFootLength(Number(footLengthCm.toFixed(1)));
       setRecommendedSize(chartRecommendation ? null : fallbackSize);
       setRecommendedSizeLabel(resolvedSizeLabel);
       setUsedChartRecommendation(Boolean(chartRecommendation));
-      setAnalysisNote(t.mediaPipeFallback);
       const nextAssistantMessage = buildAssistantMessage(resolvedSizeLabel);
       setChatMessages([
         {
@@ -960,18 +963,11 @@ export function ShoeARWidget({
       console.error('Erro ao analisar pé com MediaPipe:', error);
       const fallbackLength = 25.2;
       const fallbackSize = footLengthToBrSize(fallbackLength);
-      setEstimatedFootLength(fallbackLength);
       setLatestMeasuredFootLength(fallbackLength);
       setRecommendedSize(fallbackSize);
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
       setUsedChartRecommendation(false);
-      setAnalysisNote(t.mediaPipeFallback);
-      const nextAssistantMessage =
-        language === 'pt'
-          ? `${storeName || 'Omafit'} recomenda BR ${fallbackSize} para ${productName || 'este calçado'}. Adicione ao carrinho para continuar sua compra.`
-          : language === 'es'
-            ? `${storeName || 'Omafit'} recomienda BR ${fallbackSize} para ${productName || 'este calzado'}. Agrégalo al carrito para continuar con tu compra.`
-            : `${storeName || 'Omafit'} recommends BR ${fallbackSize} for ${productName || 'this footwear'}. Add it to cart to continue your purchase.`;
+      const nextAssistantMessage = buildAssistantMessage(`BR ${fallbackSize}`);
       setChatMessages([
         {
           role: 'assistant',
@@ -1036,30 +1032,31 @@ export function ShoeARWidget({
     setIsAddingToCart(true);
     setAddToCartFeedback('');
 
-    const requestId = `shoe_cart_${sessionId}_${Date.now()}`;
-    window.parent.postMessage(
-      {
-        type: 'omafit-add-to-cart-request',
-        requestId,
-        source: 'omafit-shoe-widget',
-        product: {
-          id: productId || 'unknown',
-          name: productName || 'Calçado',
-        },
-        selection: {
-          image_url: productImage || '',
-          recommended_size: recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : null),
-        },
-        quantity: 1,
-        shop_domain: shopDomain,
-        metadata: {
-          session_id: sessionId,
-          language,
-          estimated_foot_length_cm: estimatedFootLength,
-        },
+    const requestId = `cart_${sessionId}_${Date.now()}`;
+    const cartPayload = {
+      type: 'omafit-add-to-cart-request',
+      requestId,
+      source: 'omafit-widget',
+      product: {
+        id: productId || 'unknown',
+        name: productName || 'Calçado',
       },
-      '*'
-    );
+      selection: {
+        image_url: productImage || '',
+        color_hex: '',
+        recommended_size: getRecommendedSizeForCart(),
+      },
+      quantity: 1,
+      shop_domain: shopDomain,
+      metadata: {
+        session_id: sessionId,
+        language,
+      },
+    };
+
+    console.log('🛒 Solicitando add to cart ao parent:', cartPayload);
+
+    window.parent.postMessage(cartPayload, '*');
 
     setTimeout(() => {
       setIsAddingToCart((current) => {
@@ -1295,27 +1292,6 @@ export function ShoeARWidget({
                   <Footprints className="h-10 w-10" />
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-start">
-            {storeLogo && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
-                <img
-                  src={storeLogo}
-                  alt={storeName}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
-            <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100 text-gray-900">
-              <p className="text-sm md:text-base whitespace-pre-line">{`${t.sizeResultTitle}: ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : '--')}`}</p>
-              {estimatedFootLength ? (
-                <p className="mt-2 text-sm md:text-base text-gray-700">{estimatedFootLength.toFixed(1)} cm</p>
-              ) : null}
-              {analysisNote ? (
-                <p className="mt-3 text-sm md:text-base whitespace-pre-line text-gray-700">{analysisNote}</p>
-              ) : null}
             </div>
           </div>
 
