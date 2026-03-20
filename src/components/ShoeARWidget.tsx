@@ -195,7 +195,7 @@ const copy = {
   },
 } as const;
 
-type ShoeWidgetCopy = typeof copy.pt;
+type ShoeWidgetCopy = (typeof copy)[keyof typeof copy];
 type Step = 'info' | 'measure-capture' | 'processing' | 'measure-result' | 'ar-info' | 'ar-viewer';
 type ShoeChatMessage = {
   role: 'assistant' | 'user';
@@ -258,15 +258,6 @@ function footLengthToBrSize(footLengthCm: number) {
 
 function replaceStoreName(template: string, storeName: string) {
   return template.replace('{storeName}', storeName || 'Omafit');
-}
-
-function normalizeGender(value: unknown) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (!raw || raw === '(vazio)' || raw === 'null' || raw === 'undefined') return 'unisex';
-  if (raw === 'male' || raw === 'masculino' || raw === 'man' || raw === 'men') return 'male';
-  if (raw === 'female' || raw === 'feminino' || raw === 'woman' || raw === 'women') return 'female';
-  if (raw === 'unisex') return 'unisex';
-  return raw;
 }
 
 function parseMeasurementValue(value: unknown): number {
@@ -388,9 +379,7 @@ export function ShoeARWidget({
   shoeModelUrl = DEFAULT_SHOE_MODEL_URL,
   shoeModelIosUrl,
   shopDomain = '',
-  collectionId = '',
   collectionHandle = '',
-  defaultGender = 'unisex',
 }: ShoeARWidgetProps) {
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
   const [step, setStep] = useState<Step>('info');
@@ -398,7 +387,6 @@ export function ShoeARWidget({
   const [estimatedFootLength, setEstimatedFootLength] = useState<number | null>(null);
   const [recommendedSize, setRecommendedSize] = useState<number | null>(null);
   const [recommendedSizeLabel, setRecommendedSizeLabel] = useState<string | null>(null);
-  const [assistantMessage, setAssistantMessage] = useState('');
   const [analysisNote, setAnalysisNote] = useState('');
   const [latestMeasuredFootLength, setLatestMeasuredFootLength] = useState<number | null>(null);
   const [usedChartRecommendation, setUsedChartRecommendation] = useState(false);
@@ -454,152 +442,68 @@ export function ShoeARWidget({
       const effectiveShopDomain = shopDomain?.trim();
       if (!effectiveShopDomain) return;
 
-      const searchGender = normalizeGender(defaultGender);
-
       try {
         console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
         console.log('📊 Parâmetros de busca no ShoeARWidget:');
-        console.log('   - Gender FINAL para busca:', searchGender);
         console.log('   - Shop Domain:', effectiveShopDomain);
-        console.log('   - Collection ID (UUID interno):', collectionId || 'null');
-        console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
+        console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
 
-        let sizeChartQuery = supabase
+        const normalizedCollectionHandle = (collectionHandle || '').trim();
+
+        const { data: sizeChartRecord, error: chartError } = await supabase
           .from('size_charts')
-          .select('id, collection_id, collection_handle, gender, shop_domain');
-
-        if (collectionHandle && collectionHandle.trim() !== '') {
-          console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
-          sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', effectiveShopDomain)
-            .eq('collection_handle', collectionHandle)
-            .eq('gender', searchGender);
-        } else if (collectionId && collectionId.trim() !== '') {
-          console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
-          sizeChartQuery = sizeChartQuery
-            .eq('collection_id', collectionId)
-            .eq('gender', searchGender);
-        } else {
-          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
-          sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', effectiveShopDomain)
-            .is('collection_handle', null)
-            .is('collection_id', null)
-            .eq('gender', searchGender);
-        }
-
-        const { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
+          .select('id, shop_domain, collection_handle, sizes, measurement_refs')
+          .eq('shop_domain', effectiveShopDomain)
+          .eq('collection_handle', normalizedCollectionHandle)
+          .maybeSingle();
 
         if (chartError) {
           console.error('Erro ao buscar size_chart para calçados:', chartError);
           return;
         }
 
+        const chartRecord: any = sizeChartRecord;
+
         console.log('📊 Resultado da busca de size_chart:');
-        if (sizeChartRecord) {
+        if (chartRecord) {
           console.log('✅ SIZE_CHART ENCONTRADO:');
-          console.log('   - ID:', sizeChartRecord.id);
-          console.log('   - Collection ID:', sizeChartRecord.collection_id || 'null (global)');
-          console.log('   - Gender:', sizeChartRecord.gender);
-          console.log('   - Shop Domain:', sizeChartRecord.shop_domain);
+          console.log('   - ID:', chartRecord.id);
+          console.log('   - Shop Domain:', chartRecord.shop_domain);
+          console.log('   - Collection Handle:', chartRecord.collection_handle || 'null');
         } else {
           console.log('❌ SIZE_CHART NÃO ENCONTRADO');
         }
 
-        let sizeChartData: ShoeSizeChartEntry[] | null = null;
+        let sizeChartData: ShoeSizeChartEntry[] = [];
 
-        if (sizeChartRecord) {
-          const { data: entries, error: entriesError } = await supabase
-            .from('size_chart_entries')
-            .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-            .eq('size_chart_id', sizeChartRecord.id)
-            .order('order', { ascending: true });
+        if (chartRecord && Array.isArray(chartRecord.sizes) && chartRecord.sizes.length > 0) {
+          const measurementLabels = Array.isArray(chartRecord.measurement_refs)
+            ? chartRecord.measurement_refs
+            : undefined;
 
-          if (entriesError) {
-            console.error('Erro ao buscar size_chart_entries para calçados:', entriesError);
-            return;
-          }
+          sizeChartData = chartRecord.sizes.map((entry: any) => {
+            const resolvedSize =
+              entry?.size ??
+              entry?.size_name ??
+              entry?.name ??
+              entry?.label ??
+              '';
 
-          if (entries && entries.length > 0) {
-            sizeChartData = entries.map((entry: any) => {
-              let measurements = entry.measurements || {};
+            const measurements = Object.entries(entry || {}).reduce<Record<string, number | string>>((acc, [key, value]) => {
+              if (['size', 'size_name', 'name', 'label', 'id'].includes(key)) return acc;
+              acc[key] = value as number | string;
+              return acc;
+            }, {});
 
-              if (Object.keys(measurements).length === 0) {
-                measurements = {
-                  bust: entry.bust,
-                  waist: entry.waist,
-                  hips: entry.hips,
-                };
-              }
+            return {
+              size: String(resolvedSize),
+              measurements,
+              measurement_labels: measurementLabels,
+            };
+          }).filter((entry: ShoeSizeChartEntry) => entry.size.trim() !== '');
 
-              return {
-                size: entry.size_name,
-                measurements,
-                measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-              };
-            });
-          }
-        }
-
-        if (!sizeChartData || sizeChartData.length === 0) {
-          console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
-          let fallbackQuery = supabase
-            .from('size_charts')
-            .select('id, collection_id, collection_handle, gender, shop_domain');
-
-          if (collectionHandle && collectionHandle.trim() !== '') {
-            fallbackQuery = fallbackQuery
-              .eq('shop_domain', effectiveShopDomain)
-              .eq('collection_handle', collectionHandle)
-              .eq('gender', 'unisex');
-          } else if (collectionId && collectionId.trim() !== '') {
-            fallbackQuery = fallbackQuery
-              .eq('collection_id', collectionId)
-              .eq('gender', 'unisex');
-          } else {
-            fallbackQuery = fallbackQuery
-              .eq('shop_domain', effectiveShopDomain)
-              .is('collection_handle', null)
-              .is('collection_id', null)
-              .eq('gender', 'unisex');
-          }
-
-          const { data: unisexChart } = await fallbackQuery.maybeSingle();
-
-          if (unisexChart) {
-            console.log('✅ Chart UNISEX encontrado, buscando entries...');
-            const { data: unisexEntries, error: unisexEntriesError } = await supabase
-              .from('size_chart_entries')
-              .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-              .eq('size_chart_id', unisexChart.id)
-              .order('order', { ascending: true });
-
-            if (unisexEntriesError) {
-              console.error('Erro ao buscar size_chart_entries unisex para calçados:', unisexEntriesError);
-              return;
-            }
-
-            if (unisexEntries && unisexEntries.length > 0) {
-              sizeChartData = unisexEntries.map((entry: any) => {
-                let measurements = entry.measurements || {};
-
-                if (Object.keys(measurements).length === 0) {
-                  measurements = {
-                    bust: entry.bust,
-                    waist: entry.waist,
-                    hips: entry.hips,
-                  };
-                }
-
-                return {
-                  size: entry.size_name,
-                  measurements,
-                  measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-                };
-              });
-            }
-
-            console.log('✅ Usando size chart UNISEX como fallback');
+          if (sizeChartData.length > 0) {
+            console.log('✅ Tabela carregada a partir da coluna sizes');
             console.log('   - Número de tamanhos:', sizeChartData.length);
           }
         }
@@ -608,10 +512,7 @@ export function ShoeARWidget({
           setSizeChart([]);
           console.log('❌ PROBLEMA: Nenhum chart encontrado para calçados');
           console.log('   - Shop Domain:', effectiveShopDomain);
-          console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
-          console.log('   - Collection ID (UUID):', collectionId || 'null');
-          console.log('   - Gender:', searchGender);
-          console.log('   - Tentou unisex: Sim');
+          console.log('   - Collection Handle (Shopify):', normalizedCollectionHandle || 'null');
           return;
         }
 
@@ -624,7 +525,7 @@ export function ShoeARWidget({
     };
 
     loadSizeChart();
-  }, [shopDomain, collectionId, collectionHandle, defaultGender]);
+  }, [shopDomain, collectionHandle]);
 
   const surfaceTint = useMemo(() => hexToRgba(primaryColor, 0.1), [primaryColor]);
   const borderTint = useMemo(() => hexToRgba(primaryColor, 0.2), [primaryColor]);
@@ -662,7 +563,6 @@ export function ShoeARWidget({
 
     setRecommendedSize(null);
     setRecommendedSizeLabel(resolvedSizeLabel);
-    setAssistantMessage(nextAssistantMessage);
     setUsedChartRecommendation(true);
     setChatMessages((prev) => {
       if (!prev.length) {
@@ -722,7 +622,6 @@ export function ShoeARWidget({
     setEstimatedFootLength(null);
     setRecommendedSize(null);
     setRecommendedSizeLabel(null);
-    setAssistantMessage('');
     setAnalysisNote('');
     setLatestMeasuredFootLength(null);
     setUsedChartRecommendation(false);
@@ -766,7 +665,6 @@ export function ShoeARWidget({
         footLengthCm,
         chartRecommendation
       );
-      setAssistantMessage(nextAssistantMessage);
       setChatMessages([
         {
           role: 'assistant',
@@ -786,7 +684,6 @@ export function ShoeARWidget({
       setUsedChartRecommendation(false);
       setAnalysisNote(t.mediaPipeFallback);
       const nextAssistantMessage = `${t.sizeAssistantPrefix}: recomendamos BR ${fallbackSize} para ${productName || 'este calçado'}.`;
-      setAssistantMessage(nextAssistantMessage);
       setChatMessages([
         {
           role: 'assistant',
@@ -868,8 +765,6 @@ export function ShoeARWidget({
 
     setAddToCartFeedback(t.cartSuccess);
   };
-
-  const displayImage = productImage || footPhotoPreview;
 
   const goBack = () => {
     if (step === 'measure-capture') setStep('info');
