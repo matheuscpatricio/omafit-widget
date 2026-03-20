@@ -105,6 +105,42 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     return translation.replace('{storeName}', storeName || 'nossa loja');
   };
 
+  const getOutOfStockMessage = (): string => {
+    if (currentLanguage === 'es') return 'La variante seleccionada está agotada.';
+    if (currentLanguage === 'en') return 'The selected variant is sold out.';
+    return 'A variante selecionada está esgotada.';
+  };
+
+  const resolveAddToCartFeedback = (payload: any): string => {
+    const isSuccess = payload?.success === true || payload?.ok === true;
+    if (isSuccess) {
+      return t('addToCartSuccess');
+    }
+
+    const details = [
+      payload?.status,
+      payload?.reason,
+      payload?.code,
+      payload?.error,
+      payload?.message,
+      payload?.detail,
+      payload?.details,
+      payload?.variant_status,
+      payload?.inventory_status,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (
+      /out[\s_-]?of[\s_-]?stock|sold[\s_-]?out|esgotad|agotad|sem estoque|sin stock|no stock|unavailable/.test(details)
+    ) {
+      return getOutOfStockMessage();
+    }
+
+    return t('addToCartError');
+  };
+
   console.log('🌍 Idioma detectado no widget:', currentLanguage);
 
   // Gerar cor hover (mais escura)
@@ -527,15 +563,7 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         const responsePayload = event.data?.payload && typeof event.data.payload === 'object'
           ? event.data.payload
           : event.data;
-
-        const isSuccess = responsePayload?.success === true || responsePayload?.ok === true;
-
-        if (isSuccess) {
-          setAddToCartFeedback(t('addToCartSuccess'));
-          return;
-        }
-
-        setAddToCartFeedback(t('addToCartError'));
+        setAddToCartFeedback(resolveAddToCartFeedback(responsePayload));
       }
     };
 

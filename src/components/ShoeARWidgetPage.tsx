@@ -42,6 +42,7 @@ export function ShoeARWidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
   const [productName, setProductName] = useState<string>('Calçado em destaque');
+  const [productDescription, setProductDescription] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('Omafit');
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
@@ -62,6 +63,7 @@ export function ShoeARWidgetPage() {
     const image = params.get('productImage');
     const id = params.get('productId');
     const name = params.get('productName');
+    const description = params.get('productDescription') || params.get('product_description');
     const shopDomainParam = params.get('shopDomain');
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
@@ -81,6 +83,7 @@ export function ShoeARWidgetPage() {
     if (image) setProductImage(image);
     if (id) setProductId(id);
     if (name) setProductName(decodeURIComponent(name));
+    if (description) setProductDescription(decodeURIComponent(description));
     if (shopDomainParam) setShopDomain(decodeURIComponent(shopDomainParam));
     if (collectionIdParam) setCollectionId(collectionIdParam);
     if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
@@ -104,6 +107,12 @@ export function ShoeARWidgetPage() {
         if (config.storeLogo && (!logoParam || logoParam.trim() === '')) setStoreLogo(config.storeLogo);
         if (config.primaryColor) setPrimaryColor(config.primaryColor);
         if (config.fontFamily) setFontFamily(config.fontFamily);
+        if (config.productName || config.product_name) {
+          setProductName(config.productName || config.product_name);
+        }
+        if (config.productDescription || config.product_description) {
+          setProductDescription(config.productDescription || config.product_description);
+        }
         if (config.collectionId && !collectionIdParam) setCollectionId(config.collectionId);
         if (config.collectionHandle && !collectionHandleParam) setCollectionHandle(config.collectionHandle);
         if (config.defaultGender !== undefined && !defaultGenderParam) {
@@ -134,7 +143,12 @@ export function ShoeARWidgetPage() {
         if (event.data.primaryColor) setPrimaryColor(event.data.primaryColor);
         if (event.data.fontFamily) setFontFamily(event.data.fontFamily);
         if (event.data.productImage) setProductImage(event.data.productImage);
-        if (event.data.productName) setProductName(event.data.productName);
+        if (event.data.productName || event.data.product_name) {
+          setProductName(event.data.productName || event.data.product_name);
+        }
+        if (event.data.productDescription || event.data.product_description) {
+          setProductDescription(event.data.productDescription || event.data.product_description);
+        }
         if (event.data.productId) setProductId(event.data.productId);
         if (event.data.shopDomain) setShopDomain(event.data.shopDomain);
         if (event.data.collectionId) setCollectionId(event.data.collectionId);
@@ -177,6 +191,7 @@ export function ShoeARWidgetPage() {
             productImage={productImage}
             productId={productId}
             productName={productName}
+            productDescription={productDescription}
             storeName={storeName}
             storeLogo={storeLogo}
             primaryColor={primaryColor}
