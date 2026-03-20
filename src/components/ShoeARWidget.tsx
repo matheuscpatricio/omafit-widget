@@ -51,9 +51,10 @@ const copy = {
     feature1: 'Modelo 3D de calcado pronto para AR',
     feature2: 'Mesmas personalizacoes de logo, cores e fonte',
     feature3: 'Fluxo isolado, sem alterar o widget atual',
+    welcomeTitle: 'Bem-vindo ao assistente inteligente da {storeName}',
     infoTitle: 'Como funciona?',
     infoBody:
-      'Vou te ajudar a descobrir o número ideal para este calçado e a entender melhor o produto antes de adicionar ao carrinho.',
+      'Envie uma foto do seu pé para calcularmos o tamanho ideal desse calçado para você, tire qualquer dúvida!',
     sizeButton: 'Descobrir meu número na {storeName}',
     arButton: 'Ver como fica no meu pé',
     measureTitle: 'Descubra seu número ideal',
@@ -113,9 +114,10 @@ const copy = {
     feature1: 'Modelo 3D de calzado listo para AR',
     feature2: 'Mismas personalizaciones de logo, colores y tipografia',
     feature3: 'Flujo aislado, sin alterar el widget actual',
+    welcomeTitle: 'Bienvenido al asistente inteligente de {storeName}',
     infoTitle: '¿Cómo funciona?',
     infoBody:
-      'Voy a ayudarte a descubrir la talla ideal para este calzado y a conocer mejor el producto antes de agregarlo al carrito.',
+      'Envía una foto de tu pie para calcular la talla ideal de este calzado para ti y resuelve cualquier duda al final.',
     sizeButton: 'Descubrir mi talla en {storeName}',
     arButton: 'Ver como queda en mi pie',
     measureTitle: 'Descubre tu talla ideal',
@@ -175,9 +177,10 @@ const copy = {
     feature1: '3D footwear model ready for AR',
     feature2: 'Same logo, color and font personalization',
     feature3: 'Isolated flow, without changing the current widget',
+    welcomeTitle: 'Welcome to {storeName}\'s intelligent assistant',
     infoTitle: 'How does it work?',
     infoBody:
-      'I will help you find the ideal size for this footwear and understand the product better before adding it to cart.',
+      'Send a photo of your foot so we can calculate the ideal size for this footwear and answer any questions at the end.',
     sizeButton: 'Find my size at {storeName}',
     arButton: 'See how it looks on my foot',
     measureTitle: 'Find your ideal size',
@@ -611,6 +614,8 @@ export function ShoeARWidget({
   const [usedChartRecommendation, setUsedChartRecommendation] = useState(false);
   const [chatMessages, setChatMessages] = useState<ShoeChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
+  const [gptLoading, setGptLoading] = useState(false);
+  const [interactionCount, setInteractionCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addToCartFeedback, setAddToCartFeedback] = useState('');
@@ -756,53 +761,11 @@ export function ShoeARWidget({
     [productDescription]
   );
 
-  const createDescriptionReply = () => {
-    const itemName = productName || (language === 'pt' ? 'este calçado' : language === 'es' ? 'este calzado' : 'this footwear');
-    const brandName = storeName || 'Omafit';
-
-    if (!normalizedProductDescription) {
-      if (language === 'es') {
-        return `${itemName} de ${brandName} está pronto para seguir en tu compra. Agrégalo al carrito para continuar.`;
-      }
-
-      if (language === 'en') {
-        return `${itemName} from ${brandName} is ready to move forward in your purchase. Add it to cart to continue.`;
-      }
-
-      return `${itemName} da ${brandName} está pronto para seguir na sua compra. Adicione ao carrinho para continuar.`;
-    }
-
-    if (language === 'es') {
-      return `${itemName} de ${brandName}: ${normalizedProductDescription} Agrégalo al carrito para continuar con tu compra.`;
-    }
-
-    if (language === 'en') {
-      return `${itemName} from ${brandName}: ${normalizedProductDescription} Add it to cart to continue your purchase.`;
-    }
-
-    return `${itemName} da ${brandName}: ${normalizedProductDescription} Adicione ao carrinho para continuar sua compra.`;
-  };
-
   useEffect(() => {
     if (step === 'measure-result') {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [step, chatMessages]);
-
-  const buildAssistantMessage = (resolvedSizeLabel: string) => {
-    const itemName = productName || (language === 'pt' ? 'este calçado' : language === 'es' ? 'este calzado' : 'this footwear');
-    const brandName = storeName || 'Omafit';
-
-    if (language === 'es') {
-      return `Separei ${resolvedSizeLabel} para ${itemName} de ${brandName}. Creo que va a quedar muy bien. Agrégalo al carrito para continuar con tu compra.`;
-    }
-
-    if (language === 'en') {
-      return `I picked ${resolvedSizeLabel} for ${itemName} from ${brandName}. It should fit really well. Add it to cart to continue your purchase.`;
-    }
-
-    return `Separei o ${resolvedSizeLabel} para ${itemName} da ${brandName}. A chance de vestir muito bem é ótima. Adicione ao carrinho para continuar sua compra.`;
-  };
 
   const getCartSuccessMessage = () => {
     if (language === 'es') return 'Producto agregado al carrito!';
@@ -887,19 +850,155 @@ export function ShoeARWidget({
     }
   };
 
-  useEffect(() => {
-    if (!analyticsSessionId) return;
-    if (latestMeasuredFootLength === null) return;
-    if (!sizeChart.length) return;
+  const buildFootwearFallbackMessage = (
+    resolvedSize: string,
+    customMessage?: string
+  ) => {
+    const itemName = productName || (language === 'pt' ? 'este calçado' : language === 'es' ? 'este calzado' : 'this footwear');
+    const brandName = storeName || 'Omafit';
+    const hasQuestion = Boolean(customMessage?.trim());
 
-    const chartRecommendation = calculateRecommendedShoeSizeFromChart(latestMeasuredFootLength, sizeChart);
-    if (!chartRecommendation) return;
+    if (language === 'es') {
+      if (hasQuestion && normalizedProductDescription) {
+        return `${itemName} de ${brandName}: ${normalizedProductDescription} La talla ${resolvedSize} es la indicada. Agrégalo al carrito para continuar con tu compra.`;
+      }
+      return `${brandName} recomienda ${resolvedSize} para ${itemName}. Va a quedar muy bien. Agrégalo al carrito para continuar con tu compra.`;
+    }
 
-    const resolvedSize = chartRecommendation.size;
-    if (resolvedSize !== recommendedSizeLabel) return;
+    if (language === 'en') {
+      if (hasQuestion && normalizedProductDescription) {
+        return `${itemName} from ${brandName}: ${normalizedProductDescription} ${resolvedSize} is the right size. Add it to cart to continue your purchase.`;
+      }
+      return `${brandName} recommends ${resolvedSize} for ${itemName}. It should fit really well. Add it to cart to continue your purchase.`;
+    }
 
-    void syncMeasurementResult(resolvedSize, undefined, false);
-  }, [analyticsSessionId, latestMeasuredFootLength, sizeChart, recommendedSizeLabel]);
+    if (hasQuestion && normalizedProductDescription) {
+      return `${itemName} da ${brandName}: ${normalizedProductDescription} O tamanho ${resolvedSize} é o ideal. Adicione ao carrinho para continuar sua compra.`;
+    }
+
+    return `${brandName} recomenda ${resolvedSize} para ${itemName}. Vai ficar muito bom. Adicione ao carrinho para continuar sua compra.`;
+  };
+
+  const requestFootwearAssistant = async ({
+    resolvedSize,
+    customMessage,
+    replaceFirstAssistant = false,
+  }: {
+    resolvedSize: string;
+    customMessage?: string;
+    replaceFirstAssistant?: boolean;
+  }) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    setGptLoading(true);
+
+    try {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Configuração do Supabase ausente');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/validate-footwear-chat`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recommended_size: resolvedSize,
+          intent: customMessage?.trim() ? 'custom_message' : 'initial_result',
+          user_message: customMessage?.trim() || '',
+          session_id: analyticsSessionId || sessionId,
+          interaction_count: interactionCount,
+          shop_name: storeName,
+          shop_domain: shopDomain,
+          language,
+          product_name: productName,
+          product_description: normalizedProductDescription,
+          collection_handle: collectionHandle,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erro ao chamar assistente de calçados');
+      }
+
+      const result = await response.json();
+      const explanation =
+        result?.data?.explicacao ||
+        buildFootwearFallbackMessage(resolvedSize, customMessage);
+
+      setChatMessages((prev) => {
+        if (replaceFirstAssistant) {
+          if (!prev.length) {
+            return [{ role: 'assistant', content: explanation, timestamp: Date.now() }];
+          }
+
+          const [firstMessage, ...rest] = prev;
+          if (firstMessage.role !== 'assistant') {
+            return [{ role: 'assistant', content: explanation, timestamp: Date.now() }, ...prev];
+          }
+
+          return [
+            {
+              ...firstMessage,
+              content: explanation,
+            },
+            ...rest,
+          ];
+        }
+
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            content: explanation,
+            timestamp: Date.now(),
+          },
+        ];
+      });
+
+      setInteractionCount(result?.interaction_count || interactionCount + 1);
+    } catch (error) {
+      console.error('Erro ao chamar GPT de calçados:', error);
+      const fallbackMessage = buildFootwearFallbackMessage(resolvedSize, customMessage);
+
+      setChatMessages((prev) => {
+        if (replaceFirstAssistant) {
+          if (!prev.length) {
+            return [{ role: 'assistant', content: fallbackMessage, timestamp: Date.now() }];
+          }
+
+          const [firstMessage, ...rest] = prev;
+          if (firstMessage.role !== 'assistant') {
+            return [{ role: 'assistant', content: fallbackMessage, timestamp: Date.now() }, ...prev];
+          }
+
+          return [
+            {
+              ...firstMessage,
+              content: fallbackMessage,
+            },
+            ...rest,
+          ];
+        }
+
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            content: fallbackMessage,
+            timestamp: Date.now(),
+          },
+        ];
+      });
+
+      setInteractionCount((prev) => prev + 1);
+    } finally {
+      setGptLoading(false);
+    }
+  };
 
   const resolveAddToCartFeedback = (payload: any) => {
     const isSuccess = payload?.success === true || payload?.ok === true;
@@ -956,32 +1055,14 @@ export function ShoeARWidget({
     if (!chartRecommendation) return;
 
     const resolvedSizeLabel = chartRecommendation.size;
-    const nextAssistantMessage = buildAssistantMessage(resolvedSizeLabel);
 
     setRecommendedSize(null);
     setRecommendedSizeLabel(resolvedSizeLabel);
     setUsedChartRecommendation(true);
-    setChatMessages((prev) => {
-      if (!prev.length) {
-        return [
-          {
-            role: 'assistant',
-            content: nextAssistantMessage,
-            timestamp: Date.now(),
-          },
-        ];
-      }
-
-      const [firstMessage, ...rest] = prev;
-      if (firstMessage.role !== 'assistant') return prev;
-
-      return [
-        {
-          ...firstMessage,
-          content: nextAssistantMessage,
-        },
-        ...rest,
-      ];
+    void syncMeasurementResult(resolvedSizeLabel, undefined, false);
+    void requestFootwearAssistant({
+      resolvedSize: resolvedSizeLabel,
+      replaceFirstAssistant: true,
     });
   }, [latestMeasuredFootLength, sizeChart, usedChartRecommendation]);
 
@@ -1055,15 +1136,12 @@ export function ShoeARWidget({
       setRecommendedSizeLabel(resolvedSizeLabel);
       setUsedChartRecommendation(Boolean(chartRecommendation));
       void syncMeasurementResult(resolvedSizeLabel, photoPreview, true);
-      const nextAssistantMessage = buildAssistantMessage(resolvedSizeLabel);
-      setChatMessages([
-        {
-          role: 'assistant',
-          content: nextAssistantMessage,
-          timestamp: Date.now(),
-        },
-      ]);
+      setChatMessages([]);
       setStep('measure-result');
+      await requestFootwearAssistant({
+        resolvedSize: resolvedSizeLabel,
+        replaceFirstAssistant: false,
+      });
     } catch (error) {
       console.error('Erro ao analisar pé com MediaPipe:', error);
       const fallbackLength = 25.2;
@@ -1073,42 +1151,20 @@ export function ShoeARWidget({
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
       setUsedChartRecommendation(false);
       void syncMeasurementResult(`BR ${fallbackSize}`, photoPreview, true);
-      const nextAssistantMessage = buildAssistantMessage(`BR ${fallbackSize}`);
-      setChatMessages([
-        {
-          role: 'assistant',
-          content: nextAssistantMessage,
-          timestamp: Date.now(),
-        },
-      ]);
+      setChatMessages([]);
       setStep('measure-result');
+      await requestFootwearAssistant({
+        resolvedSize: `BR ${fallbackSize}`,
+        replaceFirstAssistant: false,
+      });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleSendChatMessage = () => {
+  const handleSendChatMessage = async () => {
     const trimmedMessage = chatInput.trim();
-    if (!trimmedMessage) return;
-
-    const normalizedMessage = trimmedMessage
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-
-    const isDescriptionQuestion =
-      normalizedMessage.includes('descricao') ||
-      normalizedMessage.includes('detalhe') ||
-      normalizedMessage.includes('material') ||
-      normalizedMessage.includes('acabamento') ||
-      normalizedMessage.includes('sobre o produto') ||
-      normalizedMessage.includes('sobre este produto') ||
-      normalizedMessage.includes('description') ||
-      normalizedMessage.includes('details') ||
-      normalizedMessage.includes('materials') ||
-      normalizedMessage.includes('descripcion') ||
-      normalizedMessage.includes('detalle') ||
-      normalizedMessage.includes('materiales');
+    if (!trimmedMessage || gptLoading) return;
 
     const userMessage: ShoeChatMessage = {
       role: 'user',
@@ -1116,20 +1172,12 @@ export function ShoeARWidget({
       timestamp: Date.now(),
     };
 
-    const assistantReply: ShoeChatMessage = {
-      role: 'assistant',
-      content: isDescriptionQuestion
-        ? createDescriptionReply()
-        : language === 'pt'
-          ? `${storeName || 'Omafit'} recomenda ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'o tamanho ideal')} para ${productName || 'este calçado'}. Adicione ao carrinho para continuar sua compra.`
-          : language === 'es'
-            ? `${storeName || 'Omafit'} recomienda ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'la talla ideal')} para ${productName || 'este calzado'}. Agrégalo al carrito para continuar con tu compra.`
-            : `${storeName || 'Omafit'} recommends ${recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : 'the ideal size')} for ${productName || 'this footwear'}. Add it to cart to continue your purchase.`,
-      timestamp: Date.now() + 1,
-    };
-
-    setChatMessages((prev) => [...prev, userMessage, assistantReply]);
+    setChatMessages((prev) => [...prev, userMessage]);
     setChatInput('');
+    await requestFootwearAssistant({
+      resolvedSize: getResolvedRecommendedSize() || 'BR 39',
+      customMessage: trimmedMessage,
+    });
   };
 
   const handleAddToCart = () => {
@@ -1190,6 +1238,8 @@ export function ShoeARWidget({
     setAnalyticsSessionId(null);
     setChatMessages([]);
     setChatInput('');
+    setGptLoading(false);
+    setInteractionCount(0);
     setAddToCartFeedback('');
   };
 
@@ -1281,7 +1331,7 @@ export function ShoeARWidget({
 
               <div className="text-center">
                 <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
-                  {productName}
+                  {replaceStoreName(t.welcomeTitle, storeName)}
                 </h3>
                 <p className="text-gray-700 text-lg md:text-xl">{t.infoBody}</p>
               </div>
@@ -1314,9 +1364,6 @@ export function ShoeARWidget({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="order-1 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
                 <div className="text-center mb-3">
-                  <h3 className="text-2xl font-semibold mb-2" style={{ color: primaryColor }}>
-                    {t.footPhotoLabel}
-                  </h3>
                   <p className="text-gray-700 text-base">
                     {t.betterResults}
                   </p>
@@ -1456,6 +1503,32 @@ export function ShoeARWidget({
             </div>
           ))}
 
+          {gptLoading && (
+            <div className="flex gap-2 justify-start">
+              {storeLogo && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
+                  <img src={storeLogo} alt={storeName} className="w-full h-full object-contain" />
+                </div>
+              )}
+              <div className="max-w-[80%] rounded-2xl p-4 bg-gray-100">
+                <div className="flex items-center gap-1">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full animate-bounce"
+                    style={{ backgroundColor: primaryColor, animationDelay: '0ms', animationDuration: '1.4s' }}
+                  />
+                  <span
+                    className="inline-block w-2 h-2 rounded-full animate-bounce"
+                    style={{ backgroundColor: primaryColor, animationDelay: '200ms', animationDuration: '1.4s' }}
+                  />
+                  <span
+                    className="inline-block w-2 h-2 rounded-full animate-bounce"
+                    style={{ backgroundColor: primaryColor, animationDelay: '400ms', animationDuration: '1.4s' }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div ref={chatEndRef} />
 
           <div className="p-4 border-t bg-gray-50">
@@ -1488,6 +1561,7 @@ export function ShoeARWidget({
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={t.chatPlaceholder}
+                disabled={gptLoading}
                 className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -1497,6 +1571,7 @@ export function ShoeARWidget({
               />
               <button
                 type="button"
+                disabled={gptLoading}
                 className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md"
                 style={{ backgroundColor: primaryColor }}
                 onClick={handleSendChatMessage}
