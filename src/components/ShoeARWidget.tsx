@@ -788,6 +788,15 @@ export function ShoeARWidget({
   const getResolvedRecommendedSize = () =>
     recommendedSizeLabel || (recommendedSize ? `BR ${recommendedSize}` : null);
 
+  const getCartRecommendedSizeValue = () => {
+    const resolvedSize = getResolvedRecommendedSize();
+    if (!resolvedSize) return null;
+
+    const normalized = String(resolvedSize).trim();
+    const withoutPrefix = normalized.replace(/^(br|eu|us|uk)\s*/i, '').trim();
+    return withoutPrefix || normalized;
+  };
+
   const syncMeasurementResult = async (
     resolvedSize: string,
     previewImage?: string,
@@ -1187,6 +1196,8 @@ export function ShoeARWidget({
     setAddToCartFeedback('');
 
     const requestId = `cart_${sessionId}_${Date.now()}`;
+    const resolvedSizeLabel = getResolvedRecommendedSize();
+    const variantSizeValue = getCartRecommendedSizeValue();
     const cartPayload = {
       type: 'omafit-add-to-cart-request',
       requestId,
@@ -1198,13 +1209,20 @@ export function ShoeARWidget({
       selection: {
         image_url: productImage || '',
         color_hex: '',
-          recommended_size: getResolvedRecommendedSize(),
+        recommended_size: variantSizeValue,
+        recommended_size_label: resolvedSizeLabel,
+        variant_option_name: 'Tamanho do calçado',
+        selected_options: {
+          'Tamanho do calçado': variantSizeValue,
+        },
       },
       quantity: 1,
       shop_domain: shopDomain,
       metadata: {
         session_id: sessionId,
         language,
+        recommended_size_label: resolvedSizeLabel,
+        variant_option_name: 'Tamanho do calçado',
       },
     };
 
