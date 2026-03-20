@@ -45,10 +45,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('public_id is required');
     }
 
-    if (!session_id && (!product_id || !UUID_REGEX.test(String(product_id)))) {
-      throw new Error('product_id must be a valid UUID');
-    }
-
     if (!session_id && !model_image) {
       throw new Error('model_image is required when creating a new session');
     }
@@ -166,10 +162,52 @@ Deno.serve(async (req: Request) => {
     const sessionStartTime = new Date().toISOString();
     let sessionId = session_id && UUID_REGEX.test(String(session_id)) ? String(session_id) : null;
     let sessionCreatedNow = false;
+    let resolvedProductId = product_id ? String(product_id) : null;
+
+    if (!sessionId) {
+      if (!resolvedProductId) {
+        throw new Error('product_id is required');
+      }
+
+      if (!UUID_REGEX.test(resolvedProductId)) {
+        let productLookupQuery = supabaseClient
+          .from('products')
+          .select('id')
+          .eq('shopify_id', resolvedProductId);
+
+        if (effectiveUserId) {
+          productLookupQuery = productLookupQuery.eq('user_id', effectiveUserId);
+        }
+
+        let { data: mappedProduct, error: mappedProductError } = await productLookupQuery.maybeSingle();
+
+        if ((!mappedProduct || mappedProductError) && product_name) {
+          let productNameQuery = supabaseClient
+            .from('products')
+            .select('id')
+            .eq('name', product_name)
+            .limit(1);
+
+          if (effectiveUserId) {
+            productNameQuery = productNameQuery.eq('user_id', effectiveUserId);
+          }
+
+          const fallbackByName = await productNameQuery.maybeSingle();
+          mappedProduct = fallbackByName.data;
+          mappedProductError = fallbackByName.error;
+        }
+
+        if (mappedProductError || !mappedProduct?.id) {
+          throw new Error('Could not resolve internal product UUID from product_id');
+        }
+
+        resolvedProductId = mappedProduct.id;
+      }
+    }
 
     if (!sessionId) {
       const sessionData: Record<string, unknown> = {
-        product_id,
+        product_id: resolvedProductId,
         customer_email: clientIp,
         model_image,
         user_id: effectiveUserId,
@@ -204,7 +242,7 @@ Deno.serve(async (req: Request) => {
         user_id: effectiveUserId,
         public_id,
         shop_domain: resolvedShopDomain || null,
-        product_id,
+        product_id: resolvedProductId,
         product_name: product_name || null,
         collection_handle: collection_handle || null,
         recommended_size: recommendedSize,

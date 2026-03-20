@@ -1336,15 +1336,6 @@ export function ShoeARWidget({
                 <p className="text-gray-700 text-lg md:text-xl">{t.infoBody}</p>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
-                <div className="text-center">
-                  <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">{t.measureTipsTitle}</h4>
-                  <p className="text-base md:text-lg text-blue-700">
-                    {t.measureTip1} {t.measureTip2} {t.measureTip3}
-                  </p>
-                </div>
-              </div>
-
               <button
                 type="button"
                 onClick={() => setStep('measure-capture')}
@@ -1551,8 +1542,8 @@ export function ShoeARWidget({
               <p className="text-xs text-center text-gray-600 mb-3">{addToCartFeedback}</p>
             )}
 
-            {chatMessages.length > 0 && (
-              <p className="text-sm text-gray-600 text-center mt-3 mb-3">{t.chatPrompt}</p>
+            {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
+              <p className="text-sm text-gray-600 text-center mb-3">{t.chatPrompt}</p>
             )}
 
             <div className="flex gap-2">
