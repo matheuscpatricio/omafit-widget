@@ -456,69 +456,14 @@ export function ShoeARWidget({
 
       const searchGender = normalizeGender(defaultGender);
 
-      const fetchGlobalChartRecord = async (genderToFetch: string) => {
-        const { data: nullHandleChart, error: nullHandleChartError } = await supabase
-          .from('size_charts')
-          .select('id, collection_id, collection_handle, gender, shop_domain')
-          .eq('shop_domain', effectiveShopDomain)
-          .is('collection_handle', null)
-          .is('collection_id', null)
-          .eq('gender', genderToFetch)
-          .maybeSingle();
-
-        if (nullHandleChartError) {
-          return { data: null, error: nullHandleChartError };
-        }
-
-        if (nullHandleChart) {
-          return { data: nullHandleChart, error: null };
-        }
-
-        const { data: emptyHandleChart, error: emptyHandleChartError } = await supabase
-          .from('size_charts')
-          .select('id, collection_id, collection_handle, gender, shop_domain')
-          .eq('shop_domain', effectiveShopDomain)
-          .eq('collection_handle', '')
-          .eq('gender', genderToFetch)
-          .maybeSingle();
-
-        return { data: emptyHandleChart, error: emptyHandleChartError };
-      };
-
-      const fetchEntriesForChart = async (chartId: string) => {
-        const { data: entries, error: entriesError } = await supabase
-          .from('size_chart_entries')
-          .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-          .eq('size_chart_id', chartId)
-          .order('order', { ascending: true });
-
-        if (entriesError) {
-          return { data: [] as ShoeSizeChartEntry[], error: entriesError };
-        }
-
-        const mappedEntries: ShoeSizeChartEntry[] = (entries || []).map((entry: any) => {
-          let measurements = entry.measurements || {};
-
-          if (Object.keys(measurements).length === 0) {
-            measurements = {
-              bust: entry.bust,
-              waist: entry.waist,
-              hips: entry.hips,
-            };
-          }
-
-          return {
-            size: entry.size_name,
-            measurements,
-            measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-          };
-        });
-
-        return { data: mappedEntries, error: null };
-      };
-
       try {
         console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
+        console.log('📊 Parâmetros de busca no ShoeARWidget:');
+        console.log('   - Gender FINAL para busca:', searchGender);
+        console.log('   - Shop Domain:', effectiveShopDomain);
+        console.log('   - Collection ID (UUID interno):', collectionId || 'null');
+        console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
+
         let sizeChartQuery = supabase
           .from('size_charts')
           .select('id, collection_id, collection_handle, gender, shop_domain');
@@ -550,11 +495,20 @@ export function ShoeARWidget({
           return;
         }
 
-        let sizeChartData: ShoeSizeChartEntry[] = [];
+        console.log('📊 Resultado da busca de size_chart:');
+        if (sizeChartRecord) {
+          console.log('✅ SIZE_CHART ENCONTRADO:');
+          console.log('   - ID:', sizeChartRecord.id);
+          console.log('   - Collection ID:', sizeChartRecord.collection_id || 'null (global)');
+          console.log('   - Gender:', sizeChartRecord.gender);
+          console.log('   - Shop Domain:', sizeChartRecord.shop_domain);
+        } else {
+          console.log('❌ SIZE_CHART NÃO ENCONTRADO');
+        }
+
+        let sizeChartData: ShoeSizeChartEntry[] | null = null;
 
         if (sizeChartRecord) {
-          console.log('✅ SIZE_CHART ENCONTRADO:', sizeChartRecord.id);
-
           const { data: entries, error: entriesError } = await supabase
             .from('size_chart_entries')
             .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
@@ -587,7 +541,7 @@ export function ShoeARWidget({
           }
         }
 
-        if ((!sizeChartData || sizeChartData.length === 0) && searchGender !== 'unisex') {
+        if (!sizeChartData || sizeChartData.length === 0) {
           console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
           let fallbackQuery = supabase
             .from('size_charts')
@@ -613,6 +567,7 @@ export function ShoeARWidget({
           const { data: unisexChart } = await fallbackQuery.maybeSingle();
 
           if (unisexChart) {
+            console.log('✅ Chart UNISEX encontrado, buscando entries...');
             const { data: unisexEntries, error: unisexEntriesError } = await supabase
               .from('size_chart_entries')
               .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
@@ -643,176 +598,26 @@ export function ShoeARWidget({
                 };
               });
             }
-          }
-        }
 
-        if ((!sizeChartData || sizeChartData.length === 0) && collectionHandle && collectionHandle.trim() !== '') {
-          console.log('⚠️ Nenhum chart encontrado na coleção. Tentando tabela global da loja...');
-
-          const { data: globalChart, error: globalChartError } = await fetchGlobalChartRecord(searchGender);
-
-          if (globalChartError) {
-            console.error('Erro ao buscar size_chart global para calçados:', globalChartError);
-            return;
-          }
-
-          if (globalChart) {
-            const { data: globalEntries, error: globalEntriesError } = await supabase
-              .from('size_chart_entries')
-              .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-              .eq('size_chart_id', globalChart.id)
-              .order('order', { ascending: true });
-
-            if (globalEntriesError) {
-              console.error('Erro ao buscar size_chart_entries globais para calçados:', globalEntriesError);
-              return;
-            }
-
-            if (globalEntries && globalEntries.length > 0) {
-              sizeChartData = globalEntries.map((entry: any) => {
-                let measurements = entry.measurements || {};
-
-                if (Object.keys(measurements).length === 0) {
-                  measurements = {
-                    bust: entry.bust,
-                    waist: entry.waist,
-                    hips: entry.hips,
-                  };
-                }
-
-                return {
-                  size: entry.size_name,
-                  measurements,
-                  measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-                };
-              });
-            }
-          }
-        }
-
-        if ((!sizeChartData || sizeChartData.length === 0) && collectionHandle && collectionHandle.trim() !== '' && searchGender !== 'unisex') {
-          console.log('⚠️ Tabela global específica não encontrada. Tentando tabela global unisex...');
-
-          const { data: globalUnisexChart, error: globalUnisexChartError } = await fetchGlobalChartRecord('unisex');
-
-          if (globalUnisexChartError) {
-            console.error('Erro ao buscar size_chart global unisex para calçados:', globalUnisexChartError);
-            return;
-          }
-
-          if (globalUnisexChart) {
-            const { data: globalUnisexEntries, error: globalUnisexEntriesError } = await supabase
-              .from('size_chart_entries')
-              .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-              .eq('size_chart_id', globalUnisexChart.id)
-              .order('order', { ascending: true });
-
-            if (globalUnisexEntriesError) {
-              console.error('Erro ao buscar size_chart_entries globais unisex para calçados:', globalUnisexEntriesError);
-              return;
-            }
-
-            if (globalUnisexEntries && globalUnisexEntries.length > 0) {
-              sizeChartData = globalUnisexEntries.map((entry: any) => {
-                let measurements = entry.measurements || {};
-
-                if (Object.keys(measurements).length === 0) {
-                  measurements = {
-                    bust: entry.bust,
-                    waist: entry.waist,
-                    hips: entry.hips,
-                  };
-                }
-
-                return {
-                  size: entry.size_name,
-                  measurements,
-                  measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-                };
-              });
-            }
-          }
-        }
-
-        if (!sizeChartData || sizeChartData.length === 0) {
-          const alternateGenders = ['male', 'female'].filter((gender) => gender !== searchGender);
-
-          for (const alternateGender of alternateGenders) {
-            console.log(`⚠️ Nenhum chart encontrado com gender=${searchGender}. Tentando gender alternativo: ${alternateGender}`);
-
-            let alternateQuery = supabase
-              .from('size_charts')
-              .select('id, collection_id, collection_handle, gender, shop_domain');
-
-            if (collectionHandle && collectionHandle.trim() !== '') {
-              alternateQuery = alternateQuery
-                .eq('shop_domain', effectiveShopDomain)
-                .eq('collection_handle', collectionHandle)
-                .eq('gender', alternateGender);
-            } else if (collectionId && collectionId.trim() !== '') {
-              alternateQuery = alternateQuery
-                .eq('collection_id', collectionId)
-                .eq('gender', alternateGender);
-            } else {
-              alternateQuery = alternateQuery
-                .eq('shop_domain', effectiveShopDomain)
-                .is('collection_handle', null)
-                .is('collection_id', null)
-                .eq('gender', alternateGender);
-            }
-
-            const { data: alternateChart, error: alternateChartError } = await alternateQuery.maybeSingle();
-
-            if (alternateChartError) {
-              console.error(`Erro ao buscar size_chart alternativo (${alternateGender}) para calçados:`, alternateChartError);
-              return;
-            }
-
-            if (alternateChart) {
-              const { data: alternateEntries, error: alternateEntriesError } = await fetchEntriesForChart(alternateChart.id);
-
-              if (alternateEntriesError) {
-                console.error(`Erro ao buscar size_chart_entries alternativos (${alternateGender}) para calçados:`, alternateEntriesError);
-                return;
-              }
-
-              if (alternateEntries.length > 0) {
-                sizeChartData = alternateEntries;
-                break;
-              }
-            }
-
-            const { data: alternateGlobalChart, error: alternateGlobalChartError } = await fetchGlobalChartRecord(alternateGender);
-
-            if (alternateGlobalChartError) {
-              console.error(`Erro ao buscar size_chart global alternativo (${alternateGender}) para calçados:`, alternateGlobalChartError);
-              return;
-            }
-
-            if (alternateGlobalChart) {
-              const { data: alternateGlobalEntries, error: alternateGlobalEntriesError } = await fetchEntriesForChart(alternateGlobalChart.id);
-
-              if (alternateGlobalEntriesError) {
-                console.error(`Erro ao buscar size_chart_entries globais alternativos (${alternateGender}) para calçados:`, alternateGlobalEntriesError);
-                return;
-              }
-
-              if (alternateGlobalEntries.length > 0) {
-                sizeChartData = alternateGlobalEntries;
-                break;
-              }
-            }
+            console.log('✅ Usando size chart UNISEX como fallback');
+            console.log('   - Número de tamanhos:', sizeChartData.length);
           }
         }
 
         if (!sizeChartData || sizeChartData.length === 0) {
           setSizeChart([]);
           console.log('❌ PROBLEMA: Nenhum chart encontrado para calçados');
+          console.log('   - Shop Domain:', effectiveShopDomain);
+          console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
+          console.log('   - Collection ID (UUID):', collectionId || 'null');
+          console.log('   - Gender:', searchGender);
+          console.log('   - Tentou unisex: Sim');
           return;
         }
 
         setSizeChart(sizeChartData);
-        console.log('✅ setSizeChart() chamado com sucesso (calçados)');
+        console.log('✅ setSizeChart() chamado com sucesso');
+        console.log('   - Tamanhos disponíveis:', sizeChartData.map((s: any) => s.size).join(', '));
       } catch (error) {
         console.error('Erro crítico ao carregar size chart do widget de calçados:', error);
       }
