@@ -447,6 +447,35 @@ export function ShoeARWidget({
 
       const searchGender = defaultGender || 'unisex';
 
+      const fetchGlobalChartRecord = async (genderToFetch: string) => {
+        const { data: nullHandleChart, error: nullHandleChartError } = await supabase
+          .from('size_charts')
+          .select('id, collection_id, collection_handle, gender, shop_domain')
+          .eq('shop_domain', effectiveShopDomain)
+          .is('collection_handle', null)
+          .is('collection_id', null)
+          .eq('gender', genderToFetch)
+          .maybeSingle();
+
+        if (nullHandleChartError) {
+          return { data: null, error: nullHandleChartError };
+        }
+
+        if (nullHandleChart) {
+          return { data: nullHandleChart, error: null };
+        }
+
+        const { data: emptyHandleChart, error: emptyHandleChartError } = await supabase
+          .from('size_charts')
+          .select('id, collection_id, collection_handle, gender, shop_domain')
+          .eq('shop_domain', effectiveShopDomain)
+          .eq('collection_handle', '')
+          .eq('gender', genderToFetch)
+          .maybeSingle();
+
+        return { data: emptyHandleChart, error: emptyHandleChartError };
+      };
+
       try {
         console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
         let sizeChartQuery = supabase
@@ -579,14 +608,7 @@ export function ShoeARWidget({
         if ((!sizeChartData || sizeChartData.length === 0) && collectionHandle && collectionHandle.trim() !== '') {
           console.log('⚠️ Nenhum chart encontrado na coleção. Tentando tabela global da loja...');
 
-          const { data: globalChart, error: globalChartError } = await supabase
-            .from('size_charts')
-            .select('id, collection_id, collection_handle, gender, shop_domain')
-            .eq('shop_domain', effectiveShopDomain)
-            .is('collection_handle', null)
-            .is('collection_id', null)
-            .eq('gender', searchGender)
-            .maybeSingle();
+          const { data: globalChart, error: globalChartError } = await fetchGlobalChartRecord(searchGender);
 
           if (globalChartError) {
             console.error('Erro ao buscar size_chart global para calçados:', globalChartError);
@@ -630,14 +652,7 @@ export function ShoeARWidget({
         if ((!sizeChartData || sizeChartData.length === 0) && collectionHandle && collectionHandle.trim() !== '' && searchGender !== 'unisex') {
           console.log('⚠️ Tabela global específica não encontrada. Tentando tabela global unisex...');
 
-          const { data: globalUnisexChart, error: globalUnisexChartError } = await supabase
-            .from('size_charts')
-            .select('id, collection_id, collection_handle, gender, shop_domain')
-            .eq('shop_domain', effectiveShopDomain)
-            .is('collection_handle', null)
-            .is('collection_id', null)
-            .eq('gender', 'unisex')
-            .maybeSingle();
+          const { data: globalUnisexChart, error: globalUnisexChartError } = await fetchGlobalChartRecord('unisex');
 
           if (globalUnisexChartError) {
             console.error('Erro ao buscar size_chart global unisex para calçados:', globalUnisexChartError);
