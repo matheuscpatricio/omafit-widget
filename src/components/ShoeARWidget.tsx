@@ -485,6 +485,38 @@ export function ShoeARWidget({
         return { data: emptyHandleChart, error: emptyHandleChartError };
       };
 
+      const fetchEntriesForChart = async (chartId: string) => {
+        const { data: entries, error: entriesError } = await supabase
+          .from('size_chart_entries')
+          .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
+          .eq('size_chart_id', chartId)
+          .order('order', { ascending: true });
+
+        if (entriesError) {
+          return { data: [] as ShoeSizeChartEntry[], error: entriesError };
+        }
+
+        const mappedEntries: ShoeSizeChartEntry[] = (entries || []).map((entry: any) => {
+          let measurements = entry.measurements || {};
+
+          if (Object.keys(measurements).length === 0) {
+            measurements = {
+              bust: entry.bust,
+              waist: entry.waist,
+              hips: entry.hips,
+            };
+          }
+
+          return {
+            size: entry.size_name,
+            measurements,
+            measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
+          };
+        });
+
+        return { data: mappedEntries, error: null };
+      };
+
       try {
         console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
         let sizeChartQuery = supabase
@@ -698,6 +730,77 @@ export function ShoeARWidget({
                   measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
                 };
               });
+            }
+          }
+        }
+
+        if (!sizeChartData || sizeChartData.length === 0) {
+          const alternateGenders = ['male', 'female'].filter((gender) => gender !== searchGender);
+
+          for (const alternateGender of alternateGenders) {
+            console.log(`⚠️ Nenhum chart encontrado com gender=${searchGender}. Tentando gender alternativo: ${alternateGender}`);
+
+            let alternateQuery = supabase
+              .from('size_charts')
+              .select('id, collection_id, collection_handle, gender, shop_domain');
+
+            if (collectionHandle && collectionHandle.trim() !== '') {
+              alternateQuery = alternateQuery
+                .eq('shop_domain', effectiveShopDomain)
+                .eq('collection_handle', collectionHandle)
+                .eq('gender', alternateGender);
+            } else if (collectionId && collectionId.trim() !== '') {
+              alternateQuery = alternateQuery
+                .eq('collection_id', collectionId)
+                .eq('gender', alternateGender);
+            } else {
+              alternateQuery = alternateQuery
+                .eq('shop_domain', effectiveShopDomain)
+                .is('collection_handle', null)
+                .is('collection_id', null)
+                .eq('gender', alternateGender);
+            }
+
+            const { data: alternateChart, error: alternateChartError } = await alternateQuery.maybeSingle();
+
+            if (alternateChartError) {
+              console.error(`Erro ao buscar size_chart alternativo (${alternateGender}) para calçados:`, alternateChartError);
+              return;
+            }
+
+            if (alternateChart) {
+              const { data: alternateEntries, error: alternateEntriesError } = await fetchEntriesForChart(alternateChart.id);
+
+              if (alternateEntriesError) {
+                console.error(`Erro ao buscar size_chart_entries alternativos (${alternateGender}) para calçados:`, alternateEntriesError);
+                return;
+              }
+
+              if (alternateEntries.length > 0) {
+                sizeChartData = alternateEntries;
+                break;
+              }
+            }
+
+            const { data: alternateGlobalChart, error: alternateGlobalChartError } = await fetchGlobalChartRecord(alternateGender);
+
+            if (alternateGlobalChartError) {
+              console.error(`Erro ao buscar size_chart global alternativo (${alternateGender}) para calçados:`, alternateGlobalChartError);
+              return;
+            }
+
+            if (alternateGlobalChart) {
+              const { data: alternateGlobalEntries, error: alternateGlobalEntriesError } = await fetchEntriesForChart(alternateGlobalChart.id);
+
+              if (alternateGlobalEntriesError) {
+                console.error(`Erro ao buscar size_chart_entries globais alternativos (${alternateGender}) para calçados:`, alternateGlobalEntriesError);
+                return;
+              }
+
+              if (alternateGlobalEntries.length > 0) {
+                sizeChartData = alternateGlobalEntries;
+                break;
+              }
             }
           }
         }
