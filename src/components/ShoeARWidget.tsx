@@ -290,30 +290,56 @@ function getShoeLengthCmFromEntry(entry: ShoeSizeChartEntry) {
   const measurements = entry.measurements || {};
   const labels = Array.isArray(entry.measurement_labels) ? entry.measurement_labels : [];
 
-  // No widget de calcados usamos uma unica medida da tabela:
-  // comprimento do pe em cm, normalmente salvo em `medida1`.
+  // No widget de calçados usamos uma única medida da tabela:
+  // comprimento do pé em cm. Alguns lojistas salvam isso em `medida1`,
+  // outros em chaves antigas como `bust`.
   if (labels.length > 0) {
-    const firstLabel = String(labels[0] || '').trim().toLowerCase();
-    if (
-      firstLabel.includes('comprimento') ||
-      firstLabel.includes('pe') ||
-      firstLabel.includes('pé') ||
-      firstLabel.includes('foot') ||
-      firstLabel.includes('length')
-    ) {
-      const firstMeasurement = parseMeasurementValue(measurements.medida1);
-      if (firstMeasurement > 0) return firstMeasurement;
+    for (let index = 0; index < labels.length; index += 1) {
+      const normalizedLabel = String(labels[index] || '').trim().toLowerCase();
+      const isFootLengthLabel =
+        normalizedLabel.includes('comprimento') ||
+        normalizedLabel.includes('pe') ||
+        normalizedLabel.includes('pé') ||
+        normalizedLabel.includes('foot') ||
+        normalizedLabel.includes('length');
+
+      if (!isFootLengthLabel) continue;
+
+      const keyedMeasurement = parseMeasurementValue(measurements[`medida${index + 1}`]);
+      if (keyedMeasurement > 0) return keyedMeasurement;
     }
   }
 
-  return getMeasurementFromEntry(entry, [
+  const directMeasurement = getMeasurementFromEntry(entry, [
     'medida1',
+    'medida_1',
     'comprimento',
+    'comprimento_pe',
+    'comprimento_do_pe',
     'length',
     'pe',
     'pé',
     'foot',
+    'foot_length',
   ]);
+
+  if (directMeasurement > 0) return directMeasurement;
+
+  const legacyMeasurement = getMeasurementFromEntry(entry, [
+    'bust',
+    'chest',
+    'waist',
+    'hips',
+    'hip',
+  ]);
+
+  if (legacyMeasurement > 0) return legacyMeasurement;
+
+  const fallbackMeasurement = Object.values(measurements)
+    .map((value) => parseMeasurementValue(value))
+    .find((value) => value > 0);
+
+  return fallbackMeasurement || 0;
 }
 
 function calculateRecommendedShoeSizeFromChart(
@@ -376,11 +402,11 @@ export function ShoeARWidget({
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const { detectPose } = useMediaPipePose({
-    enabled: step === 'measure-capture' || isAnalyzing,
-    useWorker: false,
-    silentNoPose: true,
-  });
+  const {
+    isLoading: mediapipeLoading,
+    error: mediapipeError,
+    detectPose,
+  } = useMediaPipePose();
 
   useEffect(() => {
     if (customElements.get('model-viewer')) return;
@@ -402,48 +428,101 @@ export function ShoeARWidget({
   }, []);
 
   useEffect(() => {
+    if (mediapipeLoading) {
+      console.log('⏳ Carregando MediaPipe Pose Landmarker...');
+    } else if (mediapipeError) {
+      console.error('❌ Erro ao carregar MediaPipe:', mediapipeError);
+    } else {
+      console.log('✅ MediaPipe Pose Landmarker pronto!');
+    }
+  }, [mediapipeLoading, mediapipeError]);
+
+  useEffect(() => {
     const loadSizeChart = async () => {
-      if (!shopDomain) return;
+      const effectiveShopDomain = shopDomain?.trim();
+      if (!effectiveShopDomain) return;
 
       const searchGender = defaultGender || 'unisex';
 
       try {
+        console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
         let sizeChartQuery = supabase
           .from('size_charts')
           .select('id, collection_id, collection_handle, gender, shop_domain');
 
         if (collectionHandle && collectionHandle.trim() !== '') {
+          console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
           sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', shopDomain)
+            .eq('shop_domain', effectiveShopDomain)
             .eq('collection_handle', collectionHandle)
             .eq('gender', searchGender);
         } else if (collectionId && collectionId.trim() !== '') {
+          console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
           sizeChartQuery = sizeChartQuery
             .eq('collection_id', collectionId)
             .eq('gender', searchGender);
         } else {
+          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
           sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', shopDomain)
+            .eq('shop_domain', effectiveShopDomain)
             .is('collection_handle', null)
             .is('collection_id', null)
             .eq('gender', searchGender);
         }
 
-        let { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
+        const { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
 
         if (chartError) {
           console.error('Erro ao buscar size_chart para calçados:', chartError);
           return;
         }
 
-        if (!sizeChartRecord && searchGender !== 'unisex') {
+        let sizeChartData: ShoeSizeChartEntry[] = [];
+
+        if (sizeChartRecord) {
+          console.log('✅ SIZE_CHART ENCONTRADO:', sizeChartRecord.id);
+
+          const { data: entries, error: entriesError } = await supabase
+            .from('size_chart_entries')
+            .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
+            .eq('size_chart_id', sizeChartRecord.id)
+            .order('order', { ascending: true });
+
+          if (entriesError) {
+            console.error('Erro ao buscar size_chart_entries para calçados:', entriesError);
+            return;
+          }
+
+          if (entries && entries.length > 0) {
+            sizeChartData = entries.map((entry: any) => {
+              let measurements = entry.measurements || {};
+
+              if (Object.keys(measurements).length === 0) {
+                measurements = {
+                  bust: entry.bust,
+                  waist: entry.waist,
+                  hips: entry.hips,
+                };
+              }
+
+              return {
+                size: entry.size_name,
+                measurements,
+                measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
+              };
+            });
+          }
+        }
+
+        if ((!sizeChartData || sizeChartData.length === 0) && searchGender !== 'unisex') {
+          console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
           let fallbackQuery = supabase
             .from('size_charts')
             .select('id, collection_id, collection_handle, gender, shop_domain');
 
           if (collectionHandle && collectionHandle.trim() !== '') {
             fallbackQuery = fallbackQuery
-              .eq('shop_domain', shopDomain)
+              .eq('shop_domain', effectiveShopDomain)
               .eq('collection_handle', collectionHandle)
               .eq('gender', 'unisex');
           } else if (collectionId && collectionId.trim() !== '') {
@@ -452,46 +531,56 @@ export function ShoeARWidget({
               .eq('gender', 'unisex');
           } else {
             fallbackQuery = fallbackQuery
-              .eq('shop_domain', shopDomain)
+              .eq('shop_domain', effectiveShopDomain)
               .is('collection_handle', null)
               .is('collection_id', null)
               .eq('gender', 'unisex');
           }
 
-          const fallback = await fallbackQuery.maybeSingle();
-          sizeChartRecord = fallback.data;
+          const { data: unisexChart } = await fallbackQuery.maybeSingle();
+
+          if (unisexChart) {
+            const { data: unisexEntries, error: unisexEntriesError } = await supabase
+              .from('size_chart_entries')
+              .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
+              .eq('size_chart_id', unisexChart.id)
+              .order('order', { ascending: true });
+
+            if (unisexEntriesError) {
+              console.error('Erro ao buscar size_chart_entries unisex para calçados:', unisexEntriesError);
+              return;
+            }
+
+            if (unisexEntries && unisexEntries.length > 0) {
+              sizeChartData = unisexEntries.map((entry: any) => {
+                let measurements = entry.measurements || {};
+
+                if (Object.keys(measurements).length === 0) {
+                  measurements = {
+                    bust: entry.bust,
+                    waist: entry.waist,
+                    hips: entry.hips,
+                  };
+                }
+
+                return {
+                  size: entry.size_name,
+                  measurements,
+                  measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
+                };
+              });
+            }
+          }
         }
 
-        if (!sizeChartRecord) {
+        if (!sizeChartData || sizeChartData.length === 0) {
           setSizeChart([]);
+          console.log('❌ PROBLEMA: Nenhum chart encontrado para calçados');
           return;
         }
 
-        const { data: entries, error: entriesError } = await supabase
-          .from('size_chart_entries')
-          .select('size_name, measurements, measurement_labels, bust, waist, hips, order')
-          .eq('size_chart_id', sizeChartRecord.id)
-          .order('order', { ascending: true });
-
-        if (entriesError) {
-          console.error('Erro ao buscar size_chart_entries para calçados:', entriesError);
-          return;
-        }
-
-        const mappedEntries: ShoeSizeChartEntry[] = (entries || []).map((entry: any) => ({
-          size: entry.size_name,
-          measurements:
-            entry.measurements && Object.keys(entry.measurements).length > 0
-              ? entry.measurements
-              : {
-                  bust: entry.bust,
-                  waist: entry.waist,
-                  hips: entry.hips,
-                },
-          measurement_labels: Array.isArray(entry.measurement_labels) ? entry.measurement_labels : undefined,
-        }));
-
-        setSizeChart(mappedEntries);
+        setSizeChart(sizeChartData);
+        console.log('✅ setSizeChart() chamado com sucesso (calçados)');
       } catch (error) {
         console.error('Erro crítico ao carregar size chart do widget de calçados:', error);
       }
