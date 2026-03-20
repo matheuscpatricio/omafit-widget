@@ -622,6 +622,7 @@ export function ShoeARWidget({
   const [sizeChart, setSizeChart] = useState<ShoeSizeChartEntry[]>([]);
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
   const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
+  const [initialMeasurementTracked, setInitialMeasurementTracked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const {
@@ -801,7 +802,7 @@ export function ShoeARWidget({
     resolvedSize: string,
     previewImage?: string,
     trackUsage = true
-  ) => {
+  ): Promise<string | null> => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -811,7 +812,7 @@ export function ShoeARWidget({
         supabaseUrlPresent: Boolean(supabaseUrl),
         supabaseAnonKeyPresent: Boolean(supabaseAnonKey),
       });
-      return;
+      return null;
     }
 
     try {
@@ -845,17 +846,20 @@ export function ShoeARWidget({
       }
 
       const result = await response.json();
+      const resolvedSessionId = result?.session_id || analyticsSessionId;
       if (result?.session_id) {
         setAnalyticsSessionId(result.session_id);
       }
 
       console.log('✅ Medição do calçado sincronizada com o Supabase:', {
         recommendedSize: resolvedSize,
-        sessionId: result?.session_id || analyticsSessionId,
+        sessionId: resolvedSessionId,
         usageTracked: trackUsage,
       });
+      return resolvedSessionId || null;
     } catch (error) {
       console.error('Erro ao sincronizar medição do widget de calçados:', error);
+      return null;
     }
   };
 
@@ -1059,6 +1063,8 @@ export function ShoeARWidget({
     if (latestMeasuredFootLength === null) return;
     if (!sizeChart.length) return;
     if (usedChartRecommendation) return;
+    if (!initialMeasurementTracked) return;
+    if (!analyticsSessionId) return;
 
     const chartRecommendation = calculateRecommendedShoeSizeFromChart(latestMeasuredFootLength, sizeChart);
     if (!chartRecommendation) return;
@@ -1073,7 +1079,7 @@ export function ShoeARWidget({
       resolvedSize: resolvedSizeLabel,
       replaceFirstAssistant: true,
     });
-  }, [latestMeasuredFootLength, sizeChart, usedChartRecommendation]);
+  }, [latestMeasuredFootLength, sizeChart, usedChartRecommendation, initialMeasurementTracked, analyticsSessionId]);
 
   const modelViewer = React.createElement('model-viewer', {
     src: shoeModelUrl,
@@ -1111,6 +1117,7 @@ export function ShoeARWidget({
     setLatestMeasuredFootLength(null);
     setUsedChartRecommendation(false);
     setAnalyticsSessionId(null);
+    setInitialMeasurementTracked(false);
     setChatMessages([]);
     setChatInput('');
     setAddToCartFeedback('');
@@ -1144,7 +1151,8 @@ export function ShoeARWidget({
       setRecommendedSize(chartRecommendation ? null : fallbackSize);
       setRecommendedSizeLabel(resolvedSizeLabel);
       setUsedChartRecommendation(Boolean(chartRecommendation));
-      void syncMeasurementResult(resolvedSizeLabel, photoPreview, true);
+      const trackedSessionId = await syncMeasurementResult(resolvedSizeLabel, photoPreview, true);
+      setInitialMeasurementTracked(Boolean(trackedSessionId));
       setChatMessages([]);
       setStep('measure-result');
       await requestFootwearAssistant({
@@ -1159,7 +1167,8 @@ export function ShoeARWidget({
       setRecommendedSize(fallbackSize);
       setRecommendedSizeLabel(`BR ${fallbackSize}`);
       setUsedChartRecommendation(false);
-      void syncMeasurementResult(`BR ${fallbackSize}`, photoPreview, true);
+      const trackedSessionId = await syncMeasurementResult(`BR ${fallbackSize}`, photoPreview, true);
+      setInitialMeasurementTracked(Boolean(trackedSessionId));
       setChatMessages([]);
       setStep('measure-result');
       await requestFootwearAssistant({
@@ -1254,6 +1263,7 @@ export function ShoeARWidget({
     setLatestMeasuredFootLength(null);
     setUsedChartRecommendation(false);
     setAnalyticsSessionId(null);
+    setInitialMeasurementTracked(false);
     setChatMessages([]);
     setChatInput('');
     setGptLoading(false);

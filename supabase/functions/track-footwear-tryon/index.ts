@@ -158,6 +158,14 @@ Deno.serve(async (req: Request) => {
       user_measurements?.recommended_size ||
       user_measurements?.recommendedSize ||
       null;
+    const footLengthCmRaw =
+      user_measurements?.foot_length_cm ??
+      user_measurements?.footLengthCm ??
+      null;
+    const footLengthCm =
+      footLengthCmRaw === null || footLengthCmRaw === undefined || footLengthCmRaw === ''
+        ? null
+        : Number(footLengthCmRaw);
 
     const sessionStartTime = new Date().toISOString();
     let sessionId = session_id && UUID_REGEX.test(String(session_id)) ? String(session_id) : null;
@@ -236,26 +244,83 @@ Deno.serve(async (req: Request) => {
       sessionCreatedNow = true;
     }
 
-    await supabaseClient.rpc('upsert_session_analytics_from_tryon_payload', {
-      payload: {
-        id: sessionId,
-        user_id: effectiveUserId,
-        public_id,
-        shop_domain: resolvedShopDomain || null,
-        product_id: resolvedProductId,
-        product_name: product_name || null,
-        collection_handle: collection_handle || null,
-        recommended_size: recommendedSize,
-        user_measurements: user_measurements
-          ? {
-              ...user_measurements,
-              recommended_size: recommendedSize,
-              shop_domain: resolvedShopDomain || null,
-            }
-          : null,
-        created_at: sessionStartTime,
-      },
-    });
+    const baseSessionAnalytics: Record<string, unknown> = {
+      tryon_session_id: sessionId,
+      user_id: effectiveUserId,
+      duration_seconds: 0,
+      completed: false,
+      shared: false,
+      processing_time_seconds: 0,
+      images_processed: 1,
+    };
+
+    const enrichedSessionAnalytics: Record<string, unknown> = {
+      ...baseSessionAnalytics,
+      public_id: public_id || null,
+      shop_domain: resolvedShopDomain || null,
+      product_id: resolvedProductId,
+      product_name: product_name || null,
+      collection_handle: collection_handle || null,
+      gender: user_measurements?.gender || 'unisex',
+      height: user_measurements?.height || null,
+      weight: user_measurements?.weight || null,
+      foot_length_cm: Number.isFinite(footLengthCm) ? footLengthCm : null,
+      recommended_size: recommendedSize,
+      body_type_index: user_measurements?.body_type_index ?? null,
+      fit_preference_index: user_measurements?.fit_preference_index ?? null,
+      user_measurements: user_measurements
+        ? {
+            ...user_measurements,
+            recommended_size: recommendedSize,
+            shop_domain: resolvedShopDomain || null,
+          }
+        : null,
+    };
+
+    let { error: analyticsError } = await supabaseClient
+      .from('session_analytics')
+      .upsert([enrichedSessionAnalytics], { onConflict: 'tryon_session_id' });
+
+    if (analyticsError) {
+      console.warn('⚠️ Upsert enriquecido em session_analytics falhou. Tentando fallback básico...', analyticsError);
+      const fallbackResult = await supabaseClient
+        .from('session_analytics')
+        .upsert([baseSessionAnalytics], { onConflict: 'tryon_session_id' });
+      analyticsError = fallbackResult.error;
+    }
+
+    if (analyticsError) {
+      console.warn('⚠️ Falha ao salvar session_analytics do cálculo de calçados:', analyticsError);
+    }
+
+    try {
+      const { error: analyticsRpcError } = await supabaseClient.rpc('upsert_session_analytics_from_tryon_payload', {
+        payload: {
+          id: sessionId,
+          user_id: effectiveUserId,
+          public_id,
+          shop_domain: resolvedShopDomain || null,
+          product_id: resolvedProductId,
+          product_name: product_name || null,
+          collection_handle: collection_handle || null,
+          recommended_size: recommendedSize,
+          user_measurements: user_measurements
+            ? {
+                ...user_measurements,
+                recommended_size: recommendedSize,
+                shop_domain: resolvedShopDomain || null,
+              }
+            : null,
+          created_at: sessionStartTime,
+        },
+      });
+
+      if (analyticsRpcError) {
+        console.warn('⚠️ upsert_session_analytics_from_tryon_payload falhou para calçados:', analyticsRpcError);
+      }
+    } catch (analyticsRpcUnexpectedError) {
+      console.warn('⚠️ Erro inesperado no RPC de analytics para calçados:', analyticsRpcUnexpectedError);
+    }
 
     if (sessionCreatedNow && user_measurements) {
       await supabaseClient
@@ -327,7 +392,7 @@ Deno.serve(async (req: Request) => {
         if (billingShopDomain) {
           const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://ranging-drill-proper-wayne.trycloudflare.com';
 
-          await fetch(`${appUrl}/api/billing/usage`, {
+          const billingResponse = await fetch(`${appUrl}/api/billing/usage`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -337,6 +402,11 @@ Deno.serve(async (req: Request) => {
               imagesCount: 1,
             }),
           });
+
+          if (!billingResponse.ok) {
+            const errorText = await billingResponse.text().catch(() => '');
+            console.error('[Billing] ⚠️ Erro ao registrar uso do cálculo de calçados:', errorText || billingResponse.statusText);
+          }
         }
       } catch (billingError) {
         console.error('[Billing] ⚠️ Erro ao processar billing do cálculo de calçados:', billingError);
