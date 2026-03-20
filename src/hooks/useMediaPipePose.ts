@@ -152,6 +152,11 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!enabled || useWorker) return;
+    void initializeMainThreadPoseLandmarker();
+  }, [enabled, useWorker, initializeMainThreadPoseLandmarker]);
+
   const hasGoodLandmarkVisibility = useCallback((landmarks: PoseLandmark[] | undefined): boolean => {
     if (!landmarks || landmarks.length === 0) return false;
 

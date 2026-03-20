@@ -406,7 +406,10 @@ export function ShoeARWidget({
     isLoading: mediapipeLoading,
     error: mediapipeError,
     detectPose,
-  } = useMediaPipePose();
+  } = useMediaPipePose({
+    useWorker: false,
+    silentNoPose: true,
+  });
 
   useEffect(() => {
     if (customElements.get('model-viewer')) return;
