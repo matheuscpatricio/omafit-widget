@@ -103,6 +103,40 @@ const getOptimizedRemoteTryOnImageUrl = (rawUrl: string): string => {
   }
 };
 
+async function uploadTryOnModelImage(blob: Blob, fileName?: string): Promise<string> {
+  const metadataResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon-upload-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      mimeType: blob.type || 'image/jpeg',
+      folder: 'tryon-models',
+      fileName: fileName || 'tryon-model.jpg',
+    }),
+  });
+
+  if (!metadataResponse.ok) {
+    const errorText = await metadataResponse.text();
+    throw new Error(`Failed to prepare direct upload: ${errorText}`);
+  }
+
+  const uploadMetadata = await metadataResponse.json();
+  const { error } = await supabase.storage
+    .from(uploadMetadata.bucket || 'tryon-images')
+    .uploadToSignedUrl(uploadMetadata.path, uploadMetadata.token, blob, {
+      contentType: blob.type || 'image/jpeg',
+      cacheControl: '3600',
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload model image: ${error.message}`);
+  }
+
+  return uploadMetadata.publicUrl;
+}
+
 async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {
   const objectUrl = URL.createObjectURL(file);
 
@@ -1840,6 +1874,13 @@ const handleSubmit = async () => {
   try {
     const optimizedImage = await optimizeTryOnImage(modelImage);
     optimizedPreviewUrl = optimizedImage.previewUrl;
+    const modelImageUploadPromise = uploadTryOnModelImage(
+      optimizedImage.blob,
+      modelImage.name || 'tryon-model.jpg',
+    ).catch((error) => {
+      console.warn('⚠️ Upload direto da imagem falhou; usando fallback via edge function.', error);
+      return null;
+    });
 
     console.log('🗜️ Imagem do modelo otimizada:', {
       originalSizeBytes: modelImage.size,
@@ -1952,8 +1993,10 @@ const handleSubmit = async () => {
 
     setProcessingMessage(t('sendingImages'));
     const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
+    const uploadedModelImageUrl = await modelImageUploadPromise;
     const payload = {
       shop_domain: effectiveShopDomain,
+      model_image: uploadedModelImageUrl || '',
       garment_image: optimizedGarmentImageUrl,
       product_name: product.name,
       product_id: product.id,
@@ -1970,16 +2013,6 @@ const handleSubmit = async () => {
       pose_landmarks: detectedLandmarks,
       detected_measurements: detectedMeasurements
     };
-    const formData = new FormData();
-    formData.append('model_image_file', optimizedImage.blob, modelImage.name || 'tryon-model.jpg');
-    formData.append('shop_domain', payload.shop_domain);
-    formData.append('garment_image', payload.garment_image);
-    formData.append('product_name', payload.product_name);
-    formData.append('product_id', payload.product_id);
-    formData.append('public_id', payload.public_id || '');
-    formData.append('user_measurements', JSON.stringify(payload.user_measurements));
-    formData.append('pose_landmarks', JSON.stringify(payload.pose_landmarks));
-    formData.append('detected_measurements', JSON.stringify(payload.detected_measurements));
 
     console.log('═══════════════════════════════════════════════════════');
     console.log('📤 PAYLOAD ENVIADO PARA EDGE FUNCTION');
@@ -1993,7 +2026,9 @@ const handleSubmit = async () => {
     console.log('   • body_type_index:', payload.user_measurements.body_type_index);
     console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
-    console.log('📷 model_image:', `arquivo otimizado ${optimizedImage.blob.size} bytes`);
+    console.log('📷 model_image:', uploadedModelImageUrl
+      ? `upload direto concluído (${optimizedImage.blob.size} bytes)`
+      : `fallback via edge function (${optimizedImage.blob.size} bytes)`);
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
     if (optimizedGarmentImageUrl !== (selectedProductImage || product.garment_image)) {
       console.log('🪄 garment_image otimizada para download mais rápido no worker');
@@ -2002,13 +2037,35 @@ const handleSubmit = async () => {
     console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
     console.log('═══════════════════════════════════════════════════════');
 
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: formData,
-    });
+    let response: Response;
+    if (uploadedModelImageUrl) {
+      response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      const formData = new FormData();
+      formData.append('model_image_file', optimizedImage.blob, modelImage.name || 'tryon-model.jpg');
+      formData.append('shop_domain', payload.shop_domain);
+      formData.append('garment_image', payload.garment_image);
+      formData.append('product_name', payload.product_name);
+      formData.append('product_id', payload.product_id);
+      formData.append('public_id', payload.public_id || '');
+      formData.append('user_measurements', JSON.stringify(payload.user_measurements));
+      formData.append('pose_landmarks', JSON.stringify(payload.pose_landmarks));
+      formData.append('detected_measurements', JSON.stringify(payload.detected_measurements));
+      response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: formData,
+      });
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
