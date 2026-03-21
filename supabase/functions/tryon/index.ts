@@ -434,35 +434,6 @@ Deno.serve(async (req: Request) => {
       console.log('✅ Regular subscription validated');
     }
 
-    if (!resolvedShopDomain && effectiveUserId) {
-      try {
-        const { data: shopDomainByUser } = await supabaseClient
-          .from('shopify_shops')
-          .select('shop_domain')
-          .eq('user_id', effectiveUserId)
-          .not('shop_domain', 'is', null)
-          .limit(1)
-          .maybeSingle();
-
-        resolvedShopDomain = normalizeShopDomain(shopDomainByUser?.shop_domain);
-      } catch (_err) {
-        // non-blocking
-      }
-    }
-
-    if (!resolvedShopDomain && effectiveUserId) {
-      try {
-        const { data: shopifyStore } = await supabaseClient
-          .from('shopify_stores')
-          .select('store_url')
-          .eq('user_id', effectiveUserId)
-          .maybeSingle();
-        resolvedShopDomain = normalizeShopDomain(shopifyStore?.store_url);
-      } catch (_err) {
-        // non-blocking
-      }
-    }
-
     const sessionStartTime = new Date().toISOString();
 
     // Preparar dados da sessão com shop_name se disponível
@@ -502,128 +473,6 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('✅ Sessão criada com sucesso. ID:', session.id);
-
-    // Salvar analytics da sessão (com medidas para robustez de analytics).
-    // Fallback automático para schema antigo sem colunas enriquecidas.
-    console.log('💾 Criando analytics da sessão...');
-    const baseSessionAnalytics: Record<string, unknown> = {
-          tryon_session_id: session.id,
-          user_id: effectiveUserId,
-          duration_seconds: 0,
-          completed: false,
-          shared: false,
-          processing_time_seconds: 0,
-          images_processed: 1,
-    };
-
-    const enrichedSessionAnalytics: Record<string, unknown> = {
-      ...baseSessionAnalytics,
-      public_id: public_id || null,
-      shop_domain: resolvedShopDomain || null,
-      product_id: product_id || null,
-      product_name: product_name || null,
-      collection_handle: collection_handle || null,
-      gender: user_measurements?.gender || null,
-      height: user_measurements?.height || null,
-      weight: user_measurements?.weight || null,
-      recommended_size: resolvedRecommendedSize,
-      body_type_index: user_measurements?.body_type_index ?? null,
-      fit_preference_index: user_measurements?.fit_preference_index ?? null,
-      user_measurements: user_measurements || null,
-    };
-
-    let { error: analyticsError } = await supabaseClient
-      .from('session_analytics')
-      .upsert([enrichedSessionAnalytics], { onConflict: 'tryon_session_id' });
-
-    if (analyticsError) {
-      console.warn('⚠️ Upsert enriquecido em session_analytics falhou. Tentando update por sessão...', analyticsError);
-      const updateResult = await supabaseClient
-        .from('session_analytics')
-        .update(enrichedSessionAnalytics)
-        .select('id')
-        .eq('tryon_session_id', session.id);
-      if (updateResult.error) {
-        analyticsError = updateResult.error;
-      } else if (!updateResult.data || updateResult.data.length === 0) {
-        analyticsError = new Error('Nenhuma linha atualizada em session_analytics');
-      } else {
-        analyticsError = null;
-      }
-    }
-
-    // Compatibilidade final: se schema antigo impedir update enriquecido, salva ao menos o básico.
-    if (analyticsError) {
-      console.warn('⚠️ Update enriquecido falhou. Tentando fallback básico...', analyticsError);
-      const fallbackResult = await supabaseClient
-        .from('session_analytics')
-        .upsert([baseSessionAnalytics], { onConflict: 'tryon_session_id' });
-      analyticsError = fallbackResult.error;
-    }
-
-    if (analyticsError) {
-      console.error('⚠️ Erro ao criar analytics (não crítico):', analyticsError);
-    } else {
-      console.log('✅ Analytics criado com sucesso');
-    }
-
-    // Salvar medidas do usuário se disponíveis
-    if (user_measurements) {
-      console.log('💾 Salvando medidas do usuário:', {
-        gender: user_measurements.gender,
-        height: user_measurements.height,
-        weight: user_measurements.weight,
-        recommended_size: resolvedRecommendedSize
-      });
-
-      const { error: measurementsError } = await supabaseClient
-        .from('user_measurements')
-        .insert([
-          {
-            tryon_session_id: session.id,
-            gender: user_measurements.gender,
-            height: user_measurements.height,
-            weight: user_measurements.weight,
-            body_type_index: user_measurements.body_type_index,
-            fit_preference_index: user_measurements.fit_preference_index,
-            recommended_size: resolvedRecommendedSize
-          }
-        ]);
-
-      if (measurementsError) {
-        console.error('⚠️ Erro ao salvar medidas (não crítico):', measurementsError);
-      } else {
-        console.log('✅ Medidas do usuário salvas com sucesso');
-      }
-    } else {
-      console.log('⚠️ Nenhuma medida de usuário foi fornecida');
-    }
-
-    try {
-      await supabaseClient.rpc('upsert_session_analytics_from_tryon_payload', {
-        payload: {
-          id: session.id,
-          user_id: effectiveUserId,
-          public_id: public_id,
-          shop_domain: resolvedShopDomain || null,
-          product_id: product_id,
-          product_name: product_name,
-          collection_handle: collection_handle || null,
-          recommended_size: resolvedRecommendedSize,
-          user_measurements: user_measurements
-            ? {
-                ...user_measurements,
-                recommended_size: resolvedRecommendedSize,
-                shop_domain: resolvedShopDomain || null
-              }
-            : null,
-          created_at: sessionStartTime
-        }
-      });
-      console.log('✅ upsert_session_analytics_from_tryon_payload executado');
-    } catch (analyticsUpsertError) {
-      console.warn('⚠️ Falha no upsert_session_analytics_from_tryon_payload:', analyticsUpsertError);
-    }
 
     console.log('🚀 Submitting try-on job with provider:', {
       provider: tryOnProvider,
@@ -674,6 +523,153 @@ Deno.serve(async (req: Request) => {
 
       try {
         console.log('🔄 Background processing started for try-on session:', session.id);
+
+        if (!resolvedShopDomain && effectiveUserId) {
+          try {
+            const { data: shopDomainByUser } = await supabaseClient
+              .from('shopify_shops')
+              .select('shop_domain')
+              .eq('user_id', effectiveUserId)
+              .not('shop_domain', 'is', null)
+              .limit(1)
+              .maybeSingle();
+
+            resolvedShopDomain = normalizeShopDomain(shopDomainByUser?.shop_domain);
+          } catch (_err) {
+            // non-blocking
+          }
+        }
+
+        if (!resolvedShopDomain && effectiveUserId) {
+          try {
+            const { data: shopifyStore } = await supabaseClient
+              .from('shopify_stores')
+              .select('store_url')
+              .eq('user_id', effectiveUserId)
+              .maybeSingle();
+            resolvedShopDomain = normalizeShopDomain(shopifyStore?.store_url);
+          } catch (_err) {
+            // non-blocking
+          }
+        }
+
+        console.log('💾 Criando analytics da sessão...');
+        const baseSessionAnalytics: Record<string, unknown> = {
+          tryon_session_id: session.id,
+          user_id: effectiveUserId,
+          duration_seconds: 0,
+          completed: false,
+          shared: false,
+          processing_time_seconds: 0,
+          images_processed: 1,
+        };
+
+        const enrichedSessionAnalytics: Record<string, unknown> = {
+          ...baseSessionAnalytics,
+          public_id: public_id || null,
+          shop_domain: resolvedShopDomain || null,
+          product_id: product_id || null,
+          product_name: product_name || null,
+          collection_handle: collection_handle || null,
+          gender: user_measurements?.gender || null,
+          height: user_measurements?.height || null,
+          weight: user_measurements?.weight || null,
+          recommended_size: resolvedRecommendedSize,
+          body_type_index: user_measurements?.body_type_index ?? null,
+          fit_preference_index: user_measurements?.fit_preference_index ?? null,
+          user_measurements: user_measurements || null,
+        };
+
+        let { error: analyticsError } = await supabaseClient
+          .from('session_analytics')
+          .upsert([enrichedSessionAnalytics], { onConflict: 'tryon_session_id' });
+
+        if (analyticsError) {
+          console.warn('⚠️ Upsert enriquecido em session_analytics falhou. Tentando update por sessão...', analyticsError);
+          const updateResult = await supabaseClient
+            .from('session_analytics')
+            .update(enrichedSessionAnalytics)
+            .select('id')
+            .eq('tryon_session_id', session.id);
+          if (updateResult.error) {
+            analyticsError = updateResult.error;
+          } else if (!updateResult.data || updateResult.data.length === 0) {
+            analyticsError = new Error('Nenhuma linha atualizada em session_analytics');
+          } else {
+            analyticsError = null;
+          }
+        }
+
+        if (analyticsError) {
+          console.warn('⚠️ Update enriquecido falhou. Tentando fallback básico...', analyticsError);
+          const fallbackResult = await supabaseClient
+            .from('session_analytics')
+            .upsert([baseSessionAnalytics], { onConflict: 'tryon_session_id' });
+          analyticsError = fallbackResult.error;
+        }
+
+        if (analyticsError) {
+          console.error('⚠️ Erro ao criar analytics (não crítico):', analyticsError);
+        } else {
+          console.log('✅ Analytics criado com sucesso');
+        }
+
+        if (user_measurements) {
+          console.log('💾 Salvando medidas do usuário:', {
+            gender: user_measurements.gender,
+            height: user_measurements.height,
+            weight: user_measurements.weight,
+            recommended_size: resolvedRecommendedSize
+          });
+
+          const { error: measurementsError } = await supabaseClient
+            .from('user_measurements')
+            .insert([
+              {
+                tryon_session_id: session.id,
+                gender: user_measurements.gender,
+                height: user_measurements.height,
+                weight: user_measurements.weight,
+                body_type_index: user_measurements.body_type_index,
+                fit_preference_index: user_measurements.fit_preference_index,
+                recommended_size: resolvedRecommendedSize
+              }
+            ]);
+
+          if (measurementsError) {
+            console.error('⚠️ Erro ao salvar medidas (não crítico):', measurementsError);
+          } else {
+            console.log('✅ Medidas do usuário salvas com sucesso');
+          }
+        } else {
+          console.log('⚠️ Nenhuma medida de usuário foi fornecida');
+        }
+
+        try {
+          await supabaseClient.rpc('upsert_session_analytics_from_tryon_payload', {
+            payload: {
+              id: session.id,
+              user_id: effectiveUserId,
+              public_id: public_id,
+              shop_domain: resolvedShopDomain || null,
+              product_id: product_id,
+              product_name: product_name,
+              collection_handle: collection_handle || null,
+              recommended_size: resolvedRecommendedSize,
+              user_measurements: user_measurements
+                ? {
+                    ...user_measurements,
+                    recommended_size: resolvedRecommendedSize,
+                    shop_domain: resolvedShopDomain || null
+                  }
+                : null,
+              created_at: sessionStartTime
+            }
+          });
+          console.log('✅ upsert_session_analytics_from_tryon_payload executado');
+        } catch (analyticsUpsertError) {
+          console.warn('⚠️ Falha no upsert_session_analytics_from_tryon_payload:', analyticsUpsertError);
+        }
 
         if (detected_measurements && pose_landmarks && Array.isArray(pose_landmarks) && pose_landmarks.length > 0) {
           console.log('⏭️ MEDIAPIPE backend pulado: frontend já enviou landmarks e medidas.');
