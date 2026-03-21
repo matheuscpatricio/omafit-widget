@@ -64,6 +64,14 @@ const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number):
     }, type, quality);
   });
 
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
 async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {
   const objectUrl = URL.createObjectURL(file);
 
@@ -320,29 +328,6 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     if (attempt <= 8) return 1500;
     if (attempt <= 16) return 2500;
     return 4000;
-  };
-
-  const uploadTryOnModelImage = async (blob: Blob) => {
-    const fileName = `${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const filePath = `tryon-models/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('tryon-images')
-      .upload(filePath, blob, {
-        cacheControl: '3600',
-        contentType: 'image/jpeg',
-        upsert: false,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('tryon-images')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
   };
 
   // Calcular cor hover baseada na cor primária local
@@ -1821,7 +1806,7 @@ const handleSubmit = async () => {
   try {
     const optimizedImage = await optimizeTryOnImage(modelImage);
     optimizedPreviewUrl = optimizedImage.previewUrl;
-    const modelImageUploadPromise = uploadTryOnModelImage(optimizedImage.blob);
+    const modelImageDataUrlPromise = blobToDataUrl(optimizedImage.blob);
 
     console.log('🗜️ Imagem do modelo otimizada:', {
       originalSizeBytes: modelImage.size,
@@ -1942,11 +1927,11 @@ const handleSubmit = async () => {
     }
 
     setProcessingMessage(t('sendingImages'));
-    const modelImageUrl = await modelImageUploadPromise;
+    const modelImageDataUrl = await modelImageDataUrlPromise;
 
     const payload = {
       shop_domain: effectiveShopDomain,
-      model_image: modelImageUrl,
+      model_image: modelImageDataUrl,
       garment_image: selectedProductImage || product.garment_image,
       product_name: product.name,
       product_id: product.id,
@@ -1976,7 +1961,7 @@ const handleSubmit = async () => {
     console.log('   • body_type_index:', payload.user_measurements.body_type_index);
     console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
-    console.log('📷 model_image:', modelImageUrl ? modelImageUrl.substring(0, 120) + '...' : '❌ AUSENTE');
+    console.log('📷 model_image:', modelImageDataUrl ? `presente (base64 otimizado ${modelImageDataUrl.length} chars)` : '❌ AUSENTE');
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
     console.log('🎯 pose_landmarks:', detectedLandmarks ? `presente (${detectedLandmarks.length} landmarks)` : '❌ não detectado (edge function fará)');
     console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
