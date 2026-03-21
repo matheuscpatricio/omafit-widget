@@ -13,6 +13,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const TRYON_REMOTE_IMAGE_MAX_DIMENSION = 1024;
+const TRYON_REMOTE_IMAGE_QUALITY = 75;
+
 function buildImmediateBodyMeasurements(userMeasurements: any, detectedMeasurements: any) {
   if (detectedMeasurements) {
     return {
@@ -38,6 +41,39 @@ function buildImmediateBodyMeasurements(userMeasurements: any, detectedMeasureme
   }
 
   return null;
+}
+
+function optimizeTryOnInputUrl(rawUrl: string): string {
+  if (!rawUrl || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
+    return rawUrl;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    const supabasePublicMarker = '/storage/v1/object/public/';
+
+    if (url.pathname.includes(supabasePublicMarker)) {
+      const publicPath = url.pathname.split(supabasePublicMarker)[1];
+      if (publicPath) {
+        const optimizedUrl = new URL(`/storage/v1/render/image/public/${publicPath}`, url.origin);
+        optimizedUrl.searchParams.set('width', String(TRYON_REMOTE_IMAGE_MAX_DIMENSION));
+        optimizedUrl.searchParams.set('quality', String(TRYON_REMOTE_IMAGE_QUALITY));
+        return optimizedUrl.toString();
+      }
+    }
+
+    if (url.hostname.includes('shopify.com')) {
+      const existingWidth = Number(url.searchParams.get('width') || '0');
+      if (!existingWidth || existingWidth > TRYON_REMOTE_IMAGE_MAX_DIMENSION) {
+        url.searchParams.set('width', String(TRYON_REMOTE_IMAGE_MAX_DIMENSION));
+      }
+      return url.toString();
+    }
+
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -156,6 +192,12 @@ Deno.serve(async (req: Request) => {
 
       garmentImageUrl = urlData.publicUrl;
       console.log('✅ Garment image uploaded:', garmentImageUrl);
+    }
+
+    const optimizedGarmentImageUrl = optimizeTryOnInputUrl(garmentImageUrl);
+    if (optimizedGarmentImageUrl !== garmentImageUrl) {
+      console.log('🪄 Garment image URL optimized for faster self-hosted download');
+      garmentImageUrl = optimizedGarmentImageUrl;
     }
 
     console.log('🔍 Buscando widget com public_id:', public_id);

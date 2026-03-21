@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import shutil
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -56,6 +58,44 @@ def _download_image(url: str, target_path: Path) -> dict:
     }
 
 
+def _build_cache_path(url: str) -> Path:
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    suffix = Path(url.split("?", 1)[0]).suffix or ".img"
+    return settings.download_cache_dir / f"{digest}{suffix.lower()}"
+
+
+def _is_cache_fresh(path: Path) -> bool:
+    if not path.exists():
+        return False
+    ttl_seconds = max(settings.download_cache_ttl_seconds, 0)
+    if ttl_seconds == 0:
+        return True
+    age_seconds = time.time() - path.stat().st_mtime
+    return age_seconds <= ttl_seconds
+
+
+def _download_cached_garment(url: str, target_path: Path) -> dict:
+    cache_path = _build_cache_path(url)
+    started = time.perf_counter()
+
+    if _is_cache_fresh(cache_path):
+        shutil.copy2(cache_path, target_path)
+        elapsed = round(time.perf_counter() - started, 3)
+        return {
+            "url": url,
+            "bytes": cache_path.stat().st_size,
+            "status_code": 200,
+            "content_type": None,
+            "seconds": elapsed,
+            "cache_hit": True,
+        }
+
+    download_result = _download_image(url, cache_path)
+    shutil.copy2(cache_path, target_path)
+    download_result["cache_hit"] = False
+    return download_result
+
+
 def _download_images_parallel(
     person_url: str,
     garment_url: str,
@@ -67,7 +107,7 @@ def _download_images_parallel(
     with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {
             ex.submit(_download_image, person_url, person_path): "person",
-            ex.submit(_download_image, garment_url, garment_path): "garment",
+            ex.submit(_download_cached_garment, garment_url, garment_path): "garment",
         }
         for fut in as_completed(futures):
             label = futures[fut]
@@ -110,6 +150,7 @@ def run_tryon_job(
         "download_total_seconds": 0.0,
         "person_image_bytes": 0,
         "garment_image_bytes": 0,
+        "garment_cache_hit": False,
         "decode_seconds": 0.0,
         "pipeline_load_seconds": 0.0,
         "pipeline_cache_hit": False,
@@ -154,14 +195,16 @@ def run_tryon_job(
             timings["download_garment_seconds"] = download_results.get("garment", {}).get("seconds", 0.0)
             timings["person_image_bytes"] = download_results.get("person", {}).get("bytes", 0)
             timings["garment_image_bytes"] = download_results.get("garment", {}).get("bytes", 0)
+            timings["garment_cache_hit"] = bool(download_results.get("garment", {}).get("cache_hit"))
             _LOGGER.info(
-                "[tryon-job:%s] download person=%.3fs garment=%.3fs total=%.3fs person_bytes=%s garment_bytes=%s",
+                "[tryon-job:%s] download person=%.3fs garment=%.3fs total=%.3fs person_bytes=%s garment_bytes=%s garment_cache_hit=%s",
                 job_id,
                 timings["download_person_seconds"],
                 timings["download_garment_seconds"],
                 timings["download_total_seconds"],
                 timings["person_image_bytes"],
                 timings["garment_image_bytes"],
+                timings["garment_cache_hit"],
             )
 
             _update_stage("decoding", timings=timings)

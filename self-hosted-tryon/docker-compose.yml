@@ -30,12 +30,13 @@ services:
   worker:
     build:
       context: .
-    command: ["rq", "worker", "--url", "redis://redis:6379/0", "tryon"]
+    command: ["python3", "-m", "app.run_worker"]
     env_file:
       - .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
+      - ./cache:/app/cache
       - ./outputs:/app/outputs
       - ./weights:/app/weights
     depends_on:

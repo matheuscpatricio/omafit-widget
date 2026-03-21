@@ -41,8 +41,10 @@ interface SizeChartEntry {
 }
 
 const GPT_INTERACTION_LIMIT = 5;
-const TRYON_IMAGE_MAX_DIMENSION = 1280;
-const TRYON_IMAGE_QUALITY = 0.82;
+const TRYON_IMAGE_MAX_DIMENSION = 1024;
+const TRYON_IMAGE_QUALITY = 0.76;
+const TRYON_REMOTE_IMAGE_MAX_DIMENSION = 1024;
+const TRYON_REMOTE_IMAGE_QUALITY = 75;
 const TRYON_MAX_POLL_MS = 300000;
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
@@ -71,6 +73,43 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+
+const applyMaxWidthSearchParam = (url: URL, width: number) => {
+  const existingWidth = Number(url.searchParams.get('width') || '0');
+  if (!existingWidth || existingWidth > width) {
+    url.searchParams.set('width', String(width));
+  }
+};
+
+const getOptimizedRemoteTryOnImageUrl = (rawUrl: string): string => {
+  if (!rawUrl || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
+    return rawUrl;
+  }
+
+  try {
+    const parsedUrl = new URL(rawUrl);
+    const supabasePublicMarker = '/storage/v1/object/public/';
+
+    if (parsedUrl.pathname.includes(supabasePublicMarker)) {
+      const publicPath = parsedUrl.pathname.split(supabasePublicMarker)[1];
+      if (publicPath) {
+        const optimizedUrl = new URL(`/storage/v1/render/image/public/${publicPath}`, parsedUrl.origin);
+        optimizedUrl.searchParams.set('width', String(TRYON_REMOTE_IMAGE_MAX_DIMENSION));
+        optimizedUrl.searchParams.set('quality', String(TRYON_REMOTE_IMAGE_QUALITY));
+        return optimizedUrl.toString();
+      }
+    }
+
+    if (parsedUrl.hostname.includes('shopify.com')) {
+      applyMaxWidthSearchParam(parsedUrl, TRYON_REMOTE_IMAGE_MAX_DIMENSION);
+      return parsedUrl.toString();
+    }
+
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+};
 
 async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {
   const objectUrl = URL.createObjectURL(file);
@@ -1929,10 +1968,12 @@ const handleSubmit = async () => {
     setProcessingMessage(t('sendingImages'));
     const modelImageDataUrl = await modelImageDataUrlPromise;
 
+    const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
+
     const payload = {
       shop_domain: effectiveShopDomain,
       model_image: modelImageDataUrl,
-      garment_image: selectedProductImage || product.garment_image,
+      garment_image: optimizedGarmentImageUrl,
       product_name: product.name,
       product_id: product.id,
       public_id: publicId,
@@ -1963,6 +2004,9 @@ const handleSubmit = async () => {
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
     console.log('📷 model_image:', modelImageDataUrl ? `presente (base64 otimizado ${modelImageDataUrl.length} chars)` : '❌ AUSENTE');
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
+    if (optimizedGarmentImageUrl !== (selectedProductImage || product.garment_image)) {
+      console.log('🪄 garment_image otimizada para download mais rápido no worker');
+    }
     console.log('🎯 pose_landmarks:', detectedLandmarks ? `presente (${detectedLandmarks.length} landmarks)` : '❌ não detectado (edge function fará)');
     console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
     console.log('═══════════════════════════════════════════════════════');

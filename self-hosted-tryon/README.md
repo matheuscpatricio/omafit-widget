@@ -20,6 +20,7 @@ Base de API assíncrona para rodar `FASHN VTON v1.5` em EC2 GPU e integrar com a
 
 - `app/main.py`: API e contrato HTTP
 - `app/worker.py`: worker GPU e chamada do modelo
+- `app/run_worker.py`: bootstrap do worker persistente com preload do pipeline
 - `docker-compose.yml`: stack local da EC2
 - `.env.example`: variáveis de ambiente
 

@@ -15,8 +15,10 @@ class Settings:
     output_storage_backend: str
     outputs_dir: Path
     weights_dir: Path
+    download_cache_dir: Path
     job_timeout: int
     result_ttl: int
+    download_cache_ttl_seconds: int
     supabase_url: str
     supabase_service_role_key: str
     supabase_output_bucket: str
@@ -33,8 +35,10 @@ class Settings:
 def load_settings() -> Settings:
     outputs_dir = Path(os.getenv("OUTPUTS_DIR", "./outputs")).resolve()
     weights_dir = Path(os.getenv("WEIGHTS_DIR", "./weights")).resolve()
+    download_cache_dir = Path(os.getenv("DOWNLOAD_CACHE_DIR", "./cache/downloads")).resolve()
     outputs_dir.mkdir(parents=True, exist_ok=True)
     weights_dir.mkdir(parents=True, exist_ok=True)
+    download_cache_dir.mkdir(parents=True, exist_ok=True)
 
     num_timesteps = int(os.getenv("NUM_TIMESTEPS", "18"))
     if num_timesteps < 15:
@@ -53,8 +57,10 @@ def load_settings() -> Settings:
         output_storage_backend=os.getenv("OUTPUT_STORAGE_BACKEND", "local").strip().lower(),
         outputs_dir=outputs_dir,
         weights_dir=weights_dir,
+        download_cache_dir=download_cache_dir,
         job_timeout=int(os.getenv("RQ_JOB_TIMEOUT", "900")),
         result_ttl=int(os.getenv("RQ_RESULT_TTL", "86400")),
+        download_cache_ttl_seconds=int(os.getenv("DOWNLOAD_CACHE_TTL_SECONDS", "604800")),
         supabase_url=os.getenv("SUPABASE_URL", "").rstrip("/"),
         supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
         supabase_output_bucket=os.getenv("SUPABASE_OUTPUT_BUCKET", "tryon-images"),
