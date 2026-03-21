@@ -3336,9 +3336,6 @@ const handleSubmit = async () => {
             <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
             </h3>
-            <p className="text-gray-700 mb-4 text-base md:text-lg">
-              {t('creatingTryOn')}
-            </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
               <p className="text-yellow-800 text-base md:text-lg">
                 {t('estimatedTime')}
