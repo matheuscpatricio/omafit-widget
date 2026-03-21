@@ -27,6 +27,10 @@ export interface UseMediaPipePoseOptions {
   silentNoPose?: boolean;
 }
 
+function debugMediaPipeLog(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+}
+
 export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
   const enabled = options?.enabled ?? true;
   const useWorker = options?.useWorker ?? true;
@@ -42,6 +46,14 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // #region agent log
+    debugMediaPipeLog('src/hooks/useMediaPipePose.ts:48', 'hook-effect-enter', {
+      enabled,
+      useWorker,
+      silentNoPose,
+      hasWorker: typeof Worker !== 'undefined',
+    }, 'H2');
+    // #endregion
     if (!enabled) return;
     if (!useWorker) {
       setUseMainThreadFallback(true);
@@ -76,6 +88,13 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
             initTimeoutRef.current = null;
           }
           console.error('❌ Erro no Worker:', workerError);
+          // #region agent log
+          debugMediaPipeLog('src/hooks/useMediaPipePose.ts:82', 'worker-error-message', {
+            workerError: String(workerError || ''),
+            useWorker,
+            willUseMainThreadFallback: String(workerError || '').includes('self.import is not a function'),
+          }, 'H1');
+          // #endregion
           if (String(workerError || '').includes('self.import is not a function')) {
             console.warn('⚠️ Worker incompatível com MediaPipe neste ambiente. Ativando fallback para main thread.');
             setUseMainThreadFallback(true);
@@ -140,6 +159,12 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
         close: () => landmarker.close()
       };
       console.log('✅ [MainThreadFallback] MediaPipe pronto no main thread');
+      // #region agent log
+      debugMediaPipeLog('src/hooks/useMediaPipePose.ts:148', 'main-thread-fallback-initialized', {
+        delegate: 'CPU',
+        useWorker,
+      }, 'H4');
+      // #endregion
     })();
 
     mainThreadInitPromiseRef.current = initPromise;
@@ -260,6 +285,13 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
         console.log('✅ Inicialização concluída');
       } catch (err) {
         console.error('❌ Falha na inicialização:', err);
+        // #region agent log
+        debugMediaPipeLog('src/hooks/useMediaPipePose.ts:270', 'worker-init-failed-during-detect', {
+          error: err instanceof Error ? err.message : String(err),
+          useMainThreadFallback,
+          useWorker,
+        }, 'H1');
+        // #endregion
         if (err instanceof Error && err.message.includes('self.import is not a function')) {
           console.warn('⚠️ Ativando fallback para main thread após falha de inicialização do Worker');
           setUseMainThreadFallback(true);

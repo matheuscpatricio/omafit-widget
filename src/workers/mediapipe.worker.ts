@@ -3,6 +3,10 @@ import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 let poseLandmarkerInstance: any = null;
 let isInitialized = false;
 
+function debugMediaPipeWorkerLog(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+}
+
 self.onmessage = async (e: MessageEvent) => {
   console.log('[Worker] Mensagem recebida:', e.data.type);
   const { type, imageData } = e.data;
@@ -41,16 +45,33 @@ async function initializeMediaPipe() {
     return;
   }
 
+  let stage = 'before-fileset';
   try {
     console.log('[Worker] Carregando biblioteca MediaPipe...');
+    // #region agent log
+    debugMediaPipeWorkerLog('src/workers/mediapipe.worker.ts:48', 'worker-init-start', {
+      hasImportScripts: typeof importScripts === 'function',
+      hasSelfImport: typeof (self as unknown as { import?: unknown }).import,
+      hasFetch: typeof fetch === 'function',
+      isInitialized,
+    }, 'H3');
+    // #endregion
 
     console.log('[Worker] Biblioteca carregada, carregando FilesetResolver...');
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
     );
     console.log('[Worker] FilesetResolver carregado');
+    stage = 'after-fileset';
+    // #region agent log
+    debugMediaPipeWorkerLog('src/workers/mediapipe.worker.ts:61', 'worker-fileset-loaded', {
+      visionLoaded: !!vision,
+      hasSelfImport: typeof (self as unknown as { import?: unknown }).import,
+    }, 'H3');
+    // #endregion
 
     console.log('[Worker] Criando PoseLandmarker...');
+    stage = 'create-from-options';
     poseLandmarkerInstance = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
@@ -70,6 +91,13 @@ async function initializeMediaPipe() {
     console.log('[Worker] Mensagem "initialized" enviada');
   } catch (error) {
     console.error('[Worker] Erro na inicialização:', error);
+    // #region agent log
+    debugMediaPipeWorkerLog('src/workers/mediapipe.worker.ts:86', 'worker-init-error', {
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+      hasSelfImport: typeof (self as unknown as { import?: unknown }).import,
+    }, 'H1');
+    // #endregion
     self.postMessage({
       type: 'error',
       error: error instanceof Error ? error.message : 'Failed to initialize MediaPipe'
