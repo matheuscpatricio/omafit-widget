@@ -1991,7 +1991,7 @@ const handleSubmit = async () => {
       setCalculatedSize(provisionalSize);
     }
 
-    setProcessingMessage(t('sendingImages'));
+    setProcessingMessage(t('creatingTryOn'));
     const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
     const uploadedModelImageUrl = await modelImageUploadPromise;
     const payload = {

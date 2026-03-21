@@ -74,14 +74,14 @@ export const widgetTranslations = {
 
     // Step 4: Processing
     generating: 'Gerando sua prévia...',
-    creatingTryOn: 'Estamos criando seu try-on virtual.',
+    creatingTryOn: 'Prévia em criação...',
     estimatedTime: 'Tempo estimado: 15-25 segundos',
-    analyzingPhoto: 'Analisando sua foto...',
-    scanningBody: 'Scanneando seu corpo...',
+    analyzingPhoto: 'Foto recebida e analisada...',
+    scanningBody: 'Corpo escaneado...',
     applyingProduct: 'Aplicando o produto...',
     refiningDetails: 'Refinando detalhes...',
     finalizingResult: 'Finalizando resultado...',
-    sendingImages: 'Enviando imagens...',
+    sendingImages: 'Imagens enviadas...',
 
     // Step 5: Result
     yourPreview: 'Sua prévia:',
@@ -180,14 +180,14 @@ export const widgetTranslations = {
 
     // Step 4: Processing
     generating: 'Generando tu vista previa...',
-    creatingTryOn: 'Estamos creando tu prueba virtual.',
+    creatingTryOn: 'Vista previa en creación...',
     estimatedTime: 'Tiempo estimado: 15-25 segundos',
-    analyzingPhoto: 'Analizando tu foto...',
-    scanningBody: 'Escaneando tu cuerpo...',
+    analyzingPhoto: 'Foto recibida y analizada...',
+    scanningBody: 'Cuerpo escaneado...',
     applyingProduct: 'Aplicando el producto...',
     refiningDetails: 'Refinando detalles...',
     finalizingResult: 'Finalizando resultado...',
-    sendingImages: 'Enviando imágenes...',
+    sendingImages: 'Imágenes enviadas...',
 
     // Step 5: Result
     yourPreview: 'Tu vista previa:',
@@ -286,14 +286,14 @@ export const widgetTranslations = {
 
     // Step 4: Processing
     generating: 'Generating your preview...',
-    creatingTryOn: 'We are creating your virtual try-on.',
+    creatingTryOn: 'Preview being created...',
     estimatedTime: 'Estimated time: 15-25 seconds',
-    analyzingPhoto: 'Analyzing your photo...',
-    scanningBody: 'Scanning your body...',
+    analyzingPhoto: 'Photo received and analyzed...',
+    scanningBody: 'Body scanned...',
     applyingProduct: 'Applying the product...',
     refiningDetails: 'Refining details...',
     finalizingResult: 'Finalizing result...',
-    sendingImages: 'Sending images...',
+    sendingImages: 'Images sent...',
 
     // Step 5: Result
     yourPreview: 'Your preview:',
