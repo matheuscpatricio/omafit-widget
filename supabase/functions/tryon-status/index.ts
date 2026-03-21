@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
     console.log('📡 Fetching session from database...');
     const { data: sessionData, error: sessionError } = await supabase
       .from('tryon_sessions')
-      .select('id, product_id')
+      .select('id, product_id, fashn_status, result_image')
       .eq('fashn_prediction_id', predictionId)
       .maybeSingle();
 
@@ -71,18 +71,40 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: productData } = await supabase
-      .from('products')
-      .select('user_id')
-      .eq('id', sessionData.product_id)
-      .maybeSingle();
+    if (sessionData.fashn_status === 'completed' && sessionData.result_image) {
+      return new Response(JSON.stringify({
+        prediction_id: predictionId,
+        status: 'completed',
+        output: [sessionData.result_image],
+        fal_status: 'COMPLETED',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-    const userId = productData?.user_id;
+    if (sessionData.fashn_status === 'failed') {
+      return new Response(JSON.stringify({
+        prediction_id: predictionId,
+        status: 'failed',
+        output: null,
+        fal_status: 'FAILED',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const tryOnProvider = resolveTryOnProvider();
     let falApiKey: string | null = null;
 
     if (tryOnProvider === 'fal') {
+      const { data: productData } = await supabase
+        .from('products')
+        .select('user_id')
+        .eq('id', sessionData.product_id)
+        .maybeSingle();
+
+      const userId = productData?.user_id;
+
       const { data: globalApiConfig } = await supabase
         .from('api_config')
         .select('key_value')

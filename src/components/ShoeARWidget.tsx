@@ -26,12 +26,30 @@ interface ShoeARWidgetProps {
   collectionId?: string;
   collectionHandle?: string;
   defaultGender?: string;
+  productCatalog?: ProductCatalog;
+  selectedVariantId?: string;
+  selectedVariantOptions?: Record<string, string>;
 }
 
 interface ShoeSizeChartEntry {
   size: string;
   measurements?: Record<string, number | string>;
   measurement_labels?: string[];
+}
+
+interface ProductCatalogVariant {
+  id?: string | number;
+  title?: string;
+  available?: boolean;
+  size?: string | null;
+  color?: string | null;
+  options?: string[];
+}
+
+interface ProductCatalog {
+  sizes: string[];
+  colors: string[];
+  variants: ProductCatalogVariant[];
 }
 
 const DEFAULT_SHOE_MODEL_URL =
@@ -256,6 +274,17 @@ function hexToRgba(hex: string, alpha: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeOptionValue(value: unknown) {
+  return String(value || '').trim();
+}
+
+function detectOptionKind(name: string) {
+  const normalized = normalizeOptionValue(name).toLowerCase();
+  if (/size|tamanho|talla|taille|größe|grosse/.test(normalized)) return 'size';
+  if (/color|cor|colour|couleur|farbe/.test(normalized)) return 'color';
+  return 'other';
 }
 
 function getContrastTextColor(hexColor: string): string {
@@ -604,6 +633,9 @@ export function ShoeARWidget({
   shoeModelIosUrl,
   shopDomain = '',
   collectionHandle = '',
+  productCatalog = { sizes: [], colors: [], variants: [] },
+  selectedVariantId = '',
+  selectedVariantOptions = {},
 }: ShoeARWidgetProps) {
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
   const [step, setStep] = useState<Step>('info');
@@ -623,6 +655,7 @@ export function ShoeARWidget({
   const [sessionId] = useState(() => Math.random().toString(36).slice(2));
   const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
   const [initialMeasurementTracked, setInitialMeasurementTracked] = useState(false);
+  const [showHeaderLogoFallback, setShowHeaderLogoFallback] = useState(!storeLogo);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const {
@@ -662,6 +695,19 @@ export function ShoeARWidget({
       console.log('✅ MediaPipe Pose Landmarker pronto!');
     }
   }, [mediapipeLoading, mediapipeError]);
+
+  useEffect(() => {
+    if (storeLogo) {
+      setShowHeaderLogoFallback(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowHeaderLogoFallback(true);
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [storeLogo]);
 
   useEffect(() => {
     const loadSizeChart = async () => {
@@ -796,6 +842,33 @@ export function ShoeARWidget({
     const normalized = String(resolvedSize).trim();
     const withoutPrefix = normalized.replace(/^(br|eu|us|uk)\s*/i, '').trim();
     return withoutPrefix || normalized;
+  };
+
+  const getSizeOptionName = () => {
+    const selectedSizeOption = Object.keys(selectedVariantOptions).find(
+      (optionName) => detectOptionKind(optionName) === 'size'
+    );
+
+    if (selectedSizeOption) return selectedSizeOption;
+    return 'Tamanho do calçado';
+  };
+
+  const buildSelectedOptionsForCart = () => {
+    const sizeValue = getCartRecommendedSizeValue();
+    const sizeOptionName = getSizeOptionName();
+    const normalizedSelection = Object.entries(selectedVariantOptions).reduce<Record<string, string>>((acc, [key, value]) => {
+      const normalizedKey = normalizeOptionValue(key);
+      const normalizedValue = normalizeOptionValue(value);
+      if (!normalizedKey || !normalizedValue) return acc;
+      acc[normalizedKey] = normalizedValue;
+      return acc;
+    }, {});
+
+    if (sizeValue) {
+      normalizedSelection[sizeOptionName] = sizeValue;
+    }
+
+    return normalizedSelection;
   };
 
   const syncMeasurementResult = async (
@@ -1207,6 +1280,8 @@ export function ShoeARWidget({
     const requestId = `cart_${sessionId}_${Date.now()}`;
     const resolvedSizeLabel = getResolvedRecommendedSize();
     const variantSizeValue = getCartRecommendedSizeValue();
+    const selectedOptions = buildSelectedOptionsForCart();
+    const sizeOptionName = getSizeOptionName();
     const cartPayload = {
       type: 'omafit-add-to-cart-request',
       requestId,
@@ -1220,10 +1295,9 @@ export function ShoeARWidget({
         color_hex: '',
         recommended_size: variantSizeValue,
         recommended_size_label: resolvedSizeLabel,
-        variant_option_name: 'Tamanho do calçado',
-        selected_options: {
-          'Tamanho do calçado': variantSizeValue,
-        },
+        variant_option_name: sizeOptionName,
+        selected_options: selectedOptions,
+        selected_variant_id: selectedVariantId || null,
       },
       quantity: 1,
       shop_domain: shopDomain,
@@ -1231,7 +1305,9 @@ export function ShoeARWidget({
         session_id: sessionId,
         language,
         recommended_size_label: resolvedSizeLabel,
-        variant_option_name: 'Tamanho do calçado',
+        variant_option_name: sizeOptionName,
+        selected_variant_id: selectedVariantId || null,
+        variant_catalog_count: productCatalog.variants.length,
       },
     };
 
@@ -1309,13 +1385,15 @@ export function ShoeARWidget({
         <div className="flex-1 flex justify-center">
           {storeLogo ? (
             <img src={storeLogo} alt={storeName} className="h-12 w-auto object-contain" />
-          ) : (
+          ) : showHeaderLogoFallback ? (
             <div
               className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
               style={{ backgroundColor: primaryColor }}
             >
               <Footprints className="h-5 w-5" />
             </div>
+          ) : (
+            <div className="h-12 w-12" aria-hidden="true" />
           )}
         </div>
 

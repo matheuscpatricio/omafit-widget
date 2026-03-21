@@ -13,6 +13,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function buildImmediateBodyMeasurements(userMeasurements: any, detectedMeasurements: any) {
+  if (detectedMeasurements) {
+    return {
+      shoulderWidth: detectedMeasurements.shoulder_width || detectedMeasurements.shoulderWidth || 0,
+      chestCircumference: detectedMeasurements.chest || detectedMeasurements.chestCircumference || 0,
+      waistCircumference: detectedMeasurements.waist || detectedMeasurements.waistCircumference || 0,
+      hipCircumference: detectedMeasurements.hip || detectedMeasurements.hipCircumference || 0,
+      bodyHeight: detectedMeasurements.bodyHeight || userMeasurements?.height || 0,
+      armLength: detectedMeasurements.armLength || Math.round((userMeasurements?.height || 170) * 0.38),
+      legLength: detectedMeasurements.legLength || Math.round((userMeasurements?.height || 170) * 0.47),
+      confidence: detectedMeasurements.confidence || 0.8,
+      userInput: userMeasurements || null,
+      source: 'frontend_mediapipe',
+    };
+  }
+
+  if (userMeasurements) {
+    return {
+      source: 'user_input',
+      userInput: userMeasurements,
+      confidence: 0,
+    };
+  }
+
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -513,202 +540,26 @@ Deno.serve(async (req: Request) => {
       category: tryOnCategory,
     });
 
-    // 🎯 PROCESSAMENTO PARALELO: FASHN + MediaPipe
-    console.log('🔄 Iniciando processamento PARALELO...');
-
+    const immediateBodyMeasurements = buildImmediateBodyMeasurements(user_measurements, detected_measurements);
     let request_id: string | null = null;
-    let mediapipeMeasurements: any = null;
-    let debugInfo = {
-      mediapipe_status: 'unknown',
-      mediapipe_returned: false,
-      mediapipe_source: 'none',
-      user_height_received: user_measurements?.height || 'missing',
-      user_weight_received: user_measurements?.weight || 'missing',
-      user_gender_received: user_measurements?.gender || 'missing',
-    };
+    let providerStatus = 'processing';
 
     try {
-      // Iniciar AMBOS em paralelo
-      const [fashnResult, mediapipeResult] = await Promise.allSettled([
-        // 1️⃣ TRY-ON PROVIDER
-        submitTryOnJob({
-          provider: tryOnProvider,
-          providerApiKey: falApiKey,
-          modelImageUrl,
-          garmentImageUrl,
-          category: tryOnCategory,
-          sessionId: session.id,
-          publicId: public_id,
-        }),
-
-        // 2️⃣ MediaPipe Pose Landmarker (2-3s) ⚡
-        (async () => {
-          console.log('═══════════════════════════════════════════════════════');
-          console.log('🤖 MEDIAPIPE: Iniciando análise de pose...');
-          console.log('═══════════════════════════════════════════════════════');
-          const startTime = Date.now();
-
-          try {
-            // 🔹 DEBUG: Ver exatamente o que chegou
-            console.log('📦 user_measurements recebido no edge function:');
-            console.log('   • Objeto completo:', JSON.stringify(user_measurements, null, 2));
-            console.log('   • Tipo:', typeof user_measurements);
-            console.log('   • É null?', user_measurements === null);
-            console.log('   • É undefined?', user_measurements === undefined);
-            console.log('');
-
-            // 🔹 VALIDAR altura e peso OBRIGATÓRIOS
-            const userHeight = user_measurements?.height;
-            const userWeight = user_measurements?.weight;
-            const userGender = user_measurements?.gender;
-
-            console.log('📏 Valores extraídos:');
-            console.log('   • userHeight:', userHeight, '(tipo:', typeof userHeight + ')');
-            console.log('   • userWeight:', userWeight, '(tipo:', typeof userWeight + ')');
-            console.log('   • userGender:', userGender);
-            console.log('');
-
-            if (!userHeight || !userWeight) {
-              console.log('❌ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios!');
-              console.log('   • Altura fornecida:', userHeight, '→', !userHeight ? '❌ VAZIO/ZERO' : '✅ OK');
-              console.log('   • Peso fornecido:', userWeight, '→', !userWeight ? '❌ VAZIO/ZERO' : '✅ OK');
-              console.log('   • Pulando análise MediaPipe...');
-              console.log('   • Retornando source: user_input');
-              console.log('═══════════════════════════════════════════════════════');
-              console.log('');
-              return user_measurements ? {
-                source: 'user_input',
-                userInput: user_measurements
-              } : null;
-            }
-
-            console.log('📏 MEDIAPIPE INPUT:');
-            console.log('   • Imagem do modelo:', modelImageUrl.substring(0, 100) + '...');
-            console.log('   • Altura do usuário:', userHeight, 'cm');
-            console.log('   • Peso do usuário:', userWeight, 'kg');
-            console.log('   • Gênero:', userGender || 'não especificado');
-            console.log('   • 🎯 Landmarks do frontend:', pose_landmarks ? `presente (${pose_landmarks.length} landmarks)` : '❌ não fornecido');
-            console.log('   • 📐 Medidas detectadas no frontend:', detected_measurements ? 'presentes' : '❌ não fornecido');
-            console.log('');
-
-            // Extrair medidas corporais reais da imagem usando MediaPipe
-            // Se landmarks foram detectados no frontend, usa eles diretamente
-            // Caso contrário, faz a detecção aqui (fallback)
-            const bodyMeasurements = await extractBodyMeasurements(
-              modelImageUrl,
-              userHeight,
-              userWeight,
-              userGender,
-              pose_landmarks,
-              detected_measurements
-            );
-
-            const processingTime = Date.now() - startTime;
-
-            if (bodyMeasurements) {
-              console.log('✅ MEDIAPIPE SUCCESS: Pose detectada!');
-              console.log('   ⏱️  Tempo de processamento:', processingTime + 'ms');
-              console.log('   📊 Confiança geral:', (bodyMeasurements.confidence * 100).toFixed(1) + '%');
-              console.log('');
-              console.log('📐 MEDIDAS EXTRAÍDAS:');
-              console.log('   • Altura corporal:', bodyMeasurements.bodyHeight + 'cm');
-              console.log('   • Largura dos ombros:', bodyMeasurements.shoulderWidth + 'cm');
-              console.log('   • Circunferência do peito:', bodyMeasurements.chestCircumference + 'cm');
-              console.log('   • Circunferência da cintura:', bodyMeasurements.waistCircumference + 'cm');
-              console.log('   • Circunferência do quadril:', bodyMeasurements.hipCircumference + 'cm');
-              console.log('   • Comprimento do braço:', bodyMeasurements.armLength + 'cm');
-              console.log('   • Comprimento da perna:', bodyMeasurements.legLength + 'cm');
-              console.log('');
-              console.log('🔍 DEBUG: bodyMeasurements COMPLETO:', JSON.stringify(bodyMeasurements, null, 2));
-              console.log('═══════════════════════════════════════════════════════');
-
-              // Combinar com dados do usuário se disponível
-              const finalResult = {
-                ...bodyMeasurements,
-                userInput: user_measurements || null,
-                source: 'mediapipe'
-              };
-
-              console.log('🔍 DEBUG: finalResult que será retornado:', JSON.stringify(finalResult, null, 2));
-
-              return finalResult;
-            }
-
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('⚠️ MEDIAPIPE WARNING: Nenhuma pose detectada!');
-            console.log('   • Tempo de processamento:', processingTime + 'ms');
-            console.log('   • Possíveis causas:');
-            console.log('     - Imagem muito escura ou de baixa qualidade');
-            console.log('     - Pessoa não está de corpo inteiro');
-            console.log('     - Pose muito complexa ou obstruída');
-            console.log('   • Fallback: Usando dados manuais do usuário');
-            console.log('═══════════════════════════════════════════════════════');
-
-            return user_measurements ? {
-              source: 'user_input',
-              userInput: user_measurements
-            } : null;
-
-          } catch (error) {
-            const processingTime = Date.now() - startTime;
-            console.log('═══════════════════════════════════════════════════════');
-            console.error('❌ MEDIAPIPE ERROR: Falha no processamento!');
-            console.error('   • Erro:', error.message);
-            console.error('   • Stack:', error.stack);
-            console.log('   • Tempo até erro:', processingTime + 'ms');
-            console.log('   • Fallback: Usando dados manuais do usuário');
-            console.log('═══════════════════════════════════════════════════════');
-
-            // Fallback: usar dados do usuário se disponível
-            return user_measurements ? {
-              source: 'user_input_fallback',
-              userInput: user_measurements
-            } : null;
-          }
-        })()
-      ]);
-
-      // Processar resultado do FASHN
-      if (fashnResult.status === 'fulfilled') {
-        request_id = fashnResult.value.requestId;
-        console.log('✅ TRY-ON submitted, request_id:', request_id, '| provider_status:', fashnResult.value.providerStatus);
-      } else {
-        console.error('❌ TRY-ON submission error:', fashnResult.reason);
-        throw new Error(`Failed to submit try-on job: ${fashnResult.reason.message}`);
-      }
-
-      // Processar resultado do MediaPipe
-      console.log('');
-      console.log('📊 MEDIAPIPE RESULT STATUS:', mediapipeResult.status);
-
-      // Atualizar debug info
-      debugInfo.mediapipe_status = mediapipeResult.status;
-
-      if (mediapipeResult.status === 'fulfilled' && mediapipeResult.value) {
-        mediapipeMeasurements = mediapipeResult.value;
-        debugInfo.mediapipe_returned = true;
-        debugInfo.mediapipe_source = mediapipeMeasurements.source;
-
-        if (mediapipeMeasurements.source === 'mediapipe') {
-          console.log('✅ MEDIAPIPE: Medidas REAIS extraídas com sucesso!');
-          console.log('   → Serão enviadas ao frontend para cálculo de tamanho');
-        } else {
-          console.log('⚠️ MEDIAPIPE: Usando dados MANUAIS (fallback)');
-          console.log('   → Source:', mediapipeMeasurements.source);
-        }
-      } else if (mediapipeResult.status === 'rejected') {
-        console.warn('⚠️ MEDIAPIPE: Processo rejeitado (non-blocking)');
-        console.warn('   → Erro:', mediapipeResult.reason);
-        debugInfo.mediapipe_returned = false;
-      } else {
-        console.log('⚠️ MEDIAPIPE: Nenhum resultado retornado');
-        debugInfo.mediapipe_returned = false;
-      }
-      console.log('');
-
+      const submitResult = await submitTryOnJob({
+        provider: tryOnProvider,
+        providerApiKey: falApiKey,
+        modelImageUrl,
+        garmentImageUrl,
+        category: tryOnCategory,
+        sessionId: session.id,
+        publicId: public_id,
+      });
+      request_id = submitResult.requestId;
+      providerStatus = submitResult.providerStatus;
+      console.log('✅ TRY-ON submitted, request_id:', request_id, '| provider_status:', providerStatus);
     } catch (error) {
-      console.error('❌ Parallel processing error:', error);
-      throw error;
+      console.error('❌ TRY-ON submission error:', error);
+      throw new Error(`Failed to submit try-on job: ${error.message}`);
     }
 
     await supabaseClient
@@ -719,96 +570,153 @@ Deno.serve(async (req: Request) => {
       })
       .eq('id', session.id);
 
-    // Atualizar contadores
-    const updatePromises = [
-      supabaseClient
-        .from('widget_keys')
-        .update({
-          usage_count: widgetKeyData.usage_count + 1,
-          last_used_at: new Date().toISOString()
-        })
-        .eq('id', widgetKeyData.id)
-    ];
+    EdgeRuntime.waitUntil((async () => {
+      let debugInfo = {
+        mediapipe_status: immediateBodyMeasurements ? 'immediate' : 'pending',
+        mediapipe_returned: !!immediateBodyMeasurements,
+        mediapipe_source: immediateBodyMeasurements?.source || 'none',
+        user_height_received: user_measurements?.height || 'missing',
+        user_weight_received: user_measurements?.weight || 'missing',
+        user_gender_received: user_measurements?.gender || 'missing',
+      };
 
-    if (isShopifyWidget) {
-      // Para Shopify, atualizar shopify_shops
-      updatePromises.push(
-        supabaseClient
-          .from('shopify_shops')
-          .update({
-            images_used_month: subscription.images_used + 1
-          })
-          .eq('shop_domain', widgetKeyShopDomain)
-      );
-    } else {
-      // Para widgets regulares, atualizar subscriptions
-      updatePromises.push(
-        supabaseClient
-          .from('subscriptions')
-          .update({
-            images_used: subscription.images_used + 1
-          })
-          .eq('user_id', effectiveUserId)
-          .eq('status', 'active')
-      );
-    }
+      try {
+        console.log('🔄 Background processing started for try-on session:', session.id);
 
-    await Promise.all(updatePromises);
-
-    // ✅ BILLING SHOPIFY: Registrar uso de imagem e cobrar se necessário
-    try {
-      let shopDomain: string | null = null;
-
-      if (isShopifyWidget) {
-        // Para Shopify widgets, usar o shop_domain diretamente
-        shopDomain = widgetKeyShopDomain;
-      } else {
-        // Para widgets regulares, buscar shop_domain via shopify_stores
-        const { data: shopifyStore } = await supabaseClient
-          .from('shopify_stores')
-          .select('store_url')
-          .eq('user_id', effectiveUserId)
-          .maybeSingle();
-
-        if (shopifyStore && shopifyStore.store_url) {
-          shopDomain = shopifyStore.store_url;
-        }
-      }
-
-      if (shopDomain) {
-        console.log(`[Billing] Registrando uso de imagem para loja: ${shopDomain}`);
-
-        // Chamar API de billing do app principal
-        const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://ranging-drill-proper-wayne.trycloudflare.com';
-
-        const billingResponse = await fetch(`${appUrl}/api/billing/usage`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            shopDomain: shopDomain,
-            imagesCount: 1
-          })
-        });
-
-        if (billingResponse.ok) {
-          const billingResult = await billingResponse.json();
-          console.log('[Billing] ✅ Uso registrado:', billingResult);
+        if (detected_measurements && pose_landmarks && Array.isArray(pose_landmarks) && pose_landmarks.length > 0) {
+          console.log('⏭️ MEDIAPIPE backend pulado: frontend já enviou landmarks e medidas.');
         } else {
-          const errorText = await billingResponse.text();
-          console.error('[Billing] ⚠️ Erro ao registrar uso:', errorText);
-        }
-      } else {
-        console.warn('[Billing] ⚠️ shop_domain não encontrado para user_id:', effectiveUserId);
-      }
-    } catch (billingError) {
-      // Não falhar a requisição principal se o billing der erro
-      console.error('[Billing] ⚠️ Erro ao processar billing:', billingError);
-    }
+          console.log('═══════════════════════════════════════════════════════');
+          console.log('🤖 MEDIAPIPE: Iniciando análise de pose em background...');
+          console.log('═══════════════════════════════════════════════════════');
+          const startTime = Date.now();
 
-    // 🔹 Log final de debug
-    console.log('🔍 DEBUG INFO PARA FRONTEND:', debugInfo);
+          try {
+            const userHeight = user_measurements?.height;
+            const userWeight = user_measurements?.weight;
+            const userGender = user_measurements?.gender;
+
+            if (!userHeight || !userWeight) {
+              console.log('❌ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios!');
+              debugInfo.mediapipe_status = 'skipped';
+              debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
+            } else {
+              const bodyMeasurements = await extractBodyMeasurements(
+                modelImageUrl,
+                userHeight,
+                userWeight,
+                userGender,
+                pose_landmarks,
+                detected_measurements
+              );
+
+              const processingTime = Date.now() - startTime;
+
+              if (bodyMeasurements) {
+                debugInfo.mediapipe_status = 'fulfilled';
+                debugInfo.mediapipe_returned = true;
+                debugInfo.mediapipe_source = 'mediapipe';
+                console.log('✅ MEDIAPIPE SUCCESS (background):', {
+                  processingTime,
+                  confidence: bodyMeasurements.confidence,
+                });
+              } else {
+                debugInfo.mediapipe_status = 'fulfilled';
+                debugInfo.mediapipe_returned = false;
+                debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
+                console.log('⚠️ MEDIAPIPE sem resultado em background. Tempo:', processingTime + 'ms');
+              }
+            }
+          } catch (error) {
+            debugInfo.mediapipe_status = 'rejected';
+            debugInfo.mediapipe_returned = false;
+            debugInfo.mediapipe_source = user_measurements ? 'user_input_fallback' : 'none';
+            console.error('❌ MEDIAPIPE background error:', error);
+          }
+        }
+
+        const updatePromises = [
+          supabaseClient
+            .from('widget_keys')
+            .update({
+              usage_count: widgetKeyData.usage_count + 1,
+              last_used_at: new Date().toISOString()
+            })
+            .eq('id', widgetKeyData.id)
+        ];
+
+        if (isShopifyWidget) {
+          updatePromises.push(
+            supabaseClient
+              .from('shopify_shops')
+              .update({
+                images_used_month: subscription.images_used + 1
+              })
+              .eq('shop_domain', widgetKeyShopDomain)
+          );
+        } else {
+          updatePromises.push(
+            supabaseClient
+              .from('subscriptions')
+              .update({
+                images_used: subscription.images_used + 1
+              })
+              .eq('user_id', effectiveUserId)
+              .eq('status', 'active')
+          );
+        }
+
+        await Promise.all(updatePromises);
+
+        try {
+          let shopDomain: string | null = null;
+
+          if (isShopifyWidget) {
+            shopDomain = widgetKeyShopDomain;
+          } else {
+            const { data: shopifyStore } = await supabaseClient
+              .from('shopify_stores')
+              .select('store_url')
+              .eq('user_id', effectiveUserId)
+              .maybeSingle();
+
+            if (shopifyStore && shopifyStore.store_url) {
+              shopDomain = shopifyStore.store_url;
+            }
+          }
+
+          if (shopDomain) {
+            const appUrl = Deno.env.get('SHOPIFY_APP_URL') || 'https://ranging-drill-proper-wayne.trycloudflare.com';
+            const billingResponse = await fetch(`${appUrl}/api/billing/usage`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                shopDomain: shopDomain,
+                imagesCount: 1
+              })
+            });
+
+            if (billingResponse.ok) {
+              const billingResult = await billingResponse.json();
+              console.log('[Billing] ✅ Uso registrado:', billingResult);
+            } else {
+              const errorText = await billingResponse.text();
+              console.error('[Billing] ⚠️ Erro ao registrar uso:', errorText);
+            }
+          } else {
+            console.warn('[Billing] ⚠️ shop_domain não encontrado para user_id:', effectiveUserId);
+          }
+        } catch (billingError) {
+          console.error('[Billing] ⚠️ Erro ao processar billing:', billingError);
+        }
+
+        console.log('🔍 DEBUG INFO BACKGROUND:', debugInfo);
+      } catch (backgroundError) {
+        console.error('❌ Background processing error:', backgroundError);
+      }
+    })());
 
     return new Response(
       JSON.stringify({
@@ -816,9 +724,15 @@ Deno.serve(async (req: Request) => {
         prediction_id: session.id,
         fal_request_id: request_id,
         credits_remaining: subscription.images_limit === -1 ? 'unlimited' : subscription.images_limit - subscription.images_used - 1,
-        body_measurements: mediapipeMeasurements || null,
+        body_measurements: immediateBodyMeasurements,
         debug: {
-          ...debugInfo,
+          mediapipe_status: immediateBodyMeasurements ? 'immediate' : 'background',
+          mediapipe_returned: !!immediateBodyMeasurements,
+          mediapipe_source: immediateBodyMeasurements?.source || 'none',
+          user_height_received: user_measurements?.height || 'missing',
+          user_weight_received: user_measurements?.weight || 'missing',
+          user_gender_received: user_measurements?.gender || 'missing',
+          provider_status: providerStatus,
           provider: tryOnProvider,
           category: tryOnCategory,
         }

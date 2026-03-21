@@ -19,6 +19,7 @@ class SubmitJobResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     job_id: str
     status: Literal["queued", "processing", "completed", "failed"]
+    stage: Optional[str] = None
     result_url: Optional[str] = None
     error: Optional[str] = None
     timings: Optional[dict] = Field(default=None)

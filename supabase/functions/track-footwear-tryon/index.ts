@@ -256,6 +256,27 @@ Deno.serve(async (req: Request) => {
           mappedProductError = fallbackByName.error;
         }
 
+        if ((!mappedProduct || mappedProductError) && effectiveUserId) {
+          const placeholderProductPayload: Record<string, unknown> = {
+            user_id: effectiveUserId,
+            shopify_id: resolvedProductId,
+            name: product_name || 'Calçado',
+            description: null,
+            category: 'shoes',
+          };
+
+          const { data: createdProduct, error: createdProductError } = await supabaseClient
+            .from('products')
+            .insert([placeholderProductPayload])
+            .select('id')
+            .single();
+
+          if (!createdProductError && createdProduct?.id) {
+            mappedProduct = createdProduct;
+            mappedProductError = null;
+          }
+        }
+
         if (mappedProductError || !mappedProduct?.id) {
           throw new Error('Could not resolve internal product UUID from product_id');
         }

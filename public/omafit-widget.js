@@ -337,24 +337,88 @@
     };
   }
 
-  async function getProductCatalog(productHandle) {
+  function getProductDataFromPage() {
     try {
       if (window.meta && window.meta.product && Array.isArray(window.meta.product.variants)) {
-        return extractProductCatalog(window.meta.product);
-      }
-
-      if (productHandle) {
-        const response = await fetch('/products/' + productHandle + '.js');
-        if (response.ok) {
-          const productData = await response.json();
-          return extractProductCatalog(productData);
-        }
+        return window.meta.product;
       }
     } catch (error) {
-      console.warn('⚠️ Não foi possível obter catálogo de variantes do produto:', error);
+      console.warn('⚠️ Não foi possível ler window.meta.product:', error);
     }
 
-    return { sizes: [], colors: [], variants: [] };
+    return null;
+  }
+
+  async function getProductData(productHandle) {
+    const pageProductData = getProductDataFromPage();
+    if (pageProductData) return pageProductData;
+
+    if (!productHandle) return null;
+
+    try {
+      const response = await fetch('/products/' + productHandle + '.js');
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.warn('⚠️ Não foi possível obter dados completos do produto:', error);
+    }
+
+    return null;
+  }
+
+  function getSelectedVariantIdFromPage() {
+    try {
+      const urlVariantId = new URLSearchParams(window.location.search).get('variant');
+      if (urlVariantId) return String(urlVariantId).trim();
+    } catch (error) {
+      console.warn('⚠️ Não foi possível ler variant da URL:', error);
+    }
+
+    const variantInput = document.querySelector(
+      'form[action*="/cart/add"] [name="id"], .product-form [name="id"], form.product-form [name="id"]'
+    );
+
+    if (variantInput && variantInput.value) {
+      return String(variantInput.value).trim();
+    }
+
+    return '';
+  }
+
+  function extractSelectedVariantContext(productData) {
+    if (!productData || !Array.isArray(productData.variants)) {
+      return { selectedVariantId: '', selectedVariantOptions: {} };
+    }
+
+    const selectedVariantId = getSelectedVariantIdFromPage();
+    const optionNames = Array.isArray(productData.options)
+      ? productData.options.map(function (option) {
+          if (typeof option === 'string') return normalizeOptionValue(option);
+          return normalizeOptionValue(option && option.name ? option.name : '');
+        })
+      : [];
+
+    const selectedVariant =
+      productData.variants.find(function (variant) {
+        return String(variant.id) === String(selectedVariantId);
+      }) || (productData.variants.length === 1 ? productData.variants[0] : null);
+
+    const selectedVariantOptions = {};
+
+    if (selectedVariant) {
+      [selectedVariant.option1, selectedVariant.option2, selectedVariant.option3].forEach(function (optionValue, index) {
+        const optionName = optionNames[index] || '';
+        const normalizedValue = normalizeOptionValue(optionValue);
+        if (!optionName || !normalizedValue) return;
+        selectedVariantOptions[optionName] = normalizedValue;
+      });
+    }
+
+    return {
+      selectedVariantId: selectedVariant ? String(selectedVariant.id) : '',
+      selectedVariantOptions: selectedVariantOptions,
+    };
   }
 
   // Buscar um produto complementar de uma coleção (diferente da atual, ou qualquer se não houver atual)
@@ -1091,7 +1155,9 @@
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
 
     const productInfo = getProductInfo();
-    const productCatalog = await getProductCatalog(productInfo.productHandle);
+    const productData = await getProductData(productInfo.productHandle);
+    const productCatalog = productData ? extractProductCatalog(productData) : { sizes: [], colors: [], variants: [] };
+    const currentProductSelection = extractSelectedVariantContext(productData);
     const isMobile = window.innerWidth <= 768;
 
     const overlay = document.createElement('div');
@@ -1303,7 +1369,9 @@
           product_name: productInfo.productName || '',
           productDescription: productInfo.productDescription || '',
           product_description: productInfo.productDescription || '',
-          productCatalog: productCatalog
+          productCatalog: productCatalog,
+          selectedVariantId: currentProductSelection.selectedVariantId,
+          selectedVariantOptions: currentProductSelection.selectedVariantOptions
         }, 'https://omafit.netlify.app');
 
         // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
@@ -1383,7 +1451,9 @@
               product_name: productInfo.productName || '',
               productDescription: productInfo.productDescription || '',
               product_description: productInfo.productDescription || '',
-              productCatalog: productCatalog
+              productCatalog: productCatalog,
+              selectedVariantId: currentProductSelection.selectedVariantId,
+              selectedVariantOptions: currentProductSelection.selectedVariantOptions
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (com logo):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1419,7 +1489,9 @@
               product_name: productInfo.productName || '',
               productDescription: productInfo.productDescription || '',
               product_description: productInfo.productDescription || '',
-              productCatalog: productCatalog
+              productCatalog: productCatalog,
+              selectedVariantId: currentProductSelection.selectedVariantId,
+              selectedVariantOptions: currentProductSelection.selectedVariantOptions
             }, 'https://omafit.netlify.app');
             console.log('📤 Configuração enviada via postMessage (sem logo - inválido):', {
               primaryColor: OMAFIT_CONFIG.colors?.primary,
@@ -1450,7 +1522,9 @@
             product_name: productInfo.productName || '',
             productDescription: productInfo.productDescription || '',
             product_description: productInfo.productDescription || '',
-            productCatalog: productCatalog
+            productCatalog: productCatalog,
+            selectedVariantId: currentProductSelection.selectedVariantId,
+            selectedVariantOptions: currentProductSelection.selectedVariantOptions
           }, 'https://omafit.netlify.app');
           console.log('📤 Configuração enviada via postMessage (sem logo):', {
             primaryColor: OMAFIT_CONFIG.colors?.primary,

@@ -41,6 +41,83 @@ interface SizeChartEntry {
 }
 
 const GPT_INTERACTION_LIMIT = 5;
+const TRYON_IMAGE_MAX_DIMENSION = 1280;
+const TRYON_IMAGE_QUALITY = 0.82;
+const TRYON_MAX_POLL_MS = 300000;
+
+const loadImageElement = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Falha ao converter canvas para blob'));
+      }
+    }, type, quality);
+  });
+
+async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await loadImageElement(objectUrl);
+    const longestSide = Math.max(image.width, image.height);
+    const scale = longestSide > TRYON_IMAGE_MAX_DIMENSION
+      ? TRYON_IMAGE_MAX_DIMENSION / longestSide
+      : 1;
+
+    const targetWidth = Math.max(1, Math.round(image.width * scale));
+    const targetHeight = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Falha ao obter contexto do canvas');
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    const compressedBlob = await canvasToBlob(canvas, 'image/jpeg', TRYON_IMAGE_QUALITY);
+    const shouldUseOriginal =
+      scale === 1 &&
+      file.type === 'image/jpeg' &&
+      compressedBlob.size >= file.size * 0.95;
+
+    const blob = shouldUseOriginal ? file : compressedBlob;
+    const previewUrl = URL.createObjectURL(blob);
+
+    return {
+      blob,
+      previewUrl,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+const logTryOnTimings = (label: string, timings?: Record<string, unknown> | null) => {
+  if (!timings || typeof timings !== 'object') {
+    console.log(`⏱️ ${label}: timings não disponíveis`);
+    return;
+  }
+
+  console.log(`⏱️ ${label}:`);
+  Object.entries(timings).forEach(([key, value]) => {
+    console.log(`   • ${key}:`, value);
+  });
+};
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -194,6 +271,8 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   });
   const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
+  const pollingTimeoutRef = useRef<number | null>(null);
+  const pollingDeadlineRef = useRef<number | null>(null);
 
   // Armazenar medidas do modelo corporal final para envio ao GPT
   const [finalBodyMeasurements, setFinalBodyMeasurements] = useState<{
@@ -227,6 +306,44 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
+
+  const clearPollingTimers = () => {
+    if (pollingTimeoutRef.current !== null) {
+      window.clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+    pollingDeadlineRef.current = null;
+  };
+
+  const getPollingDelayMs = (attempt: number) => {
+    if (attempt <= 3) return 1000;
+    if (attempt <= 8) return 1500;
+    if (attempt <= 16) return 2500;
+    return 4000;
+  };
+
+  const uploadTryOnModelImage = async (blob: Blob) => {
+    const fileName = `${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const filePath = `tryon-models/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('tryon-images')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('tryon-images')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
 
   // Calcular cor hover baseada na cor primária local
   const hoverColor = darkenColor(localPrimaryColor);
@@ -1699,12 +1816,18 @@ const handleSubmit = async () => {
   setError('');
   setProcessingMessage(t('sendingImages'));
 
+  let optimizedPreviewUrl: string | null = null;
+
   try {
-    const modelImageDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(modelImage);
+    const optimizedImage = await optimizeTryOnImage(modelImage);
+    optimizedPreviewUrl = optimizedImage.previewUrl;
+    const modelImageUploadPromise = uploadTryOnModelImage(optimizedImage.blob);
+
+    console.log('🗜️ Imagem do modelo otimizada:', {
+      originalSizeBytes: modelImage.size,
+      optimizedSizeBytes: optimizedImage.blob.size,
+      width: optimizedImage.width,
+      height: optimizedImage.height,
     });
 
     // 🎯 DETECTAR LANDMARKS COM MEDIAPIPE (FRONTEND)
@@ -1721,7 +1844,7 @@ const handleSubmit = async () => {
 
         console.log('📷 Carregando imagem para análise...');
         const imgElement = new Image();
-        imgElement.src = modelImageDataUrl;
+        imgElement.src = optimizedImage.previewUrl;
 
         await new Promise((resolve, reject) => {
           imgElement.onload = resolve;
@@ -1818,9 +1941,12 @@ const handleSubmit = async () => {
       setCalculatedSize(provisionalSize);
     }
 
+    setProcessingMessage(t('sendingImages'));
+    const modelImageUrl = await modelImageUploadPromise;
+
     const payload = {
       shop_domain: effectiveShopDomain,
-      model_image: modelImageDataUrl,
+      model_image: modelImageUrl,
       garment_image: selectedProductImage || product.garment_image,
       product_name: product.name,
       product_id: product.id,
@@ -1850,7 +1976,7 @@ const handleSubmit = async () => {
     console.log('   • body_type_index:', payload.user_measurements.body_type_index);
     console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
-    console.log('📷 model_image:', modelImageDataUrl ? 'presente (base64 ' + modelImageDataUrl.length + ' chars)' : '❌ AUSENTE');
+    console.log('📷 model_image:', modelImageUrl ? modelImageUrl.substring(0, 120) + '...' : '❌ AUSENTE');
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
     console.log('🎯 pose_landmarks:', detectedLandmarks ? `presente (${detectedLandmarks.length} landmarks)` : '❌ não detectado (edge function fará)');
     console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
@@ -1877,6 +2003,11 @@ const handleSubmit = async () => {
     console.log('═══════════════════════════════════════════════════════');
     console.log('• FAL Request ID:', result.fal_request_id);
     console.log('• Body Measurements presente?', !!result.body_measurements);
+    console.log('• Provider:', result.debug?.provider || 'N/A');
+    console.log('• Provider status:', result.debug?.provider_status || 'N/A');
+    console.log('• MediaPipe status:', result.debug?.mediapipe_status || 'N/A');
+    console.log('• MediaPipe source:', result.debug?.mediapipe_source || 'N/A');
+    logTryOnTimings('Resposta inicial do /tryon', result.timings || null);
 
     // 🔹 MOSTRAR DEBUG INFO DA EDGE FUNCTION
     if (result.debug) {
@@ -1920,6 +2051,7 @@ const handleSubmit = async () => {
     if (result.success && result.fal_request_id) {
       setPredictionId(result.fal_request_id);
       setProcessingMessage(t('generating'));
+      console.log('🚦 Iniciando polling do self-hosted:', result.fal_request_id);
 
       const bm = result.body_measurements;
       const source = bm?.source || '';
@@ -1976,6 +2108,10 @@ const handleSubmit = async () => {
     setError(error.message || t('processingError'));
     setStep('confirm');
     setLoading(false);
+  } finally {
+    if (optimizedPreviewUrl) {
+      URL.revokeObjectURL(optimizedPreviewUrl);
+    }
   }
 };
 
@@ -1987,14 +2123,21 @@ const handleSubmit = async () => {
   };
 
   const startPolling = (predictionId: string) => {
+    clearPollingTimers();
     let pollCount = 0;
-    const maxPolls = 60;
+    pollingDeadlineRef.current = Date.now() + TRYON_MAX_POLL_MS;
+    console.log('🛰️ Polling configurado para prediction:', predictionId, '| timeout_ms:', TRYON_MAX_POLL_MS);
 
-    const pollInterval = setInterval(async () => {
+    const scheduleNextPoll = (delay: number) => {
+      console.log('⏳ Próximo polling em', delay, 'ms', '| tentativa atual:', pollCount);
+      pollingTimeoutRef.current = window.setTimeout(runPoll, delay);
+    };
+
+    const runPoll = async () => {
       pollCount++;
 
-      if (pollCount > maxPolls) {
-        clearInterval(pollInterval);
+      if (pollingDeadlineRef.current && Date.now() > pollingDeadlineRef.current) {
+        clearPollingTimers();
         openFinalStepWithoutImage();
         return;
       }
@@ -2017,7 +2160,7 @@ const handleSubmit = async () => {
             console.error('Error details:', errorData);
 
             if (errorData.status === 'error' || errorData.status === 'failed') {
-              clearInterval(pollInterval);
+              clearPollingTimers();
               openFinalStepWithoutImage();
               return;
             }
@@ -2025,71 +2168,82 @@ const handleSubmit = async () => {
             console.error('Failed to parse error response:', e);
           }
 
-          if (statusResponse.status === 404) {
-            console.log('⚠️ Prediction not found, continuing to poll...');
-            return;
-          }
-
           if (statusResponse.status >= 500) {
-            clearInterval(pollInterval);
+            clearPollingTimers();
             openFinalStepWithoutImage();
             return;
           }
 
+          scheduleNextPoll(getPollingDelayMs(pollCount));
           return;
         }
 
         const statusData = await statusResponse.json();
         console.log('📊 Status data:', statusData);
+        console.log('📦 TRY-ON STATUS:', {
+          predictionId,
+          pollCount,
+          status: statusData.status,
+          stage: statusData.stage || 'N/A',
+          fal_status: statusData.fal_status || 'N/A',
+        });
+        logTryOnTimings(`Polling #${pollCount}`, statusData.timings || null);
 
         if (statusData.status === 'completed' && statusData.output) {
           const imageUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
           if (imageUrl) {
-            clearInterval(pollInterval);
+            clearPollingTimers();
             console.log('✅ Setting result image:', imageUrl);
+            console.log('✅ TRY-ON concluído com timings finais:');
+            logTryOnTimings('Job concluído', statusData.timings || null);
             setResult(imageUrl);
 
-          console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
-          console.log('   - recommendedSize:', recommendedSize);
-          console.log('   - calculatedSize:', calculatedSize);
+            console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
+            console.log('   - recommendedSize:', recommendedSize);
+            console.log('   - calculatedSize:', calculatedSize);
 
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
             setLoading(false);
+            return;
           }
-        } else if (statusData.status === 'failed' || statusData.status === 'error') {
-          clearInterval(pollInterval);
-          openFinalStepWithoutImage();
-        } else if (statusData.status === 'not_found') {
-          clearInterval(pollInterval);
-          openFinalStepWithoutImage();
-        } else {
-          const messages = [
-            t('sendingImages'),
-            t('scanningBody'),
-            t('finalizingResult')
-          ];
-
-          const messageIndex = Math.min(pollCount - 1, messages.length - 1);
-          setProcessingMessage(messages[messageIndex]);
         }
+
+        if (statusData.status === 'failed' || statusData.status === 'error' || statusData.status === 'not_found') {
+          console.error('❌ TRY-ON falhou ou não foi encontrado:', {
+            predictionId,
+            pollCount,
+            status: statusData.status,
+            stage: statusData.stage || 'N/A',
+            error: statusData.error || 'N/A',
+          });
+          logTryOnTimings('Job com falha', statusData.timings || null);
+          clearPollingTimers();
+          openFinalStepWithoutImage();
+          return;
+        }
+
+        const messages = [
+          t('sendingImages'),
+          t('scanningBody'),
+          t('finalizingResult')
+        ];
+
+        const messageIndex = Math.min(pollCount - 1, messages.length - 1);
+        setProcessingMessage(messages[messageIndex]);
+        scheduleNextPoll(getPollingDelayMs(pollCount));
       } catch (error) {
         console.error('❌ Polling error:', error);
-        clearInterval(pollInterval);
+        clearPollingTimers();
         openFinalStepWithoutImage();
       }
-    }, 3000); // Poll every 3 seconds
-    
-    // Stop polling after 5 minutes
-    setTimeout(() => {
-      clearInterval(pollInterval);
-      if (loading) {
-        openFinalStepWithoutImage();
-      }
-    }, 300000); // 5 minutes
+    };
+
+    scheduleNextPoll(800);
   };
 
   const resetWidget = () => {
+    clearPollingTimers();
     setStep('info');
     setModelImage(null);
     setImagePreview(null);
@@ -2102,6 +2256,12 @@ const handleSubmit = async () => {
     setChatMessages([]);
     setInteractionCount(0);
   };
+
+  useEffect(() => {
+    return () => {
+      clearPollingTimers();
+    };
+  }, []);
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
     if (interactionCount >= GPT_INTERACTION_LIMIT) {

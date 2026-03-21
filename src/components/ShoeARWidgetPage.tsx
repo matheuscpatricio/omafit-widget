@@ -38,6 +38,12 @@ const normalizeDefaultGender = (value: unknown): string => {
   return raw;
 };
 
+type ProductCatalog = {
+  sizes: string[];
+  colors: string[];
+  variants: Array<Record<string, unknown>>;
+};
+
 export function ShoeARWidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
@@ -57,6 +63,13 @@ export function ShoeARWidgetPage() {
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [isFootwearCollection, setIsFootwearCollection] = useState<boolean>(false);
   const [collectionTypeResolved, setCollectionTypeResolved] = useState<boolean>(false);
+  const [productCatalog, setProductCatalog] = useState<ProductCatalog>({
+    sizes: [],
+    colors: [],
+    variants: [],
+  });
+  const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -173,6 +186,30 @@ export function ShoeARWidgetPage() {
         }
         if (event.data.shoeModelUrl) setShoeModelUrl(event.data.shoeModelUrl);
         if (event.data.shoeModelIosUrl) setShoeModelIosUrl(event.data.shoeModelIosUrl);
+        if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
+          const catalog = event.data.productCatalog as Partial<ProductCatalog>;
+          setProductCatalog({
+            sizes: Array.isArray(catalog.sizes) ? catalog.sizes.map((value) => String(value)) : [],
+            colors: Array.isArray(catalog.colors) ? catalog.colors.map((value) => String(value)) : [],
+            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
+          });
+        }
+        if (event.data.selectedVariantId !== undefined) {
+          setSelectedVariantId(String(event.data.selectedVariantId || '').trim());
+        }
+        if (event.data.selectedVariantOptions && typeof event.data.selectedVariantOptions === 'object') {
+          const normalizedOptions = Object.entries(event.data.selectedVariantOptions as Record<string, unknown>).reduce<Record<string, string>>(
+            (acc, [key, value]) => {
+              const normalizedKey = String(key || '').trim();
+              const normalizedValue = String(value || '').trim();
+              if (!normalizedKey || !normalizedValue) return acc;
+              acc[normalizedKey] = normalizedValue;
+              return acc;
+            },
+            {}
+          );
+          setSelectedVariantOptions(normalizedOptions);
+        }
 
         const eventLanguage = normalizeWidgetLanguage(
           event.data.adminLocale || event.data.admin_locale || event.data.language
@@ -213,6 +250,9 @@ export function ShoeARWidgetPage() {
             collectionId={collectionId}
             collectionHandle={collectionHandle}
             defaultGender={defaultGender}
+            productCatalog={productCatalog}
+            selectedVariantId={selectedVariantId}
+            selectedVariantOptions={selectedVariantOptions}
           />
         ) : (
           <div className="rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">

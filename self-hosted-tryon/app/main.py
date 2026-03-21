@@ -76,13 +76,25 @@ def get_job_status(job_id: str, redis: Redis = Depends(get_redis)) -> JobStatusR
         return JobStatusResponse(
             job_id=job.id,
             status="completed",
+            stage="completed",
             result_url=result.get("result_url"),
             timings=result.get("timings"),
         )
 
     if job.is_failed:
         error = job.meta.get("error") or (job.exc_info.splitlines()[-1] if job.exc_info else "Job failed")
-        return JobStatusResponse(job_id=job.id, status="failed", error=error)
+        return JobStatusResponse(
+            job_id=job.id,
+            status="failed",
+            stage=job.meta.get("stage"),
+            error=error,
+            timings=job.meta.get("timings"),
+        )
 
     meta_status = job.meta.get("status") or ("processing" if job.is_started else "queued")
-    return JobStatusResponse(job_id=job.id, status=meta_status)
+    return JobStatusResponse(
+        job_id=job.id,
+        status=meta_status,
+        stage=job.meta.get("stage"),
+        timings=job.meta.get("timings"),
+    )
