@@ -76,6 +76,49 @@ function optimizeTryOnInputUrl(rawUrl: string): string {
   }
 }
 
+function getStringFormValue(value: FormDataEntryValue | null): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function parseOptionalJson<T>(value: FormDataEntryValue | null): T | null {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function uploadTryOnImage(
+  supabaseClient: ReturnType<typeof createClient>,
+  file: Blob | Uint8Array,
+  mimeType: string,
+  folder: string,
+): Promise<string> {
+  const extension = mimeType.split('/')[1] || 'bin';
+  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+  const imageBuffer = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
+
+  const { error: uploadError } = await supabaseClient.storage
+    .from('tryon-images')
+    .upload(fileName, imageBuffer, {
+      contentType: mimeType,
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (uploadError) {
+    console.error('❌ Upload error:', uploadError);
+    throw new Error(`Failed to upload image: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabaseClient.storage
+    .from('tryon-images')
+    .getPublicUrl(fileName);
+
+  return urlData.publicUrl;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -85,19 +128,50 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const {
-      model_image,
-      garment_image,
-      product_name,
-      product_id,
-      public_id,
-      user_measurements,
-      pose_landmarks,
-      detected_measurements,
-      shop_name,
-      shop_domain,
-      collection_handle
-    } = await req.json();
+    const contentType = req.headers.get('content-type') || '';
+    let model_image = '';
+    let garment_image = '';
+    let product_name = '';
+    let product_id = '';
+    let public_id = '';
+    let user_measurements: any = null;
+    let pose_landmarks: any = null;
+    let detected_measurements: any = null;
+    let shop_name = '';
+    let shop_domain = '';
+    let collection_handle = '';
+    let modelImageFile: Blob | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      modelImageFile = formData.get('model_image_file') instanceof Blob
+        ? formData.get('model_image_file') as Blob
+        : null;
+      model_image = getStringFormValue(formData.get('model_image'));
+      garment_image = getStringFormValue(formData.get('garment_image'));
+      product_name = getStringFormValue(formData.get('product_name'));
+      product_id = getStringFormValue(formData.get('product_id'));
+      public_id = getStringFormValue(formData.get('public_id'));
+      user_measurements = parseOptionalJson(formData.get('user_measurements'));
+      pose_landmarks = parseOptionalJson(formData.get('pose_landmarks'));
+      detected_measurements = parseOptionalJson(formData.get('detected_measurements'));
+      shop_name = getStringFormValue(formData.get('shop_name'));
+      shop_domain = getStringFormValue(formData.get('shop_domain'));
+      collection_handle = getStringFormValue(formData.get('collection_handle'));
+    } else {
+      const payload = await req.json();
+      model_image = payload.model_image || '';
+      garment_image = payload.garment_image || '';
+      product_name = payload.product_name || '';
+      product_id = payload.product_id || '';
+      public_id = payload.public_id || '';
+      user_measurements = payload.user_measurements || null;
+      pose_landmarks = payload.pose_landmarks || null;
+      detected_measurements = payload.detected_measurements || null;
+      shop_name = payload.shop_name || '';
+      shop_domain = payload.shop_domain || '';
+      collection_handle = payload.collection_handle || '';
+    }
 
     console.log('📦 DADOS RECEBIDOS DO WIDGET:');
     console.log('   • shop_name:', shop_name || 'não fornecido');
@@ -110,7 +184,7 @@ Deno.serve(async (req: Request) => {
     console.log('   • pose_landmarks:', pose_landmarks ? 'presente' : 'não fornecido');
     console.log('   • detected_measurements:', detected_measurements ? 'presente' : 'não fornecido');
 
-    if (!model_image || !garment_image) {
+    if ((!model_image && !modelImageFile) || !garment_image) {
       throw new Error('model_image and garment_image are required');
     }
 
@@ -130,35 +204,28 @@ Deno.serve(async (req: Request) => {
     let modelImageUrl = model_image;
     let garmentImageUrl = garment_image;
 
-    if (model_image.startsWith('data:')) {
+    if (modelImageFile) {
+      console.log('📤 Uploading binary model image to storage...');
+      const mimeType = modelImageFile.type || 'image/jpeg';
+      modelImageUrl = await uploadTryOnImage(
+        supabaseClient,
+        modelImageFile,
+        mimeType,
+        'tryon-models',
+      );
+      console.log('✅ Model image uploaded:', modelImageUrl);
+    } else if (model_image.startsWith('data:')) {
       console.log('📤 Uploading base64 model image to storage...');
 
       const base64Data = model_image.split(',')[1];
       const mimeType = model_image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
-      const extension = mimeType.split('/')[1];
-
       const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-
-      const fileName = `tryon-models/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
-
-      const { data: uploadData, error: uploadError } = await supabaseClient.storage
-        .from('tryon-images')
-        .upload(fileName, imageBuffer, {
-          contentType: mimeType,
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        throw new Error(`Failed to upload model image: ${uploadError.message}`);
-      }
-
-      const { data: urlData } = supabaseClient.storage
-        .from('tryon-images')
-        .getPublicUrl(fileName);
-
-      modelImageUrl = urlData.publicUrl;
+      modelImageUrl = await uploadTryOnImage(
+        supabaseClient,
+        imageBuffer,
+        mimeType,
+        'tryon-models',
+      );
       console.log('✅ Model image uploaded:', modelImageUrl);
     }
 
@@ -167,30 +234,13 @@ Deno.serve(async (req: Request) => {
 
       const base64Data = garment_image.split(',')[1];
       const mimeType = garment_image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
-      const extension = mimeType.split('/')[1];
-
       const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-
-      const fileName = `tryon-garments/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
-
-      const { data: uploadData, error: uploadError } = await supabaseClient.storage
-        .from('tryon-images')
-        .upload(fileName, imageBuffer, {
-          contentType: mimeType,
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        throw new Error(`Failed to upload garment image: ${uploadError.message}`);
-      }
-
-      const { data: urlData } = supabaseClient.storage
-        .from('tryon-images')
-        .getPublicUrl(fileName);
-
-      garmentImageUrl = urlData.publicUrl;
+      garmentImageUrl = await uploadTryOnImage(
+        supabaseClient,
+        imageBuffer,
+        mimeType,
+        'tryon-garments',
+      );
       console.log('✅ Garment image uploaded:', garmentImageUrl);
     }
 

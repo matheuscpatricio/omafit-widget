@@ -66,14 +66,6 @@ const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number):
     }, type, quality);
   });
 
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
 const applyMaxWidthSearchParam = (url: URL, width: number) => {
   const existingWidth = Number(url.searchParams.get('width') || '0');
   if (!existingWidth || existingWidth > width) {
@@ -363,10 +355,10 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   };
 
   const getPollingDelayMs = (attempt: number) => {
-    if (attempt <= 3) return 1000;
-    if (attempt <= 8) return 1500;
-    if (attempt <= 16) return 2500;
-    return 4000;
+    if (attempt <= 8) return 750;
+    if (attempt <= 20) return 1000;
+    if (attempt <= 40) return 1500;
+    return 2500;
   };
 
   // Calcular cor hover baseada na cor primária local
@@ -476,8 +468,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('================================');
   }, [step, imagePreview, selectedProductImage, modelImage]);
 
-  // MediaPipe Pose Detection (carrega ao montar para estar pronto quando usuário enviar foto)
-  const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose();
+  // O try-on usa MediaPipe no main thread para evitar a incompatibilidade
+  // do worker com o runtime publicado do widget. Isso não afeta o widget de calçados.
+  const { isLoading: mediapipeLoading, error: mediapipeError, detectPose, calculateBodyMeasurements } = useMediaPipePose({
+    useWorker: false,
+  });
 
   useEffect(() => {
     if (mediapipeLoading) {
@@ -1845,7 +1840,6 @@ const handleSubmit = async () => {
   try {
     const optimizedImage = await optimizeTryOnImage(modelImage);
     optimizedPreviewUrl = optimizedImage.previewUrl;
-    const modelImageDataUrlPromise = blobToDataUrl(optimizedImage.blob);
 
     console.log('🗜️ Imagem do modelo otimizada:', {
       originalSizeBytes: modelImage.size,
@@ -1863,9 +1857,6 @@ const handleSubmit = async () => {
         console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
         setProcessingMessage(t('analyzingPhoto'));
 
-        // Permitir que a UI atualize antes de processar
-        await new Promise(resolve => setTimeout(resolve, 100));
-
         console.log('📷 Carregando imagem para análise...');
         const imgElement = new Image();
         imgElement.src = optimizedImage.previewUrl;
@@ -1879,9 +1870,6 @@ const handleSubmit = async () => {
 
         console.log('✅ Imagem carregada, iniciando detecção de pose...');
         setProcessingMessage(t('detectingBodyPoints'));
-
-        // Permitir que a UI atualize novamente
-        await new Promise(resolve => setTimeout(resolve, 100));
 
         const poseResult = await detectPose(imgElement);
         console.log('📊 detectPose() retornou:', poseResult);
@@ -1911,9 +1899,6 @@ const handleSubmit = async () => {
           }
 
           setProcessingMessage(t('calculatingMeasurements'));
-          // Permitir que a UI atualize antes do cálculo pesado
-          await new Promise(resolve => setTimeout(resolve, 100));
-
           console.log('📏 Calculando medidas corporais...');
           const measurements = calculateBodyMeasurements(
             detectedLandmarks,
@@ -1966,13 +1951,9 @@ const handleSubmit = async () => {
     }
 
     setProcessingMessage(t('sendingImages'));
-    const modelImageDataUrl = await modelImageDataUrlPromise;
-
     const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
-
     const payload = {
       shop_domain: effectiveShopDomain,
-      model_image: modelImageDataUrl,
       garment_image: optimizedGarmentImageUrl,
       product_name: product.name,
       product_id: product.id,
@@ -1989,6 +1970,16 @@ const handleSubmit = async () => {
       pose_landmarks: detectedLandmarks,
       detected_measurements: detectedMeasurements
     };
+    const formData = new FormData();
+    formData.append('model_image_file', optimizedImage.blob, modelImage.name || 'tryon-model.jpg');
+    formData.append('shop_domain', payload.shop_domain);
+    formData.append('garment_image', payload.garment_image);
+    formData.append('product_name', payload.product_name);
+    formData.append('product_id', payload.product_id);
+    formData.append('public_id', payload.public_id || '');
+    formData.append('user_measurements', JSON.stringify(payload.user_measurements));
+    formData.append('pose_landmarks', JSON.stringify(payload.pose_landmarks));
+    formData.append('detected_measurements', JSON.stringify(payload.detected_measurements));
 
     console.log('═══════════════════════════════════════════════════════');
     console.log('📤 PAYLOAD ENVIADO PARA EDGE FUNCTION');
@@ -2002,7 +1993,7 @@ const handleSubmit = async () => {
     console.log('   • body_type_index:', payload.user_measurements.body_type_index);
     console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
     console.log('   • recommended_size:', payload.user_measurements.recommended_size);
-    console.log('📷 model_image:', modelImageDataUrl ? `presente (base64 otimizado ${modelImageDataUrl.length} chars)` : '❌ AUSENTE');
+    console.log('📷 model_image:', `arquivo otimizado ${optimizedImage.blob.size} bytes`);
     console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
     if (optimizedGarmentImageUrl !== (selectedProductImage || product.garment_image)) {
       console.log('🪄 garment_image otimizada para download mais rápido no worker');
@@ -2014,10 +2005,9 @@ const handleSubmit = async () => {
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify(payload),
+      body: formData,
     });
 
     if (!response.ok) {
@@ -2268,7 +2258,7 @@ const handleSubmit = async () => {
       }
     };
 
-    scheduleNextPoll(800);
+    scheduleNextPoll(250);
   };
 
   const resetWidget = () => {
