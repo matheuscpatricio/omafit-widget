@@ -49,6 +49,21 @@ interface SizeChartEntry {
   length?: string;
 }
 
+interface OptimizedModelImage {
+  sourceId: string;
+  blob: Blob;
+  previewUrl: string;
+  width: number;
+  height: number;
+}
+
+interface PreparedPoseAnalysis {
+  sourceId: string;
+  detectedLandmarks: Array<{ x: number; y: number; z: number; visibility?: number }> | null;
+  detectedMeasurements: any | null;
+  validationMessage: string | null;
+}
+
 const GPT_INTERACTION_LIMIT = 5;
 const TRYON_IMAGE_MAX_DIMENSION = 1024;
 const TRYON_IMAGE_QUALITY = 0.76;
@@ -405,6 +420,12 @@ export function TryOnWidget({
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
   const pollingDeadlineRef = useRef<number | null>(null);
+  const preparedModelImageRef = useRef<OptimizedModelImage | null>(null);
+  const preparedPoseAnalysisRef = useRef<PreparedPoseAnalysis | null>(null);
+  const modelImagePreparationPromiseRef = useRef<Promise<OptimizedModelImage | null> | null>(null);
+  const modelImageUploadPromiseRef = useRef<Promise<string | null> | null>(null);
+  const posePreparationPromiseRef = useRef<Promise<PreparedPoseAnalysis | null> | null>(null);
+  const activeModelImageJobRef = useRef(0);
 
   // Armazenar medidas do modelo corporal final para envio ao GPT
   const [finalBodyMeasurements, setFinalBodyMeasurements] = useState<{
@@ -438,6 +459,157 @@ export function TryOnWidget({
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
+
+  const revokePreparedPreview = (preparedImage: OptimizedModelImage | null) => {
+    if (preparedImage?.previewUrl) {
+      URL.revokeObjectURL(preparedImage.previewUrl);
+    }
+  };
+
+  const clearPreparedModelAssets = () => {
+    revokePreparedPreview(preparedModelImageRef.current);
+    preparedModelImageRef.current = null;
+    preparedPoseAnalysisRef.current = null;
+    modelImagePreparationPromiseRef.current = null;
+    modelImageUploadPromiseRef.current = null;
+    posePreparationPromiseRef.current = null;
+  };
+
+  const invalidatePreparedModelAssets = () => {
+    activeModelImageJobRef.current += 1;
+    clearPreparedModelAssets();
+  };
+
+  const startModelImageUploadPreparation = (preparedImage: OptimizedModelImage, fileName: string, jobId: number) => {
+    if (modelImageUploadPromiseRef.current) return modelImageUploadPromiseRef.current;
+
+    modelImageUploadPromiseRef.current = uploadTryOnModelImage(
+      preparedImage.blob,
+      fileName || 'tryon-model.jpg',
+    ).catch((uploadError) => {
+      console.warn('⚠️ Upload direto da imagem falhou; usando fallback via edge function.', uploadError);
+      if (activeModelImageJobRef.current !== jobId) {
+        return null;
+      }
+      return null;
+    });
+
+    return modelImageUploadPromiseRef.current;
+  };
+
+  const startPosePreparation = (preparedImage: OptimizedModelImage, jobId: number) => {
+    if (posePreparationPromiseRef.current) return posePreparationPromiseRef.current;
+
+    posePreparationPromiseRef.current = (async () => {
+      if (mediapipeError) {
+        console.log('⏭️ Pré-análise ignorada porque o MediaPipe está com erro');
+        return {
+          sourceId: preparedImage.sourceId,
+          detectedLandmarks: null,
+          detectedMeasurements: null,
+          validationMessage: null,
+        };
+      }
+
+      try {
+        console.log('⚡ Pré-processando MediaPipe ainda na confirmação...');
+        const imgElement = await loadImageElement(preparedImage.previewUrl);
+        if (activeModelImageJobRef.current !== jobId) return null;
+
+        const poseResult = await detectPose(imgElement);
+        if (activeModelImageJobRef.current !== jobId) return null;
+
+        if (poseResult?.landmarks?.length) {
+          const landmarks = poseResult.landmarks[0].map((lm: any) => ({
+            x: lm.x,
+            y: lm.y,
+            z: lm.z,
+            visibility: lm.visibility || 0,
+          }));
+
+          const photoValidation = validatePhotoForCollection(
+            landmarks,
+            localCollectionType || 'upper'
+          );
+
+          if (!photoValidation.valid) {
+            return {
+              sourceId: preparedImage.sourceId,
+              detectedLandmarks: landmarks,
+              detectedMeasurements: null,
+              validationMessage: photoValidation.message || t('processingError'),
+            };
+          }
+
+          const measurements = calculateBodyMeasurements(
+            landmarks,
+            imgElement.width,
+            imgElement.height,
+            sizeData?.height,
+            sizeData?.weight,
+            sizeData?.gender
+          );
+
+          return {
+            sourceId: preparedImage.sourceId,
+            detectedLandmarks: landmarks,
+            detectedMeasurements: measurements,
+            validationMessage: null,
+          };
+        }
+      } catch (poseError) {
+        console.warn('⚠️ Pré-análise do MediaPipe falhou; o submit seguirá com fallback.', poseError);
+      }
+
+      return {
+        sourceId: preparedImage.sourceId,
+        detectedLandmarks: null,
+        detectedMeasurements: null,
+        validationMessage: null,
+      };
+    })().then((result) => {
+      if (result && activeModelImageJobRef.current === jobId) {
+        preparedPoseAnalysisRef.current = result;
+      }
+      return result;
+    });
+
+    return posePreparationPromiseRef.current;
+  };
+
+  const startModelImagePreparation = (file: File, jobId: number) => {
+    modelImagePreparationPromiseRef.current = optimizeTryOnImage(file)
+      .then((optimizedImage) => {
+        if (activeModelImageJobRef.current !== jobId) {
+          URL.revokeObjectURL(optimizedImage.previewUrl);
+          return null;
+        }
+
+        const preparedImage: OptimizedModelImage = {
+          sourceId: `${file.name}:${file.size}:${file.lastModified}`,
+          blob: optimizedImage.blob,
+          previewUrl: optimizedImage.previewUrl,
+          width: optimizedImage.width,
+          height: optimizedImage.height,
+        };
+
+        revokePreparedPreview(preparedModelImageRef.current);
+        preparedModelImageRef.current = preparedImage;
+
+        void startModelImageUploadPreparation(preparedImage, file.name || 'tryon-model.jpg', jobId);
+        void startPosePreparation(preparedImage, jobId);
+
+        return preparedImage;
+      })
+      .catch((preparationError) => {
+        if (activeModelImageJobRef.current === jobId) {
+          console.error('❌ Falha ao preparar imagem do try-on:', preparationError);
+        }
+        return null;
+      });
+
+    return modelImagePreparationPromiseRef.current;
+  };
 
   useEffect(() => {
     setProductCatalog(normalizeProductCatalog(initialProductCatalog));
@@ -1826,9 +1998,13 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       return;
     }
 
+    invalidatePreparedModelAssets();
     setModelImage(file);
+    const jobId = activeModelImageJobRef.current;
+
     const reader = new FileReader();
     reader.onloadend = () => {
+      if (activeModelImageJobRef.current !== jobId) return;
       const preview = reader.result as string;
       console.log('✅ Image preview gerado, tamanho:', preview.length, 'caracteres');
       console.log('🎯 selectedProductImage:', selectedProductImage);
@@ -1838,6 +2014,7 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       console.log('📍 Step alterado para: confirm');
     };
     reader.readAsDataURL(file);
+    void startModelImagePreparation(file, jobId);
   }
 };
 
@@ -1953,18 +2130,17 @@ const handleSubmit = async () => {
   setError('');
   setProcessingMessage(t('sendingImages'));
 
-  let optimizedPreviewUrl: string | null = null;
-
   try {
-    const optimizedImage = await optimizeTryOnImage(modelImage);
-    optimizedPreviewUrl = optimizedImage.previewUrl;
-    const modelImageUploadPromise = uploadTryOnModelImage(
-      optimizedImage.blob,
-      modelImage.name || 'tryon-model.jpg',
-    ).catch((error) => {
-      console.warn('⚠️ Upload direto da imagem falhou; usando fallback via edge function.', error);
-      return null;
-    });
+    const currentJobId = activeModelImageJobRef.current;
+    const optimizedImage = preparedModelImageRef.current
+      ?? await (modelImagePreparationPromiseRef.current || startModelImagePreparation(modelImage, currentJobId));
+
+    if (!optimizedImage || activeModelImageJobRef.current !== currentJobId) {
+      throw new Error(t('processingError'));
+    }
+
+    const modelImageUploadPromise = modelImageUploadPromiseRef.current
+      || startModelImageUploadPreparation(optimizedImage, modelImage.name || 'tryon-model.jpg', currentJobId);
 
     console.log('🗜️ Imagem do modelo otimizada:', {
       originalSizeBytes: modelImage.size,
@@ -1977,80 +2153,32 @@ const handleSubmit = async () => {
     let detectedLandmarks = null;
     let detectedMeasurements = null;
 
-    if (!mediapipeLoading && !mediapipeError) {
-      try {
-        console.log('🔍 Detectando landmarks com MediaPipe no frontend...');
-        setProcessingMessage(t('analyzingPhoto'));
+    const preparedPoseAnalysis = preparedPoseAnalysisRef.current
+      ?? await (posePreparationPromiseRef.current || startPosePreparation(optimizedImage, currentJobId));
 
-        console.log('📷 Carregando imagem para análise...');
-        const imgElement = new Image();
-        imgElement.src = optimizedImage.previewUrl;
+    if (activeModelImageJobRef.current !== currentJobId) {
+      throw new Error(t('processingError'));
+    }
 
-        await new Promise((resolve, reject) => {
-          imgElement.onload = resolve;
-          imgElement.onerror = reject;
-          // Timeout de segurança
-          setTimeout(() => reject(new Error('Image load timeout')), 5000);
-        });
+    if (preparedPoseAnalysis?.validationMessage) {
+      console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
+      setError(preparedPoseAnalysis.validationMessage);
+      setLoading(false);
+      setStep('confirm');
+      return;
+    }
 
-        console.log('✅ Imagem carregada, iniciando detecção de pose...');
-        setProcessingMessage(t('detectingBodyPoints'));
-
-        const poseResult = await detectPose(imgElement);
-        console.log('📊 detectPose() retornou:', poseResult);
-
-        if (poseResult && poseResult.landmarks && poseResult.landmarks.length > 0) {
-          const landmarks = poseResult.landmarks[0];
-          console.log('✅ MediaPipe detectou', landmarks.length, 'landmarks');
-
-          detectedLandmarks = landmarks.map((lm: any) => ({
-            x: lm.x,
-            y: lm.y,
-            z: lm.z,
-            visibility: lm.visibility || 0
-          }));
-
-          const photoValidation = validatePhotoForCollection(
-            detectedLandmarks,
-            localCollectionType || 'upper'
-          );
-
-          if (!photoValidation.valid) {
-            console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
-            setError(photoValidation.message || t('processingError'));
-            setLoading(false);
-            setStep('confirm');
-            return;
-          }
-
-          setProcessingMessage(t('calculatingMeasurements'));
-          console.log('📏 Calculando medidas corporais...');
-          const measurements = calculateBodyMeasurements(
-            detectedLandmarks,
-            imgElement.width,
-            imgElement.height,
-            sizeData?.height,
-            sizeData?.weight,
-            sizeData?.gender
-          );
-
-          detectedMeasurements = measurements;
-
-          console.log('✅ Medidas calculadas pelo MediaPipe:', measurements);
-        } else {
-          console.warn('⚠️ MediaPipe não detectou poses na imagem - continuando com medidas do formulário');
-          detectedLandmarks = null;
-          detectedMeasurements = null;
-        }
-      } catch (err) {
-        console.error('❌ Erro ao detectar landmarks no frontend:', err);
-        console.error('   Detalhes do erro:', err);
-        // Continuar mesmo com erro no MediaPipe - edge function fará a detecção
-      }
-    } else {
+    if (preparedPoseAnalysis?.detectedLandmarks?.length) {
+      console.log('✅ Reutilizando landmarks pré-processados da etapa de confirmação');
+      detectedLandmarks = preparedPoseAnalysis.detectedLandmarks;
+      detectedMeasurements = preparedPoseAnalysis.detectedMeasurements;
+      console.log('✅ Medidas reutilizadas do pré-processamento:', detectedMeasurements);
+    } else if (mediapipeError) {
       console.log('⏭️ MediaPipe não está pronto, edge function fará a detecção');
       console.log('   - mediapipeLoading:', mediapipeLoading);
       console.log('   - mediapipeError:', mediapipeError);
+    } else {
+      console.warn('⚠️ Pré-processamento não encontrou pose; edge function fará a detecção');
     }
 
     // 🔹 VALIDAÇÃO CRÍTICA: altura e peso são obrigatórios para MediaPipe
@@ -2268,10 +2396,6 @@ const handleSubmit = async () => {
     setError(error.message || t('processingError'));
     setStep('confirm');
     setLoading(false);
-  } finally {
-    if (optimizedPreviewUrl) {
-      URL.revokeObjectURL(optimizedPreviewUrl);
-    }
   }
 };
 
@@ -2404,6 +2528,7 @@ const handleSubmit = async () => {
 
   const resetWidget = () => {
     clearPollingTimers();
+    invalidatePreparedModelAssets();
     setStep('info');
     setModelImage(null);
     setImagePreview(null);
@@ -2420,6 +2545,7 @@ const handleSubmit = async () => {
   useEffect(() => {
     return () => {
       clearPollingTimers();
+      invalidatePreparedModelAssets();
     };
   }, []);
 
@@ -3390,8 +3516,9 @@ const handleSubmit = async () => {
             <div className="flex gap-3">
               <button
                 onClick={() => {
+                  invalidatePreparedModelAssets();
                   setStep('photo');
-                  setImagePreview('');
+                  setImagePreview(null);
                   setModelImage(null);
                 }}
                 className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-lg md:text-xl rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out font-medium"
