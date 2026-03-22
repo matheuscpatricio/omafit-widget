@@ -590,10 +590,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   title: t.card1Title,
                   content: (
                     <div>
-                      <p className="text-gray-900 md:text-gray-800 dark:text-neutral-200 text-sm md:text-sm font-normal mb-4">
+                      <p className="text-gray-900 md:text-gray-800 text-sm md:text-sm font-normal mb-4">
                         {t.card1Desc}
                       </p>
-                      <p className="text-gray-800 md:text-gray-600 dark:text-neutral-400 text-sm md:text-sm font-medium">
+                      <p className="text-gray-800 md:text-gray-600 text-sm md:text-sm font-medium">
                         {t.card1Badge}
                       </p>
                 </div>
@@ -603,10 +603,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   title: t.card2Title,
                   content: (
                     <div>
-                      <p className="text-gray-900 md:text-gray-800 dark:text-neutral-200 text-sm md:text-sm font-normal mb-4">
+                      <p className="text-gray-900 md:text-gray-800 text-sm md:text-sm font-normal mb-4">
                         {t.card2Desc}
                       </p>
-                      <p className="text-gray-800 md:text-gray-600 dark:text-neutral-400 text-sm md:text-sm font-medium">
+                      <p className="text-gray-800 md:text-gray-600 text-sm md:text-sm font-medium">
                         {t.card2Badge}
                       </p>
                 </div>
@@ -616,10 +616,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   title: t.card3Title,
                   content: (
                     <div>
-                      <p className="text-gray-900 md:text-gray-800 dark:text-neutral-200 text-sm md:text-sm font-normal mb-4">
+                      <p className="text-gray-900 md:text-gray-800 text-sm md:text-sm font-normal mb-4">
                         {t.card3Desc}
                       </p>
-                      <p className="text-gray-800 md:text-gray-600 dark:text-neutral-400 text-sm md:text-sm font-medium">
+                      <p className="text-gray-800 md:text-gray-600 text-sm md:text-sm font-medium">
                         {t.card3Badge}
                       </p>
                 </div>
@@ -629,10 +629,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
                   title: t.card4Title,
                   content: (
                     <div>
-                      <p className="text-gray-900 md:text-gray-800 dark:text-neutral-200 text-sm md:text-sm font-normal mb-4">
+                      <p className="text-gray-900 md:text-gray-800 text-sm md:text-sm font-normal mb-4">
                         {t.card4Desc}
                       </p>
-                      <p className="text-gray-800 md:text-gray-600 dark:text-neutral-400 text-sm md:text-sm font-medium">
+                      <p className="text-gray-800 md:text-gray-600 text-sm md:text-sm font-medium">
                         {t.card4Badge}
                       </p>
                 </div>
