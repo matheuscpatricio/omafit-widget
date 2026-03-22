@@ -26,6 +26,15 @@ interface TryOnWidgetProps {
   recommendedProductName?: string;
   recommendedProductUrl?: string;
   language?: 'pt' | 'es' | 'en';
+  productCatalog?: ProductCatalog;
+  selectedVariantId?: string;
+  selectedVariantOptions?: Record<string, string>;
+}
+
+interface ProductCatalog {
+  sizes: string[];
+  colors: string[];
+  variants: any[];
 }
 
 interface SizeChartEntry {
@@ -213,6 +222,33 @@ const normalizeOptionList = (value: unknown): string[] => {
   return Array.from(unique);
 };
 
+const normalizeOptionValue = (value: unknown): string => String(value || '').trim();
+
+const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object') return {};
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, optionValue]) => {
+    const normalizedKey = normalizeOptionValue(key);
+    const normalizedValue = normalizeOptionValue(optionValue);
+    if (!normalizedKey || !normalizedValue) return acc;
+    acc[normalizedKey] = normalizedValue;
+    return acc;
+  }, {});
+};
+
+const normalizeProductCatalog = (catalog?: Partial<ProductCatalog> | null): ProductCatalog => ({
+  sizes: normalizeOptionList(catalog?.sizes),
+  colors: normalizeOptionList(catalog?.colors),
+  variants: Array.isArray(catalog?.variants) ? catalog.variants : [],
+});
+
+const detectOptionKind = (name: string): 'size' | 'color' | 'other' => {
+  const normalized = normalizeOptionValue(name).toLowerCase();
+  if (/size|tamanho|talla|taille|größe|grosse/.test(normalized)) return 'size';
+  if (/color|cor|colour|couleur|farbe/.test(normalized)) return 'color';
+  return 'other';
+};
+
 const logProductCatalogDebug = (
   source: string,
   catalog: { sizes: string[]; colors: string[]; variants: any[] }
@@ -226,7 +262,30 @@ const logProductCatalogDebug = (
   }
 };
 
-export function TryOnWidget({ garmentImage, productId = 'unknown', productName = 'Produto', storeName = '', storeLogo, primaryColor = '#810707', fontFamily = 'Outfit', publicId, productImages = [], shopDomain = '', collectionId = '', collectionHandle = '', gender = 'unisex', defaultGender = 'unisex', collectionType, collectionElasticity, recommendedProductName, recommendedProductUrl, language }: TryOnWidgetProps) {
+export function TryOnWidget({
+  garmentImage,
+  productId = 'unknown',
+  productName = 'Produto',
+  storeName = '',
+  storeLogo,
+  primaryColor = '#810707',
+  fontFamily = 'Outfit',
+  publicId,
+  productImages = [],
+  shopDomain = '',
+  collectionId = '',
+  collectionHandle = '',
+  gender = 'unisex',
+  defaultGender = 'unisex',
+  collectionType,
+  collectionElasticity,
+  recommendedProductName,
+  recommendedProductUrl,
+  language,
+  productCatalog: initialProductCatalog = { sizes: [], colors: [], variants: [] },
+  selectedVariantId: initialSelectedVariantId = '',
+  selectedVariantOptions: initialSelectedVariantOptions = {},
+}: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
@@ -337,11 +396,11 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [selectedColorHex, setSelectedColorHex] = useState<string>(primaryColor);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [addToCartFeedback, setAddToCartFeedback] = useState('');
-  const [productCatalog, setProductCatalog] = useState<{ sizes: string[]; colors: string[]; variants: any[] }>({
-    sizes: [],
-    colors: [],
-    variants: [],
-  });
+  const [productCatalog, setProductCatalog] = useState<ProductCatalog>(() => normalizeProductCatalog(initialProductCatalog));
+  const [selectedVariantId, setSelectedVariantId] = useState<string>(() => normalizeOptionValue(initialSelectedVariantId));
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>(
+    () => normalizeSelectedVariantOptions(initialSelectedVariantOptions)
+  );
   const chatEndRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
@@ -379,6 +438,18 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
+
+  useEffect(() => {
+    setProductCatalog(normalizeProductCatalog(initialProductCatalog));
+  }, [initialProductCatalog]);
+
+  useEffect(() => {
+    setSelectedVariantId(normalizeOptionValue(initialSelectedVariantId));
+  }, [initialSelectedVariantId]);
+
+  useEffect(() => {
+    setSelectedVariantOptions(normalizeSelectedVariantOptions(initialSelectedVariantOptions));
+  }, [initialSelectedVariantOptions]);
 
   const clearPollingTimers = () => {
     if (pollingTimeoutRef.current !== null) {
@@ -637,14 +708,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         }
 
         if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
-          const catalog = event.data.productCatalog;
-          const normalizedCatalog = {
-            sizes: normalizeOptionList(catalog.sizes),
-            colors: normalizeOptionList(catalog.colors),
-            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
-          };
+          const normalizedCatalog = normalizeProductCatalog(event.data.productCatalog);
           logProductCatalogDebug('omafit-context', normalizedCatalog);
           setProductCatalog(normalizedCatalog);
+        }
+
+        if (event.data.selectedVariantId !== undefined) {
+          setSelectedVariantId(normalizeOptionValue(event.data.selectedVariantId));
+        }
+
+        if (event.data.selectedVariantOptions && typeof event.data.selectedVariantOptions === 'object') {
+          setSelectedVariantOptions(normalizeSelectedVariantOptions(event.data.selectedVariantOptions));
         }
       }
 
@@ -700,14 +774,17 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
         }
 
         if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
-          const catalog = event.data.productCatalog;
-          const normalizedCatalog = {
-            sizes: normalizeOptionList(catalog.sizes),
-            colors: normalizeOptionList(catalog.colors),
-            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
-          };
+          const normalizedCatalog = normalizeProductCatalog(event.data.productCatalog);
           logProductCatalogDebug('omafit-config-update', normalizedCatalog);
           setProductCatalog(normalizedCatalog);
+        }
+
+        if (event.data.selectedVariantId !== undefined) {
+          setSelectedVariantId(normalizeOptionValue(event.data.selectedVariantId));
+        }
+
+        if (event.data.selectedVariantOptions && typeof event.data.selectedVariantOptions === 'object') {
+          setSelectedVariantOptions(normalizeSelectedVariantOptions(event.data.selectedVariantOptions));
         }
       }
 
@@ -750,6 +827,13 @@ export function TryOnWidget({ garmentImage, productId = 'unknown', productName =
     console.log('   • colors:', productCatalog.colors.length, productCatalog.colors);
     console.log('   • variants:', productCatalog.variants.length);
   }, [productCatalog]);
+
+  useEffect(() => {
+    console.log('🧩 [VARIANT:state] Contexto de variante atual no try-on:', {
+      selectedVariantId,
+      selectedVariantOptions,
+    });
+  }, [selectedVariantId, selectedVariantOptions]);
 
   // Buscar configurações do widget ao carregar
   useEffect(() => {
@@ -2502,6 +2586,21 @@ const handleSubmit = async () => {
     setAddToCartFeedback('');
 
     const requestId = `cart_${sessionId}_${Date.now()}`;
+    const sizeOptionName =
+      Object.keys(selectedVariantOptions).find((optionName) => detectOptionKind(optionName) === 'size') || 'Tamanho';
+    const recommendedCartSize = normalizeOptionValue(recommendedSize || calculatedSize);
+    const selectedOptions = Object.entries(selectedVariantOptions).reduce<Record<string, string>>((acc, [key, value]) => {
+      const normalizedKey = normalizeOptionValue(key);
+      const normalizedValue = normalizeOptionValue(value);
+      if (!normalizedKey || !normalizedValue) return acc;
+      acc[normalizedKey] = normalizedValue;
+      return acc;
+    }, {});
+
+    if (recommendedCartSize) {
+      selectedOptions[sizeOptionName] = recommendedCartSize;
+    }
+
     const cartPayload = {
       type: 'omafit-add-to-cart-request',
       requestId,
@@ -2513,13 +2612,21 @@ const handleSubmit = async () => {
       selection: {
         image_url: selectedProductImage,
         color_hex: selectedColorHex,
-        recommended_size: recommendedSize || calculatedSize || null
+        recommended_size: recommendedCartSize || null,
+        recommended_size_label: recommendedCartSize || null,
+        variant_option_name: sizeOptionName,
+        selected_options: selectedOptions,
+        selected_variant_id: selectedVariantId || null,
       },
       quantity: 1,
       shop_domain: effectiveShopDomain,
       metadata: {
         session_id: sessionId,
-        language: currentLanguage
+        language: currentLanguage,
+        recommended_size_label: recommendedCartSize || null,
+        variant_option_name: sizeOptionName,
+        selected_variant_id: selectedVariantId || null,
+        variant_catalog_count: productCatalog.variants.length,
       }
     };
 

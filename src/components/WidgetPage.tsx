@@ -12,6 +12,24 @@ const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   return null;
 };
 
+type ProductCatalog = {
+  sizes: string[];
+  colors: string[];
+  variants: Array<Record<string, unknown>>;
+};
+
+const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object') return {};
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, optionValue]) => {
+    const normalizedKey = String(key || '').trim();
+    const normalizedValue = String(optionValue || '').trim();
+    if (!normalizedKey || !normalizedValue) return acc;
+    acc[normalizedKey] = normalizedValue;
+    return acc;
+  }, {});
+};
+
 export function WidgetPage() {
   const [productImage, setProductImage] = useState<string>('');
   const [productImages, setProductImages] = useState<string[]>([]);
@@ -34,6 +52,13 @@ export function WidgetPage() {
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
   const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>('en');
+  const [productCatalog, setProductCatalog] = useState<ProductCatalog>({
+    sizes: [],
+    colors: [],
+    variants: [],
+  });
+  const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -268,6 +293,20 @@ export function WidgetPage() {
             setRecommendedProductUrl(event.data.complementaryProduct.url);
           }
         }
+        if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
+          const catalog = event.data.productCatalog as Partial<ProductCatalog>;
+          setProductCatalog({
+            sizes: Array.isArray(catalog.sizes) ? catalog.sizes.map((value) => String(value)) : [],
+            colors: Array.isArray(catalog.colors) ? catalog.colors.map((value) => String(value)) : [],
+            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
+          });
+        }
+        if (event.data.selectedVariantId !== undefined) {
+          setSelectedVariantId(String(event.data.selectedVariantId || '').trim());
+        }
+        if (event.data.selectedVariantOptions && typeof event.data.selectedVariantOptions === 'object') {
+          setSelectedVariantOptions(normalizeSelectedVariantOptions(event.data.selectedVariantOptions));
+        }
       }
 
       if (event.data.type === 'omafit-config-update') {
@@ -320,6 +359,20 @@ export function WidgetPage() {
             setRecommendedProductUrl(event.data.complementaryProduct.url);
           }
         }
+        if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
+          const catalog = event.data.productCatalog as Partial<ProductCatalog>;
+          setProductCatalog({
+            sizes: Array.isArray(catalog.sizes) ? catalog.sizes.map((value) => String(value)) : [],
+            colors: Array.isArray(catalog.colors) ? catalog.colors.map((value) => String(value)) : [],
+            variants: Array.isArray(catalog.variants) ? catalog.variants : [],
+          });
+        }
+        if (event.data.selectedVariantId !== undefined) {
+          setSelectedVariantId(String(event.data.selectedVariantId || '').trim());
+        }
+        if (event.data.selectedVariantOptions && typeof event.data.selectedVariantOptions === 'object') {
+          setSelectedVariantOptions(normalizeSelectedVariantOptions(event.data.selectedVariantOptions));
+        }
       }
     };
 
@@ -369,6 +422,9 @@ export function WidgetPage() {
           recommendedProductName={recommendedProductName}
           recommendedProductUrl={recommendedProductUrl}
           language={storeLanguage}
+          productCatalog={productCatalog}
+          selectedVariantId={selectedVariantId}
+          selectedVariantOptions={selectedVariantOptions}
         />
       </div>
     </div>
