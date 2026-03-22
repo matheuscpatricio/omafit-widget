@@ -237,6 +237,14 @@ const normalizeOptionList = (value: unknown): string[] => {
   return Array.from(unique);
 };
 
+const verboseTryOnDebug = import.meta.env.DEV;
+
+const logVerboseTryOn = (...args: unknown[]) => {
+  if (verboseTryOnDebug) {
+    console.log(...args);
+  }
+};
+
 const normalizeOptionValue = (value: unknown): string => String(value || '').trim();
 
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
@@ -420,6 +428,7 @@ export function TryOnWidget({
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
   const pollingDeadlineRef = useRef<number | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
   const preparedModelImageRef = useRef<OptimizedModelImage | null>(null);
   const preparedPoseAnalysisRef = useRef<PreparedPoseAnalysis | null>(null);
   const modelImagePreparationPromiseRef = useRef<Promise<OptimizedModelImage | null> | null>(null);
@@ -631,11 +640,56 @@ export function TryOnWidget({
     pollingDeadlineRef.current = null;
   };
 
-  const getPollingDelayMs = (attempt: number) => {
-    if (attempt <= 8) return 750;
-    if (attempt <= 20) return 1000;
-    if (attempt <= 40) return 1500;
-    return 2500;
+  const revokePreviewObjectUrl = () => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
+  };
+
+  const getPollingDelayMs = (attempt: number, status?: string, stage?: string) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    const normalizedStage = String(stage || '').trim().toLowerCase();
+
+    if (
+      normalizedStatus === 'completed' ||
+      normalizedStage.includes('complete') ||
+      normalizedStage.includes('final') ||
+      normalizedStage.includes('persist')
+    ) {
+      return 150;
+    }
+
+    if (
+      normalizedStatus === 'queued' ||
+      normalizedStage.includes('queue') ||
+      normalizedStage.includes('pending') ||
+      normalizedStage.includes('download')
+    ) {
+      return attempt <= 6 ? 250 : 400;
+    }
+
+    if (
+      normalizedStage.includes('pose') ||
+      normalizedStage.includes('measure') ||
+      normalizedStage.includes('scan') ||
+      normalizedStage.includes('preprocess')
+    ) {
+      return attempt <= 8 ? 300 : 450;
+    }
+
+    if (
+      normalizedStage.includes('infer') ||
+      normalizedStage.includes('generate') ||
+      normalizedStage.includes('render')
+    ) {
+      return attempt <= 12 ? 450 : 650;
+    }
+
+    if (attempt <= 8) return 350;
+    if (attempt <= 20) return 600;
+    if (attempt <= 40) return 900;
+    return 1500;
   };
 
   // Calcular cor hover baseada na cor primária local
@@ -2001,19 +2055,17 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     invalidatePreparedModelAssets();
     setModelImage(file);
     const jobId = activeModelImageJobRef.current;
+    revokePreviewObjectUrl();
+    const previewObjectUrl = URL.createObjectURL(file);
+    previewObjectUrlRef.current = previewObjectUrl;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (activeModelImageJobRef.current !== jobId) return;
-      const preview = reader.result as string;
-      console.log('✅ Image preview gerado, tamanho:', preview.length, 'caracteres');
-      console.log('🎯 selectedProductImage:', selectedProductImage);
-      setImagePreview(preview);
+    if (activeModelImageJobRef.current === jobId) {
+      setImagePreview(previewObjectUrl);
       setError('');
       setStep('confirm');
       console.log('📍 Step alterado para: confirm');
-    };
-    reader.readAsDataURL(file);
+    }
+
     void startModelImagePreparation(file, jobId);
   }
 };
@@ -2226,28 +2278,16 @@ const handleSubmit = async () => {
       detected_measurements: detectedMeasurements
     };
 
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('📤 PAYLOAD ENVIADO PARA EDGE FUNCTION');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🔑 publicId:', publicId);
-    console.log('📦 product:', product.name, '(id:', product.id + ')');
-    console.log('👤 user_measurements enviado:');
-    console.log('   • gender:', payload.user_measurements.gender);
-    console.log('   • height:', payload.user_measurements.height, 'cm');
-    console.log('   • weight:', payload.user_measurements.weight, 'kg');
-    console.log('   • body_type_index:', payload.user_measurements.body_type_index);
-    console.log('   • fit_preference_index:', payload.user_measurements.fit_preference_index);
-    console.log('   • recommended_size:', payload.user_measurements.recommended_size);
-    console.log('📷 model_image:', uploadedModelImageUrl
-      ? `upload direto concluído (${optimizedImage.blob.size} bytes)`
-      : `fallback via edge function (${optimizedImage.blob.size} bytes)`);
-    console.log('👕 garment_image:', payload.garment_image.substring(0, 80) + '...');
-    if (optimizedGarmentImageUrl !== (selectedProductImage || product.garment_image)) {
-      console.log('🪄 garment_image otimizada para download mais rápido no worker');
-    }
-    console.log('🎯 pose_landmarks:', detectedLandmarks ? `presente (${detectedLandmarks.length} landmarks)` : '❌ não detectado (edge function fará)');
-    console.log('📐 detected_measurements:', detectedMeasurements || '❌ não detectado');
-    console.log('═══════════════════════════════════════════════════════');
+    console.log('📤 Enviando try-on para backend:', {
+      productId: payload.product_id,
+      hasUploadedModelImage: Boolean(uploadedModelImageUrl),
+      optimizedModelBytes: optimizedImage.blob.size,
+      hasPoseLandmarks: Boolean(detectedLandmarks?.length),
+      hasDetectedMeasurements: Boolean(detectedMeasurements),
+      recommendedSize: payload.user_measurements.recommended_size,
+    });
+    logVerboseTryOn('🔑 publicId:', publicId);
+    logVerboseTryOn('👕 garment_image:', payload.garment_image);
 
     let response: Response;
     if (uploadedModelImageUrl) {
@@ -2286,55 +2326,44 @@ const handleSubmit = async () => {
 
     const result = await response.json();
 
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('📦 RESPOSTA DO BACKEND RECEBIDA');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('• FAL Request ID:', result.fal_request_id);
-    console.log('• Body Measurements presente?', !!result.body_measurements);
-    console.log('• Provider:', result.debug?.provider || 'N/A');
-    console.log('• Provider status:', result.debug?.provider_status || 'N/A');
-    console.log('• MediaPipe status:', result.debug?.mediapipe_status || 'N/A');
-    console.log('• MediaPipe source:', result.debug?.mediapipe_source || 'N/A');
+    console.log('📦 Resposta inicial do try-on:', {
+      requestId: result.fal_request_id,
+      hasBodyMeasurements: Boolean(result.body_measurements),
+      provider: result.debug?.provider || 'N/A',
+      providerStatus: result.debug?.provider_status || 'N/A',
+      mediaPipeStatus: result.debug?.mediapipe_status || 'N/A',
+      mediaPipeSource: result.debug?.mediapipe_source || 'N/A',
+    });
     logTryOnTimings('Resposta inicial do /tryon', result.timings || null);
 
-    // 🔹 MOSTRAR DEBUG INFO DA EDGE FUNCTION
     if (result.debug) {
-      console.log('');
-      console.log('🔍 DEBUG INFO DA EDGE FUNCTION:');
-      console.log('   • MediaPipe Status:', result.debug.mediapipe_status);
-      console.log('   • MediaPipe Retornou Algo?', result.debug.mediapipe_returned);
-      console.log('   • MediaPipe Source:', result.debug.mediapipe_source);
-      console.log('   • Altura Recebida no Backend:', result.debug.user_height_received);
-      console.log('   • Peso Recebido no Backend:', result.debug.user_weight_received);
-      console.log('   • Gênero Recebido no Backend:', result.debug.user_gender_received);
-      console.log('');
+      logVerboseTryOn('🔍 DEBUG INFO DA EDGE FUNCTION:', result.debug);
     }
 
     if (result.body_measurements) {
-      console.log('🔍 FRONTEND - body_measurements COMPLETO:');
-      console.log(JSON.stringify(result.body_measurements, null, 2));
-      console.log('');
+      logVerboseTryOn('🔍 FRONTEND - body_measurements COMPLETO:', result.body_measurements);
 
-      console.log('📊 MEDIAPIPE - DADOS RECEBIDOS:');
-      console.log('   Source:', result.body_measurements.source || 'N/A');
-      console.log('   Confiança:', result.body_measurements.confidence ?
-        (result.body_measurements.confidence * 100).toFixed(1) + '%' : 'N/A');
+      console.log('📊 MediaPipe recebido do backend:', {
+        source: result.body_measurements.source || 'N/A',
+        confidence: result.body_measurements.confidence
+          ? `${(result.body_measurements.confidence * 100).toFixed(1)}%`
+          : 'N/A',
+      });
 
       if (result.body_measurements.bodyHeight) {
-        console.log('');
-        console.log('📐 Medidas corporais detectadas:');
-        console.log('   • Altura:', result.body_measurements.bodyHeight + 'cm');
-        console.log('   • Ombros:', result.body_measurements.shoulderWidth + 'cm');
-        console.log('   • Peito:', result.body_measurements.chestCircumference + 'cm');
-        console.log('   • Cintura:', result.body_measurements.waistCircumference + 'cm');
-        console.log('   • Quadril:', result.body_measurements.hipCircumference + 'cm');
-        console.log('   • Braço:', result.body_measurements.armLength + 'cm');
-        console.log('   • Perna:', result.body_measurements.legLength + 'cm');
+        logVerboseTryOn('📐 Medidas corporais detectadas:', {
+          height: result.body_measurements.bodyHeight,
+          shoulder: result.body_measurements.shoulderWidth,
+          chest: result.body_measurements.chestCircumference,
+          waist: result.body_measurements.waistCircumference,
+          hip: result.body_measurements.hipCircumference,
+          arm: result.body_measurements.armLength,
+          leg: result.body_measurements.legLength,
+        });
       }
     } else {
       console.log('⚠️ Nenhum dado do MediaPipe retornado');
     }
-    console.log('═══════════════════════════════════════════════════════');
 
     if (result.success && result.fal_request_id) {
       setPredictionId(result.fal_request_id);
@@ -2412,7 +2441,7 @@ const handleSubmit = async () => {
     pollingDeadlineRef.current = Date.now() + TRYON_MAX_POLL_MS;
     console.log('🛰️ Polling configurado para prediction:', predictionId, '| timeout_ms:', TRYON_MAX_POLL_MS);
 
-    const scheduleNextPoll = (delay: number) => {
+      const scheduleNextPoll = (delay: number) => {
       console.log('⏳ Próximo polling em', delay, 'ms', '| tentativa atual:', pollCount);
       pollingTimeoutRef.current = window.setTimeout(runPoll, delay);
     };
@@ -2463,7 +2492,6 @@ const handleSubmit = async () => {
         }
 
         const statusData = await statusResponse.json();
-        console.log('📊 Status data:', statusData);
         console.log('📦 TRY-ON STATUS:', {
           predictionId,
           pollCount,
@@ -2471,6 +2499,7 @@ const handleSubmit = async () => {
           stage: statusData.stage || 'N/A',
           fal_status: statusData.fal_status || 'N/A',
         });
+        logVerboseTryOn('📊 Status data:', statusData);
         logTryOnTimings(`Polling #${pollCount}`, statusData.timings || null);
 
         if (statusData.status === 'completed' && statusData.output) {
@@ -2515,7 +2544,7 @@ const handleSubmit = async () => {
 
         const messageIndex = Math.min(pollCount - 1, messages.length - 1);
         setProcessingMessage(messages[messageIndex]);
-        scheduleNextPoll(getPollingDelayMs(pollCount));
+        scheduleNextPoll(getPollingDelayMs(pollCount, statusData.status, statusData.stage));
       } catch (error) {
         console.error('❌ Polling error:', error);
         clearPollingTimers();
@@ -2523,12 +2552,13 @@ const handleSubmit = async () => {
       }
     };
 
-    scheduleNextPoll(250);
+    scheduleNextPoll(150);
   };
 
   const resetWidget = () => {
     clearPollingTimers();
     invalidatePreparedModelAssets();
+    revokePreviewObjectUrl();
     setStep('info');
     setModelImage(null);
     setImagePreview(null);
@@ -2546,6 +2576,7 @@ const handleSubmit = async () => {
     return () => {
       clearPollingTimers();
       invalidatePreparedModelAssets();
+      revokePreviewObjectUrl();
     };
   }, []);
 
@@ -3517,6 +3548,7 @@ const handleSubmit = async () => {
               <button
                 onClick={() => {
                   invalidatePreparedModelAssets();
+                  revokePreviewObjectUrl();
                   setStep('photo');
                   setImagePreview(null);
                   setModelImage(null);
