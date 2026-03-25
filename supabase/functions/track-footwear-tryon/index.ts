@@ -169,12 +169,15 @@ Deno.serve(async (req: Request) => {
     } else {
       const { data: regularSubscription, error: subscriptionError } = await supabaseClient
         .from('subscriptions')
-        .select('images_limit, images_used, status, period_end')
+        .select('id, images_limit, images_used, status, period_end')
         .eq('user_id', widgetKeyData.user_id)
         .eq('status', 'active')
+        .order('period_end', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (subscriptionError) {
+        console.error('❌ Subscription query error:', subscriptionError);
         throw new Error('Error checking subscription status');
       }
 
@@ -430,15 +433,14 @@ Deno.serve(async (req: Request) => {
             })
             .eq('shop_domain', widgetKeyShopDomain)
         );
-      } else {
+      } else if (subscription?.id) {
         updatePromises.push(
           supabaseClient
             .from('subscriptions')
             .update({
               images_used: (subscription.images_used || 0) + 1,
             })
-            .eq('user_id', effectiveUserId)
-            .eq('status', 'active')
+            .eq('id', subscription.id)
         );
       }
 

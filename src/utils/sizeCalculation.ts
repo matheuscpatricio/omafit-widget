@@ -218,35 +218,76 @@ function normalizeWeights(weights: { [key: string]: number }): { [key: string]: 
   return normalized;
 }
 
+/** Medidas com 0 na tabela (ou inválidas) não entram no score; pesos são renormados só entre as ativas. */
+function shouldIgnoreGarmentMeasurement(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'number') return !Number.isFinite(value) || value === 0;
+  const n = Number(String(value).trim().replace(',', '.'));
+  return !Number.isFinite(n) || n === 0;
+}
+
+function coerceChartNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const n = Number(String(value).trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
 function getMeasurementValue(entry: SizeChartEntry, key: string, index: number): number {
+  let raw: unknown = 0;
+  let foundInMeasurementsObject = false;
+
   if (entry.measurements) {
     const measurementKey = `medida${index + 1}`;
     const value = entry.measurements[measurementKey];
-    if (value !== undefined && value !== null) return value;
-
-    const directKey = key.toLowerCase();
-    const directValue = entry.measurements[directKey];
-    if (directValue !== undefined && directValue !== null) return directValue;
-
-    if (key === 'Busto' || key === 'Peito') {
-      return entry.measurements.bust || entry.measurements.chest || entry.measurements.busto || entry.measurements.peito || 0;
-    }
-    if (key === 'Cintura' || key === 'Waist') {
-      return entry.measurements.waist || entry.measurements.cintura || 0;
-    }
-    if (key === 'Quadril' || key === 'Hip') {
-      return entry.measurements.hips || entry.measurements.hip || entry.measurements.quadril || 0;
-    }
-    if (key === 'Comprimento' || key === 'Length') {
-      return entry.measurements.comprimento || entry.measurements.length || 0;
+    if (value !== undefined && value !== null) {
+      raw = value;
+      foundInMeasurementsObject = true;
+    } else {
+      const directKey = key.toLowerCase();
+      const directValue = entry.measurements[directKey];
+      if (directValue !== undefined && directValue !== null) {
+        raw = directValue;
+        foundInMeasurementsObject = true;
+      } else if (key === 'Busto' || key === 'Peito') {
+        const v =
+          entry.measurements.bust ??
+          entry.measurements.chest ??
+          entry.measurements.busto ??
+          entry.measurements.peito;
+        if (v !== undefined && v !== null) {
+          raw = v;
+          foundInMeasurementsObject = true;
+        }
+      } else if (key === 'Cintura' || key === 'Waist') {
+        const v = entry.measurements.waist ?? entry.measurements.cintura;
+        if (v !== undefined && v !== null) {
+          raw = v;
+          foundInMeasurementsObject = true;
+        }
+      } else if (key === 'Quadril' || key === 'Hip') {
+        const v = entry.measurements.hips ?? entry.measurements.hip ?? entry.measurements.quadril;
+        if (v !== undefined && v !== null) {
+          raw = v;
+          foundInMeasurementsObject = true;
+        }
+      } else if (key === 'Comprimento' || key === 'Length') {
+        const v = entry.measurements.comprimento ?? entry.measurements.length;
+        if (v !== undefined && v !== null) {
+          raw = v;
+          foundInMeasurementsObject = true;
+        }
+      }
     }
   }
 
-  if ((key === 'Busto' || key === 'Peito') && entry.bust !== undefined) return entry.bust;
-  if (key === 'Cintura' && entry.waist !== undefined) return entry.waist;
-  if (key === 'Quadril' && entry.hips !== undefined) return entry.hips;
+  if (!foundInMeasurementsObject) {
+    if ((key === 'Busto' || key === 'Peito') && entry.bust !== undefined) raw = entry.bust;
+    else if (key === 'Cintura' && entry.waist !== undefined) raw = entry.waist;
+    else if (key === 'Quadril' && entry.hips !== undefined) raw = entry.hips;
+  }
 
-  return 0;
+  return coerceChartNumber(raw);
 }
 
 function calculateSizeScores(
@@ -254,7 +295,7 @@ function calculateSizeScores(
   fitMultiplier: number,
   sizeChart: SizeChartEntry[],
   measurementNames: string[],
-  normalizedWeights: { [key: string]: number },
+  rawWeights: { [key: string]: number },
   elasticityLevel: ElasticityLevel
 ): SizeScore[] {
   const scores: SizeScore[] = [];
@@ -262,14 +303,38 @@ function calculateSizeScores(
   const asymmetryFactor = ASYMMETRY_FACTORS[elasticityLevel];
 
   for (const entry of sizeChart) {
+    const active: Array<{ name: string; index: number; garmentValue: number }> = [];
+
+    measurementNames.forEach((name, index) => {
+      const garmentRaw = getMeasurementValue(entry, name, index);
+      if (shouldIgnoreGarmentMeasurement(garmentRaw)) return;
+      active.push({
+        name,
+        index,
+        garmentValue: typeof garmentRaw === 'number' ? garmentRaw : coerceChartNumber(garmentRaw),
+      });
+    });
+
+    if (active.length === 0) {
+      scores.push({
+        size: entry.size_name,
+        score: Number.POSITIVE_INFINITY,
+        details: {},
+      });
+      continue;
+    }
+
+    const partialWeights: { [key: string]: number } = {};
+    active.forEach(({ name }) => {
+      partialWeights[name] = rawWeights[name] ?? 1.0;
+    });
+    const rowWeights = normalizeWeights(partialWeights);
+
     let totalScore = 0;
     const details: SizeScore['details'] = {};
 
-    measurementNames.forEach((name, index) => {
-      const garmentValue = getMeasurementValue(entry, name, index);
+    active.forEach(({ name, garmentValue }) => {
       const bodyValue = bodyModel[name] * fitMultiplier;
-
-      if (garmentValue === 0) return;
 
       let difference = garmentValue - bodyValue;
 
@@ -279,7 +344,7 @@ function calculateSizeScores(
 
       const tolerance = tolerances[name] || 5.0;
       const normalizedError = Math.abs(difference) / tolerance;
-      const weight = normalizedWeights[name] || 0;
+      const weight = rowWeights[name] || 0;
       const penalty = Math.pow(normalizedError, 2) * weight;
 
       totalScore += penalty;
@@ -402,8 +467,6 @@ export function calculateIdealSize(
     }
   });
 
-  const normalizedWeights = normalizeWeights(weights);
-
   const bodyModel = buildBodyModel(
     height,
     weight,
@@ -417,7 +480,7 @@ export function calculateIdealSize(
     fitFactor,
     sizeChart,
     measurements,
-    normalizedWeights,
+    weights,
     elasticityLevel
   );
 

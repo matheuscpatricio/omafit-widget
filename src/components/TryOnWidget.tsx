@@ -1507,112 +1507,117 @@ export function TryOnWidget({
       const shoulder = parseMeasurementValue(sizeData.ombro || sizeData.shoulder);
       const length = parseMeasurementValue(sizeData.comprimento || sizeData.length);
 
-      // Construir diferenças ponderadas com FIT aplicado
-      const weightedDifferences: number[] = [];
-      const measurementsUsed: string[] = [];
+      // Medidas com 0 na tabela são ignoradas; pesos renormados só entre as ativas nesta linha.
+      type RowPart = { penaltySq: number; rawW: number; label: string };
+      const parts: RowPart[] = [];
+
+      const rawWFor = (key: string, fallback: number): number => {
+        if (!hasWeights) return 1.0;
+        const v = measurementWeights[key];
+        return v !== undefined && v !== null ? v : fallback;
+      };
 
       if (chest > 0) {
-        const weight = hasWeights ? (normalizedWeights['Peito'] || normalizedWeights['Busto'] || 1.0) : 1.0;
+        const rw = rawWFor('Peito', rawWFor('Busto', 1.0));
         const bodyMeasurement = bodyChest * fitMultiplier;
         const rawDiff = Math.abs(bodyMeasurement - chest);
         const tolerance = toleranceProfile.chest;
         let normalizedError = rawDiff / tolerance;
-
-        // Penalidade assimétrica: peça menor que corpo é PIOR
         const isGarmentTooSmall = bodyMeasurement > chest;
-        if (isGarmentTooSmall) {
-          normalizedError *= asymmetricPenalty;
-        }
-
-        const diff = Math.pow(normalizedError, 2) * weight;
-        weightedDifferences.push(diff);
-        const penaltyLabel = isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : '';
-        measurementsUsed.push(`peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
+        if (isGarmentTooSmall) normalizedError *= asymmetricPenalty;
+        parts.push({
+          penaltySq: Math.pow(normalizedError, 2),
+          rawW: rw,
+          label: `peito (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${chest}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm${isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : ''})`,
+        });
       }
 
       if (waist > 0) {
-        const weight = hasWeights ? (normalizedWeights['Cintura'] || 1.0) : 1.0;
+        const rw = rawWFor('Cintura', 1.0);
         const bodyMeasurement = bodyWaist * fitMultiplier;
         const rawDiff = Math.abs(bodyMeasurement - waist);
         const tolerance = toleranceProfile.waist;
         let normalizedError = rawDiff / tolerance;
-
-        // Penalidade assimétrica: peça menor que corpo é PIOR
         const isGarmentTooSmall = bodyMeasurement > waist;
-        if (isGarmentTooSmall) {
-          normalizedError *= asymmetricPenalty;
-        }
-
-        const diff = Math.pow(normalizedError, 2) * weight;
-        weightedDifferences.push(diff);
-        const penaltyLabel = isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : '';
-        measurementsUsed.push(`cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
+        if (isGarmentTooSmall) normalizedError *= asymmetricPenalty;
+        parts.push({
+          penaltySq: Math.pow(normalizedError, 2),
+          rawW: rw,
+          label: `cintura (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${waist}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm${isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : ''})`,
+        });
       }
 
       if (hip > 0) {
-        const weight = hasWeights ? (normalizedWeights['Quadril'] || 1.0) : 1.0;
+        const rw = rawWFor('Quadril', 1.0);
         const bodyMeasurement = bodyHip * fitMultiplier;
         const rawDiff = Math.abs(bodyMeasurement - hip);
         const tolerance = toleranceProfile.hip;
         let normalizedError = rawDiff / tolerance;
-
-        // Penalidade assimétrica: peça menor que corpo é PIOR
         const isGarmentTooSmall = bodyMeasurement > hip;
-        if (isGarmentTooSmall) {
-          normalizedError *= asymmetricPenalty;
-        }
-
-        const diff = Math.pow(normalizedError, 2) * weight;
-        weightedDifferences.push(diff);
-        const penaltyLabel = isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : '';
-        measurementsUsed.push(`quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
+        if (isGarmentTooSmall) normalizedError *= asymmetricPenalty;
+        parts.push({
+          penaltySq: Math.pow(normalizedError, 2),
+          rawW: rw,
+          label: `quadril (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${hip}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm${isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : ''})`,
+        });
       }
 
       if (shoulder > 0) {
-        const weight = hasWeights ? (normalizedWeights['Ombro'] || 1.0) : 1.0;
+        const rw = rawWFor('Ombro', 1.0);
         const bodyMeasurement = bodyShoulder * fitMultiplier;
         const rawDiff = Math.abs(bodyMeasurement - shoulder);
         const tolerance = toleranceProfile.shoulder;
         let normalizedError = rawDiff / tolerance;
-
-        // Penalidade assimétrica: peça menor que corpo é PIOR
         const isGarmentTooSmall = bodyMeasurement > shoulder;
-        if (isGarmentTooSmall) {
-          normalizedError *= asymmetricPenalty;
-        }
-
-        const diff = Math.pow(normalizedError, 2) * weight;
-        weightedDifferences.push(diff);
-        const penaltyLabel = isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : '';
-        measurementsUsed.push(`ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
+        if (isGarmentTooSmall) normalizedError *= asymmetricPenalty;
+        parts.push({
+          penaltySq: Math.pow(normalizedError, 2),
+          rawW: rw,
+          label: `ombro (corpo: ${bodyMeasurement.toFixed(1)}, peça: ${shoulder}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm${isGarmentTooSmall ? ` [APERTADO ×${asymmetricPenalty}]` : ''})`,
+        });
       }
 
       if (length > 0 && bodyLengthReference > 0) {
-        const weight = hasWeights
-          ? (normalizedWeights['Comprimento'] || normalizedWeights['Length'] || 0.9)
+        const rw = hasWeights
+          ? rawWFor('Comprimento', rawWFor('Length', 0.9))
           : 0.9;
         const bodyMeasurement = bodyLengthReference * fitMultiplier;
         const rawDiff = Math.abs(bodyMeasurement - length);
         const tolerance = toleranceProfile.length || (baseTolerance + 1.5);
         let normalizedError = rawDiff / tolerance;
-
-        // Em comprimento, penalidade assimétrica mais suave do que busto/cintura
         const isGarmentTooShort = bodyMeasurement > length;
         if (isGarmentTooShort) {
           normalizedError *= Math.max(1.0, asymmetricPenalty - 0.25);
         }
-
-        const diff = Math.pow(normalizedError, 2) * weight;
-        weightedDifferences.push(diff);
         const penaltyMultiplier = Math.max(1.0, asymmetricPenalty - 0.25);
-        const penaltyLabel = isGarmentTooShort ? ` [CURTO ×${penaltyMultiplier.toFixed(2)}]` : '';
-        measurementsUsed.push(`comprimento (${localCollectionType || 'upper'} corpo: ${bodyMeasurement.toFixed(1)}, peça: ${length}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm, peso: ${weight.toFixed(3)}${penaltyLabel})`);
+        parts.push({
+          penaltySq: Math.pow(normalizedError, 2),
+          rawW: rw,
+          label: `comprimento (${localCollectionType || 'upper'} corpo: ${bodyMeasurement.toFixed(1)}, peça: ${length}, erro: ${rawDiff.toFixed(1)}cm, tolerância: ${tolerance}cm${isGarmentTooShort ? ` [CURTO ×${penaltyMultiplier.toFixed(2)}]` : ''})`,
+        });
       }
 
-      if (weightedDifferences.length === 0) {
+      if (parts.length === 0) {
         console.warn(`   ${index + 1}. ⚠️ Tamanho ${sizeData.size}: sem medidas válidas`);
         return;
       }
+
+      const sumRawW = parts.reduce((s, p) => s + p.rawW, 0);
+      const weightedDifferences = parts.map((p) => {
+        const w =
+          hasWeights && sumRawW > 0
+            ? p.rawW / sumRawW
+            : 1 / parts.length;
+        return p.penaltySq * w;
+      });
+
+      const measurementsUsed = parts.map((p, i) => {
+        const w =
+          hasWeights && sumRawW > 0
+            ? parts[i].rawW / sumRawW
+            : 1 / parts.length;
+        return `${p.label}, peso: ${w.toFixed(3)}`;
+      });
 
       const score = Math.sqrt(weightedDifferences.reduce((sum, diff) => sum + diff, 0));
       sizeScores.push({ size: sizeData.size, score, details: measurementsUsed });
