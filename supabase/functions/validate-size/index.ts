@@ -251,6 +251,50 @@ function enforceSizeFirstMessage(
   };
 }
 
+function resolveCanonicalSizeLabel(normalizedWanted: string, availableSizes: string[]): string {
+  const wanted = normalizeSizeLabel(normalizedWanted);
+  if (!wanted) return normalizedWanted;
+  const match = (availableSizes || []).find((s) => normalizeSizeLabel(String(s)) === wanted);
+  return match ? String(match).trim() : wanted;
+}
+
+function buildOldStyleResponse(data: ValidateSizeRequest, normalizedSize: string): GPTResponse {
+  const language = data.language || 'pt';
+  const productName =
+    data.product_name ||
+    (language === 'es' ? 'esta prenda' : language === 'en' ? 'this item' : 'este produto');
+
+  const canonicalSize = resolveCanonicalSizeLabel(
+    normalizedSize,
+    (data.available_sizes || []).filter(Boolean).map(String)
+  );
+
+  if (language === 'es') {
+    return {
+      tamanho_final: canonicalSize,
+      explicacao: `¡Hola! Tu talla ideal para ${productName} es ${canonicalSize}, te quedará genial. ¿Lo añadimos al carrito?`,
+      coerencia: 'alta',
+      confianca: 0.98,
+    };
+  }
+
+  if (language === 'en') {
+    return {
+      tamanho_final: canonicalSize,
+      explicacao: `Hi! Your ideal size for ${productName} is ${canonicalSize} — it will look great on you. Want to add it to cart?`,
+      coerencia: 'high',
+      confianca: 0.98,
+    };
+  }
+
+  return {
+    tamanho_final: canonicalSize,
+    explicacao: `Olá! Seu tamanho ideal para o ${productName} é ${canonicalSize}, vai ficar ótimo nas suas proporções. Que tal adicionar ao carrinho?`,
+    coerencia: 'alta',
+    confianca: 0.98,
+  };
+}
+
 function getSystemPrompt(language: string): string {
   const prompts: Record<string, string> = {
     pt: `Você é um consultor de moda pessoal caloroso e envolvente, especializado em ajuste perfeito e análise de corpo.
@@ -961,7 +1005,17 @@ Deno.serve(async (req: Request) => {
 
     // Garantir que o tamanho final exista no catálogo real do produto selecionado.
     // Exemplo: se o algoritmo sugerir "GG", mas o produto só tem P..G, corrigimos para um tamanho existente.
-    const finalResponse = enforceSizeFirstMessage(enforceAvailableSizes(gptResponse, data), data);
+    const constrainedResponse = enforceAvailableSizes(gptResponse, data);
+
+    // Para a primeira mensagem/padrão (induzir carrinho), use um formato fixo (estilo antigo),
+    // evitando que o GPT liste catálogo e deixando a resposta sempre curta e objetiva.
+    const isDefaultFlow =
+      !data.intencao_usuario ||
+      data.intencao_usuario === 'induzir_adicionar_carrinho';
+
+    const finalResponse = isDefaultFlow
+      ? buildOldStyleResponse(data, constrainedResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M')
+      : enforceSizeFirstMessage(constrainedResponse, data);
 
     return new Response(
       JSON.stringify({
