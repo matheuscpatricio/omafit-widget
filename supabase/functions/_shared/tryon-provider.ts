@@ -132,7 +132,8 @@ export async function submitTryOnJob(params: SubmitTryOnParams): Promise<SubmitT
     input: {
       model_image: params.modelImageUrl,
       garment_image: params.garmentImageUrl,
-      category: "auto",
+      // Use the category resolved by the edge function (tops/bottoms/one-pieces).
+      category: params.category,
       mode: "performance",
       garment_photo_type: "auto",
       moderation_level: "none",

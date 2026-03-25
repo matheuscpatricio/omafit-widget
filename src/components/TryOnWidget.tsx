@@ -2283,6 +2283,9 @@ const handleSubmit = async () => {
     const uploadedModelImageUrl = await modelImageUploadPromise;
     const payload = {
       shop_domain: effectiveShopDomain,
+      // Hint explícito para o backend escolher o modelo correto do try-on.
+      // upper/lower/full (do nosso UI) deve virar tops/bottoms/one-pieces no backend.
+      collection_type: localCollectionType || 'upper',
       model_image: uploadedModelImageUrl || '',
       garment_image: optimizedGarmentImageUrl,
       product_name: product.name,
@@ -2326,6 +2329,7 @@ const handleSubmit = async () => {
       const formData = new FormData();
       formData.append('model_image_file', optimizedImage.blob, modelImage.name || 'tryon-model.jpg');
       formData.append('shop_domain', payload.shop_domain);
+      formData.append('collection_type', String(payload.collection_type || 'upper'));
       formData.append('garment_image', payload.garment_image);
       formData.append('product_name', payload.product_name);
       formData.append('product_id', payload.product_id);

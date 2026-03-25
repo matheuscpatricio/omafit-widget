@@ -6,6 +6,7 @@ import {
   resolveTryOnProvider,
   submitTryOnJob,
 } from '../_shared/tryon-provider.ts';
+import type { TryOnCategory } from '../_shared/tryon-provider.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,6 +141,8 @@ Deno.serve(async (req: Request) => {
     let shop_name = '';
     let shop_domain = '';
     let collection_handle = '';
+    // UI hint from the widget: upper/lower/full -> backend maps to tops/bottoms/one-pieces.
+    let collection_type = '';
     let modelImageFile: Blob | null = null;
 
     if (contentType.includes('multipart/form-data')) {
@@ -158,6 +161,7 @@ Deno.serve(async (req: Request) => {
       shop_name = getStringFormValue(formData.get('shop_name'));
       shop_domain = getStringFormValue(formData.get('shop_domain'));
       collection_handle = getStringFormValue(formData.get('collection_handle'));
+      collection_type = getStringFormValue(formData.get('collection_type'));
     } else {
       const payload = await req.json();
       model_image = payload.model_image || '';
@@ -171,6 +175,7 @@ Deno.serve(async (req: Request) => {
       shop_name = payload.shop_name || '';
       shop_domain = payload.shop_domain || '';
       collection_handle = payload.collection_handle || '';
+      collection_type = payload.collection_type || '';
     }
 
     console.log('📦 DADOS RECEBIDOS DO WIDGET:');
@@ -364,7 +369,17 @@ Deno.serve(async (req: Request) => {
 
     const tryOnProvider = resolveTryOnProvider();
     console.log('🔧 Try-on provider:', tryOnProvider, '(TRYON_PROVIDER=' + (Deno.env.get("TRYON_PROVIDER") || "unset") + ', SELF_HOSTED_TRYON_URL=' + (Deno.env.get("SELF_HOSTED_TRYON_URL") ? "set" : "unset") + ')');
-    const tryOnCategory = inferTryOnCategory(collection_handle);
+    const mapCollectionTypeToTryOnCategory = (typeHint: string): TryOnCategory | null => {
+      const normalized = (typeHint || '').toLowerCase().trim();
+      if (normalized === 'upper') return 'tops';
+      if (normalized === 'lower') return 'bottoms';
+      if (normalized === 'full') return 'one-pieces';
+      return null;
+    };
+
+    const tryOnCategoryOverride = mapCollectionTypeToTryOnCategory(collection_type);
+    const tryOnCategory = tryOnCategoryOverride ?? inferTryOnCategory(collection_handle);
+    console.log('🎯 Try-on category:', { collection_type, inferred_from_collection_handle: collection_handle, tryOnCategory });
     let falApiKey: string | null = null;
 
     if (tryOnProvider === 'fal') {
