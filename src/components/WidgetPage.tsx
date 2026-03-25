@@ -49,6 +49,7 @@ export function WidgetPage() {
   const [shopDomain, setShopDomain] = useState<string>('');
   const [collectionId, setCollectionId] = useState<string>('');
   const [collectionHandle, setCollectionHandle] = useState<string>('');
+  const [collectionHandlesList, setCollectionHandlesList] = useState<string[]>([]);
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [collectionType, setCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(undefined);
@@ -164,6 +165,7 @@ export function WidgetPage() {
       handlesFromUrl,
       collectionHandleParam || undefined
     );
+    setCollectionHandlesList(handlesFromUrl);
     if (resolvedCollectionHandle) {
       console.log('✅ Collection Handle resolvido (URL + lista):', resolvedCollectionHandle);
       setCollectionHandle(resolvedCollectionHandle);
@@ -274,10 +276,9 @@ export function WidgetPage() {
       if (event.data.type === 'omafit-collection-handle') {
         console.log('📦 Collection Handle recebido via postMessage:', event.data.collectionHandle);
         const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
-        const resolved = pickPreferredCollectionHandle(
-          list,
-          event.data.collectionHandle ? String(event.data.collectionHandle) : undefined
-        );
+        const ch = event.data.collectionHandle ? String(event.data.collectionHandle) : '';
+        setCollectionHandlesList([...new Set([...list, ch].filter(Boolean))]);
+        const resolved = pickPreferredCollectionHandle(list, ch || undefined);
         if (resolved) {
           setCollectionHandle(resolved);
         } else if (event.data.collectionHandle) {
@@ -293,12 +294,12 @@ export function WidgetPage() {
         }
         if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
           const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
-          const resolved = pickPreferredCollectionHandle(
-            list,
+          const ch =
             event.data.collectionHandle !== undefined && event.data.collectionHandle !== null
               ? String(event.data.collectionHandle)
-              : undefined
-          );
+              : '';
+          setCollectionHandlesList([...new Set([...list, ch].filter(Boolean))]);
+          const resolved = pickPreferredCollectionHandle(list, ch || undefined);
           console.log(
             '📦 Collection Handle do contexto (resolvido):',
             resolved || event.data.collectionHandle || 'vazio (tabela global)'
@@ -365,12 +366,12 @@ export function WidgetPage() {
         }
         if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
           const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
-          const resolved = pickPreferredCollectionHandle(
-            list,
+          const ch =
             event.data.collectionHandle !== undefined && event.data.collectionHandle !== null
               ? String(event.data.collectionHandle)
-              : undefined
-          );
+              : '';
+          setCollectionHandlesList([...new Set([...list, ch].filter(Boolean))]);
+          const resolved = pickPreferredCollectionHandle(list, ch || undefined);
           console.log(
             '📦 Collection Handle do config (resolvido):',
             resolved || event.data.collectionHandle || 'vazio (tabela global)'
@@ -464,6 +465,7 @@ export function WidgetPage() {
           shopDomain={shopDomain}
           collectionId={collectionId}
           collectionHandle={collectionHandle}
+          collectionHandles={collectionHandlesList}
           gender={gender}
           defaultGender={defaultGender}
           collectionType={collectionType}

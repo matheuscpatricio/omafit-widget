@@ -8,6 +8,10 @@ import {
 } from 'lucide-react';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { supabase } from '../lib/supabase';
+import {
+  resolveCollectionHandleWithSavedSizeChart,
+  sortHandlesBySpecificityDesc,
+} from '../utils/pickPreferredCollectionHandle';
 
 interface ShoeARWidgetProps {
   productImage?: string;
@@ -25,6 +29,7 @@ interface ShoeARWidgetProps {
   shopDomain?: string;
   collectionId?: string;
   collectionHandle?: string;
+  collectionHandles?: string[];
   defaultGender?: string;
   productCatalog?: ProductCatalog;
   selectedVariantId?: string;
@@ -633,6 +638,7 @@ export function ShoeARWidget({
   shoeModelIosUrl,
   shopDomain = '',
   collectionHandle = '',
+  collectionHandles = [],
   productCatalog = { sizes: [], colors: [], variants: [] },
   selectedVariantId = '',
   selectedVariantOptions = {},
@@ -720,7 +726,32 @@ export function ShoeARWidget({
         console.log('   - Shop Domain:', effectiveShopDomain);
         console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
 
-        const normalizedCollectionHandle = (collectionHandle || '').trim();
+        const candidateHandles = Array.from(
+          new Set(
+            [...(collectionHandles || []), collectionHandle]
+              .map((h) => String(h || '').trim())
+              .filter(Boolean)
+          )
+        );
+        let handleForChart = (collectionHandle || '').trim();
+        if (candidateHandles.length > 0) {
+          const ordered = sortHandlesBySpecificityDesc(candidateHandles);
+          const resolvedWithChart = await resolveCollectionHandleWithSavedSizeChart(
+            supabase,
+            effectiveShopDomain,
+            ordered,
+            ''
+          );
+          if (resolvedWithChart) {
+            handleForChart = resolvedWithChart;
+            console.log(
+              '🧭 calçados: collection_handle (mais específico com tabela salva):',
+              resolvedWithChart
+            );
+          }
+        }
+
+        const normalizedCollectionHandle = handleForChart;
 
         const { data: sizeChartRecord, error: chartError } = await supabase
           .from('size_charts')
@@ -797,7 +828,7 @@ export function ShoeARWidget({
     };
 
     loadSizeChart();
-  }, [shopDomain, collectionHandle]);
+  }, [shopDomain, collectionHandle, collectionHandles?.join(',')]);
 
   const surfaceTint = useMemo(() => hexToRgba(primaryColor, 0.1), [primaryColor]);
   const borderTint = useMemo(() => hexToRgba(primaryColor, 0.2), [primaryColor]);

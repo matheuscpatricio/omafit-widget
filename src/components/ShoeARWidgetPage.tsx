@@ -64,6 +64,7 @@ export function ShoeARWidgetPage() {
   const [shopDomain, setShopDomain] = useState<string>('');
   const [collectionId, setCollectionId] = useState<string>('');
   const [collectionHandle, setCollectionHandle] = useState<string>('');
+  const [collectionHandlesList, setCollectionHandlesList] = useState<string[]>([]);
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
   const [isFootwearCollection, setIsFootwearCollection] = useState<boolean>(false);
   const [collectionTypeResolved, setCollectionTypeResolved] = useState<boolean>(false);
@@ -113,6 +114,7 @@ export function ShoeARWidgetPage() {
           .map((h) => h.trim())
           .filter(Boolean)
       : [];
+    setCollectionHandlesList(handlesFromUrl);
     const resolvedHandle = pickPreferredCollectionHandle(handlesFromUrl, collectionHandleParam || undefined);
     if (resolvedHandle) setCollectionHandle(resolvedHandle);
     else if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
@@ -271,6 +273,7 @@ export function ShoeARWidgetPage() {
             shopDomain={shopDomain}
             collectionId={collectionId}
             collectionHandle={collectionHandle}
+            collectionHandles={collectionHandlesList}
             defaultGender={defaultGender}
             productCatalog={productCatalog}
             selectedVariantId={selectedVariantId}

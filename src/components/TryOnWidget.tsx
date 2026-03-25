@@ -3,6 +3,10 @@ import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, Shoppin
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
+import {
+  resolveCollectionHandleWithSavedSizeChart,
+  sortHandlesBySpecificityDesc,
+} from '../utils/pickPreferredCollectionHandle';
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 
@@ -19,6 +23,8 @@ interface TryOnWidgetProps {
   shopDomain?: string;
   collectionId?: string;
   collectionHandle?: string;
+  /** Handles de todas as coleções do produto (Shopify); usado para escolher o mais específico que tenha size chart no Supabase */
+  collectionHandles?: string[];
   gender?: string;
   defaultGender?: string;
   collectionType?: 'upper' | 'lower' | 'full';
@@ -304,6 +310,7 @@ export function TryOnWidget({
   shopDomain = '',
   collectionId = '',
   collectionHandle = '',
+  collectionHandles = [],
   gender = 'unisex',
   defaultGender = 'unisex',
   collectionType,
@@ -330,6 +337,10 @@ export function TryOnWidget({
   console.log('   - 🧵 collectionElasticity:', collectionElasticity || 'não especificado');
   console.log('   - 📦 collectionId (UUID):', collectionId || 'não fornecido');
   console.log('   - 📦 collectionHandle (Shopify):', collectionHandle || 'não fornecido (tabela global)');
+  console.log(
+    '   - 📦 collectionHandles (lista Shopify):',
+    collectionHandles?.length ? collectionHandles.join(', ') : 'não fornecido'
+  );
   console.log('   - 👤 gender (deprecated):', gender);
   console.log('   - 👤 defaultGender (sugestão inicial):', defaultGender);
   console.log('   - 🎁 recommendedProductName:', recommendedProductName || 'não fornecido');
@@ -1792,16 +1803,43 @@ export function TryOnWidget({
         return;
       }
 
+      // SEMPRE usar o gender escolhido pelo usuário no widget
+      const searchGender = sizeData.gender;
+
+      const candidateHandles = Array.from(
+        new Set(
+          [...(collectionHandles || []), collectionHandle]
+            .map((h) => String(h || '').trim())
+            .filter(Boolean)
+        )
+      );
+      let handleForChart = (collectionHandle || '').trim();
+      if (candidateHandles.length > 0 && effectiveShopDomain) {
+        const ordered = sortHandlesBySpecificityDesc(candidateHandles);
+        const resolvedWithChart = await resolveCollectionHandleWithSavedSizeChart(
+          supabase,
+          effectiveShopDomain,
+          ordered,
+          searchGender
+        );
+        if (resolvedWithChart) {
+          handleForChart = resolvedWithChart;
+          console.log(
+            '🧭 collection_handle usado (mais específico entre os que têm size chart salva):',
+            resolvedWithChart
+          );
+        }
+      }
+
       console.log('📊 Parâmetros de busca no TryOnWidget:');
       console.log('   - Gender escolhido pelo usuário (sizeData):', sizeData.gender);
       console.log('   - Default Gender (props, não usado na busca):', defaultGender);
       console.log('   - Shop Domain:', effectiveShopDomain);
       console.log('   - Collection ID (UUID interno):', collectionId || 'null');
-      console.log('   - Collection Handle (Shopify):', collectionHandle || 'null (tabela global)');
+      console.log('   - Collection Handle (prop):', collectionHandle || 'null (tabela global)');
+      console.log('   - Handles candidatos (Shopify):', candidateHandles.length ? candidateHandles.join(', ') : '(nenhum)');
+      console.log('   - Collection handle efetivo (busca):', handleForChart || 'null (tabela global / collection_id)');
       console.log('   - Product ID:', productId);
-
-      // SEMPRE usar o gender escolhido pelo usuário no widget
-      const searchGender = sizeData.gender;
       console.log('   - 🎯 Gender FINAL para busca (sempre do usuário):', searchGender);
 
       try {
@@ -1812,16 +1850,16 @@ export function TryOnWidget({
           .select('id, collection_id, collection_handle, gender, shop_domain');
 
         // Prioridade 1: collection_handle (vindo do Shopify)
-        if (collectionHandle && collectionHandle.trim() !== '') {
+        if (handleForChart) {
           console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
           console.log('   SELECT * FROM size_charts');
           console.log('   WHERE shop_domain =', effectiveShopDomain);
-          console.log('   AND collection_handle =', collectionHandle);
+          console.log('   AND collection_handle =', handleForChart);
           console.log('   AND gender =', searchGender);
 
           sizeChartQuery = sizeChartQuery
             .eq('shop_domain', effectiveShopDomain)
-            .eq('collection_handle', collectionHandle)
+            .eq('collection_handle', handleForChart)
             .eq('gender', searchGender);
         }
         // Prioridade 2: collection_id (UUID interno)
@@ -1957,15 +1995,15 @@ export function TryOnWidget({
             .select('id, collection_id, collection_handle, gender, shop_domain');
 
           // Prioridade 1: collection_handle (vindo do Shopify)
-          if (collectionHandle && collectionHandle.trim() !== '') {
+          if (handleForChart) {
             console.log('   SELECT * FROM size_charts');
             console.log('   WHERE shop_domain =', effectiveShopDomain);
-            console.log('   AND collection_handle =', collectionHandle);
+            console.log('   AND collection_handle =', handleForChart);
             console.log('   AND gender = unisex');
 
             fallbackQuery = fallbackQuery
               .eq('shop_domain', effectiveShopDomain)
-              .eq('collection_handle', collectionHandle)
+              .eq('collection_handle', handleForChart)
               .eq('gender', 'unisex');
           }
           // Prioridade 2: collection_id (UUID interno)
@@ -2040,7 +2078,7 @@ export function TryOnWidget({
         } else {
           console.log('❌ PROBLEMA: Nenhum chart encontrado!');
           console.log('   - Shop Domain:', effectiveShopDomain);
-          console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
+          console.log('   - Collection Handle (Shopify):', handleForChart || collectionHandle || 'null');
           console.log('   - Collection ID (UUID):', collectionId || 'null');
           console.log('   - Gender:', searchGender);
           console.log('   - Tentou unisex: Sim');
@@ -2054,7 +2092,13 @@ export function TryOnWidget({
     };
 
     loadSizeChart();
-  }, [sizeData?.gender, effectiveShopDomain, collectionId, collectionHandle]);
+  }, [
+    sizeData?.gender,
+    effectiveShopDomain,
+    collectionId,
+    collectionHandle,
+    collectionHandles?.join(','),
+  ]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
