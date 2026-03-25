@@ -2998,7 +2998,10 @@ const handleSubmit = async () => {
   // Verificar se o produto foi carregado
   if (!product) {
     return (
-      <div className="w-full h-full bg-white flex items-center justify-center rounded-2xl">
+      <div
+        className="w-full h-full bg-white flex items-center justify-center rounded-2xl"
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-4">
             <span
@@ -3037,7 +3040,7 @@ const handleSubmit = async () => {
   console.log('🎨 Estilos aplicados no widget:', { fontFamily });
 
   return (
-    <>
+    <div className="omafit-tryon-root w-full min-h-0" onContextMenu={(e) => e.preventDefault()}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
 
@@ -3759,6 +3762,6 @@ const handleSubmit = async () => {
       </div>
     </div>
       )}
-    </>
+    </div>
   );
 }

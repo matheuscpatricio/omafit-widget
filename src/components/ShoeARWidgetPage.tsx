@@ -250,6 +250,7 @@ export function ShoeARWidgetPage() {
     <div
       className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4"
       style={{ fontFamily: fontFamily || 'inherit' }}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div className="w-full sm:max-w-6xl max-h-[92vh] overflow-auto">
         {!collectionTypeResolved ? (

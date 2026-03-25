@@ -435,7 +435,10 @@ export function WidgetPage() {
 
   if (!productImage) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
+      <div
+        className="min-h-screen bg-transparent flex items-center justify-center p-4"
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-lg">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707] mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando produto...</p>
@@ -450,7 +453,11 @@ export function WidgetPage() {
   console.log('   - recommendedProductUrl:', recommendedProductUrl || 'VAZIO');
 
   return (
-    <div className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4" style={{ fontFamily: fontFamily || 'inherit' }}>
+    <div
+      className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4"
+      style={{ fontFamily: fontFamily || 'inherit' }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div className="w-full sm:max-w-2xl max-h-[85vh] overflow-auto">
         <TryOnWidget
           garmentImage={productImage}

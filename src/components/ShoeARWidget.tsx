@@ -1390,7 +1390,10 @@ export function ShoeARWidget({
   };
 
   return (
-    <div className="omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out">
+    <div
+      className="omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
 
