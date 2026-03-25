@@ -2636,8 +2636,15 @@ const handleSubmit = async () => {
     setImagePreview(null);
     setSizeData(null);
     setCalculatedSize(null);
+    setRecommendedSize(null);
+    setFinalBodyMeasurements(null);
     setResult(null);
     setError('');
+    setLoading(false);
+    setGptLoading(false);
+    setIsAddingToCart(false);
+    setAddToCartFeedback('');
+    setProcessingMessage(t('generating'));
     setPredictionId(null);
     setCurrentImageIndex(0);
     setChatMessages([]);
