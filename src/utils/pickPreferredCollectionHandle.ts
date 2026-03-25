@@ -1,0 +1,69 @@
+/**
+ * Escolhe o handle de coleção mais específico para tabela de medidas:
+ * - remove prefixos quando existe refinamento (ex.: "cuecas" se existe "cuecas-slips");
+ * - entre handles restantes, prioriza mais segmentos (-/_), depois comprimento.
+ */
+export function pickPreferredCollectionHandle(
+  handles: string[],
+  fallbackHandle?: string | null
+): string {
+  const all = (handles || [])
+    .map((h) => String(h || '').trim())
+    .filter(Boolean)
+    .concat(fallbackHandle ? [String(fallbackHandle).trim()].filter(Boolean) : []);
+
+  if (all.length === 0) return '';
+
+  const unique: string[] = [];
+  for (const h of all) {
+    if (!unique.includes(h)) unique.push(h);
+  }
+
+  const lower = (s: string) => s.toLowerCase();
+
+  const isRefinementOf = (maybeRefined: string, base: string): boolean => {
+    const x = lower(maybeRefined);
+    const b = lower(base);
+    if (!b.length || b === x) return false;
+    return x.startsWith(b + '-') || x.startsWith(b + '_');
+  };
+
+  const filtered = unique.filter((h) => {
+    for (const other of unique) {
+      if (other === h) continue;
+      if (isRefinementOf(other, h)) return false;
+    }
+    return true;
+  });
+
+  const candidates = filtered.length > 0 ? filtered : unique;
+
+  const scored = candidates.map((h, idx) => {
+    const normalized = lower(h);
+    const tokenCount = normalized.split(/[-_]+/).filter(Boolean).length;
+    const isComposed = tokenCount > 1 ? 1 : 0;
+    return { handle: h, idx, scoreA: isComposed, scoreB: tokenCount, scoreC: normalized.length };
+  });
+
+  scored.sort((a, b) => {
+    if (b.scoreA !== a.scoreA) return b.scoreA - a.scoreA;
+    if (b.scoreB !== a.scoreB) return b.scoreB - a.scoreB;
+    if (b.scoreC !== a.scoreC) return b.scoreC - a.scoreC;
+    return a.idx - b.idx;
+  });
+
+  return scored[0]?.handle || String(fallbackHandle || '').trim() || '';
+}
+
+export function parseCollectionHandlesFromMessage(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v || '').trim()).filter(Boolean);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}

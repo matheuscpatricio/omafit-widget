@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ShoeARWidget } from './ShoeARWidget';
+import {
+  parseCollectionHandlesFromMessage,
+  pickPreferredCollectionHandle,
+} from '../utils/pickPreferredCollectionHandle';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -82,6 +86,7 @@ export function ShoeARWidgetPage() {
     const shopDomainParam = params.get('shopDomain');
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
+    const collectionHandlesCsv = params.get('collectionHandles');
     const defaultGenderParam = params.get('defaultGender');
     const collectionTypeParam = params.get('collectionType');
     const shopNameParam = params.get('shopName') || params.get('shop_name');
@@ -102,7 +107,15 @@ export function ShoeARWidgetPage() {
     if (publicIdParam) setPublicId(decodeURIComponent(publicIdParam));
     if (shopDomainParam) setShopDomain(decodeURIComponent(shopDomainParam));
     if (collectionIdParam) setCollectionId(collectionIdParam);
-    if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
+    const handlesFromUrl = collectionHandlesCsv
+      ? collectionHandlesCsv
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
+      : [];
+    const resolvedHandle = pickPreferredCollectionHandle(handlesFromUrl, collectionHandleParam || undefined);
+    if (resolvedHandle) setCollectionHandle(resolvedHandle);
+    else if (collectionHandleParam) setCollectionHandle(collectionHandleParam);
     if (defaultGenderParam !== null) setDefaultGender(normalizeDefaultGender(defaultGenderParam));
     if (collectionTypeParam !== null) {
       setCollectionTypeResolved(true);
@@ -174,7 +187,16 @@ export function ShoeARWidgetPage() {
         if (event.data.productId) setProductId(event.data.productId);
         if (event.data.shopDomain) setShopDomain(event.data.shopDomain);
         if (event.data.collectionId) setCollectionId(event.data.collectionId);
-        if (event.data.collectionHandle !== undefined) setCollectionHandle(event.data.collectionHandle || '');
+        if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
+          const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+          const resolved = pickPreferredCollectionHandle(
+            list,
+            event.data.collectionHandle !== undefined && event.data.collectionHandle !== null
+              ? String(event.data.collectionHandle)
+              : undefined
+          );
+          setCollectionHandle(resolved || '');
+        }
         if (event.data.defaultGender !== undefined) {
           setDefaultGender(normalizeDefaultGender(event.data.defaultGender));
         }

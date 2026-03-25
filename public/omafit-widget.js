@@ -1234,7 +1234,73 @@
       '';
     config.storeName = resolvedStoreName;
     const rootEl = document.getElementById('omafit-widget-root');
-    let collectionHandle = (rootEl && rootEl.dataset && rootEl.dataset.collectionHandle) ? rootEl.dataset.collectionHandle : '';
+    const currentCollectionHandle = (rootEl && rootEl.dataset && rootEl.dataset.collectionHandle) ? rootEl.dataset.collectionHandle : '';
+    const productCollectionHandles = (rootEl && rootEl.dataset && rootEl.dataset.collectionHandles)
+      ? rootEl.dataset.collectionHandles.split(',').map(function (item) { return item.trim(); }).filter(Boolean)
+      : [];
+    const pickPreferredCollectionHandle = function (handles, fallbackHandle) {
+      const all = []
+        .concat(Array.isArray(handles) ? handles : [])
+        .concat(fallbackHandle ? [fallbackHandle] : [])
+        .map(function (h) { return String(h || '').trim(); })
+        .filter(Boolean);
+      if (all.length === 0) return '';
+
+      const unique = [];
+      all.forEach(function (h) {
+        if (unique.indexOf(h) === -1) unique.push(h);
+      });
+
+      const lower = function (s) {
+        return String(s || '').toLowerCase();
+      };
+
+      const isRefinementOf = function (maybeRefined, base) {
+        const x = lower(maybeRefined);
+        const b = lower(base);
+        if (!b.length || b === x) return false;
+        return x.indexOf(b + '-') === 0 || x.indexOf(b + '_') === 0;
+      };
+
+      const filtered = unique.filter(function (h) {
+        for (var i = 0; i < unique.length; i++) {
+          var other = unique[i];
+          if (other === h) continue;
+          if (isRefinementOf(other, h)) return false;
+        }
+        return true;
+      });
+
+      const candidates = filtered.length > 0 ? filtered : unique;
+
+      const scored = candidates.map(function (h, idx) {
+        const normalized = lower(h);
+        const tokenCount = normalized.split(/[-_]+/).filter(Boolean).length;
+        const isComposed = tokenCount > 1 ? 1 : 0;
+        return {
+          handle: h,
+          idx: idx,
+          scoreA: isComposed,
+          scoreB: tokenCount,
+          scoreC: normalized.length
+        };
+      });
+
+      scored.sort(function (a, b) {
+        if (b.scoreA !== a.scoreA) return b.scoreA - a.scoreA;
+        if (b.scoreB !== a.scoreB) return b.scoreB - a.scoreB;
+        if (b.scoreC !== a.scoreC) return b.scoreC - a.scoreC;
+        return a.idx - b.idx;
+      });
+
+      return scored[0].handle || fallbackHandle || '';
+    };
+    let collectionHandle = pickPreferredCollectionHandle(productCollectionHandles, currentCollectionHandle);
+    console.log('🧭 CollectionHandle resolvido para size_chart:', {
+      currentCollectionHandle: currentCollectionHandle || '',
+      productCollectionHandles: productCollectionHandles,
+      selected: collectionHandle || ''
+    });
     const defaultGender = (rootEl && rootEl.dataset && rootEl.dataset.defaultGender) ? rootEl.dataset.defaultGender : '';
     const collectionType = await fetchCollectionType(shopDomain, collectionHandle);
     const collectionElasticity = await fetchCollectionElasticity(shopDomain, collectionHandle);
@@ -1281,6 +1347,9 @@
       '&shopName=' + encodeURIComponent(resolvedStoreName) +
       '&shop_name=' + encodeURIComponent(resolvedStoreName) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
+      (productCollectionHandles.length
+        ? '&collectionHandles=' + encodeURIComponent(productCollectionHandles.join(','))
+        : '') +
       (defaultGender ? '&defaultGender=' + encodeURIComponent(defaultGender) : '') +
       (collectionType ? '&collectionType=' + encodeURIComponent(collectionType) : '') +
       (collectionElasticity ? '&collectionElasticity=' + encodeURIComponent(collectionElasticity) : '') +
@@ -1367,6 +1436,7 @@
         iframe.contentWindow.postMessage({
           type: 'omafit-context',
           collectionHandle: typeof collectionHandle === 'string' ? collectionHandle : '',
+          collectionHandles: productCollectionHandles,
           defaultGender: typeof defaultGender === 'string' ? defaultGender : '',
           collectionType: typeof collectionType === 'string' ? collectionType : '',
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
@@ -1451,6 +1521,7 @@
               adminLocale: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
+              collectionHandles: productCollectionHandles,
               defaultGender: defaultGender || '',
               collectionType: collectionType || '',
               collectionElasticity: collectionElasticity || '',
@@ -1489,6 +1560,7 @@
               adminLocale: storeLanguage,
               shopDomain: shopDomain,
               collectionHandle: collectionHandle || '',
+              collectionHandles: productCollectionHandles,
               defaultGender: defaultGender || '',
               collectionType: collectionType || '',
               collectionElasticity: collectionElasticity || '',
@@ -1522,6 +1594,7 @@
             adminLocale: storeLanguage,
             shopDomain: shopDomain,
             collectionHandle: collectionHandle || '',
+            collectionHandles: productCollectionHandles,
             defaultGender: defaultGender || '',
             collectionType: collectionType || '',
             collectionElasticity: collectionElasticity || '',

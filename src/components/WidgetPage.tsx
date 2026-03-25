@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
+import {
+  parseCollectionHandlesFromMessage,
+  pickPreferredCollectionHandle,
+} from '../utils/pickPreferredCollectionHandle';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -73,6 +77,7 @@ export function WidgetPage() {
     const logoParam = params.get('storeLogo');
     const collectionIdParam = params.get('collectionId');
     const collectionHandleParam = params.get('collectionHandle');
+    const collectionHandlesCsv = params.get('collectionHandles');
     const genderParam = params.get('gender');
     const defaultGenderParam = params.get('defaultGender');
     const collectionTypeParam = params.get('collectionType');
@@ -94,6 +99,10 @@ export function WidgetPage() {
     console.log('   - publicId:', pubId);
     console.log('   - collectionId:', collectionIdParam || 'não fornecido');
     console.log('   - collectionHandle:', collectionHandleParam || 'não fornecido (tabela global)');
+    console.log(
+      '   - collectionHandles (lista):',
+      collectionHandlesCsv || 'não fornecido'
+    );
     console.log('   - gender:', genderParam || 'não fornecido');
     console.log('   - defaultGender:', defaultGenderParam || 'não fornecido');
     console.log('   - 👕 collectionType:', collectionTypeParam || 'não fornecido');
@@ -145,8 +154,21 @@ export function WidgetPage() {
       setCollectionId(collectionIdParam);
     }
 
-    if (collectionHandleParam) {
-      console.log('✅ Collection Handle definido:', collectionHandleParam);
+    const handlesFromUrl = collectionHandlesCsv
+      ? collectionHandlesCsv
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
+      : [];
+    const resolvedCollectionHandle = pickPreferredCollectionHandle(
+      handlesFromUrl,
+      collectionHandleParam || undefined
+    );
+    if (resolvedCollectionHandle) {
+      console.log('✅ Collection Handle resolvido (URL + lista):', resolvedCollectionHandle);
+      setCollectionHandle(resolvedCollectionHandle);
+    } else if (collectionHandleParam) {
+      console.log('✅ Collection Handle definido (só URL):', collectionHandleParam);
       setCollectionHandle(collectionHandleParam);
     }
 
@@ -251,8 +273,15 @@ export function WidgetPage() {
 
       if (event.data.type === 'omafit-collection-handle') {
         console.log('📦 Collection Handle recebido via postMessage:', event.data.collectionHandle);
-        if (event.data.collectionHandle) {
-          setCollectionHandle(event.data.collectionHandle);
+        const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+        const resolved = pickPreferredCollectionHandle(
+          list,
+          event.data.collectionHandle ? String(event.data.collectionHandle) : undefined
+        );
+        if (resolved) {
+          setCollectionHandle(resolved);
+        } else if (event.data.collectionHandle) {
+          setCollectionHandle(String(event.data.collectionHandle));
         }
       }
 
@@ -262,9 +291,19 @@ export function WidgetPage() {
           console.log('✅ Default Gender do contexto:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
         }
-        if (event.data.collectionHandle !== undefined) {
-          console.log('📦 Collection Handle do contexto:', event.data.collectionHandle || 'vazio (tabela global)');
-          setCollectionHandle(event.data.collectionHandle || '');
+        if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
+          const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+          const resolved = pickPreferredCollectionHandle(
+            list,
+            event.data.collectionHandle !== undefined && event.data.collectionHandle !== null
+              ? String(event.data.collectionHandle)
+              : undefined
+          );
+          console.log(
+            '📦 Collection Handle do contexto (resolvido):',
+            resolved || event.data.collectionHandle || 'vazio (tabela global)'
+          );
+          setCollectionHandle(resolved || '');
         }
         if (event.data.shopDomain) {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
@@ -324,9 +363,19 @@ export function WidgetPage() {
           console.log('✅ Atualizando storeLogo via postMessage:', event.data.storeLogo);
           setStoreLogo(event.data.storeLogo);
         }
-        if (event.data.collectionHandle !== undefined) {
-          console.log('📦 Collection Handle do config:', event.data.collectionHandle || 'vazio (tabela global)');
-          setCollectionHandle(event.data.collectionHandle || '');
+        if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
+          const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+          const resolved = pickPreferredCollectionHandle(
+            list,
+            event.data.collectionHandle !== undefined && event.data.collectionHandle !== null
+              ? String(event.data.collectionHandle)
+              : undefined
+          );
+          console.log(
+            '📦 Collection Handle do config (resolvido):',
+            resolved || event.data.collectionHandle || 'vazio (tabela global)'
+          );
+          setCollectionHandle(resolved || '');
         }
         if (event.data.shopDomain) {
           console.log('🏪 Shop Domain do config:', event.data.shopDomain);
