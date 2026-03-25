@@ -53,6 +53,120 @@ interface GPTResponse {
   should_end_conversation?: boolean;
 }
 
+function normalizeSizeLabel(size: string): string {
+  return String(size || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}
+
+function rankSize(size: string): number | null {
+  const s = normalizeSizeLabel(size);
+  if (!s) return null;
+
+  // Numéricos (quando existirem)
+  const numeric = s.match(/^\d+$/);
+  if (numeric) return Number(numeric[0]);
+
+  const letterRanks: Record<string, number> = {
+    // Padrão XS..XXL
+    XS: 1,
+    S: 2,
+    M: 3,
+    L: 4,
+    XL: 5,
+    XXL: 6,
+    XXXL: 7,
+    // Padrão PP..GG (muito comum em camisetas/roupas no Brasil)
+    PP: 1,
+    P: 2,
+    M_BR: 3,
+    G: 4,
+    GG: 5,
+  };
+
+  // Tratar M/GG explicitamente quando não for "M" do padrão XS..XXL
+  // (ex: "M" é ambíguo, então usamos uma heurística: se existe "GG" nos tamanhos, tratamos "M" como 3)
+  if (s === 'M') return 3;
+  if (s === 'G') return 4;
+  if (s === 'GG') return 5;
+  if (s === 'P') return 2;
+  if (s === 'PP') return 1;
+
+  if (letterRanks[s] != null) return letterRanks[s];
+
+  return null;
+}
+
+function pickClosestAvailableSize(suggestedSize: string, availableSizes: string[]): string {
+  const normalizedAvailable = availableSizes.map(normalizeSizeLabel).filter(Boolean);
+  const availableUnique = Array.from(new Set(normalizedAvailable));
+  if (availableUnique.length === 0) return normalizeSizeLabel(suggestedSize) || availableSizes[0] || 'M';
+
+  const suggested = normalizeSizeLabel(suggestedSize);
+  if (!suggested) return availableUnique[0];
+
+  if (availableUnique.includes(suggested)) return suggested;
+
+  const suggestedRank = rankSize(suggested);
+  const rankedAvailable = availableUnique
+    .map((s) => ({ s, r: rankSize(s) }))
+    .filter((x) => x.r != null) as Array<{ s: string; r: number }>;
+
+  // Se não der pra ranquear, só garantimos que um tamanho existente será escolhido.
+  if (rankedAvailable.length === 0) return availableUnique[availableUnique.length - 1];
+
+  const minRank = Math.min(...rankedAvailable.map((x) => x.r));
+  const maxRank = Math.max(...rankedAvailable.map((x) => x.r));
+
+  if (suggestedRank == null) return availableUnique[availableUnique.length - 1];
+
+  if (suggestedRank <= minRank) {
+    return rankedAvailable.reduce((acc, cur) => (cur.r < acc.r ? cur : acc)).s;
+  }
+  if (suggestedRank >= maxRank) {
+    return rankedAvailable.reduce((acc, cur) => (cur.r > acc.r ? cur : acc)).s;
+  }
+
+  // Entre min/max, escolhe o mais próximo (por distância no "ranking").
+  return rankedAvailable.reduce((best, cur) => {
+    if (cur.r == null) return best;
+    const bestDiff = Math.abs(best.r - (suggestedRank as number));
+    const curDiff = Math.abs(cur.r - (suggestedRank as number));
+    return curDiff < bestDiff ? cur : best;
+  }).s;
+}
+
+function enforceAvailableSizes(
+  gptResponse: GPTResponse,
+  data: ValidateSizeRequest
+): GPTResponse {
+  const available = (data.available_sizes || []).filter(Boolean).map(String);
+  if (available.length === 0) return gptResponse;
+
+  const normalizedAvailable = available.map(normalizeSizeLabel);
+  const normalizedFinal = normalizeSizeLabel(gptResponse.tamanho_final);
+
+  if (normalizedAvailable.includes(normalizedFinal)) return gptResponse;
+
+  const corrected = pickClosestAvailableSize(gptResponse.tamanho_final, available);
+
+  // Como o texto gerado pelo GPT provavelmente menciona o tamanho antigo,
+  // retornamos uma explicação consistente com o novo tamanho.
+  const correctedResponse = buildGuaranteedFallbackResponse(
+    {
+      ...data,
+      tamanho_calculado_algoritmo: corrected,
+    },
+    data.language || 'pt'
+  );
+
+  return {
+    ...correctedResponse,
+    should_end_conversation: gptResponse.should_end_conversation,
+  };
+}
+
 function getSystemPrompt(language: string): string {
   const prompts: Record<string, string> = {
     pt: `Você é um consultor de moda pessoal caloroso e envolvente, especializado em ajuste perfeito e análise de corpo.
@@ -761,10 +875,14 @@ Deno.serve(async (req: Request) => {
     console.log('🚀 Enviando prompt para OpenAI. Intenção:', data.intencao_usuario || 'validar_tamanho');
     const gptResponse = await callOpenAI(userPrompt, language);
 
+    // Garantir que o tamanho final exista no catálogo real do produto selecionado.
+    // Exemplo: se o algoritmo sugerir "GG", mas o produto só tem P..G, corrigimos para um tamanho existente.
+    const finalResponse = enforceAvailableSizes(gptResponse, data);
+
     return new Response(
       JSON.stringify({
         success: true,
-        data: gptResponse,
+        data: finalResponse,
         interaction_count: interactionCount + 1,
       }),
       {

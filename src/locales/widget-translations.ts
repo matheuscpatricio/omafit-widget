@@ -7,7 +7,7 @@ export const widgetTranslations = {
     visualExperience: 'Olá, sou o assistente inteligente da {storeName}!',
     visualExperienceDesc: 'Iremos te ajudar com qualquer dúvida sobre esta roupa',
     howItWorks: 'Como funciona?',
-    howItWorksDesc: 'Nós iremos te indicar seu tamanho ideal para esta roupa, te entregar uma prévia de como você ficará usando-a e tirar qualquer dúvida que você tenha.',
+    howItWorksDesc: 'Insira seus dados de altura, peso e biotipo e envie uma foto que nós iremos calcular o melhor tamanho e tirar suas dúvidas.',
     startNow: 'Começar Agora',
     privacyNote: 'Suas fotos são processadas de forma segura e não são compartilhadas.',
 
@@ -113,7 +113,7 @@ export const widgetTranslations = {
     visualExperience: 'Bienvenido al asistente inteligente de ventas de {storeName}!',
     visualExperienceDesc: 'Te ayudaremos con cualquier duda sobre esta prenda',
     howItWorks: '¿Cómo funciona?',
-    howItWorksDesc: 'Te indicaremos tu talla ideal para esta prenda, te entregaremos una vista previa de cómo te verás usándola y aclararemos cualquier duda que tengas.',
+    howItWorksDesc: 'Ingresa tus datos de altura, peso y biotipo y envía una foto; calcularemos la mejor talla y resolveremos tus dudas.',
     startNow: 'Empezar Ahora',
     privacyNote: 'Tus fotos se procesan de forma segura y no se comparten.',
 
@@ -219,7 +219,7 @@ export const widgetTranslations = {
     visualExperience: 'Welcome to {storeName}\'s intelligent sales assistant!',
     visualExperienceDesc: 'We will help you with any questions about this garment',
     howItWorks: 'How does it work?',
-    howItWorksDesc: 'We will indicate your ideal size for this garment, deliver a preview of how you will look wearing it, and answer any questions you have.',
+    howItWorksDesc: 'Enter your height, weight, and body type data and upload a photo. We will calculate the best size and answer your questions.',
     startNow: 'Start Now',
     privacyNote: 'Your photos are securely processed and not shared.',
 
