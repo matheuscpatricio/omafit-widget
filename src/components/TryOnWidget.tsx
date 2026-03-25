@@ -435,6 +435,8 @@ export function TryOnWidget({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gptLoading, setGptLoading] = useState(false);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  /** UUID em tryon_sessions (via track-footwear-tryon), alinhado ao fluxo do ShoeARWidget */
+  const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
   const [interactionCount, setInteractionCount] = useState(0);
   const [selectedColorHex, setSelectedColorHex] = useState<string>(primaryColor);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -2351,8 +2353,65 @@ const handleSubmit = async () => {
       setCalculatedSize(provisionalSize);
     }
 
+    const uploadedModelImageUrl = await modelImageUploadPromise;
+
+    const trackGarmentMediapipeSession = async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!publicId || !supabaseUrl || !supabaseAnonKey || !product) {
+        console.warn('⚠️ Não foi possível registar sessão de medição (publicId/Supabase/produto ausente).');
+        return;
+      }
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/track-footwear-tryon`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({
+            session_id: analyticsSessionId,
+            track_usage: true,
+            public_id: publicId,
+            shop_domain: effectiveShopDomain || null,
+            shop_name: localStoreName || null,
+            product_id: product.id,
+            product_name: product.name,
+            collection_handle: collectionHandle || null,
+            model_image: uploadedModelImageUrl || 'garment-widget-mediapipe',
+            user_measurements: {
+              measurement_type: 'garment',
+              recommended_size: provisionalSize,
+              gender: sizeData.gender || 'unisex',
+              height: sizeData.height,
+              weight: sizeData.weight,
+              body_type_index: sizeData.bodyTypeIndex ?? 0,
+              fit_preference_index: sizeData.fitIndex ?? 0,
+              chest: measurementsForProvisionalCalc.chest,
+              waist: measurementsForProvisionalCalc.waist,
+              hip: measurementsForProvisionalCalc.hip,
+              mediapipe_source: 'frontend',
+            },
+          }),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn('⚠️ track-footwear-tryon (garment/MediaPipe):', response.status, errText);
+          return;
+        }
+        const data = await response.json();
+        if (data?.session_id) {
+          setAnalyticsSessionId(String(data.session_id));
+        }
+        console.log('✅ tryon_sessions contabilizada (mediapipe, sem geração de try-on):', data?.session_id);
+      } catch (err) {
+        console.warn('⚠️ Erro ao registar sessão garment/MediaPipe:', err);
+      }
+    };
+
     if (tryOnEnabled === false) {
       console.log('⚠️ Try-on desativado para esta loja (tryon_enabled=false). Pulando /functions/v1/tryon.');
+      await trackGarmentMediapipeSession();
       setPredictionId(null);
       setResult(null);
       setError('');
@@ -2363,7 +2422,6 @@ const handleSubmit = async () => {
 
     setProcessingMessage(t('creatingTryOn'));
     const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
-    const uploadedModelImageUrl = await modelImageUploadPromise;
     const payload = {
       shop_domain: effectiveShopDomain,
       // Hint explícito para o backend escolher o modelo correto do try-on.
@@ -2479,6 +2537,7 @@ const handleSubmit = async () => {
     // mantemos o fluxo funcionando sem imagem (mostra chat/cart com base no tamanho).
     if (result?.tryon_disabled === true) {
       console.log('⚠️ Try-on desativado pelo backend. Pulando polling.');
+      await trackGarmentMediapipeSession();
       setPredictionId(null);
       setResult(null);
       setError('');
@@ -2782,7 +2841,7 @@ const handleSubmit = async () => {
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
         intencao_usuario: intention === 'custom' ? 'custom_message' : intention === 'complementary' ? 'sugerir_combinacoes' : 'induzir_adicionar_carrinho',
         custom_message: customMessage,
-        session_id: sessionId,
+        session_id: analyticsSessionId || sessionId,
         interaction_count: interactionCount,
         shop_name: localStoreName,
         language: currentLanguage,
@@ -2923,7 +2982,7 @@ const handleSubmit = async () => {
       quantity: 1,
       shop_domain: effectiveShopDomain,
       metadata: {
-        session_id: sessionId,
+        session_id: analyticsSessionId || sessionId,
         language: currentLanguage,
         recommended_size_label: recommendedCartSize || null,
         variant_option_name: sizeOptionName,
