@@ -167,6 +167,90 @@ function enforceAvailableSizes(
   };
 }
 
+function stripCatalogLines(text: string): string {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const catalogLinePrefixes = [
+    // PT
+    /^tamanhos dispon[ií]veis\s*:/i,
+    /^cores dispon[ií]veis\s*:/i,
+    /^cat[aá]logo do produto/i,
+    /^cat[aá]logo do produto visualizado/i,
+    /^-?\s*tamanhos dispon[ií]veis\s*:/i,
+    /^-?\s*cores dispon[ií]veis\s*:/i,
+    // ES
+    /^tallas disponibles\s*:/i,
+    /^colores disponibles\s*:/i,
+    /^cat[aá]logo del producto/i,
+    /^-?\s*tallas disponibles\s*:/i,
+    /^-?\s*colores disponibles\s*:/i,
+    // EN
+    /^available sizes\s*:/i,
+    /^available colors\s*:/i,
+    /^catalog of current product/i,
+    /^-?\s*available sizes\s*:/i,
+    /^-?\s*available colors\s*:/i,
+  ];
+
+  const cleaned = lines.filter((line) => !catalogLinePrefixes.some((re) => re.test(line)));
+  return cleaned.join(' ');
+}
+
+function removeSizeMentions(text: string, sizeLabel: string): string {
+  const size = normalizeSizeLabel(sizeLabel);
+  if (!size) return String(text || '');
+
+  // Remove ocorrências do tamanho (ex.: "GG", "XL") e construções "tamanho GG"/"size XL"/"talla XL"
+  // Mantemos o resto do texto o mais natural possível.
+  let out = String(text || '');
+  const patterns = [
+    new RegExp(`\\b(tamanho|talla|size)\\s*[:\\-]?\\s*${size}\\b`, 'gi'),
+    new RegExp(`\\b${size}\\b`, 'gi'),
+  ];
+  for (const re of patterns) out = out.replace(re, '').replace(/\s{2,}/g, ' ');
+  return out.trim();
+}
+
+function buildSizeFirstSentence(language: string, size: string): string {
+  if (language === 'es') return `Tu talla ideal es ${size}!`;
+  if (language === 'en') return `Your ideal size is ${size}!`;
+  return `Seu tamanho ideal é ${size}!`;
+}
+
+function enforceSizeFirstMessage(
+  gptResponse: GPTResponse,
+  data: ValidateSizeRequest
+): GPTResponse {
+  const language = data.language || 'pt';
+  const size = normalizeSizeLabel(gptResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M');
+
+  // 1) Limpa linhas de catálogo para evitar que "tamanhos/cores disponíveis" dominem a mensagem.
+  const withoutCatalog = stripCatalogLines(gptResponse.explicacao || '');
+
+  // 2) Remove menções ao tamanho no resto do texto para garantir que apareça só uma vez (na 1a frase).
+  const body = removeSizeMentions(withoutCatalog, size);
+
+  // 3) Sempre começa com a frase do tamanho ideal.
+  const first = buildSizeFirstSentence(language, size);
+
+  // Se o corpo ficar vazio, usa um fallback curto sem catálogo.
+  const fallbackBody =
+    language === 'es'
+      ? 'Si te gusta, agrégalo al carrito con confianza.'
+      : language === 'en'
+        ? 'If you like it, add it to cart with confidence.'
+        : 'Se gostou, adicione ao carrinho com confiança.';
+
+  return {
+    ...gptResponse,
+    tamanho_final: size,
+    explicacao: `${first} ${(body || fallbackBody).trim()}`.trim(),
+  };
+}
+
 function getSystemPrompt(language: string): string {
   const prompts: Record<string, string> = {
     pt: `Você é um consultor de moda pessoal caloroso e envolvente, especializado em ajuste perfeito e análise de corpo.
@@ -877,7 +961,7 @@ Deno.serve(async (req: Request) => {
 
     // Garantir que o tamanho final exista no catálogo real do produto selecionado.
     // Exemplo: se o algoritmo sugerir "GG", mas o produto só tem P..G, corrigimos para um tamanho existente.
-    const finalResponse = enforceAvailableSizes(gptResponse, data);
+    const finalResponse = enforceSizeFirstMessage(enforceAvailableSizes(gptResponse, data), data);
 
     return new Response(
       JSON.stringify({
