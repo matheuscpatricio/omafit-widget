@@ -264,10 +264,15 @@ function buildOldStyleResponse(data: ValidateSizeRequest, normalizedSize: string
     data.product_name ||
     (language === 'es' ? 'esta prenda' : language === 'en' ? 'this item' : 'este produto');
 
-  const canonicalSize = resolveCanonicalSizeLabel(
-    normalizedSize,
-    (data.available_sizes || []).filter(Boolean).map(String)
-  );
+  const availableSizes = (data.available_sizes || []).filter(Boolean).map(String);
+
+  // Regra: a primeira mensagem SEMPRE usa o tamanho calculado pelo algoritmo (payload),
+  // apenas garantindo que ele exista no catálogo do produto (available_sizes).
+  const algorithmSize = normalizeSizeLabel(data.tamanho_calculado_algoritmo || normalizedSize || 'M');
+  const sizeWithinCatalog = availableSizes.length > 0
+    ? pickClosestAvailableSize(algorithmSize, availableSizes)
+    : algorithmSize;
+  const canonicalSize = resolveCanonicalSizeLabel(sizeWithinCatalog, availableSizes);
 
   if (language === 'es') {
     return {
