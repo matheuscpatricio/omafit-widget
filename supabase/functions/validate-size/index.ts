@@ -294,6 +294,13 @@ function removeLeadingSizeSentence(language: string, text: string): string {
   return out.replace(/\s{2,}/g, ' ').trim();
 }
 
+function hasSizeMention(text: string, sizeLabel: string): boolean {
+  const size = normalizeSizeLabel(sizeLabel);
+  if (!size) return false;
+  const normalizedText = normalizeSizeLabel(String(text || ''));
+  return normalizedText.includes(size);
+}
+
 function enforceSizeFirstMessage(
   gptResponse: GPTResponse,
   data: ValidateSizeRequest
@@ -316,7 +323,7 @@ function enforceSizeFirstMessage(
   const withoutCatalog = stripCatalogLines(gptResponse.explicacao || '');
 
   // 2) Remove APENAS a frase inicial "Seu tamanho ideal é ...", mantendo o restante da resposta do GPT.
-  const body = removeLeadingSizeSentence(language, withoutCatalog);
+  let body = removeLeadingSizeSentence(language, withoutCatalog);
 
   // Se o corpo ficar vazio, usa um fallback curto sem catálogo.
   const fallbackBody =
@@ -325,6 +332,18 @@ function enforceSizeFirstMessage(
       : language === 'en'
         ? 'If you like it, add it to cart with confidence.'
         : 'Se gostou, adicione ao carrinho com confiança.';
+
+  // 3) Não usar frase inicial automática, mas garantir que o tamanho apareça ao menos 1x.
+  // Se o GPT não mencionar o tamanho, adicionamos no final de forma curta e natural.
+  if (!hasSizeMention(body, size)) {
+    const sizeTail =
+      language === 'es'
+        ? ` Talla recomendada: ${size}.`
+        : language === 'en'
+          ? ` Recommended size: ${size}.`
+          : ` Tamanho recomendado: ${size}.`;
+    body = `${(body || fallbackBody).trim()}${sizeTail}`.trim();
+  }
 
   return {
     ...gptResponse,
