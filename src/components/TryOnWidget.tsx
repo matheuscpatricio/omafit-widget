@@ -246,6 +246,12 @@ const logVerboseTryOn = (...args: unknown[]) => {
 };
 
 const normalizeOptionValue = (value: unknown): string => String(value || '').trim();
+const normalizeSizeToken = (value: unknown): string =>
+  String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
@@ -2828,7 +2834,13 @@ const handleSubmit = async () => {
     const requestId = `cart_${sessionId}_${Date.now()}`;
     const sizeOptionName =
       Object.keys(selectedVariantOptions).find((optionName) => detectOptionKind(optionName) === 'size') || 'Tamanho';
-    const recommendedCartSize = normalizeOptionValue(recommendedSize || calculatedSize);
+    const baseRecommendedSize = normalizeOptionValue(calculatedSize || recommendedSize);
+    const recommendedToken = normalizeSizeToken(baseRecommendedSize);
+    const catalogSizes = productCatalog.sizes || [];
+    const matchedCatalogSize = catalogSizes.find((sizeLabel) => normalizeSizeToken(sizeLabel) === recommendedToken)
+      || catalogSizes.find((sizeLabel) => normalizeSizeToken(sizeLabel).includes(recommendedToken) || recommendedToken.includes(normalizeSizeToken(sizeLabel)))
+      || '';
+    const recommendedCartSize = normalizeOptionValue(matchedCatalogSize || baseRecommendedSize);
     const selectedOptions = Object.entries(selectedVariantOptions).reduce<Record<string, string>>((acc, [key, value]) => {
       const normalizedKey = normalizeOptionValue(key);
       const normalizedValue = normalizeOptionValue(value);
@@ -2836,6 +2848,11 @@ const handleSubmit = async () => {
       acc[normalizedKey] = normalizedValue;
       return acc;
     }, {});
+
+    const currentSelectedSize = normalizeOptionValue(selectedOptions[sizeOptionName] || '');
+    const hasSizeOverride =
+      Boolean(recommendedCartSize) &&
+      normalizeSizeToken(recommendedCartSize) !== normalizeSizeToken(currentSelectedSize);
 
     if (recommendedCartSize) {
       selectedOptions[sizeOptionName] = recommendedCartSize;
@@ -2856,7 +2873,8 @@ const handleSubmit = async () => {
         recommended_size_label: recommendedCartSize || null,
         variant_option_name: sizeOptionName,
         selected_options: selectedOptions,
-        selected_variant_id: selectedVariantId || null,
+        // Se estamos mudando tamanho, não enviar selected_variant_id antigo para não forçar variante errada.
+        selected_variant_id: hasSizeOverride ? null : (selectedVariantId || null),
       },
       quantity: 1,
       shop_domain: effectiveShopDomain,
@@ -2865,7 +2883,7 @@ const handleSubmit = async () => {
         language: currentLanguage,
         recommended_size_label: recommendedCartSize || null,
         variant_option_name: sizeOptionName,
-        selected_variant_id: selectedVariantId || null,
+        selected_variant_id: hasSizeOverride ? null : (selectedVariantId || null),
         variant_catalog_count: productCatalog.variants.length,
       }
     };
