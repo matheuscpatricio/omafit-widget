@@ -43,6 +43,10 @@ interface ValidateSizeRequest {
     category: string;
     image_url: string;
   };
+  chat_history?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
 }
 
 interface GPTResponse {
@@ -151,18 +155,12 @@ function enforceAvailableSizes(
 
   const corrected = pickClosestAvailableSize(gptResponse.tamanho_final, available);
 
-  // Como o texto gerado pelo GPT provavelmente menciona o tamanho antigo,
-  // retornamos uma explicação consistente com o novo tamanho.
-  const correctedResponse = buildGuaranteedFallbackResponse(
-    {
-      ...data,
-      tamanho_calculado_algoritmo: corrected,
-    },
-    data.language || 'pt'
-  );
-
+  // Não substituímos a explicação aqui (para manter o "tom GPT").
+  // O pós-processamento (enforceSizeFirstMessage) já vai garantir que o tamanho apareça apenas na 1ª frase,
+  // e removerá listagens de catálogo quando necessário.
   return {
-    ...correctedResponse,
+    ...gptResponse,
+    tamanho_final: resolveCanonicalSizeLabel(corrected, available),
     should_end_conversation: gptResponse.should_end_conversation,
   };
 }
@@ -196,7 +194,25 @@ function stripCatalogLines(text: string): string {
   ];
 
   const cleaned = lines.filter((line) => !catalogLinePrefixes.some((re) => re.test(line)));
-  return cleaned.join(' ');
+  const joined = cleaned.join(' ');
+
+  // Também remove segmentos inline (quando o GPT coloca tudo na mesma linha).
+  // Ex: "... combina... Cores disponíveis: ... Tamanhos disponíveis: ... Se gostou..."
+  const inlineMarkers = [
+    // PT
+    /(?:\s|^)(cores dispon[ií]veis\s*:)[\s\S]*?(?=(?:\s+tamanhos dispon[ií]veis\s*:|\s+se gostou|\s+que tal|\s+adicion(e|ar)|$))/i,
+    /(?:\s|^)(tamanhos dispon[ií]veis\s*:)[\s\S]*?(?=(?:\s+se gostou|\s+que tal|\s+adicion(e|ar)|$))/i,
+    // ES
+    /(?:\s|^)(colores disponibles\s*:)[\s\S]*?(?=(?:\s+tallas disponibles\s*:|\s+si te gusta|\s+añad(e|ir)|$))/i,
+    /(?:\s|^)(tallas disponibles\s*:)[\s\S]*?(?=(?:\s+si te gusta|\s+añad(e|ir)|$))/i,
+    // EN
+    /(?:\s|^)(available colors\s*:)[\s\S]*?(?=(?:\s+available sizes\s*:|\s+if you like|\s+add to cart|\s+want to add|$))/i,
+    /(?:\s|^)(available sizes\s*:)[\s\S]*?(?=(?:\s+if you like|\s+add to cart|\s+want to add|$))/i,
+  ];
+
+  let out = joined;
+  for (const re of inlineMarkers) out = out.replace(re, ' ');
+  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 function removeSizeMentions(text: string, sizeLabel: string): string {
@@ -693,6 +709,13 @@ function buildCustomMessagePrompt(data: ValidateSizeRequest, language: string): 
   const productDesc = data.product_description ? `\n- Descrição do produto: ${data.product_description}` : '';
   const productCatalogContext = buildProductCatalogContext(data, language);
   const catalogHardRules = buildCatalogHardRules(data, language);
+  const chatHistory = Array.isArray(data.chat_history) ? data.chat_history : [];
+  const chatHistoryText = chatHistory.length > 0
+    ? `\nHISTÓRICO DA CONVERSA (para contexto):\n${chatHistory
+        .slice(-12)
+        .map((m) => `- ${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${String(m.content || '').trim()}`)
+        .join('\n')}\n`
+    : '';
 
   const messages: Record<string, string> = {
     pt: `O usuário fez a seguinte pergunta sobre o produto${storeContext}:
@@ -704,6 +727,7 @@ Contexto:
 - Categoria: ${data.categoria}
 - Elasticidade: ${data.elasticidade}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}${productInfo}${productDesc}
 ${productCatalogContext}
+${chatHistoryText}
 
 REGRAS IMPORTANTES:
 1. Se a pergunta for sobre o produto/descrição, use as informações acima para responder de forma útil
@@ -731,6 +755,7 @@ Contexto:
 - Categoría: ${data.categoria}
 - Elasticidad: ${data.elasticidade}${data.shop_name ? `\n- Tienda: ${data.shop_name}` : ''}
 ${productCatalogContext}
+${chatHistoryText}
 
 REGLAS IMPORTANTES:
 1. Si mencionas la talla, hazlo SOLO UNA VEZ al inicio de la respuesta
@@ -755,6 +780,7 @@ Context:
 - Category: ${data.categoria}
 - Elasticity: ${data.elasticidade}${data.shop_name ? `\n- Store: ${data.shop_name}` : ''}
 ${productCatalogContext}
+${chatHistoryText}
 
 IMPORTANT RULES:
 1. If you mention the size, do it ONLY ONCE at the beginning of your response
@@ -1010,17 +1036,22 @@ Deno.serve(async (req: Request) => {
 
     // Garantir que o tamanho final exista no catálogo real do produto selecionado.
     // Exemplo: se o algoritmo sugerir "GG", mas o produto só tem P..G, corrigimos para um tamanho existente.
-    const constrainedResponse = enforceAvailableSizes(gptResponse, data);
+    const availableSizes = (data.available_sizes || []).filter(Boolean).map(String);
+    const algorithmSizeNormalized = normalizeSizeLabel(data.tamanho_calculado_algoritmo || 'M');
+    const algorithmSizeWithinCatalog = availableSizes.length > 0
+      ? pickClosestAvailableSize(algorithmSizeNormalized, availableSizes)
+      : algorithmSizeNormalized;
+    const algorithmCanonical = resolveCanonicalSizeLabel(algorithmSizeWithinCatalog, availableSizes);
 
-    // Para a primeira mensagem/padrão (induzir carrinho), use um formato fixo (estilo antigo),
-    // evitando que o GPT liste catálogo e deixando a resposta sempre curta e objetiva.
-    const isDefaultFlow =
-      !data.intencao_usuario ||
-      data.intencao_usuario === 'induzir_adicionar_carrinho';
+    // Regra: a mensagem inicial (e qualquer mensagem) deve refletir o tamanho do algoritmo (payload),
+    // não um tamanho "inventado" pelo GPT. O GPT pode ajustar o discurso, mas o tamanho é do sistema.
+    const gptWithForcedSize: GPTResponse = {
+      ...gptResponse,
+      tamanho_final: algorithmCanonical,
+    };
 
-    const finalResponse = isDefaultFlow
-      ? buildOldStyleResponse(data, constrainedResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M')
-      : enforceSizeFirstMessage(constrainedResponse, data);
+    const constrainedResponse = enforceAvailableSizes(gptWithForcedSize, data);
+    const finalResponse = enforceSizeFirstMessage(constrainedResponse, data);
 
     return new Response(
       JSON.stringify({

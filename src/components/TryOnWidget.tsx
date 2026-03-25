@@ -2704,6 +2704,10 @@ const handleSubmit = async () => {
         selected_color: selectedColorHex,
         variant_catalog: productCatalog.variants.slice(0, 100),
         complementary_product: complementaryProduct,
+        chat_history: chatMessages
+          .slice(-12)
+          .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
+          .map(m => ({ role: m.role, content: String(m.content || '').trim() })),
       };
 
       console.log('🤖 [GPT PAYLOAD] Catálogo enviado para validate-size:');
