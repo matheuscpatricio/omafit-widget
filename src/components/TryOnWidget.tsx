@@ -2258,10 +2258,43 @@ const handleSubmit = async () => {
       return;
     }
 
+    const hasDetectedBodyMeasurements =
+      detectedMeasurements &&
+      typeof detectedMeasurements === 'object' &&
+      Number.isFinite(Number(detectedMeasurements.chest)) &&
+      Number(detectedMeasurements.chest) > 0 &&
+      Number.isFinite(Number(detectedMeasurements.waist)) &&
+      Number(detectedMeasurements.waist) > 0 &&
+      Number.isFinite(Number(detectedMeasurements.hip)) &&
+      Number(detectedMeasurements.hip) > 0;
+
+    const measurementsForProvisionalCalc = hasDetectedBodyMeasurements
+      ? {
+          ...sizeData,
+          chest: Number(detectedMeasurements.chest),
+          waist: Number(detectedMeasurements.waist),
+          hip: Number(detectedMeasurements.hip),
+          shoulder: Number(
+            detectedMeasurements.shoulder_width ??
+            detectedMeasurements.shoulderWidth ??
+            0
+          ) || undefined,
+          legLength: Number(detectedMeasurements.legLength ?? 0) || undefined,
+        }
+      : (sizeData as any);
+
+    if (hasDetectedBodyMeasurements) {
+      console.log('✅ Provisional size usando medidas reais detectadas (pré-processamento):', {
+        chest: measurementsForProvisionalCalc.chest,
+        waist: measurementsForProvisionalCalc.waist,
+        hip: measurementsForProvisionalCalc.hip,
+      });
+    }
+
     const provisionalSize =
       recommendedSize ||
       calculatedSize ||
-      (sizeChart.length > 0 ? calculateRecommendedSize(sizeData as any, sizeChart)?.size : 'M');
+      (sizeChart.length > 0 ? calculateRecommendedSize(measurementsForProvisionalCalc as any, sizeChart)?.size : 'M');
 
     if (!recommendedSize && !calculatedSize && provisionalSize) {
       setRecommendedSize(provisionalSize);
