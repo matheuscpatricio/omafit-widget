@@ -722,56 +722,61 @@ Deno.serve(async (req: Request) => {
           console.warn('⚠️ Falha no upsert_session_analytics_from_tryon_payload:', analyticsUpsertError);
         }
 
-        if (detected_measurements && pose_landmarks && Array.isArray(pose_landmarks) && pose_landmarks.length > 0) {
-          console.log('⏭️ MEDIAPIPE backend pulado: frontend já enviou landmarks e medidas.');
-        } else {
-          console.log('═══════════════════════════════════════════════════════');
-          console.log('🤖 MEDIAPIPE: Iniciando análise de pose em background...');
-          console.log('═══════════════════════════════════════════════════════');
-          const startTime = Date.now();
+        const frontendProvidedLandmarksAndMeasurements =
+          Boolean(detected_measurements) &&
+          Boolean(pose_landmarks) &&
+          Array.isArray(pose_landmarks) &&
+          pose_landmarks.length > 0;
 
-          try {
-            const userHeight = user_measurements?.height;
-            const userWeight = user_measurements?.weight;
-            const userGender = user_measurements?.gender;
+        // Regra solicitada: nunca pular o MediaPipe backend.
+        // Mesmo quando o frontend envia landmarks/medidas, rodamos o processamento aqui
+        // para garantir consistência e validação das medidas.
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🤖 MEDIAPIPE: Iniciando análise de pose em background... (frontendProvided=' + frontendProvidedLandmarksAndMeasurements + ')');
+        console.log('═══════════════════════════════════════════════════════');
+        const startTime = Date.now();
 
-            if (!userHeight || !userWeight) {
-              console.log('❌ MEDIAPIPE SKIPPED: Altura e peso são obrigatórios!');
-              debugInfo.mediapipe_status = 'skipped';
-              debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
+        try {
+          const userHeight = user_measurements?.height;
+          const userWeight = user_measurements?.weight;
+          const userGender = user_measurements?.gender;
+
+          if (!userHeight || !userWeight) {
+            console.log('❌ MEDIAPIPE: Altura e peso são obrigatórios!');
+            debugInfo.mediapipe_status = 'skipped';
+            debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
+          } else {
+            const bodyMeasurements = await extractBodyMeasurements(
+              modelImageUrl,
+              userHeight,
+              userWeight,
+              userGender,
+              pose_landmarks,
+              detected_measurements
+            );
+
+            const processingTime = Date.now() - startTime;
+
+            if (bodyMeasurements) {
+              debugInfo.mediapipe_status = 'fulfilled';
+              debugInfo.mediapipe_returned = true;
+              debugInfo.mediapipe_source = 'mediapipe';
+              console.log('✅ MEDIAPIPE SUCCESS (background):', {
+                processingTime,
+                confidence: bodyMeasurements.confidence,
+              });
             } else {
-              const bodyMeasurements = await extractBodyMeasurements(
-                modelImageUrl,
-                userHeight,
-                userWeight,
-                userGender,
-                pose_landmarks,
-                detected_measurements
-              );
-
-              const processingTime = Date.now() - startTime;
-
-              if (bodyMeasurements) {
-                debugInfo.mediapipe_status = 'fulfilled';
-                debugInfo.mediapipe_returned = true;
-                debugInfo.mediapipe_source = 'mediapipe';
-                console.log('✅ MEDIAPIPE SUCCESS (background):', {
-                  processingTime,
-                  confidence: bodyMeasurements.confidence,
-                });
-              } else {
-                debugInfo.mediapipe_status = 'fulfilled';
-                debugInfo.mediapipe_returned = false;
-                debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
-                console.log('⚠️ MEDIAPIPE sem resultado em background. Tempo:', processingTime + 'ms');
-              }
+              debugInfo.mediapipe_status = 'fulfilled';
+              debugInfo.mediapipe_returned = false;
+              debugInfo.mediapipe_source = user_measurements ? 'user_input' : 'none';
+              console.log('⚠️ MEDIAPIPE sem resultado em background. Tempo:', processingTime + 'ms');
             }
-          } catch (error) {
-            debugInfo.mediapipe_status = 'rejected';
-            debugInfo.mediapipe_returned = false;
-            debugInfo.mediapipe_source = user_measurements ? 'user_input_fallback' : 'none';
-            console.error('❌ MEDIAPIPE background error:', error);
           }
+        } catch (error) {
+          debugInfo.mediapipe_status = 'rejected';
+          debugInfo.mediapipe_returned = false;
+          debugInfo.mediapipe_source = user_measurements ? 'user_input_fallback' : 'none';
+          console.error('❌ MEDIAPIPE background error:', error);
         }
 
         const updatePromises = [
