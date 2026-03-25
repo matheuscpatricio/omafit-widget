@@ -403,6 +403,9 @@ export function TryOnWidget({
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState(t('generating'));
+  // Flag que controla se a loja pode gerar o try-on (imagem) via /functions/v1/tryon.
+  // Por padrão, quando a coluna/config não existir ou vier como null, consideramos true.
+  const [tryOnEnabled, setTryOnEnabled] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1072,7 +1075,7 @@ export function TryOnWidget({
       try {
         const { data: configs, error } = await supabase
           .from('widget_configurations')
-          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at')
+          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at, tryon_enabled')
           .eq('shop_domain', effectiveShopDomain)
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -1087,6 +1090,11 @@ export function TryOnWidget({
           const config = configs[0];
 
           // Atualizar estados locais com as configurações do banco
+          if (typeof config.tryon_enabled === 'boolean') {
+            setTryOnEnabled(config.tryon_enabled);
+          } else {
+            setTryOnEnabled(true);
+          }
           if (config.store_logo && config.store_logo.trim() !== '') {
             console.log('✅ Atualizando localStoreLogo do banco:', config.store_logo);
             setLocalStoreLogo(config.store_logo);
@@ -2260,6 +2268,16 @@ const handleSubmit = async () => {
       setCalculatedSize(provisionalSize);
     }
 
+    if (tryOnEnabled === false) {
+      console.log('⚠️ Try-on desativado para esta loja (tryon_enabled=false). Pulando /functions/v1/tryon.');
+      setPredictionId(null);
+      setResult(null);
+      setError('');
+      setStep('result');
+      setLoading(false);
+      return;
+    }
+
     setProcessingMessage(t('creatingTryOn'));
     const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
     const uploadedModelImageUrl = await modelImageUploadPromise;
@@ -2368,6 +2386,18 @@ const handleSubmit = async () => {
       }
     } else {
       console.log('⚠️ Nenhum dado do MediaPipe retornado');
+    }
+
+    // Se o backend bloqueou a geração de try-on (por config da loja),
+    // mantemos o fluxo funcionando sem imagem (mostra chat/cart com base no tamanho).
+    if (result?.tryon_disabled === true) {
+      console.log('⚠️ Try-on desativado pelo backend. Pulando polling.');
+      setPredictionId(null);
+      setResult(null);
+      setError('');
+      setStep('result');
+      setLoading(false);
+      return;
     }
 
     if (result.success && result.fal_request_id) {

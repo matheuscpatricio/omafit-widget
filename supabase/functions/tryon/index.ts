@@ -330,6 +330,38 @@ Deno.serve(async (req: Request) => {
       user_measurements?.sizeRecommendation ||
       null;
 
+    // Bloqueio por configuração da loja (self-hosted try-on generation).
+    // Por regra padrão: tryon_enabled=true (ou coluna ausente) => permite.
+    const { data: widgetConfig, error: widgetConfigError } = await supabaseClient
+      .from('widget_configurations')
+      .select('tryon_enabled')
+      .eq('shop_domain', resolvedShopDomain)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (widgetConfigError) {
+      console.warn('⚠️ Falha ao buscar tryon_enabled da loja (permitindo por default):', widgetConfigError);
+    }
+
+    const tryonEnabled = widgetConfig?.tryon_enabled ?? true;
+    if (!tryonEnabled) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          tryon_disabled: true,
+          fal_request_id: null,
+          error_code: 'TRYON_DISABLED',
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    }
+
     const tryOnProvider = resolveTryOnProvider();
     console.log('🔧 Try-on provider:', tryOnProvider, '(TRYON_PROVIDER=' + (Deno.env.get("TRYON_PROVIDER") || "unset") + ', SELF_HOSTED_TRYON_URL=' + (Deno.env.get("SELF_HOSTED_TRYON_URL") ? "set" : "unset") + ')');
     const tryOnCategory = inferTryOnCategory(collection_handle);
