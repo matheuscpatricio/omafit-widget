@@ -236,119 +236,23 @@ function buildSizeFirstSentence(language: string, size: string): string {
   return `Seu tamanho ideal é ${size}!`;
 }
 
-function extractSizeHintFromExplanation(language: string, explanation: string): string | null {
-  const text = String(explanation || '').trim();
-  if (!text) return null;
-
-  const patterns: RegExp[] = language === 'es'
-    ? [
-        /tu talla ideal es\s+([^\s,!.?]+)\b/i,
-        /talla ideal\s*[:\-]?\s*([^\s,!.?]+)\b/i,
-      ]
-    : language === 'en'
-      ? [
-          /your ideal size is\s+([^\s,!.?]+)\b/i,
-          /ideal size\s*[:\-]?\s*([^\s,!.?]+)\b/i,
-        ]
-      : [
-          /seu tamanho ideal é\s+([^\s,!.?]+)\b/i,
-          /tamanho ideal\s*[:\-]?\s*([^\s,!.?]+)\b/i,
-        ];
-
-  for (const re of patterns) {
-    const m = text.match(re);
-    const raw = m?.[1] ? String(m[1]).trim() : '';
-    if (raw) return raw;
-  }
-
-  return null;
-}
-
-function removeAllSizeSentences(language: string, text: string): string {
-  let out = String(text || '');
-  const sentencePatterns: RegExp[] = language === 'es'
-    ? [
-        /tu talla ideal es\s+[^\n!.?]+[!.?]\s*/gi,
-      ]
-    : language === 'en'
-      ? [
-          /your ideal size is\s+[^\n!.?]+[!.?]\s*/gi,
-        ]
-      : [
-          /seu tamanho ideal é\s+[^\n!.?]+[!.?]\s*/gi,
-        ];
-
-  for (const re of sentencePatterns) out = out.replace(re, '');
-  return out.replace(/\s{2,}/g, ' ').trim();
-}
-
-function removeLeadingSizeSentence(language: string, text: string): string {
-  let out = String(text || '').trim();
-  const leadingPatterns: RegExp[] = language === 'es'
-    ? [/^tu talla ideal es\s+[^\n!.?]+[!.?]\s*/i]
-    : language === 'en'
-      ? [/^your ideal size is\s+[^\n!.?]+[!.?]\s*/i]
-      : [/^seu tamanho ideal é\s+[^\n!.?]+[!.?]\s*/i];
-
-  for (const re of leadingPatterns) out = out.replace(re, '').trim();
-  return out.replace(/\s{2,}/g, ' ').trim();
-}
-
-function hasSizeMention(text: string, sizeLabel: string): boolean {
-  const size = normalizeSizeLabel(sizeLabel);
-  if (!size) return false;
-  const normalizedText = normalizeSizeLabel(String(text || ''));
-  return normalizedText.includes(size);
-}
-
 function enforceSizeFirstMessage(
   gptResponse: GPTResponse,
   data: ValidateSizeRequest
 ): GPTResponse {
-  const language = data.language || 'pt';
-  const availableSizes = (data.available_sizes || []).filter(Boolean).map(String);
-  const normalizedAvailable = availableSizes.map(normalizeSizeLabel);
-
-  // Preferir o tamanho que o GPT já mencionou na frase "tamanho ideal" (quando for válido),
-  // para evitar casos onde o payload vem com um label longo (ex: G3PLUS(50-52)) mas o GPT fala "G".
-  const hintedByGpt = extractSizeHintFromExplanation(language, gptResponse.explicacao || '');
-  const hintedNormalized = hintedByGpt ? normalizeSizeLabel(hintedByGpt) : '';
-
-  const fallbackSize = normalizeSizeLabel(gptResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M');
-  const size = hintedNormalized && (normalizedAvailable.length === 0 || normalizedAvailable.includes(hintedNormalized))
-    ? hintedNormalized
-    : fallbackSize;
+  const size = normalizeSizeLabel(gptResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M');
 
   // 1) Limpa linhas de catálogo para evitar que "tamanhos/cores disponíveis" dominem a mensagem.
   const withoutCatalog = stripCatalogLines(gptResponse.explicacao || '');
 
-  // 2) Remove APENAS a frase inicial "Seu tamanho ideal é ...", mantendo o restante da resposta do GPT.
-  let body = removeLeadingSizeSentence(language, withoutCatalog);
-
-  // Se o corpo ficar vazio, usa um fallback curto sem catálogo.
-  const fallbackBody =
-    language === 'es'
-      ? 'Si te gusta, agrégalo al carrito con confianza.'
-      : language === 'en'
-        ? 'If you like it, add it to cart with confidence.'
-        : 'Se gostou, adicione ao carrinho com confiança.';
-
-  // 3) Não usar frase inicial automática, mas garantir que o tamanho apareça ao menos 1x.
-  // Se o GPT não mencionar o tamanho, adicionamos no final de forma curta e natural.
-  if (!hasSizeMention(body, size)) {
-    const sizeTail =
-      language === 'es'
-        ? ` Talla recomendada: ${size}.`
-        : language === 'en'
-          ? ` Recommended size: ${size}.`
-          : ` Tamanho recomendado: ${size}.`;
-    body = `${(body || fallbackBody).trim()}${sizeTail}`.trim();
-  }
+  // Não injeta texto automático. Mantém somente a resposta do GPT,
+  // apenas sanitizando ruído de catálogo e garantindo tamanho_final coerente.
+  const cleanedBody = withoutCatalog.trim();
 
   return {
     ...gptResponse,
     tamanho_final: size,
-    explicacao: (body || fallbackBody).trim(),
+    explicacao: cleanedBody || gptResponse.explicacao,
   };
 }
 
