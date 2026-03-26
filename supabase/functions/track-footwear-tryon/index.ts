@@ -16,7 +16,18 @@ const normalizeShopifyProductId = (raw: string | null | undefined): string => {
   if (!s) return '';
   const gid = s.match(/Product\/(\d+)/i);
   if (gid?.[1]) return gid[1];
+  const vid = s.match(/ProductVariant\/(\d+)/i);
+  if (vid?.[1]) return `syn-var-${vid[1]}`;
   return s;
+};
+
+const shortHash = async (seed: string): Promise<string> => {
+  const data = new TextEncoder().encode(seed);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf))
+    .slice(0, 10)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 };
 
 const normalizeShopDomain = (value: string | null | undefined): string => {
@@ -208,6 +219,26 @@ Deno.serve(async (req: Request) => {
       subscription = regularSubscription;
     }
 
+    // shopify_shops.user_id pode ser NULL; products.user_id é NOT NULL — tenta dono via shopify_stores.
+    if (!effectiveUserId) {
+      const domainHint =
+        widgetKeyShopDomain ||
+        normalizeShopDomain(shop_domain) ||
+        '';
+      if (domainHint) {
+        const needle = domainHint.replace(/^www\./, '');
+        const { data: storeRow } = await supabaseClient
+          .from('shopify_stores')
+          .select('user_id')
+          .ilike('store_url', `%${needle}%`)
+          .limit(1)
+          .maybeSingle();
+        if (storeRow?.user_id) {
+          effectiveUserId = storeRow.user_id;
+        }
+      }
+    }
+
     if (!resolvedShopDomain && effectiveUserId) {
       const { data: shopifyStore } = await supabaseClient
         .from('shopify_stores')
@@ -234,10 +265,21 @@ Deno.serve(async (req: Request) => {
     const sessionStartTime = new Date().toISOString();
     let sessionId = session_id && UUID_REGEX.test(String(session_id)) ? String(session_id) : null;
     let sessionCreatedNow = false;
-    let resolvedProductId = product_id ? String(product_id).trim() : null;
+    let resolvedProductId =
+      product_id !== null && product_id !== undefined && String(product_id).trim() !== ''
+        ? String(product_id).trim()
+        : null;
 
     if (resolvedProductId && !UUID_REGEX.test(resolvedProductId)) {
-      resolvedProductId = normalizeShopifyProductId(resolvedProductId);
+      const normalized = normalizeShopifyProductId(resolvedProductId);
+      resolvedProductId = normalized || resolvedProductId;
+    }
+
+    if (resolvedProductId && !UUID_REGEX.test(resolvedProductId)) {
+      if (!resolvedProductId || /^unknown$/i.test(resolvedProductId)) {
+        const seed = `${public_id}|${product_name || ''}|${widgetKeyShopDomain || ''}|${normalizeShopDomain(shop_domain) || ''}|${resolvedShopDomain || ''}`;
+        resolvedProductId = `syn-${await shortHash(seed)}`;
+      }
     }
 
     const isGarmentMeasurement = user_measurements?.measurement_type === 'garment';
@@ -317,11 +359,27 @@ Deno.serve(async (req: Request) => {
             if (existingAfterConflict?.id) {
               mappedProduct = existingAfterConflict;
               mappedProductError = null;
+            } else {
+              const { data: existingAnyUser } = await supabaseClient
+                .from('products')
+                .select('id')
+                .eq('shopify_id', resolvedProductId)
+                .limit(1)
+                .maybeSingle();
+              if (existingAnyUser?.id) {
+                mappedProduct = existingAnyUser;
+                mappedProductError = null;
+              }
             }
           }
         }
 
         if (mappedProductError || !mappedProduct?.id) {
+          console.warn('⚠️ resolve product failed', {
+            resolvedProductId,
+            effectiveUserIdPresent: Boolean(effectiveUserId),
+            product_name: product_name || null,
+          });
           throw new Error('Could not resolve internal product UUID from product_id');
         }
 

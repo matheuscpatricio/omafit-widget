@@ -9,6 +9,7 @@ import {
 } from '../utils/pickPreferredCollectionHandle';
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
+import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 
 interface TryOnWidgetProps {
   garmentImage: string;
@@ -1146,7 +1147,7 @@ export function TryOnWidget({
     setCurrentImageIndex(0);
 
     setProduct({
-      id: productId,
+      id: resolveShopifyProductIdFromPage(productId),
       name: productName,
       garment_image: decodedImage,
       category: 'auto'

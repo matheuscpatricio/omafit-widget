@@ -12,6 +12,7 @@ import {
   resolveCollectionHandleWithSavedSizeChart,
   sortHandlesBySpecificityDesc,
 } from '../utils/pickPreferredCollectionHandle';
+import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 
 interface ShoeARWidgetProps {
   productImage?: string;
@@ -932,7 +933,7 @@ export function ShoeARWidget({
           public_id: publicId,
           shop_domain: shopDomain || null,
           shop_name: storeName || null,
-          product_id: productId || null,
+          product_id: resolveShopifyProductIdFromPage(productId || 'unknown'),
           product_name: productName || null,
           collection_handle: collectionHandle || null,
           model_image: previewImage || footPhotoPreview || productImage || 'shoe-widget-measurement',
