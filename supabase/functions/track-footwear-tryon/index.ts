@@ -219,9 +219,10 @@ Deno.serve(async (req: Request) => {
       subscription = regularSubscription;
     }
 
-    // shopify_shops.user_id pode ser NULL; products.user_id é NOT NULL — tenta dono via shopify_stores.
+    // shopify_shops.user_id pode ser NULL; products.user_id é NOT NULL — tenta dono via shopify_stores/widget_configurations.
     if (!effectiveUserId) {
       const domainHint =
+        resolvedShopDomain ||
         widgetKeyShopDomain ||
         normalizeShopDomain(shop_domain) ||
         '';
@@ -235,6 +236,19 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
         if (storeRow?.user_id) {
           effectiveUserId = storeRow.user_id;
+        }
+      }
+
+      if (!effectiveUserId && domainHint) {
+        const { data: cfgRow } = await supabaseClient
+          .from('widget_configurations')
+          .select('user_id')
+          .eq('shop_domain', domainHint)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cfgRow?.user_id) {
+          effectiveUserId = cfgRow.user_id;
         }
       }
     }
@@ -339,11 +353,28 @@ Deno.serve(async (req: Request) => {
             category: isGarmentMeasurement ? 'tops' : 'shoes',
           };
 
-          const { data: createdProduct, error: createdProductError } = await supabaseClient
+          let { data: createdProduct, error: createdProductError } = await supabaseClient
             .from('products')
             .insert([placeholderProductPayload])
             .select('id')
             .single();
+
+          // Fallback de compatibilidade: alguns ambientes podem não ter coluna shopify_id.
+          if (createdProductError?.message?.toLowerCase().includes('shopify_id')) {
+            const minimalPayload: Record<string, unknown> = {
+              user_id: effectiveUserId,
+              name: product_name || (isGarmentMeasurement ? 'Produto' : 'Calçado'),
+              description: null,
+              category: isGarmentMeasurement ? 'tops' : 'shoes',
+            };
+            const retry = await supabaseClient
+              .from('products')
+              .insert([minimalPayload])
+              .select('id')
+              .single();
+            createdProduct = retry.data;
+            createdProductError = retry.error;
+          }
 
           if (!createdProductError && createdProduct?.id) {
             mappedProduct = createdProduct;
