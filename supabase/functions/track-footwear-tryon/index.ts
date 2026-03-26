@@ -9,6 +9,16 @@ const corsHeaders = {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Shopify Theme / Storefront pode enviar GID; a tabela products usa shopify_id numérico. */
+const normalizeShopifyProductId = (raw: string | null | undefined): string => {
+  if (raw === null || raw === undefined) return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+  const gid = s.match(/Product\/(\d+)/i);
+  if (gid?.[1]) return gid[1];
+  return s;
+};
+
 const normalizeShopDomain = (value: string | null | undefined): string => {
   if (!value) return '';
   return value
@@ -224,7 +234,13 @@ Deno.serve(async (req: Request) => {
     const sessionStartTime = new Date().toISOString();
     let sessionId = session_id && UUID_REGEX.test(String(session_id)) ? String(session_id) : null;
     let sessionCreatedNow = false;
-    let resolvedProductId = product_id ? String(product_id) : null;
+    let resolvedProductId = product_id ? String(product_id).trim() : null;
+
+    if (resolvedProductId && !UUID_REGEX.test(resolvedProductId)) {
+      resolvedProductId = normalizeShopifyProductId(resolvedProductId);
+    }
+
+    const isGarmentMeasurement = user_measurements?.measurement_type === 'garment';
 
     if (!sessionId) {
       if (!resolvedProductId) {
@@ -242,6 +258,19 @@ Deno.serve(async (req: Request) => {
         }
 
         let { data: mappedProduct, error: mappedProductError } = await productLookupQuery.maybeSingle();
+
+        if (!mappedProduct?.id) {
+          const { data: byShopifyAnyUser } = await supabaseClient
+            .from('products')
+            .select('id')
+            .eq('shopify_id', resolvedProductId)
+            .limit(1)
+            .maybeSingle();
+          if (byShopifyAnyUser?.id) {
+            mappedProduct = byShopifyAnyUser;
+            mappedProductError = null;
+          }
+        }
 
         if ((!mappedProduct || mappedProductError) && product_name) {
           let productNameQuery = supabaseClient
@@ -263,9 +292,9 @@ Deno.serve(async (req: Request) => {
           const placeholderProductPayload: Record<string, unknown> = {
             user_id: effectiveUserId,
             shopify_id: resolvedProductId,
-            name: product_name || 'Calçado',
+            name: product_name || (isGarmentMeasurement ? 'Produto' : 'Calçado'),
             description: null,
-            category: 'shoes',
+            category: isGarmentMeasurement ? 'tops' : 'shoes',
           };
 
           const { data: createdProduct, error: createdProductError } = await supabaseClient
@@ -277,6 +306,18 @@ Deno.serve(async (req: Request) => {
           if (!createdProductError && createdProduct?.id) {
             mappedProduct = createdProduct;
             mappedProductError = null;
+          } else if (createdProductError) {
+            console.warn('⚠️ Insert placeholder product failed:', createdProductError.message);
+            const { data: existingAfterConflict } = await supabaseClient
+              .from('products')
+              .select('id')
+              .eq('shopify_id', resolvedProductId)
+              .eq('user_id', effectiveUserId)
+              .maybeSingle();
+            if (existingAfterConflict?.id) {
+              mappedProduct = existingAfterConflict;
+              mappedProductError = null;
+            }
           }
         }
 
