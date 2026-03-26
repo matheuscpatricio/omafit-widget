@@ -36,6 +36,11 @@ interface TryOnWidgetProps {
   productCatalog?: ProductCatalog;
   selectedVariantId?: string;
   selectedVariantOptions?: Record<string, string>;
+  /**
+   * Se definido (ex.: query `tryonEnabled=false` no iframe), aplica logo — não depende só do fetch ao Supabase.
+   * Evita corrida em que o utilizador submete antes de `widget_configurations.tryon_enabled` chegar.
+   */
+  tryonEnabled?: boolean;
 }
 
 interface ProductCatalog {
@@ -322,6 +327,7 @@ export function TryOnWidget({
   productCatalog: initialProductCatalog = { sizes: [], colors: [], variants: [] },
   selectedVariantId: initialSelectedVariantId = '',
   selectedVariantOptions: initialSelectedVariantOptions = {},
+  tryonEnabled: tryonEnabledProp,
 }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -423,7 +429,15 @@ export function TryOnWidget({
   const [processingMessage, setProcessingMessage] = useState(t('generating'));
   // Flag que controla se a loja pode gerar o try-on (imagem) via /functions/v1/tryon.
   // Por padrão, quando a coluna/config não existir ou vier como null, consideramos true.
-  const [tryOnEnabled, setTryOnEnabled] = useState(true);
+  const [tryOnEnabled, setTryOnEnabled] = useState(
+    typeof tryonEnabledProp === 'boolean' ? tryonEnabledProp : true
+  );
+
+  useEffect(() => {
+    if (typeof tryonEnabledProp === 'boolean') {
+      setTryOnEnabled(tryonEnabledProp);
+    }
+  }, [tryonEnabledProp]);
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1110,10 +1124,12 @@ export function TryOnWidget({
           const config = configs[0];
 
           // Atualizar estados locais com as configurações do banco
-          if (typeof config.tryon_enabled === 'boolean') {
-            setTryOnEnabled(config.tryon_enabled);
-          } else {
-            setTryOnEnabled(true);
+          if (typeof tryonEnabledProp !== 'boolean') {
+            if (typeof config.tryon_enabled === 'boolean') {
+              setTryOnEnabled(config.tryon_enabled);
+            } else {
+              setTryOnEnabled(true);
+            }
           }
           if (config.store_logo && config.store_logo.trim() !== '') {
             console.log('✅ Atualizando localStoreLogo do banco:', config.store_logo);
@@ -1136,7 +1152,7 @@ export function TryOnWidget({
     };
 
     fetchWidgetConfig();
-  }, [effectiveShopDomain]);
+  }, [effectiveShopDomain, tryonEnabledProp]);
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
@@ -2299,16 +2315,18 @@ const handleSubmit = async () => {
       console.warn('⚠️ Pré-processamento não encontrou pose; edge function fará a detecção');
     }
 
-    // 🔹 VALIDAÇÃO CRÍTICA: altura e peso são obrigatórios para MediaPipe
-    if (!sizeData || !sizeData.height || !sizeData.weight) {
-      console.error('❌ ERRO: Dados do usuário incompletos!');
-      console.error('   sizeData completo:', sizeData);
-      console.error('   height:', sizeData?.height);
-      console.error('   weight:', sizeData?.weight);
-      setError(t('requiredBodyData'));
-      setLoading(false);
-      setStep('confirm');
-      return;
+    // 🔹 Altura/peso obrigatórios para gerar try-on; com try-on desativado só precisamos de registar sessão (track-footwear-tryon).
+    if (tryOnEnabled !== false) {
+      if (!sizeData || !sizeData.height || !sizeData.weight) {
+        console.error('❌ ERRO: Dados do usuário incompletos!');
+        console.error('   sizeData completo:', sizeData);
+        console.error('   height:', sizeData?.height);
+        console.error('   weight:', sizeData?.weight);
+        setError(t('requiredBodyData'));
+        setLoading(false);
+        setStep('confirm');
+        return;
+      }
     }
 
     const hasDetectedBodyMeasurements =
@@ -2334,7 +2352,7 @@ const handleSubmit = async () => {
           ) || undefined,
           legLength: Number(detectedMeasurements.legLength ?? 0) || undefined,
         }
-      : (sizeData as any);
+      : ((sizeData as any) || {});
 
     if (hasDetectedBodyMeasurements) {
       console.log('✅ Provisional size usando medidas reais detectadas (pré-processamento):', {
@@ -2347,7 +2365,8 @@ const handleSubmit = async () => {
     const provisionalSize =
       recommendedSize ||
       calculatedSize ||
-      (sizeChart.length > 0 ? calculateRecommendedSize(measurementsForProvisionalCalc as any, sizeChart)?.size : 'M');
+      (sizeChart.length > 0 ? calculateRecommendedSize(measurementsForProvisionalCalc as any, sizeChart)?.size : null) ||
+      'M';
 
     if (!recommendedSize && !calculatedSize && provisionalSize) {
       setRecommendedSize(provisionalSize);
@@ -2383,14 +2402,14 @@ const handleSubmit = async () => {
             user_measurements: {
               measurement_type: 'garment',
               recommended_size: provisionalSize,
-              gender: sizeData.gender || 'unisex',
-              height: sizeData.height,
-              weight: sizeData.weight,
-              body_type_index: sizeData.bodyTypeIndex ?? 0,
-              fit_preference_index: sizeData.fitIndex ?? 0,
-              chest: measurementsForProvisionalCalc.chest,
-              waist: measurementsForProvisionalCalc.waist,
-              hip: measurementsForProvisionalCalc.hip,
+              gender: sizeData?.gender || 'unisex',
+              height: sizeData?.height ?? null,
+              weight: sizeData?.weight ?? null,
+              body_type_index: sizeData?.bodyTypeIndex ?? 0,
+              fit_preference_index: sizeData?.fitIndex ?? 0,
+              chest: measurementsForProvisionalCalc?.chest,
+              waist: measurementsForProvisionalCalc?.waist,
+              hip: measurementsForProvisionalCalc?.hip,
               mediapipe_source: 'frontend',
             },
           }),

@@ -22,6 +22,17 @@ type ProductCatalog = {
   variants: Array<Record<string, unknown>>;
 };
 
+const parseTryonEnabledUrlParam = (): boolean | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  const q = new URLSearchParams(window.location.search);
+  const raw = q.get('tryonEnabled') ?? q.get('tryon_enabled');
+  if (raw === null || String(raw).trim() === '') return undefined;
+  const v = String(raw).trim().toLowerCase();
+  if (v === 'false' || v === '0' || v === 'no') return false;
+  if (v === 'true' || v === '1' || v === 'yes') return true;
+  return undefined;
+};
+
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
 
@@ -64,6 +75,9 @@ export function WidgetPage() {
   });
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
+  const [tryonEnabledOverride, setTryonEnabledOverride] = useState<boolean | undefined>(() =>
+    parseTryonEnabledUrlParam()
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -260,6 +274,11 @@ export function WidgetPage() {
         if (config.fontStyle) {
           setFontStyle(config.fontStyle);
         }
+        if (typeof config.tryonEnabled === 'boolean') {
+          setTryonEnabledOverride(config.tryonEnabled);
+        } else if (typeof config.tryon_enabled === 'boolean') {
+          setTryonEnabledOverride(config.tryon_enabled);
+        }
       } catch (error) {
         console.error('Error parsing config:', error);
       }
@@ -314,6 +333,11 @@ export function WidgetPage() {
         if (contextLanguage) {
           setStoreLanguage(contextLanguage);
           console.log('🌍 Idioma recebido via contexto:', contextLanguage);
+        }
+        if (typeof event.data.tryonEnabled === 'boolean') {
+          setTryonEnabledOverride(event.data.tryonEnabled);
+        } else if (typeof event.data.tryon_enabled === 'boolean') {
+          setTryonEnabledOverride(event.data.tryon_enabled);
         }
         if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
           console.log('👕 Collection Type do contexto:', event.data.collectionType);
@@ -399,6 +423,11 @@ export function WidgetPage() {
           setStoreLanguage(configLanguage);
           console.log('🌍 Idioma recebido via config-update:', configLanguage);
         }
+        if (typeof event.data.tryonEnabled === 'boolean') {
+          setTryonEnabledOverride(event.data.tryonEnabled);
+        } else if (typeof event.data.tryon_enabled === 'boolean') {
+          setTryonEnabledOverride(event.data.tryon_enabled);
+        }
         if (event.data.complementaryProduct) {
           console.log('🎁 Produto complementar do config:', event.data.complementaryProduct);
           if (event.data.complementaryProduct.title && event.data.complementaryProduct.url) {
@@ -483,6 +512,7 @@ export function WidgetPage() {
           productCatalog={productCatalog}
           selectedVariantId={selectedVariantId}
           selectedVariantOptions={selectedVariantOptions}
+          tryonEnabled={tryonEnabledOverride}
         />
       </div>
     </div>
