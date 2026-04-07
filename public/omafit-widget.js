@@ -4,6 +4,74 @@
   let OMAFIT_CONFIG = null;
   let fontsLoaded = false;
 
+  var OMAFIT_DEBUG =
+    typeof window !== 'undefined' &&
+    (window.omafitDebug === true || /[?&]omafit_debug=1/.test(window.location.search));
+
+  /**
+   * Template com bloco app «Omafit AR óculos» (#omafit-ar-block-placed), ou GLB / link AR no DOM.
+   * Bloqueia iframe omafit.netlify.app/widget (manter alinhado com extensions/omafit-theme no repo omafit).
+   */
+  function isOmafitArEyewearPage() {
+    if (document.getElementById('omafit-ar-block-placed')) return true;
+    if (document.getElementById('omafit-suppress-clothing-widget')) return true;
+    if (document.querySelector('.omafit-ar-try-on-link')) return true;
+    var ar = document.getElementById('omafit-ar-root');
+    if (!ar) return false;
+    var glbAttr = (ar.getAttribute('data-glb-url') || '').trim();
+    if (glbAttr.length > 0) return true;
+    var d = ar.dataset && ar.dataset.glbUrl != null ? String(ar.dataset.glbUrl).trim() : '';
+    return d.length > 0;
+  }
+
+  function removeClothingOmafitUi() {
+    try {
+      document.querySelectorAll('.omafit-modal-overlay').forEach(function (el) {
+        el.remove();
+      });
+      document.querySelectorAll('.omafit-widget').forEach(function (w) {
+        if (w.closest('#omafit-ar-root')) return;
+        if (w.querySelector('.omafit-ar-try-on-link')) return;
+        if (w.querySelector('.omafit-try-on-link')) w.remove();
+      });
+    } catch (e) {
+      if (OMAFIT_DEBUG) console.warn('removeClothingOmafitUi', e);
+    }
+  }
+
+  function applyOmafitArEyewearSuppression() {
+    if (!isOmafitArEyewearPage()) return;
+    removeClothingOmafitUi();
+  }
+
+  var _omafitSuppressRaf = null;
+  function applyOmafitArEyewearSuppressionRaf() {
+    if (_omafitSuppressRaf != null) return;
+    _omafitSuppressRaf = requestAnimationFrame(function () {
+      _omafitSuppressRaf = null;
+      applyOmafitArEyewearSuppression();
+    });
+  }
+
+  function scheduleArEyewearSuppression() {
+    var delays = [0, 50, 150, 400, 1000, 2500, 5000];
+    for (var i = 0; i < delays.length; i++) {
+      setTimeout(applyOmafitArEyewearSuppression, delays[i]);
+    }
+    function attachObserver() {
+      if (!document.body) return;
+      applyOmafitArEyewearSuppression();
+      var mo = new MutationObserver(function () {
+        applyOmafitArEyewearSuppressionRaf();
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.body) attachObserver();
+    else document.addEventListener('DOMContentLoaded', attachObserver);
+  }
+
+  scheduleArEyewearSuppression();
+
   // Carregar fontes do Google Fonts APENAS quando o modal for aberto (preserva velocidade do site)
   function loadFontsWhenNeeded() {
     if (fontsLoaded) return;
@@ -1104,6 +1172,12 @@
 
   // Função que abre o modal do Omafit
   window.openOmafitModal = async function () {
+    if (isOmafitArEyewearPage()) {
+      if (OMAFIT_DEBUG) {
+        console.log('Omafit: modal de roupa bloqueado (página com AR óculos / bloco tema).');
+      }
+      return;
+    }
     loadFontsWhenNeeded();
     // Se configuração não estiver carregada, tentar carregar agora
     if (!OMAFIT_CONFIG) {
@@ -1377,6 +1451,10 @@
       console.warn('⚠️ URL ainda muito longa, usando postMessage para enviar dados grandes');
       // Remover productImages da URL se estiver muito longa
       widgetUrl = widgetUrl.split('&productImages=')[0];
+    }
+
+    if (isOmafitArEyewearPage()) {
+      widgetUrl += '&omafit_mode=eyewear_ar';
     }
 
     iframe.src = widgetUrl;
@@ -1763,6 +1841,7 @@
 
     link.addEventListener('click', function (e) {
       e.preventDefault();
+      if (isOmafitArEyewearPage()) return;
       if (typeof window.openOmafitModal === 'function') {
         window.openOmafitModal();
       }
@@ -1773,6 +1852,11 @@
 
   // Criar link Omafit logo abaixo do botão "Adicionar ao carrinho"
   function insertOmafitLinkUnderAddToCart() {
+    if (isOmafitArEyewearPage()) {
+      removeClothingOmafitUi();
+      console.log('Omafit: widget de roupa omitido (página com provador AR de óculos).');
+      return;
+    }
     if (!OMAFIT_CONFIG) {
       console.error('Omafit: configuração não carregada, não é possível inserir link');
       // Usar configuração padrão
@@ -1955,6 +2039,13 @@
   // Inicializar assim que a página e configuração estiverem prontas
   async function initOmafit() {
     try {
+      if (isOmafitArEyewearPage()) {
+        removeClothingOmafitUi();
+        if (OMAFIT_DEBUG) {
+          console.log('Omafit: provador AR óculos nesta página — widget de roupa não é carregado.');
+        }
+        return;
+      }
       console.log('🚀 Inicializando Omafit...');
 
       // Buscar configuração via API
@@ -2046,6 +2137,7 @@
   
   // Também tentar após um delay (para temas que carregam conteúdo dinamicamente)
   setTimeout(function() {
+    if (isOmafitArEyewearPage()) return;
     if (!document.querySelector('.omafit-try-on-link')) {
       console.log('🔄 Tentando inicializar novamente (retry)...');
       initOmafit();
@@ -2055,6 +2147,7 @@
   // Observar mudanças no DOM (para SPAs)
   if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver(function(mutations) {
+      if (isOmafitArEyewearPage()) return;
       if (!document.querySelector('.omafit-try-on-link')) {
         const hasProductForm = document.querySelector('form[action*="/cart/add"], button[name="add"]');
         if (hasProductForm) {

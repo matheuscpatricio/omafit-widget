@@ -33,6 +33,16 @@ const parseTryonEnabledUrlParam = (): boolean | undefined => {
   return undefined;
 };
 
+/** Página de produto com AR óculos: iframe de roupa não deve mostrar TryOnWidget (defesa no Netlify). */
+const parseEyewearArModeFromUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const q = new URLSearchParams(window.location.search);
+  const mode = (q.get('omafit_mode') || '').toLowerCase().trim();
+  if (mode === 'eyewear_ar' || mode === 'ar_eyewear') return true;
+  const legacy = (q.get('blockClothingTryon') || q.get('omafit_block_clothing') || '').toLowerCase();
+  return legacy === '1' || legacy === 'true' || legacy === 'yes';
+};
+
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
 
@@ -461,6 +471,21 @@ export function WidgetPage() {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+
+  if (typeof window !== 'undefined' && parseEyewearArModeFromUrl()) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-center gap-3"
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <p className="text-lg font-semibold text-gray-900">Provador de roupa indisponível</p>
+        <p className="text-gray-600 text-sm max-w-md">
+          Este produto utiliza o provador AR de óculos na página da loja. Fecha esta janela e usa o link de AR na página
+          do produto.
+        </p>
+      </div>
+    );
+  }
 
   if (!productImage) {
     return (

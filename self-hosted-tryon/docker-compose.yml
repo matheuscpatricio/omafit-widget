@@ -1,3 +1,7 @@
+# Worker AR óculos (Omafit app): consome fila `ar_eyewear_assets` no Supabase e gera GLB.
+# Requer clone do repo omafit ao lado deste (ver OMAFIT_AR_WORKER_CONTEXT abaixo).
+# Usa as mesmas SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY do .env (já usadas pelo try-on com Supabase).
+
 services:
   redis:
     image: redis:7-alpine
@@ -48,3 +52,17 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  # Fila AR óculos (Shopify app Omafit): GLB via stub (CPU) ou TripoSR (troque Dockerfile + GPU).
+  ar-eyewear-tripo:
+    build:
+      context: ${OMAFIT_AR_WORKER_CONTEXT:-../../omafit/workers/ar-eyewear-tripo}
+      dockerfile: ${OMAFIT_AR_WORKER_DOCKERFILE:-Dockerfile.stub}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      WORKER_STUB: ${AR_EYEWEAR_WORKER_STUB:-1}
+      POLL_SECONDS: ${AR_EYEWEAR_POLL_SECONDS:-10}

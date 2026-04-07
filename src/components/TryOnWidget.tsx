@@ -1169,9 +1169,6 @@ export function TryOnWidget({
       garment_image: decodedImage,
       category: 'auto'
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H1',location:'src/components/TryOnWidget.tsx:setProductEffect',message:'Resolved product id at widget init',data:{productIdProp:productId||null,resolvedPageProductId:resolvedPageProductId||null,hasPublicId:Boolean(publicId),shopDomain:effectiveShopDomain||null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }, [garmentImage, productId, productName, productImages]);
 
   React.useEffect(() => {
@@ -2383,9 +2380,6 @@ const handleSubmit = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       if (!publicId || !supabaseUrl || !supabaseAnonKey || !product) {
-        // #region agent log
-        fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H2',location:'src/components/TryOnWidget.tsx:trackGuard',message:'Missing required data before tracking call',data:{hasPublicId:Boolean(publicId),hasSupabaseUrl:Boolean(supabaseUrl),hasSupabaseAnonKey:Boolean(supabaseAnonKey),hasProduct:Boolean(product)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         console.warn('⚠️ Não foi possível registar sessão de medição (publicId/Supabase/produto ausente).');
         return;
       }
@@ -2414,9 +2408,6 @@ const handleSubmit = async () => {
             mediapipe_source: 'frontend',
           },
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H3',location:'src/components/TryOnWidget.tsx:trackCallStart',message:'About to call track-footwear-tryon',data:{tryOnEnabled,analyticsSessionId:analyticsSessionId||null,productId:trackPayload.product_id||null,productName:trackPayload.product_name||null,shopDomain:trackPayload.shop_domain||null,hasHeight:trackPayload.user_measurements.height!==null,hasWeight:trackPayload.user_measurements.weight!==null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const response = await fetch(`${supabaseUrl}/functions/v1/track-footwear-tryon`, {
           method: 'POST',
           headers: {
@@ -2425,21 +2416,12 @@ const handleSubmit = async () => {
           },
           body: JSON.stringify(trackPayload),
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H4',location:'src/components/TryOnWidget.tsx:trackCallResponse',message:'Received response from track-footwear-tryon',data:{status:response.status,ok:response.ok},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (!response.ok) {
           const errText = await response.text();
-          // #region agent log
-          fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H5',location:'src/components/TryOnWidget.tsx:trackCallErrorBody',message:'track-footwear-tryon returned non-200 body',data:{status:response.status,errorBody:errText?.slice?.(0,500) || null},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           console.warn('⚠️ track-footwear-tryon (garment/MediaPipe):', response.status, errText);
           return;
         }
         const data = await response.json();
-        // #region agent log
-        fetch('http://127.0.0.1:7277/ingest/1bd7601e-029d-4b4d-9720-2bc9aea0e743',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1e923a'},body:JSON.stringify({sessionId:'1e923a',runId:'pre-fix',hypothesisId:'H4',location:'src/components/TryOnWidget.tsx:trackCallSuccess',message:'track-footwear-tryon success payload',data:{session_id:data?.session_id || null,success:data?.success===true},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (data?.session_id) {
           setAnalyticsSessionId(String(data.session_id));
         }

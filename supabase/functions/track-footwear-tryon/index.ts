@@ -40,6 +40,15 @@ const normalizeShopDomain = (value: string | null | undefined): string => {
     .replace(/\/.*$/, '');
 };
 
+const buildDomainCandidates = (domain: string): string[] => {
+  const normalized = normalizeShopDomain(domain);
+  if (!normalized) return [];
+  const withoutWww = normalized.replace(/^www\./, '');
+  const slug = withoutWww.replace(/\.myshopify\.com$/, '').split('.')[0] || '';
+  const withMyshopify = slug ? `${slug}.myshopify.com` : '';
+  return [...new Set([normalized, withoutWww, slug, withMyshopify].filter(Boolean))];
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -159,7 +168,13 @@ Deno.serve(async (req: Request) => {
 
     let subscription: any = null;
     let effectiveUserId: string | null = widgetKeyData.user_id;
+    const userResolutionDebug: Record<string, unknown> = {
+      fromWidgetKey: Boolean(widgetKeyData.user_id),
+      widgetKeyShopDomain: widgetKeyShopDomain || null,
+      resolvedShopDomainInitial: resolvedShopDomain || null,
+    };
 
+    let shopifyShopRow: any = null;
     if (isShopifyWidget) {
       const { data: shopifyShop, error: shopifyError } = await supabaseClient
         .from('shopify_shops')
@@ -174,6 +189,7 @@ Deno.serve(async (req: Request) => {
       if (!shopifyShop) {
         throw new Error('Shop not found or billing not configured.');
       }
+      shopifyShopRow = shopifyShop;
 
       if (shopifyShop.billing_status !== 'active') {
         throw new Error('Shop billing is not active.');
@@ -187,6 +203,9 @@ Deno.serve(async (req: Request) => {
       };
 
       effectiveUserId = shopifyShop.user_id;
+      userResolutionDebug.fromShopifyShops = Boolean(shopifyShop.user_id);
+      userResolutionDebug.shopifyShopExactFound = true;
+      userResolutionDebug.shopifyShopBillingStatus = shopifyShop.billing_status || null;
     } else {
       const { data: regularSubscription, error: subscriptionError } = await supabaseClient
         .from('subscriptions')
@@ -219,6 +238,34 @@ Deno.serve(async (req: Request) => {
       subscription = regularSubscription;
     }
 
+    if (isShopifyWidget && !effectiveUserId && widgetKeyShopDomain) {
+      const shopSlugFromWidget = widgetKeyShopDomain
+        .replace(/^www\./, '')
+        .replace(/\.myshopify\.com$/, '')
+        .split('.')[0]
+        ?.trim();
+
+      if (shopSlugFromWidget) {
+        const { data: shopifyShopBySlug } = await supabaseClient
+          .from('shopify_shops')
+          .select('user_id, shop_domain, billing_status')
+          .ilike('shop_domain', `%${shopSlugFromWidget}%`)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        userResolutionDebug.shopifyShopSlug = shopSlugFromWidget;
+        userResolutionDebug.shopifyShopBySlugFound = Boolean(shopifyShopBySlug?.shop_domain);
+        userResolutionDebug.shopifyShopBySlugDomain = shopifyShopBySlug?.shop_domain || null;
+        userResolutionDebug.shopifyShopBySlugUserIdPresent = Boolean(shopifyShopBySlug?.user_id);
+        userResolutionDebug.shopifyShopBySlugBillingStatus = shopifyShopBySlug?.billing_status || null;
+
+        if (shopifyShopBySlug?.user_id) {
+          effectiveUserId = shopifyShopBySlug.user_id;
+        }
+      }
+    }
+
     // shopify_shops.user_id pode ser NULL; products.user_id é NOT NULL — tenta dono via shopify_stores/widget_configurations.
     if (!effectiveUserId) {
       const domainHint =
@@ -234,8 +281,48 @@ Deno.serve(async (req: Request) => {
           .ilike('store_url', `%${needle}%`)
           .limit(1)
           .maybeSingle();
+        userResolutionDebug.shopifyStoresNeedle = needle;
+        userResolutionDebug.fromStoreUrlLikeDomain = Boolean(storeRow?.user_id);
         if (storeRow?.user_id) {
           effectiveUserId = storeRow.user_id;
+        }
+      }
+
+      if (!effectiveUserId && domainHint) {
+        const shopSlug = domainHint
+          .replace(/^www\./, '')
+          .replace(/\.myshopify\.com$/, '')
+          .split('.')[0]
+          ?.trim();
+        if (shopSlug) {
+          const { data: storeBySlug } = await supabaseClient
+            .from('shopify_stores')
+            .select('user_id')
+            .ilike('store_url', `%${shopSlug}%`)
+            .limit(1)
+            .maybeSingle();
+          userResolutionDebug.shopSlug = shopSlug;
+          userResolutionDebug.fromStoreUrlLikeSlug = Boolean(storeBySlug?.user_id);
+          if (storeBySlug?.user_id) {
+            effectiveUserId = storeBySlug.user_id;
+          }
+        }
+      }
+
+      if (!effectiveUserId && shop_name) {
+        const normalizedShopName = String(shop_name).trim();
+        if (normalizedShopName) {
+          const { data: storeByName } = await supabaseClient
+            .from('shopify_stores')
+            .select('user_id')
+            .ilike('store_name', `%${normalizedShopName}%`)
+            .limit(1)
+            .maybeSingle();
+          userResolutionDebug.shopName = normalizedShopName;
+          userResolutionDebug.fromStoreName = Boolean(storeByName?.user_id);
+          if (storeByName?.user_id) {
+            effectiveUserId = storeByName.user_id;
+          }
         }
       }
 
@@ -247,11 +334,44 @@ Deno.serve(async (req: Request) => {
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        userResolutionDebug.fromWidgetConfigurations = Boolean(cfgRow?.user_id);
         if (cfgRow?.user_id) {
           effectiveUserId = cfgRow.user_id;
         }
       }
+
+      if (!effectiveUserId && domainHint) {
+        const domainCandidates = buildDomainCandidates(domainHint);
+        userResolutionDebug.domainCandidates = domainCandidates;
+
+        for (const candidate of domainCandidates) {
+          const { data: cfgLikeRow } = await supabaseClient
+            .from('widget_configurations')
+            .select('user_id, shop_domain')
+            .ilike('shop_domain', `%${candidate}%`)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (cfgLikeRow?.user_id) {
+            effectiveUserId = cfgLikeRow.user_id;
+            userResolutionDebug.fromWidgetConfigurationsLike = true;
+            userResolutionDebug.widgetConfigurationsLikeCandidate = candidate;
+            userResolutionDebug.widgetConfigurationsLikeDomain = cfgLikeRow.shop_domain || null;
+            break;
+          }
+        }
+      }
+
     }
+    if (isShopifyWidget && !shopifyShopRow?.user_id && effectiveUserId && widgetKeyShopDomain) {
+      await supabaseClient
+        .from('shopify_shops')
+        .update({ user_id: effectiveUserId })
+        .eq('shop_domain', widgetKeyShopDomain)
+        .is('user_id', null);
+      userResolutionDebug.backfilledShopifyShopsUserId = true;
+    }
+    userResolutionDebug.effectiveUserIdPresent = Boolean(effectiveUserId);
 
     if (!resolvedShopDomain && effectiveUserId) {
       const { data: shopifyStore } = await supabaseClient
@@ -304,6 +424,15 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!UUID_REGEX.test(resolvedProductId)) {
+        let lastResolutionDebug: Record<string, unknown> = {
+          hypothesisId: 'H-PRODUCT-RESOLVE',
+          resolvedProductId,
+          effectiveUserIdPresent: Boolean(effectiveUserId),
+          resolvedShopDomain: resolvedShopDomain || null,
+          widgetKeyShopDomain: widgetKeyShopDomain || null,
+          productNamePresent: Boolean(product_name),
+          userResolutionDebug,
+        };
         let productLookupQuery = supabaseClient
           .from('products')
           .select('id')
@@ -314,6 +443,12 @@ Deno.serve(async (req: Request) => {
         }
 
         let { data: mappedProduct, error: mappedProductError } = await productLookupQuery.maybeSingle();
+        if (mappedProductError) {
+          lastResolutionDebug = {
+            ...lastResolutionDebug,
+            lookupByShopifyError: mappedProductError.message || String(mappedProductError),
+          };
+        }
 
         if (!mappedProduct?.id) {
           const { data: byShopifyAnyUser } = await supabaseClient
@@ -325,6 +460,10 @@ Deno.serve(async (req: Request) => {
           if (byShopifyAnyUser?.id) {
             mappedProduct = byShopifyAnyUser;
             mappedProductError = null;
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              resolvedByShopifyAnyUser: true,
+            };
           }
         }
 
@@ -342,6 +481,17 @@ Deno.serve(async (req: Request) => {
           const fallbackByName = await productNameQuery.maybeSingle();
           mappedProduct = fallbackByName.data;
           mappedProductError = fallbackByName.error;
+          if (fallbackByName.error) {
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              lookupByNameError: fallbackByName.error.message || String(fallbackByName.error),
+            };
+          } else if (fallbackByName.data?.id) {
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              resolvedByName: true,
+            };
+          }
         }
 
         if ((!mappedProduct || mappedProductError) && effectiveUserId) {
@@ -379,8 +529,16 @@ Deno.serve(async (req: Request) => {
           if (!createdProductError && createdProduct?.id) {
             mappedProduct = createdProduct;
             mappedProductError = null;
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              createdPlaceholder: true,
+            };
           } else if (createdProductError) {
             console.warn('⚠️ Insert placeholder product failed:', createdProductError.message);
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              placeholderInsertError: createdProductError.message || String(createdProductError),
+            };
             const { data: existingAfterConflict } = await supabaseClient
               .from('products')
               .select('id')
@@ -390,6 +548,10 @@ Deno.serve(async (req: Request) => {
             if (existingAfterConflict?.id) {
               mappedProduct = existingAfterConflict;
               mappedProductError = null;
+              lastResolutionDebug = {
+                ...lastResolutionDebug,
+                resolvedByExistingAfterConflict: true,
+              };
             } else {
               const { data: existingAnyUser } = await supabaseClient
                 .from('products')
@@ -400,18 +562,70 @@ Deno.serve(async (req: Request) => {
               if (existingAnyUser?.id) {
                 mappedProduct = existingAnyUser;
                 mappedProductError = null;
+                lastResolutionDebug = {
+                  ...lastResolutionDebug,
+                  resolvedByExistingAnyUserAfterConflict: true,
+                };
               }
             }
           }
         }
 
+        if ((!mappedProduct || mappedProductError) && !effectiveUserId) {
+          const ownerlessPayload: Record<string, unknown> = {
+            shopify_id: resolvedProductId,
+            name: product_name || (isGarmentMeasurement ? 'Produto' : 'Calçado'),
+            description: null,
+            category: isGarmentMeasurement ? 'tops' : 'shoes',
+          };
+          const ownerlessResult = await supabaseClient
+            .from('products')
+            .insert([ownerlessPayload])
+            .select('id')
+            .single();
+
+          if (!ownerlessResult.error && ownerlessResult.data?.id) {
+            mappedProduct = ownerlessResult.data;
+            mappedProductError = null;
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              createdOwnerlessPlaceholder: true,
+            };
+          } else {
+            lastResolutionDebug = {
+              ...lastResolutionDebug,
+              ownerlessPlaceholderInsertError: ownerlessResult.error?.message || String(ownerlessResult.error),
+            };
+          }
+        }
+
         if (mappedProductError || !mappedProduct?.id) {
+          const compactResolutionDebug = {
+            effectiveUserIdPresent: Boolean(effectiveUserId),
+            fromWidgetKey: Boolean(userResolutionDebug.fromWidgetKey),
+            fromShopifyShops: Boolean(userResolutionDebug.fromShopifyShops),
+            shopifyShopBySlugUserIdPresent: Boolean(userResolutionDebug.shopifyShopBySlugUserIdPresent),
+            fromStoreUrlLikeDomain: Boolean(userResolutionDebug.fromStoreUrlLikeDomain),
+            fromStoreUrlLikeSlug: Boolean(userResolutionDebug.fromStoreUrlLikeSlug),
+            fromStoreName: Boolean(userResolutionDebug.fromStoreName),
+            fromWidgetConfigurations: Boolean(userResolutionDebug.fromWidgetConfigurations),
+            fromWidgetConfigurationsLike: Boolean(userResolutionDebug.fromWidgetConfigurationsLike),
+            widgetConfigurationsLikeDomain: userResolutionDebug.widgetConfigurationsLikeDomain || null,
+            ownerlessPlaceholderInsertError: (lastResolutionDebug as any).ownerlessPlaceholderInsertError || null,
+          };
           console.warn('⚠️ resolve product failed', {
             resolvedProductId,
             effectiveUserIdPresent: Boolean(effectiveUserId),
             product_name: product_name || null,
+            compactResolutionDebug,
           });
-          throw new Error('Could not resolve internal product UUID from product_id');
+          throw new Error(`Could not resolve internal product UUID from product_id | debug=${JSON.stringify({
+            hypothesisId: 'H-PRODUCT-RESOLVE',
+            resolvedProductId,
+            compactResolutionDebug,
+            mappedProductError: mappedProductError?.message || null,
+            mappedProductFound: Boolean(mappedProduct?.id),
+          }).slice(0, 700)}`);
         }
 
         resolvedProductId = mappedProduct.id;

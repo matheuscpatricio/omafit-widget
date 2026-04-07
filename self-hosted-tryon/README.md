@@ -21,7 +21,7 @@ Base de API assíncrona para rodar `FASHN VTON v1.5` em EC2 GPU e integrar com a
 - `app/main.py`: API e contrato HTTP
 - `app/worker.py`: worker GPU e chamada do modelo
 - `app/run_worker.py`: bootstrap do worker persistente com preload do pipeline
-- `docker-compose.yml`: stack local da EC2
+- `docker-compose.yml`: stack local da EC2 (inclui serviço **ar-eyewear-tripo** para fila GLB do app Omafit)
 - `.env.example`: variáveis de ambiente
 
 ## Variáveis de ambiente
@@ -57,13 +57,21 @@ Se usar `S3`, configure também:
 1. Instale Docker e NVIDIA Container Toolkit.
 2. Copie `.env.example` para `.env`.
 3. Baixe os pesos do modelo para `./weights`.
-4. Suba a stack:
+4. **(AR óculos)** Coloque o repositório **omafit** (app Shopify) ao lado de **omafit-widget**, para existir `omafit/workers/ar-eyewear-tripo` (caminho por defeito a partir daqui: `../../omafit/workers/ar-eyewear-tripo`). No `.env`, use o **mesmo** `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` que no Railway (chave **service_role**). O serviço `ar-eyewear-tripo` usa `Dockerfile.stub` (GLB de teste, só CPU). Outro caminho: variável `OMAFIT_AR_WORKER_CONTEXT` (absoluto ou relativo ao `docker-compose.yml`).
+
+5. Suba a stack:
 
 ```bash
 docker compose up --build -d
 ```
 
-5. Valide a saúde:
+Só o worker AR (sem subir api/redis do try-on):
+
+```bash
+docker compose up --build -d ar-eyewear-tripo
+```
+
+6. Valide a saúde:
 
 ```bash
 curl https://tryon.omafit.co/health
