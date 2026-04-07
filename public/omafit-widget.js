@@ -8,20 +8,50 @@
     typeof window !== 'undefined' &&
     (window.omafitDebug === true || /[?&]omafit_debug=1/.test(window.location.search));
 
-  /**
-   * Template com bloco app «Omafit AR óculos» (#omafit-ar-block-placed), ou GLB / link AR no DOM.
-   * Bloqueia iframe omafit.netlify.app/widget (manter alinhado com extensions/omafit-theme no repo omafit).
-   */
+  function isLikelyEyewearFromShopifyDom() {
+    var re =
+      /eyewear|sunglass|óculos|oculos|gafa|gafas|eyeglass|eyeglasses|spectacle|optical|optica|optics|lunette|lunettes|brille|brillen|armaç|arma[cç]ao|armação|reading\s*glass/i;
+    try {
+      var w = typeof window !== 'undefined' ? window : {};
+      var sap = w.ShopifyAnalytics && w.ShopifyAnalytics.meta && w.ShopifyAnalytics.meta.product;
+      if (sap) {
+        var type = String(sap.type || '').toLowerCase();
+        var tags = Array.isArray(sap.tags) ? sap.tags.join(' ').toLowerCase() : String(sap.tags || '').toLowerCase();
+        if (re.test(type + ' ' + tags)) return true;
+      }
+    } catch (e) {}
+    try {
+      var mp = typeof window !== 'undefined' && window.meta && window.meta.product;
+      if (mp) {
+        var t = String(mp.type || '').toLowerCase();
+        var tg = Array.isArray(mp.tags) ? mp.tags.join(' ').toLowerCase() : String(mp.tags || '').toLowerCase();
+        if (re.test(t + ' ' + tg)) return true;
+      }
+    } catch (e) {}
+    try {
+      var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (var i = 0; i < scripts.length; i++) {
+        var raw = scripts[i].textContent || '';
+        if (!/product/i.test(raw)) continue;
+        if (re.test(raw)) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   function isOmafitArEyewearPage() {
     if (document.getElementById('omafit-ar-block-placed')) return true;
     if (document.getElementById('omafit-suppress-clothing-widget')) return true;
     if (document.querySelector('.omafit-ar-try-on-link')) return true;
     var ar = document.getElementById('omafit-ar-root');
-    if (!ar) return false;
-    var glbAttr = (ar.getAttribute('data-glb-url') || '').trim();
-    if (glbAttr.length > 0) return true;
-    var d = ar.dataset && ar.dataset.glbUrl != null ? String(ar.dataset.glbUrl).trim() : '';
-    return d.length > 0;
+    if (ar) {
+      var glbAttr = (ar.getAttribute('data-glb-url') || '').trim();
+      if (glbAttr.length > 0) return true;
+      var d = ar.dataset && ar.dataset.glbUrl != null ? String(ar.dataset.glbUrl).trim() : '';
+      if (d.length > 0) return true;
+    }
+    if (isLikelyEyewearFromShopifyDom()) return true;
+    return false;
   }
 
   function removeClothingOmafitUi() {
@@ -54,7 +84,7 @@
   }
 
   function scheduleArEyewearSuppression() {
-    var delays = [0, 50, 150, 400, 1000, 2500, 5000];
+    var delays = [0, 50, 150, 400, 1000, 2500, 5000, 8000, 12000];
     for (var i = 0; i < delays.length; i++) {
       setTimeout(applyOmafitArEyewearSuppression, delays[i]);
     }

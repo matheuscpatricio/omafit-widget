@@ -43,6 +43,33 @@ const parseEyewearArModeFromUrl = (): boolean => {
   return legacy === '1' || legacy === 'true' || legacy === 'yes';
 };
 
+const EYEWEAR_HINT =
+  /eyewear|sunglass|óculos|oculos|gafa|gafas|eyeglass|eyeglasses|spectacle|optical|optica|lunette|lunettes|brille|armaç|arma[cç]ao|armação|optic/i;
+
+/** Bloqueia TryOn de roupa no iframe quando a URL já indica óculos (nome, coleção ou descrição). */
+const shouldBlockClothingTryonFromUrlParams = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (parseEyewearArModeFromUrl()) return true;
+  const q = new URLSearchParams(window.location.search);
+  const tryDecode = (s: string | null) => {
+    if (!s) return '';
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  const name = tryDecode(q.get('productName'));
+  if (name && EYEWEAR_HINT.test(name)) return true;
+  const desc = tryDecode(q.get('productDescription')) || tryDecode(q.get('product_description'));
+  if (desc && EYEWEAR_HINT.test(desc)) return true;
+  const handle = (q.get('collectionHandle') || '').toLowerCase();
+  if (handle && EYEWEAR_HINT.test(handle)) return true;
+  const handlesCsv = q.get('collectionHandles') || '';
+  if (handlesCsv && EYEWEAR_HINT.test(handlesCsv.toLowerCase())) return true;
+  return false;
+};
+
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
 
@@ -472,7 +499,7 @@ export function WidgetPage() {
     };
   }, []);
 
-  if (typeof window !== 'undefined' && parseEyewearArModeFromUrl()) {
+  if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams()) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-center gap-3"
@@ -480,8 +507,8 @@ export function WidgetPage() {
       >
         <p className="text-lg font-semibold text-gray-900">Provador de roupa indisponível</p>
         <p className="text-gray-600 text-sm max-w-md">
-          Este produto utiliza o provador AR de óculos na página da loja. Fecha esta janela e usa o link de AR na página
-          do produto.
+          Este produto parece ser de óculos: o provador de roupa não se aplica. Fecha esta janela e usa o provador AR na
+          página do produto na loja.
         </p>
       </div>
     );
