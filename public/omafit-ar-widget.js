@@ -475,6 +475,7 @@ async function runArSession({
       objectPosition: "50% 50%",
       display: "block",
       background: "#000",
+      transform: "scaleX(1)",
     },
   });
   const canvas = el("canvas", {
@@ -660,7 +661,7 @@ async function runArSession({
     const zPlane = -0.34;
     const distCamToPlane = camZ - zPlane;
     const zDepthScale = 0.12;
-    const mirrorSelfie = cfgRoot?.dataset?.arMirrorSelfie === "1";
+    const mirrorSelfie = false;
 
     function normX(px) {
       return mirrorSelfie ? 1 - px : px;
