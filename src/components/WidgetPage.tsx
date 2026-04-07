@@ -70,6 +70,75 @@ const shouldBlockClothingTryonFromUrlParams = (): boolean => {
   return false;
 };
 
+const tryDecodeUrlParam = (value: string | null): string => {
+  if (!value) return '';
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+type EyewearArBootstrap = {
+  glbUrl: string;
+  productTitle: string;
+  productImage: string;
+  primaryColor: string;
+  storeLogo: string;
+  locale: 'pt' | 'es' | 'en';
+  linkText: string;
+};
+
+/** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
+const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap | null => {
+  const q = new URLSearchParams(search);
+  const rawGlb = q.get('arGlbUrl') ?? q.get('ar_glb_url');
+  if (!rawGlb || !String(rawGlb).trim()) return null;
+  const glbUrl = tryDecodeUrlParam(String(rawGlb).trim()) || String(rawGlb).trim();
+
+  let primaryColor = '#810707';
+  let storeLogo = '';
+  const logoDirect = q.get('storeLogo');
+  if (logoDirect && logoDirect.trim() !== '') {
+    storeLogo = tryDecodeUrlParam(logoDirect.trim());
+  }
+  const configParam = q.get('config');
+  if (configParam) {
+    try {
+      const config = JSON.parse(tryDecodeUrlParam(configParam)) as Record<string, unknown>;
+      if (typeof config.primaryColor === 'string' && config.primaryColor) {
+        primaryColor = config.primaryColor;
+      }
+      if (typeof config.storeLogo === 'string' && config.storeLogo.trim() !== '' && !storeLogo) {
+        storeLogo = config.storeLogo.trim();
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const productTitle = tryDecodeUrlParam(q.get('productName')) || 'Produto';
+  const productImage = tryDecodeUrlParam(q.get('productImage')) || '';
+  const lang =
+    normalizeWidgetLanguage(
+      q.get('adminLocale') ||
+        q.get('admin_locale') ||
+        q.get('language') ||
+        q.get('lang') ||
+        q.get('storeLanguage'),
+    ) || 'pt';
+
+  return {
+    glbUrl,
+    productTitle,
+    productImage,
+    primaryColor,
+    storeLogo,
+    locale: lang,
+    linkText: 'Experimentar óculos (AR)',
+  };
+};
+
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
 
@@ -499,7 +568,32 @@ export function WidgetPage() {
     };
   }, []);
 
-  if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams()) {
+  const eyewearBootstrap =
+    typeof window !== 'undefined' ? parseEyewearArBootstrapFromSearch(window.location.search) : null;
+  const showEyewearArNetlify =
+    typeof window !== 'undefined' &&
+    shouldBlockClothingTryonFromUrlParams() &&
+    eyewearBootstrap !== null;
+
+  useEffect(() => {
+    if (!showEyewearArNetlify) return;
+    const SCRIPT_ID = 'omafit-ar-widget-module';
+    const tryStart = () => {
+      window.__omafitArStart?.();
+    };
+    if (!document.getElementById(SCRIPT_ID)) {
+      const s = document.createElement('script');
+      s.id = SCRIPT_ID;
+      s.type = 'module';
+      s.src = `${window.location.origin}/omafit-ar-widget.js`;
+      s.onload = () => tryStart();
+      document.body.appendChild(s);
+    } else {
+      tryStart();
+    }
+  }, [showEyewearArNetlify]);
+
+  if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams() && !eyewearBootstrap) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-center gap-3"
@@ -510,6 +604,24 @@ export function WidgetPage() {
           Este produto parece ser de óculos: o provador de roupa não se aplica. Fecha esta janela e usa o provador AR na
           página do produto na loja.
         </p>
+      </div>
+    );
+  }
+
+  if (showEyewearArNetlify && eyewearBootstrap) {
+    return (
+      <div className="min-h-screen bg-white" onContextMenu={(e) => e.preventDefault()}>
+        <div
+          id="omafit-ar-root"
+          data-glb-url={eyewearBootstrap.glbUrl}
+          data-primary-color={eyewearBootstrap.primaryColor}
+          data-product-title={eyewearBootstrap.productTitle}
+          data-product-image={eyewearBootstrap.productImage}
+          data-store-logo={eyewearBootstrap.storeLogo}
+          data-locale={eyewearBootstrap.locale}
+          data-link-text={eyewearBootstrap.linkText}
+          data-auto-open="1"
+        />
       </div>
     );
   }
