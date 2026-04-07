@@ -606,12 +606,19 @@ async function runArSession({
     glasses.traverse((child) => {
       if (child.isMesh) {
         child.frustumCulled = false;
+        const colorAttr = child.geometry && child.geometry.getAttribute
+          ? child.geometry.getAttribute("color")
+          : null;
+        if (!child.material && colorAttr) {
+          child.material = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true });
+        }
         if (child.material) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
           for (const mat of mats) {
             if (!mat) continue;
             if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
             if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+            if (colorAttr && "vertexColors" in mat) mat.vertexColors = true;
             mat.toneMapped = false;
             mat.needsUpdate = true;
           }
@@ -708,7 +715,7 @@ async function runArSession({
       targetPos.addScaledVector(zAxis, -0.004);
       const targetQuat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
 
-      const faceScale = Math.max(0.095, Math.min(0.26, ipdNorm * 1.75));
+      const faceScale = Math.max(0.1, Math.min(0.285, ipdNorm * 1.9));
 
       targetPos.addScaledVector(zAxis, -0.012);
       faceRoot.position.lerp(targetPos, 0.28);
