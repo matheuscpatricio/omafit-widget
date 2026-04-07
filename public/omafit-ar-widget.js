@@ -636,6 +636,7 @@ async function runArSession({
       glasses.position.sub(center);
       baseGlbScale = 1 / maxDim;
       glasses.scale.setScalar(baseGlbScale);
+      glasses.userData._omafitNormWidth = Math.max(size.x / maxDim, 1e-4);
     }
 
     /** Corrige GLB “deitado”. Rotação Z padrão 0 (ajusta no bloco do tema se precisar). */
@@ -661,6 +662,7 @@ async function runArSession({
     const zPlane = -0.34;
     const distCamToPlane = camZ - zPlane;
     const zDepthScale = 0.12;
+    const frameToIpdRatio = 1.72; // mais conservador para evitar "óculos gigante"
     const mirrorSelfie = true;
 
     function normX(px) {
@@ -713,18 +715,19 @@ async function runArSession({
       const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
       const targetPos = anchor.clone();
       targetPos.addScaledVector(yAxis, -0.006);
-      targetPos.addScaledVector(zAxis, -0.004);
+      targetPos.addScaledVector(zAxis, -0.016);
       const targetQuat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
 
-      // Escala dinâmica por distância: mais perto => IPD maior => óculos aumenta.
-      // Mapeamento mais amplo para resposta clara ao aproximar/afastar.
-      const faceScale = Math.max(0.08, Math.min(0.42, (ipdNorm - 0.03) * 4.2));
+      // Escala geométrica: largura do frame proporcional à distância entre pupilas.
+      const ipdWorld = pL.distanceTo(pR);
+      const targetFrameWidth = ipdWorld * frameToIpdRatio;
+      const modelNormWidth = glasses.userData._omafitNormWidth || 1;
+      const faceScale = Math.max(0.05, Math.min(0.22, targetFrameWidth / modelNormWidth));
 
-      targetPos.addScaledVector(zAxis, -0.012);
       faceRoot.position.lerp(targetPos, 0.38);
       faceRoot.quaternion.slerp(targetQuat, 0.38);
       const s = faceRoot.scale.x || faceScale;
-      const nextS = s + (faceScale - s) * 0.42;
+      const nextS = s + (faceScale - s) * 0.32;
       faceRoot.scale.setScalar(nextS);
       return true;
     }
