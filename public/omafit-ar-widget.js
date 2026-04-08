@@ -647,7 +647,7 @@ async function runArSession({
     const modelFix = new THREE.Group();
     modelFix.rotation.order = "YXZ";
     modelFix.rotation.set(
-      readRotRad("arGlbRotX", 180),
+      readRotRad("arGlbRotX", 0),
       readRotRad("arGlbRotY", -90),
       readRotRad("arGlbRotZ", -90),
     );
