@@ -85,6 +85,7 @@ type EyewearArBootstrap = {
   productImage: string;
   primaryColor: string;
   storeLogo: string;
+  fontFamily: string;
   locale: 'pt' | 'es' | 'en';
   linkText: string;
 };
@@ -98,9 +99,14 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
 
   let primaryColor = '#810707';
   let storeLogo = '';
+  let fontFamily = '';
   const logoDirect = q.get('storeLogo');
   if (logoDirect && logoDirect.trim() !== '') {
     storeLogo = tryDecodeUrlParam(logoDirect.trim());
+  }
+  const fontDirect = q.get('fontFamily') ?? q.get('font_family');
+  if (fontDirect && String(fontDirect).trim() !== '') {
+    fontFamily = tryDecodeUrlParam(String(fontDirect).trim());
   }
   const configParam = q.get('config');
   if (configParam) {
@@ -111,6 +117,9 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
       }
       if (typeof config.storeLogo === 'string' && config.storeLogo.trim() !== '' && !storeLogo) {
         storeLogo = config.storeLogo.trim();
+      }
+      if (typeof config.fontFamily === 'string' && config.fontFamily.trim() !== '' && !fontFamily) {
+        fontFamily = config.fontFamily.trim();
       }
     } catch {
       /* ignore */
@@ -134,6 +143,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     productImage,
     primaryColor,
     storeLogo,
+    fontFamily,
     locale: lang,
     linkText: 'Experimentar óculos (AR)',
   };
@@ -618,6 +628,9 @@ export function WidgetPage() {
           data-product-title={eyewearBootstrap.productTitle}
           data-product-image={eyewearBootstrap.productImage}
           data-store-logo={eyewearBootstrap.storeLogo}
+          {...(eyewearBootstrap.fontFamily
+            ? { 'data-font-family': eyewearBootstrap.fontFamily }
+            : {})}
           data-locale={eyewearBootstrap.locale}
           data-link-text={eyewearBootstrap.linkText}
           data-auto-open="1"
