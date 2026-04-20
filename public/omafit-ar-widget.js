@@ -784,6 +784,12 @@ function injectGlobalStyles(root, primaryOverride) {
       width: 24px;
       height: 24px;
     }
+    /* MindAR: feed da câmara fica atrás do canvas; fundos opacos no canvas tapam o vídeo. */
+    .omafit-ar-mindar-host canvas,
+    .omafit-ar-shell .omafit-ar-mindar-host canvas {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
   `;
   document.head.appendChild(s);
   const hasThemeFontFace = document.getElementById("omafit-ar-theme-font-face");
@@ -1248,6 +1254,41 @@ async function startMindARFaceWithReliableCamera(mindarThree) {
   }
 }
 
+/**
+ * MindAR coloca o `<video>` da câmara atrás do canvas (z-index -2). O fundo só
+ * se vê se o WebGL limpar com **alpha 0**; caso contrário o canvas tapa o vídeo
+ * com preto opaco — o GLB continua visível, mas o feed da câmara desaparece.
+ * Reforça também estilos do vídeo/canvas contra regras agressivas do tema.
+ */
+function fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost) {
+  try {
+    const { scene, renderer } = mindarThree || {};
+    if (scene && "background" in scene) scene.background = null;
+    if (renderer && typeof renderer.setClearColor === "function") {
+      renderer.setClearColor(0x000000, 0);
+    }
+    const video = mindarHost?.querySelector?.("video");
+    if (video) {
+      video.setAttribute("playsinline", "");
+      video.setAttribute("muted", "");
+      video.playsInline = true;
+      video.muted = true;
+      video.style.opacity = "1";
+      video.style.visibility = "visible";
+      video.style.pointerEvents = "none";
+      void video.play?.().catch?.(() => {});
+    }
+    const canvases = mindarHost?.querySelectorAll?.("canvas") || [];
+    for (let i = 0; i < canvases.length; i++) {
+      const c = canvases[i];
+      c.style.backgroundColor = "transparent";
+      c.style.pointerEvents = "none";
+    }
+  } catch (e) {
+    console.warn("[omafit-ar] fixMindARFaceVideoBehindCanvas:", e?.message || e);
+  }
+}
+
 async function runArSession({
   shell,
   mainRow,
@@ -1296,6 +1337,7 @@ async function runArSession({
   });
 
   const mindarHost = el("div", {
+    className: "omafit-ar-mindar-host",
     style: {
       position: "absolute",
       inset: "0",
@@ -1835,6 +1877,11 @@ async function runArSession({
       } catch {
         /* ignore */
       }
+      try {
+        if (mindarThree) fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+      } catch {
+        /* ignore */
+      }
     });
     arResizeObserver.observe(arWrap);
     requestAnimationFrame(() => {
@@ -1846,6 +1893,7 @@ async function runArSession({
     });
 
     await startMindARFaceWithReliableCamera(mindarThree);
+    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
 
     /**
      * Pipeline simples: rotação vem inteiramente do `data-ar-canonical-fix-yxz`
@@ -2326,6 +2374,7 @@ async function runArSession({
       }
       renderer.render(scene, camera);
     });
+    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
 
     loading.style.display = "none";
 
