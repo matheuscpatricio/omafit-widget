@@ -113,7 +113,7 @@ SUPABASE_OUTPUT_PREFIX=self-hosted-results
 NUM_TIMESTEPS=18
 ```
 
-**URLs públicas:** o bucket `tryon-images` precisa estar **público**. No Supabase Dashboard: Storage → tryon-images → ⋮ → Edit bucket → marque **Public bucket**. A URL retornada será `https://SEU-PROJETO.supabase.co/storage/v1/object/public/tryon-images/self-hosted-results/xxx.png`.
+**Resultados:** ficam em `tryon-images/self-hosted-results/`. O bucket `tryon-images` fica **privado** na migração; só `tryon-models/` e `tryon-garments/` têm leitura anónima (RLS). Resultados vêm por URL assinada (`tryon-status` + `createSignedUrl` no upload do modelo).
 
 ### Exemplo usando S3
 

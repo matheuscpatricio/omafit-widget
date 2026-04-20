@@ -26,7 +26,8 @@ def _persist_to_supabase(source_path: Path, job_id: str) -> str:
         raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for Supabase output storage.")
 
     extension = source_path.suffix or ".png"
-    object_key = f"{settings.supabase_output_prefix}/{job_id}{extension}".strip("/")
+    prefix = settings.supabase_output_prefix.strip("/")
+    object_key = f"{prefix}/{job_id}{extension}" if prefix else f"{job_id}{extension}"
     upload_url = f"{settings.supabase_url}/storage/v1/object/{settings.supabase_output_bucket}/{object_key}"
 
     response = requests.post(
@@ -42,7 +43,8 @@ def _persist_to_supabase(source_path: Path, job_id: str) -> str:
     )
     response.raise_for_status()
 
-    return f"{settings.supabase_url}/storage/v1/object/public/{settings.supabase_output_bucket}/{object_key}"
+    # Bucket privado: URL canónica sem /public/; o widget obtém URL assinada via edge function tryon-status.
+    return f"{settings.supabase_url}/storage/v1/object/{settings.supabase_output_bucket}/{object_key}"
 
 
 def _persist_to_s3(source_path: Path, job_id: str) -> str:

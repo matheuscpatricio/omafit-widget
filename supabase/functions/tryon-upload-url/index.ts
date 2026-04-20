@@ -43,14 +43,9 @@ Deno.serve(async (req: Request) => {
       throw new Error(error?.message || 'Failed to create signed upload URL');
     }
 
-    const { data: publicUrlData } = supabaseClient.storage
-      .from('tryon-images')
-      .getPublicUrl(path);
-
     return new Response(JSON.stringify({
       token: data.token,
       path,
-      publicUrl: publicUrlData.publicUrl,
       bucket: 'tryon-images',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

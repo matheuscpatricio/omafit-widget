@@ -170,7 +170,18 @@ async function uploadTryOnModelImage(blob: Blob, fileName?: string): Promise<str
     throw new Error(`Failed to upload model image: ${error.message}`);
   }
 
-  return uploadMetadata.publicUrl;
+  const bucket = uploadMetadata.bucket || 'tryon-images';
+  const { data: signedRead, error: signError } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(uploadMetadata.path, 7200);
+
+  if (signError || !signedRead?.signedUrl) {
+    throw new Error(
+      signError?.message || 'Failed to create signed read URL for model image',
+    );
+  }
+
+  return signedRead.signedUrl;
 }
 
 async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {

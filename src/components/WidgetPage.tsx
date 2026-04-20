@@ -88,6 +88,19 @@ type EyewearArBootstrap = {
   fontFamily: string;
   locale: 'pt' | 'es' | 'en';
   linkText: string;
+  /**
+   * Campos extras para suportar múltiplos tipos de acessório (glasses,
+   * necklace, watch, bracelet) dentro do iframe Netlify. Vêm propagados via
+   * query string pelo omafit-widget.js do tema (data-ar-* no DOM do cliente).
+   */
+  accessoryType?: string;
+  categoryPath?: string;
+  productType?: string;
+  productTags?: string;
+  trackingStack?: string;
+  preferredCamera?: string;
+  mindarAnchor?: string;
+  calibration?: string;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -137,6 +150,57 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
         q.get('storeLanguage'),
     ) || 'pt';
 
+  const pickQ = (keys: string[]): string => {
+    for (const k of keys) {
+      const v = q.get(k);
+      if (v != null && String(v).trim() !== '') return tryDecodeUrlParam(String(v).trim());
+    }
+    return '';
+  };
+
+  const accessoryType = pickQ(['arAccessoryType', 'ar_accessory_type']).toLowerCase();
+  const categoryPath = pickQ(['arCategoryPath', 'ar_category_path']);
+  const productType = pickQ(['arProductType', 'ar_product_type']);
+  const productTags = pickQ(['arProductTags', 'ar_product_tags']);
+  const trackingStack = pickQ(['arTrackingStack', 'ar_tracking_stack']).toLowerCase();
+  const preferredCamera = pickQ(['arPreferredCamera', 'ar_preferred_camera']).toLowerCase();
+  const mindarAnchor = pickQ(['arMindarAnchor', 'ar_mindar_anchor']);
+  const calibration = pickQ(['arOmafitCalibration', 'ar_omafit_calibration']);
+
+  /**
+   * Link text default baseado no tipo de acessório — evita "Experimentar
+   * óculos (AR)" aparecer para relógios/pulseiras/colares se o lojista não
+   * configurou um texto custom.
+   */
+  const defaultLinkText = (() => {
+    switch (accessoryType) {
+      case 'watch':
+        return lang === 'en'
+          ? 'Try watch on (AR)'
+          : lang === 'es'
+            ? 'Probar reloj (AR)'
+            : 'Experimentar relógio (AR)';
+      case 'bracelet':
+        return lang === 'en'
+          ? 'Try bracelet on (AR)'
+          : lang === 'es'
+            ? 'Probar pulsera (AR)'
+            : 'Experimentar pulseira (AR)';
+      case 'necklace':
+        return lang === 'en'
+          ? 'Try necklace on (AR)'
+          : lang === 'es'
+            ? 'Probar collar (AR)'
+            : 'Experimentar colar (AR)';
+      default:
+        return lang === 'en'
+          ? 'Try glasses on (AR)'
+          : lang === 'es'
+            ? 'Probar gafas (AR)'
+            : 'Experimentar óculos (AR)';
+    }
+  })();
+
   return {
     glbUrl,
     productTitle,
@@ -145,7 +209,15 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     storeLogo,
     fontFamily,
     locale: lang,
-    linkText: 'Experimentar óculos (AR)',
+    linkText: defaultLinkText,
+    accessoryType: accessoryType || undefined,
+    categoryPath: categoryPath || undefined,
+    productType: productType || undefined,
+    productTags: productTags || undefined,
+    trackingStack: trackingStack || undefined,
+    preferredCamera: preferredCamera || undefined,
+    mindarAnchor: mindarAnchor || undefined,
+    calibration: calibration || undefined,
   };
 };
 
@@ -619,6 +691,19 @@ export function WidgetPage() {
   }
 
   if (showEyewearArNetlify && eyewearBootstrap) {
+    /** Propaga todos os data-ar-* recebidos via query string para o DOM onde
+     *  o `/omafit-ar-widget.js` hosteado lê — sem isto o widget cai em
+     *  `glasses` por default (era esse o bug "conteúdo de óculos no relógio"). */
+    const arExtraAttrs: Record<string, string> = {};
+    if (eyewearBootstrap.accessoryType) arExtraAttrs['data-ar-accessory-type'] = eyewearBootstrap.accessoryType;
+    if (eyewearBootstrap.categoryPath) arExtraAttrs['data-ar-category-path'] = eyewearBootstrap.categoryPath;
+    if (eyewearBootstrap.productType) arExtraAttrs['data-ar-product-type'] = eyewearBootstrap.productType;
+    if (eyewearBootstrap.productTags) arExtraAttrs['data-ar-product-tags'] = eyewearBootstrap.productTags;
+    if (eyewearBootstrap.trackingStack) arExtraAttrs['data-ar-tracking-stack'] = eyewearBootstrap.trackingStack;
+    if (eyewearBootstrap.preferredCamera) arExtraAttrs['data-ar-preferred-camera'] = eyewearBootstrap.preferredCamera;
+    if (eyewearBootstrap.mindarAnchor) arExtraAttrs['data-ar-mindar-anchor'] = eyewearBootstrap.mindarAnchor;
+    if (eyewearBootstrap.calibration) arExtraAttrs['data-ar-omafit-calibration'] = eyewearBootstrap.calibration;
+
     return (
       <div className="min-h-screen bg-white" onContextMenu={(e) => e.preventDefault()}>
         <div
@@ -634,6 +719,7 @@ export function WidgetPage() {
           data-locale={eyewearBootstrap.locale}
           data-link-text={eyewearBootstrap.linkText}
           data-auto-open="1"
+          {...arExtraAttrs}
         />
       </div>
     );

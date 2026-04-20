@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { X, Code, Users, TrendingUp, Calendar, Copy, CheckCircle, Download } from 'lucide-react';
 import type { Database } from '../lib/supabase';
+import { resolveSupabaseStorageDisplayUrl } from '../utils/supabaseStorageDisplayUrl';
 
 type Product = Database['public']['Tables']['products']['Row'];
 type TryonSession = Database['public']['Tables']['tryon_sessions']['Row'];
+
+type TryonSessionWithDisplayUrls = TryonSession & {
+  displayModelUrl: string | null;
+  displayResultUrl: string | null;
+};
 
 interface ProductDetailsProps {
   product: Product;
@@ -12,7 +18,7 @@ interface ProductDetailsProps {
 }
 
 export function ProductDetails({ product, onClose }: ProductDetailsProps) {
-  const [sessions, setSessions] = useState<TryonSession[]>([]);
+  const [sessions, setSessions] = useState<TryonSessionWithDisplayUrls[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWidget, setShowWidget] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -30,7 +36,15 @@ export function ProductDetails({ product, onClose }: ProductDetailsProps) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSessions(data || []);
+      const rows = data || [];
+      const enriched: TryonSessionWithDisplayUrls[] = await Promise.all(
+        rows.map(async (s) => ({
+          ...s,
+          displayModelUrl: await resolveSupabaseStorageDisplayUrl(s.model_image),
+          displayResultUrl: await resolveSupabaseStorageDisplayUrl(s.result_image),
+        })),
+      );
+      setSessions(enriched);
     } catch (error) {
       console.error('Error fetching sessions:', error);
     } finally {
@@ -481,7 +495,7 @@ export function ProductDetails({ product, onClose }: ProductDetailsProps) {
                       <div>
                         <span className="text-sm font-medium text-gray-700 block mb-2">Foto da Cliente</span>
                         <img
-                          src={session.model_image}
+                          src={session.displayModelUrl || session.model_image || ''}
                           alt="Cliente"
                           className="w-full h-32 object-cover rounded-lg"
                         />
@@ -490,7 +504,7 @@ export function ProductDetails({ product, onClose }: ProductDetailsProps) {
                         <div>
                           <span className="text-sm font-medium text-gray-700 block mb-2">Resultado</span>
                           <img
-                            src={session.result_image}
+                            src={session.displayResultUrl || session.result_image || ''}
                             alt="Resultado"
                             className="w-full h-32 object-cover rounded-lg"
                           />

@@ -113,11 +113,15 @@ async function uploadTryOnImage(
     throw new Error(`Failed to upload image: ${uploadError.message}`);
   }
 
-  const { data: urlData } = supabaseClient.storage
+  const { data: signedRead, error: signError } = await supabaseClient.storage
     .from('tryon-images')
-    .getPublicUrl(fileName);
+    .createSignedUrl(fileName, 7200);
 
-  return urlData.publicUrl;
+  if (signError || !signedRead?.signedUrl) {
+    throw new Error(signError?.message || 'Failed to create signed read URL for uploaded image');
+  }
+
+  return signedRead.signedUrl;
 }
 
 Deno.serve(async (req: Request) => {

@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 import { getTryOnStatus, resolveTryOnProvider } from '../_shared/tryon-provider.ts';
+import { signSupabaseStorageObjectUrlIfNeeded } from '../_shared/supabase-storage-sign.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,8 +33,10 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 Checking status for prediction:', predictionId);
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      supabaseUrl,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
@@ -72,10 +75,15 @@ Deno.serve(async (req: Request) => {
     }
 
     if (sessionData.fashn_status === 'completed' && sessionData.result_image) {
+      const signedOut = await signSupabaseStorageObjectUrlIfNeeded(
+        supabase,
+        sessionData.result_image,
+        supabaseUrl,
+      );
       return new Response(JSON.stringify({
         prediction_id: predictionId,
         status: 'completed',
-        output: [sessionData.result_image],
+        output: [signedOut],
         fal_status: 'COMPLETED',
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -251,10 +259,14 @@ Deno.serve(async (req: Request) => {
           .eq('fashn_prediction_id', predictionId);
       }
 
+      const signedResultImage = resultImage
+        ? await signSupabaseStorageObjectUrlIfNeeded(supabase, resultImage, supabaseUrl)
+        : null;
+
       const responseData = {
         prediction_id: predictionId,
         status: dbStatus,
-        output: resultImage ? [resultImage] : null,
+        output: signedResultImage ? [signedResultImage] : null,
         fal_status: statusResult.providerStatus
       };
       console.log('📤 Returning response:', responseData);
