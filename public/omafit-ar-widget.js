@@ -94,8 +94,22 @@ const MEDIAPIPE_HAND_MODEL_URL =
  * utilizador reportou que o relógio ficava visivelmente pequeno no pulso.
  * O multiplicador de calibração (0,3–3×) continua disponível por cima.
  */
-const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.062;
-const OMAFIT_BRACELET_AR_WORLD_MAX_DIM = 0.068;
+/**
+ * Dimensão-alvo em mundo (metros) para o diâmetro efectivo do acessório
+ * quando posto no pulso.
+ *
+ *  • Relógios — 0,072 m (72 mm) é o comprimento da maior dimensão do bbox
+ *    (tipicamente o eixo da correia esticada + face). Um pulso adulto com
+ *    perímetro 170-190 mm tem diâmetro 54-60 mm, por isso o GLB precisa
+ *    de esticar ≈ 20 % para cobrir a maior parte da circunferência. Antes
+ *    (0,062) sobrava pele visível no lado palmar; 0,072 fecha o gap.
+ *  • Pulseiras — escaladas pela **MEDIANA** do bbox (ver `fitBraceletGlb`),
+ *    não pelo máximo. Isto garante que o anel da pulseira tem diâmetro
+ *    correcto para envolver o pulso em vez de ficar minúsculo porque a
+ *    dimensão máxima do bbox é o "fim do fecho" esticado em algumas GLBs.
+ */
+const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.072;
+const OMAFIT_BRACELET_AR_WORLD_MEDIAN_DIM = 0.062;
 
 /**
  * Comprimento real (m) do segmento punho→MCP-médio numa mão adulta.
@@ -120,7 +134,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 180;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_wrist-occluder+anchor-at-wrist-v8";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_bracelet-auto-rotate+median-fit-v9";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -2994,6 +3008,73 @@ async function runHandArSession({
 
   wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
 
+  /**
+   * Ajusta uma GLB de pulso (relógio ou pulseira) ao pulso:
+   *   1. Se for pulseira, detecta eixo do anel pela menor dimensão do bbox
+   *      e roda 90° para o alinhar com +Z local (antebraço).
+   *   2. Calcula `baseScale` por estratégia apropriada:
+   *        watch   → max(bbox) → 72 mm
+   *        bracelet → median(bbox) → 62 mm (= diâmetro real do anel)
+   *   3. Centra o pivô no bbox pós-rotação.
+   *
+   * Retorna `{ baseScale, size, bbox }` para o chamador ajustar escala.
+   */
+  function fitWristGlb(glbScene, glbRoot, accessoryType, calScale) {
+    let bbox = new THREE.Box3().setFromObject(glbScene);
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+
+    if (accessoryType === "bracelet") {
+      const sx = size.x;
+      const sy = size.y;
+      const sz = size.z;
+      let smallestAxis = "z";
+      if (sx <= sy && sx <= sz) smallestAxis = "x";
+      else if (sy <= sx && sy <= sz) smallestAxis = "y";
+
+      let rotApplied = false;
+      if (smallestAxis === "x") {
+        glbScene.quaternion.setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          -Math.PI / 2,
+        );
+        rotApplied = true;
+      } else if (smallestAxis === "y") {
+        glbScene.quaternion.setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0),
+          Math.PI / 2,
+        );
+        rotApplied = true;
+      }
+      if (rotApplied) {
+        glbScene.updateMatrixWorld(true);
+        bbox = new THREE.Box3().setFromObject(glbScene);
+        bbox.getSize(size);
+      }
+    }
+
+    const sorted = [size.x, size.y, size.z].sort((a, b) => a - b);
+    const medianDim = sorted[1] || 1;
+    const maxDim = sorted[2] || 1;
+    const isBracelet = accessoryType === "bracelet";
+    const scaleSourceDim = isBracelet ? medianDim : maxDim;
+    const worldTarget = isBracelet
+      ? OMAFIT_BRACELET_AR_WORLD_MEDIAN_DIM
+      : OMAFIT_WRIST_AR_WORLD_MAX_DIM;
+    const calcBaseScale = worldTarget / Math.max(scaleSourceDim, 1e-6);
+    const finalMul =
+      Number.isFinite(Number(calScale)) && Number(calScale) > 0
+        ? Number(calScale)
+        : 1;
+    glbRoot.scale.setScalar(calcBaseScale * finalMul);
+
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    glbScene.position.sub(center);
+
+    return { baseScale: calcBaseScale, size, bbox, maxDim, medianDim };
+  }
+
   // Load the GLB.
   const glbLoader = new GLTFLoader();
   const versionHint =
@@ -3016,30 +3097,25 @@ async function runHandArSession({
         });
         glbRoot.add(glbScene);
 
-        const bbox = new THREE.Box3().setFromObject(glbScene);
-        const size = new THREE.Vector3();
-        bbox.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z) || 1;
-        const wristWorldMax =
-          accessoryType === "bracelet"
-            ? OMAFIT_BRACELET_AR_WORLD_MAX_DIM
-            : OMAFIT_WRIST_AR_WORLD_MAX_DIM;
-        baseScale = wristWorldMax / maxDim;
-        const finalMul = userScale > 0 ? userScale : 1;
-        glbRoot.scale.setScalar(baseScale * finalMul);
+        const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
+        baseScale = fitRes.baseScale;
 
-        const center = new THREE.Vector3();
-        bbox.getCenter(center);
-        glbScene.position.sub(center);
-
-        console.log("[omafit-ar] hand GLB baked", {
+        console.log("[omafit-ar] hand GLB fit", {
           accessoryType,
-          maxDim,
-          wristWorldMax,
-          userScale: finalMul,
-          baseScale,
-          effectiveWorldMaxMm: Math.round(wristWorldMax * finalMul * 1000),
-          bbox: { x: size.x, y: size.y, z: size.z },
+          strategy:
+            accessoryType === "bracelet"
+              ? "median-dim → 62 mm (ring diameter)"
+              : "max-dim → 72 mm (strap span)",
+          baseScale: fitRes.baseScale,
+          maxDim: fitRes.maxDim,
+          medianDim: fitRes.medianDim,
+          effMaxMm: Math.round(
+            fitRes.maxDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
+          ),
+          effMedianMm: Math.round(
+            fitRes.medianDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
+          ),
+          bbox: { x: fitRes.size.x, y: fitRes.size.y, z: fitRes.size.z },
         });
 
         glbRoot.visible = true;
@@ -3231,8 +3307,16 @@ async function runHandArSession({
      * EMA lento (tau = 800 ms) para não pulsar com o jitter dos landmarks.
      */
     const handKnuckleSpan = w5.distanceTo(w17);
-    const wristRadiusRaw = Math.max(0.018, Math.min(0.032, handKnuckleSpan * 0.38));
-    const forearmLengthRaw = Math.max(0.25, Math.min(0.5, handKnuckleSpan * 5.0));
+    /**
+     * Raio: 42 % da largura entre knuckles. Estudos de antropometria indicam
+     * razão pulso/palma ≈ 0,40-0,45 para adultos. Clamp 22-38 mm cobre
+     * crianças pequenas a adultos com pulso largo. Valor ligeiramente maior
+     * que antes (era 0,38 × [18-32]) para garantir que o occluder envolve
+     * toda a circunferência do pulso — caso contrário sobrava uma faixa
+     * visível onde o strap deveria estar ocluído.
+     */
+    const wristRadiusRaw = Math.max(0.022, Math.min(0.038, handKnuckleSpan * 0.42));
+    const forearmLengthRaw = Math.max(0.3, Math.min(0.6, handKnuckleSpan * 6.0));
     if (!smoothOccluderInitialized) {
       smoothWristRadius = wristRadiusRaw;
       smoothForearmLength = forearmLengthRaw;
@@ -3354,20 +3438,8 @@ async function runHandArSession({
               bakeGLBTransforms(THREE, next, () => {});
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
-              const bbox = new THREE.Box3().setFromObject(next);
-              const size = new THREE.Vector3();
-              bbox.getSize(size);
-              const maxDim = Math.max(size.x, size.y, size.z) || 1;
-              const wristWorldMax =
-                accessoryType === "bracelet"
-                  ? OMAFIT_BRACELET_AR_WORLD_MAX_DIM
-                  : OMAFIT_WRIST_AR_WORLD_MAX_DIM;
-              baseScale = wristWorldMax / maxDim;
-              const s = Number(cal?.scale);
-              glbRoot.scale.setScalar(baseScale * (Number.isFinite(s) && s > 0 ? s : 1));
-              const center = new THREE.Vector3();
-              bbox.getCenter(center);
-              next.position.sub(center);
+              const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
+              baseScale = fitRes.baseScale;
               resolve();
             },
             undefined,
