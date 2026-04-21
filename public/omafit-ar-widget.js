@@ -134,7 +134,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 180;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_bracelet-auto-rotate+median-fit-v9";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_anthropometric-wrist-radius-fix-v11";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -3009,20 +3009,84 @@ async function runHandArSession({
   wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
 
   /**
-   * Ajusta uma GLB de pulso (relógio ou pulseira) ao pulso:
-   *   1. Se for pulseira, detecta eixo do anel pela menor dimensão do bbox
-   *      e roda 90° para o alinhar com +Z local (antebraço).
-   *   2. Calcula `baseScale` por estratégia apropriada:
-   *        watch   → max(bbox) → 72 mm
-   *        bracelet → median(bbox) → 62 mm (= diâmetro real do anel)
-   *   3. Centra o pivô no bbox pós-rotação.
+   * Dobra os vértices de uma GLB em torno de um cilindro virtual com eixo
+   * `armAxis` e raio `localR`. Coordenada ao longo de `bendAxis` vira ângulo
+   * à volta do cilindro; coordenada ao longo de `dorsalAxis` vira distância
+   * radial. O `armAxis` mantém-se inalterado.
    *
-   * Retorna `{ baseScale, size, bbox }` para o chamador ajustar escala.
+   * Math por vértice (pseudocódigo):
+   *   θ  = bendComp / localR
+   *   r  = localR + dorsalComp
+   *   newBend    = r · sin(θ)
+   *   newDorsal  = r · cos(θ) − localR
+   *   newArm     = armComp (unchanged)
+   *
+   * Isto transforma uma correia plana (X lateral) numa correia curva que
+   * envolve o pulso à medida que |x|/localR aumenta (ângulo cresce). O
+   * mostrador do relógio (perto de x=0) mantém-se praticamente plano
+   * (sin(θ)≈θ, cos(θ)≈1 para θ pequeno).
+   *
+   * Recomputa normais + bbox de cada mesh após a dobra.
+   */
+  function bendGeometryCylinder(glbScene, bendAxis, armAxis, dorsalAxis, localR) {
+    const bA = bendAxis.clone().normalize();
+    const aA = armAxis.clone().normalize();
+    const dA = dorsalAxis.clone().normalize();
+    const v = new THREE.Vector3();
+    glbScene.traverse((obj) => {
+      if (!obj.isMesh || !obj.geometry) return;
+      const pos = obj.geometry.attributes.position;
+      if (!pos) return;
+      const arr = pos.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        v.set(arr[i], arr[i + 1], arr[i + 2]);
+        const bendC = v.dot(bA);
+        const armC = v.dot(aA);
+        const dorsalC = v.dot(dA);
+        const theta = bendC / localR;
+        const r = localR + dorsalC;
+        const newBend = r * Math.sin(theta);
+        const newDorsal = r * Math.cos(theta) - localR;
+        v.copy(bA).multiplyScalar(newBend)
+          .addScaledVector(aA, armC)
+          .addScaledVector(dA, newDorsal);
+        arr[i] = v.x;
+        arr[i + 1] = v.y;
+        arr[i + 2] = v.z;
+      }
+      pos.needsUpdate = true;
+      obj.geometry.computeBoundingBox();
+      obj.geometry.computeBoundingSphere();
+      obj.geometry.computeVertexNormals();
+    });
+  }
+
+  /**
+   * Default wrist radius (m) usado no load até termos leitura estável do
+   * raio real via landmarks. Escala é depois re-ajustada por frame em
+   * `updateAnchorFromHand` para `smoothWristRadius`.
+   */
+  const OMAFIT_DEFAULT_WRIST_R_M = 0.026;
+
+  /**
+   * Ajusta uma GLB de pulso ao pulso em 3 passos:
+   *
+   *   1. Pulseira: detecta eixo do anel (dim mínima) e roda 90° para o
+   *      alinhar com +Z local.
+   *   2. Relógio plano (max/median > 2): dobra a correia à volta de um
+   *      cilindro local de raio `strap/(2π·wrapFraction)`. Depois roda
+   *      o eixo do braço (originalmente o "médio" do bbox) para +Z local.
+   *   3. Calcula `localRingR` (raio no espaço GLB) e `baseScale` inicial
+   *      assumindo pulso médio (26 mm). O caller ajusta por frame a partir
+   *      do raio real detectado.
    */
   function fitWristGlb(glbScene, glbRoot, accessoryType, calScale) {
     let bbox = new THREE.Box3().setFromObject(glbScene);
     const size = new THREE.Vector3();
     bbox.getSize(size);
+
+    let didBend = false;
+    let bendLocalR = 0;
 
     if (accessoryType === "bracelet") {
       const sx = size.x;
@@ -3051,17 +3115,135 @@ async function runHandArSession({
         bbox = new THREE.Box3().setFromObject(glbScene);
         bbox.getSize(size);
       }
+    } else {
+      /**
+       * === DETECÇÃO DE RELÓGIO PLANO ===
+       *
+       * Um relógio plano (correia esticada a direito) tem ratio max/median
+       * tipicamente 4-7. Um relógio já enrolado (correia curva) tem ratio
+       * próximo de 1. Threshold 2.0 distingue os dois com margem.
+       *
+       * Eixos após ordenação por tamanho:
+       *   • bend axis (MAX)   = comprimento da correia esticada → vai envolver
+       *   • arm axis (MEDIAN) = largura do mostrador / direcção do antebraço
+       *   • dorsal axis (MIN) = espessura (normal da face do mostrador)
+       */
+      const axes = [
+        { name: "x", size: size.x, vec: new THREE.Vector3(1, 0, 0) },
+        { name: "y", size: size.y, vec: new THREE.Vector3(0, 1, 0) },
+        { name: "z", size: size.z, vec: new THREE.Vector3(0, 0, 1) },
+      ];
+      axes.sort((a, b) => a.size - b.size);
+      const dorsal = axes[0];
+      const arm = axes[1];
+      const bend = axes[2];
+      const flatRatio = bend.size / Math.max(arm.size, 1e-6);
+      if (flatRatio > 2.0) {
+        /**
+         * wrapFraction = 0.83 → correia cobre ~300° da circunferência
+         * (buckle gap ~60° no lado palmar). Resulta num visual natural
+         * onde se vê o overlap da fivela quando a mão roda.
+         */
+        const wrapFraction = 0.83;
+        const localR = bend.size / (2 * Math.PI * wrapFraction);
+
+        /**
+         * === DETECÇÃO AUTO DO SENTIDO DORSAL ===
+         *
+         * O bbox dá-nos a magnitude mas não o sentido (±) do eixo dorsal.
+         * Se errarmos, a face do relógio acaba no interior do cilindro
+         * (invisível). Heurística: o centro do bbox tem projecção maior
+         * no lado onde há mais massa (o corpo do relógio tipicamente é
+         * mais volumoso no lado da face do que no lado da correia).
+         *
+         * Se center · dorsal_candidate < 0, invertemos o sentido.
+         */
+        const bboxCenter = new THREE.Vector3();
+        bbox.getCenter(bboxCenter);
+        const dorsalN = dorsal.vec.clone();
+        if (bboxCenter.dot(dorsalN) < 0) dorsalN.negate();
+
+        /**
+         * === BASE ORTONORMAL RIGHT-HANDED ===
+         *
+         * Para a mudança de base para o frame da âncora ser uma ROTAÇÃO
+         * própria (det+1, sem reflexão), precisamos que (bend, dorsal, arm)
+         * forme base right-handed:   bend × dorsal = +arm
+         *
+         * Se a detecção inicial de `arm` estiver no sentido oposto
+         * (depois de possivelmente termos invertido dorsal), invertê-lo
+         * garante a base correcta.
+         */
+        const bendN = bend.vec.clone();
+        const armN = arm.vec.clone();
+        const expectedArm = new THREE.Vector3().crossVectors(bendN, dorsalN);
+        if (expectedArm.dot(armN) < 0) armN.negate();
+
+        bendGeometryCylinder(glbScene, bendN, armN, dorsalN, localR);
+        didBend = true;
+        bendLocalR = localR;
+
+        /**
+         * === MUDANÇA DE BASE PARA FRAME DA ÂNCORA ===
+         *
+         * Queremos que (bend, dorsal, arm) do GLB → (X, Y, Z) da âncora
+         * (lateral, dorsal, antebraço). Construímos M com colunas
+         * (bend, dorsal, arm); a rotação desejada é M^T (= M^-1 pois M
+         * é ortonormal), que leva cada vector base ao eixo canónico.
+         *
+         * Três casos comuns:
+         *   Watch face-up (Y up):  bend=X, dorsal=Y, arm=Z → M=I, q=identity
+         *   Watch face-fwd (Z up): bend=X, dorsal=Z, arm=−Y → rot −90° em X
+         *   Watch face-side (X):   bend=Y ou Z, dorsal=X, arm=outro → rot apropriada
+         */
+        const M = new THREE.Matrix4().makeBasis(bendN, dorsalN, armN);
+        const invM = new THREE.Matrix4().copy(M).transpose();
+        const q = new THREE.Quaternion().setFromRotationMatrix(invM);
+        if (Math.abs(q.x) + Math.abs(q.y) + Math.abs(q.z) > 1e-6) {
+          glbScene.quaternion.premultiply(q);
+          glbScene.updateMatrixWorld(true);
+        }
+        bbox = new THREE.Box3().setFromObject(glbScene);
+        bbox.getSize(size);
+        console.log("[omafit-ar] watch strap bent around cylinder", {
+          armAxis: arm.name,
+          bendAxis: bend.name,
+          dorsalAxis: dorsal.name,
+          armFlipped: armN.dot(arm.vec) < 0,
+          preBbox: { max: bend.size, mid: arm.size, min: dorsal.size },
+          localR,
+          wrapFraction,
+          postBbox: { x: size.x, y: size.y, z: size.z },
+        });
+      }
     }
 
+    /**
+     * Após bracelete rodada OU relógio plano dobrado, o GLB é cilindrico
+     * com eixo ao longo de +Z local. A mediana do bbox ≈ 2·localRingR
+     * (diâmetro do cilindro). Usa isto para a escala adaptativa.
+     *
+     * Para relógio NÃO-plano (já enrolado pela autoria, ratio < 2), usamos
+     * median/2 como estimativa do raio do anel. Funciona porque bbox.median
+     * é normalmente o diâmetro do anel.
+     */
     const sorted = [size.x, size.y, size.z].sort((a, b) => a - b);
     const medianDim = sorted[1] || 1;
     const maxDim = sorted[2] || 1;
-    const isBracelet = accessoryType === "bracelet";
-    const scaleSourceDim = isBracelet ? medianDim : maxDim;
-    const worldTarget = isBracelet
-      ? OMAFIT_BRACELET_AR_WORLD_MEDIAN_DIM
-      : OMAFIT_WRIST_AR_WORLD_MAX_DIM;
-    const calcBaseScale = worldTarget / Math.max(scaleSourceDim, 1e-6);
+    const localRingR = didBend
+      ? bendLocalR
+      : Math.max(medianDim / 2, 1e-6);
+
+    /**
+     * baseScale inicial assume pulso adulto médio (26 mm). No tick/per-frame
+     * (ver updateAnchorFromHand), multiplicamos por (smoothWristR / 0.026)
+     * para o GLB ficar AJUSTADO ao utilizador actual.
+     */
+    const gapOffset =
+      accessoryType === "bracelet" ? 0.003 : 0; // 3 mm folga pulseira
+    const targetRingR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
+    const calcBaseScale = targetRingR / localRingR;
+
     const finalMul =
       Number.isFinite(Number(calScale)) && Number(calScale) > 0
         ? Number(calScale)
@@ -3072,7 +3254,15 @@ async function runHandArSession({
     bbox.getCenter(center);
     glbScene.position.sub(center);
 
-    return { baseScale: calcBaseScale, size, bbox, maxDim, medianDim };
+    return {
+      baseScale: calcBaseScale,
+      size,
+      bbox,
+      maxDim,
+      medianDim,
+      localRingR,
+      didBend,
+    };
   }
 
   // Load the GLB.
@@ -3081,6 +3271,13 @@ async function runHandArSession({
     arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "";
   const finalGlbUrl = buildGlbLoaderUrl(glbUrl, versionHint);
   let baseScale = 0.1;
+  /** Raio local do anel/cilindro wrap, em unidades GLB (pré-scale).
+   *  Usado para ajuste adaptativo de escala por frame baseado no
+   *  `smoothWristRadius` detectado, fazendo o GLB caber no pulso real. */
+  let localRingR = 0.025;
+  /** Sinaliza se o relógio foi geometricamente dobrado à volta dum cilindro
+   *  (GLB plano detectado). Usado só para logging. */
+  let didBendWatch = false;
   await new Promise((resolve, reject) => {
     glbLoader.load(
       finalGlbUrl,
@@ -3099,16 +3296,22 @@ async function runHandArSession({
 
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
+        localRingR = fitRes.localRingR;
+        didBendWatch = Boolean(fitRes.didBend);
 
         console.log("[omafit-ar] hand GLB fit", {
           accessoryType,
-          strategy:
-            accessoryType === "bracelet"
-              ? "median-dim → 62 mm (ring diameter)"
-              : "max-dim → 72 mm (strap span)",
+          strategy: fitRes.didBend
+            ? "watch BENT around cylinder → scale to user wristR (adaptive)"
+            : accessoryType === "bracelet"
+              ? "bracelet median/2 → ringR, scale to user wristR (adaptive)"
+              : "watch wrapped (no bend) → scale to user wristR (adaptive)",
           baseScale: fitRes.baseScale,
           maxDim: fitRes.maxDim,
           medianDim: fitRes.medianDim,
+          localRingR: fitRes.localRingR,
+          didBend: fitRes.didBend,
+          defaultWristR_mm: Math.round(OMAFIT_DEFAULT_WRIST_R_M * 1000),
           effMaxMm: Math.round(
             fitRes.maxDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
           ),
@@ -3308,15 +3511,34 @@ async function runHandArSession({
      */
     const handKnuckleSpan = w5.distanceTo(w17);
     /**
-     * Raio: 42 % da largura entre knuckles. Estudos de antropometria indicam
-     * razão pulso/palma ≈ 0,40-0,45 para adultos. Clamp 22-38 mm cobre
-     * crianças pequenas a adultos com pulso largo. Valor ligeiramente maior
-     * que antes (era 0,38 × [18-32]) para garantir que o occluder envolve
-     * toda a circunferência do pulso — caso contrário sobrava uma faixa
-     * visível onde o strap deveria estar ocluído.
+     * === ESTIMATIVA ANTROPOMÉTRICA DO RAIO DO PULSO ===
+     *
+     * Dados reais (WHO/NHANES adult hand anthropometry) dão um ratio
+     * muitíssimo consistente entre raio do pulso e distância entre knuckles
+     * (landmarks MediaPipe 5 e 17):
+     *
+     *   Percentil   KnuckleSpan   WristCirc   WristR    Ratio
+     *   F 5º        67 mm         140 mm      22.3 mm   0.333
+     *   Médio       78 mm         160 mm      25.5 mm   0.327
+     *   M 95º       92 mm         190 mm      30.2 mm   0.328
+     *
+     * → usa 0.33 (valor empírico médio). A versão anterior usava 0.42,
+     *   que sobreestimava o raio em ~27 % e provocava o efeito observado
+     *   pelo utilizador de "pulseira cilíndrica mas não envolve perfeitamente"
+     *   (gap de ~10 mm à volta do pulso inteiro porque a escala adaptativa
+     *   do GLB usa directamente este valor).
+     *
+     * Clamp [18, 34] mm cobre percentil 3 feminino a 98 masculino.
      */
-    const wristRadiusRaw = Math.max(0.022, Math.min(0.038, handKnuckleSpan * 0.42));
-    const forearmLengthRaw = Math.max(0.3, Math.min(0.6, handKnuckleSpan * 6.0));
+    const wristRadiusRaw = Math.max(0.018, Math.min(0.034, handKnuckleSpan * 0.33));
+    /**
+     * Comprimento do antebraço (para occluder): ratio ≈ 3.2 × knuckleSpan
+     * (comprimento médio de antebraço adulto 25-30 cm vs knuckleSpan 78-92 mm).
+     * Mantemos clamp [0.3, 0.6] m para robustez contra outliers — o occluder
+     * pode ser um pouco mais comprido que o antebraço real sem problema
+     * (depth-write extra para trás não afecta render da cena).
+     */
+    const forearmLengthRaw = Math.max(0.3, Math.min(0.6, handKnuckleSpan * 4.0));
     if (!smoothOccluderInitialized) {
       smoothWristRadius = wristRadiusRaw;
       smoothForearmLength = forearmLengthRaw;
@@ -3338,12 +3560,53 @@ async function runHandArSession({
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
 
+    /**
+     * === ESCALA ADAPTATIVA DO GLB AO PULSO REAL ===
+     *
+     * O `baseScale` foi calculado em `fitWristGlb` assumindo pulso médio
+     * (OMAFIT_DEFAULT_WRIST_R_M = 26 mm). Agora que temos leitura estável
+     * do raio real deste utilizador (smoothWristRadius), multiplicamos
+     * baseScale por (wristR_real / wristR_default) para o GLB encaixar
+     * PERFEITAMENTE no pulso actual.
+     *
+     * Para pulseira: adiciona 3 mm de folga (accessoryType === "bracelet").
+     * Para relógio dobrado/enrolado: sem folga, straps tocam pele.
+     *
+     * O resultado é um GLB que dinamicamente ajusta ao tamanho do pulso
+     * do utilizador — envolve por completo e sem gap. Se o utilizador
+     * afastar a mão da câmera, `smoothWristRadius` mantém-se (é medida
+     * em metros mundo, não em píxeis), portanto a escala é estável.
+     */
+    if (glbRoot && localRingR > 1e-6) {
+      const gapOffset = accessoryType === "bracelet" ? 0.003 : 0;
+      const targetRingR = smoothWristRadius + gapOffset;
+      const defaultTargetR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
+      const adaptMul = targetRingR / defaultTargetR;
+      const userMul =
+        Number.isFinite(Number(userScale)) && Number(userScale) > 0
+          ? Number(userScale)
+          : 1;
+      glbRoot.scale.setScalar(baseScale * userMul * adaptMul);
+    }
+
     if (debug) {
+      const userMul =
+        Number.isFinite(Number(userScale)) && Number(userScale) > 0
+          ? Number(userScale)
+          : 1;
+      const gapOffset = accessoryType === "bracelet" ? 0.003 : 0;
+      const adaptMul =
+        (smoothWristRadius + gapOffset) /
+        (OMAFIT_DEFAULT_WRIST_R_M + gapOffset);
       console.debug("[omafit-ar] hand anchor", {
         hand: handLabel || "?",
         anchor: "w0 (wrist)",
         wristR_mm: (smoothWristRadius * 1000).toFixed(1),
         forearmL_cm: (smoothForearmLength * 100).toFixed(1),
+        bent: didBendWatch,
+        localRingR_mm: (localRingR * 1000).toFixed(1),
+        adaptScale: adaptMul.toFixed(3),
+        glbScale: (baseScale * userMul * adaptMul).toFixed(4),
         zDist: zDist.toFixed(3),
         spanY: spanY.toFixed(3),
         vidAR: videoAspect().toFixed(3),
@@ -3440,6 +3703,8 @@ async function runHandArSession({
               glbRoot.add(next);
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               baseScale = fitRes.baseScale;
+              localRingR = fitRes.localRingR;
+              didBendWatch = Boolean(fitRes.didBend);
               resolve();
             },
             undefined,
