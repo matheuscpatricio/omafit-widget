@@ -123,13 +123,31 @@ const OMAFIT_WRIST_TO_MCP_M = 0.10;
  * `alpha = 1 - exp(-dt / tau)` com `tau` em ms.
  * Valores maiores de `tau` = mais estável + maior latência.
  *
- * v11.1: tau eixos baixado 180→130 ms. O valor anterior (180 ms) deixava
- * a rotação visivelmente atrás do braço ao rodar o pulso; 130 ms permite
- * ao relógio/pulseira "acompanhar" a rotação lateral em tempo real sem
- * reintroduzir jitter perceptível (validado contra shake natural da mão).
+ * v11.3: tau eixos baixado 130→90 ms. Em rotações rápidas do pulso (180°/s),
+ * 130 ms produz ~23° de lag perceptível entre o braço real e o GLB — o
+ * utilizador vê o produto "atrás" do movimento. Com 90 ms, o lag cai para
+ * ~16° — acompanha o braço em tempo quase real mantendo robustez contra
+ * jitter de landmarks. Posição mantida em 120 ms (translação tolera mais
+ * lag porque não é percepcionada tão intensamente como rotação).
  */
 const OMAFIT_HAND_POS_TAU_MS = 120;
-const OMAFIT_HAND_AXIS_TAU_MS = 130;
+const OMAFIT_HAND_AXIS_TAU_MS = 90;
+
+/**
+ * Threshold angular (rad) acima do qual uma nova target quaternion é tratada
+ * como "flip espúrio" (erro de handedness ou landmark outlier) em vez de
+ * rotação real. 150° = 2.618 rad.
+ *
+ * Motivação: Quando MediaPipe classifica mal a lateralidade por um ou dois
+ * frames (ex.: mão muito inclinada, oclusão parcial), a base (tmpX) inverte
+ * de sinal e a quaternion target salta ~180°. Sem este guard, o SLERP
+ * arrasta o GLB por esse arco de 180° durante ~120 ms, dando a ilusão de
+ * "flip" súbito que o utilizador descreve como "rotação errada".
+ *
+ * Com o guard: saltos >150° são IGNORADOS em vez de aplicados, permitindo
+ * ao handedness stabilizer (3-frame hysteresis) recuperar sem visual glitch.
+ */
+const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
 
 /**
  * ID de build visível em `console.log`. Se este valor NÃO aparecer na
@@ -137,7 +155,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 130;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_inner-radius-slerp-handedness-v11.2";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_wrist-fit-rotation-anti-flip-v11.3";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -3573,10 +3591,13 @@ async function runHandArSession({
     tmpPos.copy(w0).addScaledVector(tmpY, 0.006);
 
     /**
-     * === SUAVIZAÇÃO DA ORIENTAÇÃO (v11.2: SLERP) ===
+     * === SUAVIZAÇÃO DA ORIENTAÇÃO (v11.3: SLERP + Anti-Flip Guard) ===
      *
      * Constrói quaternion do target (tmpX, tmpY, tmpZ) e interpola
-     * esfericamente da quaternion suavizada actual para o target.
+     * esfericamente da quaternion suavizada actual para o target — EXCEPTO
+     * quando a variação angular instantânea excede `OMAFIT_HAND_FLIP_GUARD_RAD`,
+     * nesses frames rejeitamos o target (evita "flips" de 180° causados por
+     * classificação errada da lateralidade pelo MediaPipe).
      *
      * SLERP vs LERP-vector-a-vector:
      *   • SLERP move no arco mais curto da esfera → rotação natural,
@@ -3587,10 +3608,16 @@ async function runHandArSession({
      *     rápida no meio, lenta no início/fim). Visualmente, o GLB
      *     "atrasa" no início e "ultrapassa" no fim do giro.
      *
+     * Anti-flip guard:
+     *   • `angle = 2 · acos(|dot(currentQuat, targetQuat)|)` dá o ângulo
+     *     geodésico da rotação restante.
+     *   • Se > 2.618 rad (150°), provável handedness flip espúrio; reject.
+     *   • Rotações reais do braço (mesmo rápidas) raramente excedem 90°
+     *     em 16 ms (que seria 5625°/s = impossível anatomicamente).
+     *
      * Resultado: a rotação lateral do pulso (ex.: thumb para cima,
-     * thumb horizontal) é seguida de forma geodésica. O produto mostra
-     * progressivamente a lateral / traseira conforme o utilizador roda
-     * o braço, como se fosse real.
+     * thumb horizontal) é seguida de forma geodésica, MAS sem saltos
+     * súbitos de 180° quando o MediaPipe se engana momentaneamente.
      *
      * Posição continua com EMA linear (mais estável para translação).
      */
@@ -3605,7 +3632,30 @@ async function runHandArSession({
       const aPos = 1 - Math.exp(-clampDt / OMAFIT_HAND_POS_TAU_MS);
       const aAxis = 1 - Math.exp(-clampDt / OMAFIT_HAND_AXIS_TAU_MS);
       smPos.lerp(tmpPos, aPos);
-      smoothedQuat.slerp(tmpQuat, aAxis);
+      /**
+       * Anti-flip guard: medir ângulo entre smoothedQuat e tmpQuat.
+       * dot < 0 significa que estão no hemisfério oposto da esfera 4D
+       * (ambíguo mas ok — Three.js SLERP inverte internamente para shortest
+       * path). Usamos |dot| para medir o arco real.
+       */
+      const dotQ =
+        smoothedQuat.x * tmpQuat.x +
+        smoothedQuat.y * tmpQuat.y +
+        smoothedQuat.z * tmpQuat.z +
+        smoothedQuat.w * tmpQuat.w;
+      const absDot = Math.min(1, Math.abs(dotQ));
+      const angleBetween = 2 * Math.acos(absDot);
+      if (angleBetween > OMAFIT_HAND_FLIP_GUARD_RAD) {
+        /** Flip espúrio: ignorar este frame (não actualiza smoothedQuat). */
+        if (debug) {
+          console.debug("[omafit-ar] flip rejected", {
+            angleDeg: ((angleBetween * 180) / Math.PI).toFixed(1),
+            hand: handLabel || "?",
+          });
+        }
+      } else {
+        smoothedQuat.slerp(tmpQuat, aAxis);
+      }
     }
 
     /** Extrai eixos da quaternion suavizada (para debug e para
@@ -3636,7 +3686,7 @@ async function runHandArSession({
      */
     const handKnuckleSpan = w5.distanceTo(w17);
     /**
-     * === ESTIMATIVA ANTROPOMÉTRICA DO RAIO DO PULSO ===
+     * === ESTIMATIVA ANTROPOMÉTRICA DO RAIO DO PULSO (v11.3) ===
      *
      * Dados reais (WHO/NHANES adult hand anthropometry) dão um ratio
      * muitíssimo consistente entre raio do pulso e distância entre knuckles
@@ -3646,16 +3696,18 @@ async function runHandArSession({
      *   F 5º        67 mm         140 mm      22.3 mm   0.333
      *   Médio       78 mm         160 mm      25.5 mm   0.327
      *   M 95º       92 mm         190 mm      30.2 mm   0.328
+     *   M 99º       98 mm         210 mm      33.4 mm   0.341
      *
-     * → usa 0.33 (valor empírico médio). A versão anterior usava 0.42,
-     *   que sobreestimava o raio em ~27 % e provocava o efeito observado
-     *   pelo utilizador de "pulseira cilíndrica mas não envolve perfeitamente"
-     *   (gap de ~10 mm à volta do pulso inteiro porque a escala adaptativa
-     *   do GLB usa directamente este valor).
+     * → usa 0.34 (ligeiramente acima da média): melhor errar por pulso
+     *   grande (GLB envolve folgadamente) do que pulso pequeno (GLB fica
+     *   DENTRO do braço, com clipping visível). Safety-first.
      *
-     * Clamp [18, 34] mm cobre percentil 3 feminino a 98 masculino.
+     * Clamp [18, 42] mm: lower cobre percentil 3 feminino + crianças;
+     *   upper cobre percentil 99.5 masculino + atletas (pulso muito largo).
+     *   v11.2 tinha 34 mm (clipava pulsos largos → utilizador via "GLB
+     *   menor que o pulso"). Subida para 42 mm resolve este clipping.
      */
-    const wristRadiusRaw = Math.max(0.018, Math.min(0.034, handKnuckleSpan * 0.33));
+    const wristRadiusRaw = Math.max(0.018, Math.min(0.042, handKnuckleSpan * 0.34));
     /**
      * Comprimento do antebraço (para occluder): ratio ≈ 3.2 × knuckleSpan
      * (comprimento médio de antebraço adulto 25-30 cm vs knuckleSpan 78-92 mm).
@@ -3674,11 +3726,36 @@ async function runHandArSession({
       smoothWristRadius += (wristRadiusRaw - smoothWristRadius) * aOcc;
       smoothForearmLength += (forearmLengthRaw - smoothForearmLength) * aOcc;
     }
-    /** Scale X,Z = raio (geometria tem raio=base 0.022; aplicamos factor). */
-    const radiusScale = smoothWristRadius / OMAFIT_ARM_OCCLUDER_RADIUS_M;
+    /**
+     * Scale X,Z = raio (geometria tem raio=base 0.022; aplicamos factor).
+     *
+     * v11.3: occluder raio = smoothWristR + 4 mm (não apenas wristR). Motivo:
+     *   • Estimativa antropométrica pode subestimar o braço real em 1-3 mm.
+     *   • Braço humano é ligeiramente ELÍPTICO (mais largo no sentido palmar-dorsal
+     *     que no ulnar-radial), enquanto occluder é CIRCULAR. Margem cobre a
+     *     dimensão maior da elipse.
+     *   • Manter raio < raio externo da pulseira (≈ wristR + 7 mm) — assim o
+     *     OUTER do GLB continua à frente do occluder e é visível; apenas o
+     *     INNER/BACK fica atrás do occluder e é ocluído.
+     *   • Resolve "vejo a parte debaixo" quando o GLB está em ângulo: a parte
+     *     de trás da pulseira que o utilizador vê sobreposta ao braço real é
+     *     apanhada pelo depth buffer do occluder e fica invisível (mostrando
+     *     o braço real da câmara em vez do back-face do GLB).
+     */
+    const occluderR = smoothWristRadius + 0.004;
+    const radiusScale = occluderR / OMAFIT_ARM_OCCLUDER_RADIUS_M;
     const lengthScale = smoothForearmLength / OMAFIT_ARM_OCCLUDER_LENGTH_M;
     armOccluder.scale.set(radiusScale, lengthScale, radiusScale);
-    /** Re-posicionar: Y offset depende do raio (centro do braço = −raio−6 mm). */
+    /**
+     * Re-posicionar: Y offset coloca o EIXO do cilindro no centro do braço.
+     * Âncora está a +6 mm do dorso (tmpY direction). O eixo do braço está a
+     * `smoothWristRadius` por baixo do dorso. Logo em anchor local Y:
+     *   eixo = −(smoothWristRadius + 6 mm)
+     *
+     * (NÃO usamos occluderR aqui — usamos o raio do BRAÇO real, que é o que
+     * determina a posição do eixo. occluderR é só a ESPESSURA visual do
+     * cilindro para cobertura defensiva.)
+     */
     armOccluder.position.y = -(smoothWristRadius + 0.006);
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
@@ -3721,17 +3798,27 @@ async function runHandArSession({
       const adaptMul =
         (smoothWristRadius + gapOffset) /
         (OMAFIT_DEFAULT_WRIST_R_M + gapOffset);
-      console.debug("[omafit-ar] hand anchor", {
+      console.debug("[omafit-ar] hand anchor v11.3", {
         hand: handLabel || "?",
         handScore: (lastHandScore || 0).toFixed(2),
         anchor: "w0 (wrist)",
+        /** Raw knuckle span (medida bruta MediaPipe landmarks 5-17). */
+        knuckleSpan_mm: (handKnuckleSpan * 1000).toFixed(1),
+        /** wristR DEPOIS de aplicar ratio 0.34 + clamp [18, 42] mm. */
         wristR_mm: (smoothWristRadius * 1000).toFixed(1),
+        /** Occluder raio (= wristR + 4 mm buffer). */
+        occluderR_mm: ((smoothWristRadius + 0.004) * 1000).toFixed(1),
         forearmL_cm: (smoothForearmLength * 100).toFixed(1),
         bent: didBendWatch,
+        /** Raio INTERNO do GLB (superfície que toca a pele em unidades GLB). */
         localInnerR_mm: (localInnerR * 1000).toFixed(1),
+        /** Raio do EIXO do GLB (metade da mediana do bbox). */
         localRingR_mm: (localRingR * 1000).toFixed(1),
         adaptScale: adaptMul.toFixed(3),
         glbScale: (baseScale * userMul * adaptMul).toFixed(4),
+        /** Raio INTERNO final do GLB no mundo (deve ≈ wristR + gap).
+         *  Se este valor for MENOR que smoothWristR, o GLB clipa no braço!
+         *  Se for MAIOR que smoothWristR + 5mm, o GLB fica flutuando. */
         finalInnerR_mm: (localInnerR * baseScale * userMul * adaptMul * 1000).toFixed(1),
         zDist: zDist.toFixed(3),
         Yz: tmpY.z.toFixed(3),
