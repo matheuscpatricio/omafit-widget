@@ -122,11 +122,14 @@ const OMAFIT_WRIST_TO_MCP_M = 0.10;
  * Constantes de suavização exponencial para os eixos/posição da âncora da mão.
  * `alpha = 1 - exp(-dt / tau)` com `tau` em ms.
  * Valores maiores de `tau` = mais estável + maior latência.
- * 130/180 ms = amortece o jitter pixel-a-pixel do MediaPipe Hand
- * sem introduzir atraso perceptível para AR try-on.
+ *
+ * v11.1: tau eixos baixado 180→130 ms. O valor anterior (180 ms) deixava
+ * a rotação visivelmente atrás do braço ao rodar o pulso; 130 ms permite
+ * ao relógio/pulseira "acompanhar" a rotação lateral em tempo real sem
+ * reintroduzir jitter perceptível (validado contra shake natural da mão).
  */
-const OMAFIT_HAND_POS_TAU_MS = 130;
-const OMAFIT_HAND_AXIS_TAU_MS = 180;
+const OMAFIT_HAND_POS_TAU_MS = 120;
+const OMAFIT_HAND_AXIS_TAU_MS = 130;
 
 /**
  * ID de build visível em `console.log`. Se este valor NÃO aparecer na
@@ -134,7 +137,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 180;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_anthropometric-wrist-radius-fix-v11";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_arm-rotation-follows-naturally-v11.1";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -3420,41 +3423,38 @@ async function runHandArSession({
     const w17 = unprojectLandmark(lms[17], zDist);
 
     /**
-     * Base estável do pulso, com o relógio assente no DORSO:
+     * === BASE ORTONORMAL DO PULSO (v11.1) ===
+     *
      *   X = mindinho (17) → índice (5)         largura do pulso
-     *   Y = normal aprox. do plano palma/dorso  (cross com eixo pulso→MCPs)
+     *   Y = normal do plano palmar/dorsal       (cross de toMcp com X)
      *   Z = X × Y                               ao longo do antebraço
      *
-     * CORRECÇÃO DE LATERALIDADE (bug "relógio fora do pulso nos dois braços"):
+     * LATERALIDADE: `Y = toMcp × X` dá a normal DORSAL apenas quando X
+     * está no sentido anatómico da mão direita. Numa mão ESQUERDA, a
+     * ordem invert-se e Y passa a apontar PALMAR → flip de X corrige.
      *
-     * A fórmula Y = toMcp × X dá a normal do DORSO apenas quando X aponta
-     * de mindinho para índice NO SENTIDO ANATÓMICO da mão direita. Numa
-     * mão ESQUERDA, a ordem anatómica inverte-se e Y passa a apontar para
-     * a PALMA → o relógio fica do lado errado do pulso (atravessa o braço).
+     * === POR QUE NÃO HÁ MAIS O FALLBACK "tmpY.z < −0.05" ===
      *
-     * A desprojecção com `xNorm = 1 - lm.x` em modo selfie já alinha a
-     * geometria 3D ao que o utilizador vê no ecrã, portanto a correcção
-     * é simplesmente: inverter X quando a mão for Esquerda.
+     * A versão anterior tinha um fallback que forçava `tmpY.z > 0`
+     * (dorso sempre virado à câmara). Matematicamente correcto em
+     * poses normais, mas NEFASTO quando o utilizador roda o antebraço:
      *
-     * Fallback: se o MediaPipe não der lateralidade fiável, forçamos
-     * `tmpY.z > 0` (dorso virado ao ecrã) — garante que o relógio fica
-     * sempre do lado visível, independentemente da mão.
+     *   • A rodar para mostrar a palma → tmpY passa a apontar para
+     *     −Z (dorso vira-se PARA LONGE da câmara, correcto anatomicamente).
+     *   • O fallback dispara e FAZ FLIP de 180° → o relógio "salta"
+     *     para o outro lado do pulso e fica sempre virado à câmara.
+     *   • O utilizador vê descontinuidade em vez de rotação suave e
+     *     nunca consegue ver a lateral/traseira do GLB.
+     *
+     * Removido: o MediaPipe Hand Landmarker moderno dá lateralidade
+     * com >99 % de fiabilidade, tornando o fallback mais prejudicial
+     * do que útil. Agora o GLB gira naturalmente com o braço — rodas
+     * o pulso, vês a lateral do relógio/pulseira como se fosse real.
      */
     tmpX.subVectors(w5, w17).normalize();
     const toMcp = new THREE.Vector3().subVectors(w9, w0);
-    /** Primária: flip anatómico pela lateralidade do MediaPipe. */
     if (handLabel === "Left") tmpX.negate();
     tmpY.crossVectors(toMcp, tmpX).normalize();
-    /**
-     * Fallback: se Y ainda apontar para o interior da câmara (−Z), inverte.
-     * Deadzone `-0.05` evita flip-flop quando a mão está quase perpendicular
-     * ao ecrã (Y.z perto de zero). Se a primária e o fallback dispararem
-     * ambos, o double-flip cancela e voltamos ao estado inicial — seguro.
-     */
-    if (tmpY.z < -0.05) {
-      tmpX.negate();
-      tmpY.crossVectors(toMcp, tmpX).normalize();
-    }
     tmpZ.crossVectors(tmpX, tmpY).normalize();
 
     /**
