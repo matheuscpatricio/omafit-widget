@@ -84,14 +84,18 @@ const MEDIAPIPE_HAND_MODEL_URL =
 
 /**
  * Escala de mundo para relógio/pulseira após bbox (`baseScale = worldMax / maxDim`).
- *   - Relógio: 0,045 m → bbox máxima 45 mm (mostrador grande ~40 mm + strap ~5 mm).
- *   - Pulseira: 0,052 m → bbox máxima 52 mm (pulseiras costumam ser mais largas).
+ *   - Relógio: 0,062 m → bbox máx. 62 mm (mostrador 40 mm + strap fino nos lados).
+ *   - Pulseira: 0,068 m → bbox máx. 68 mm (pulseiras tipicamente mais largas).
  * **Não** usar 0,16 (isso é para óculos/colar no preview facial). Tem de coincidir
  * com `PreviewModel` em `app.ar-eyewear_.calibrate.$assetId.jsx` quando
  * `accessoryType` é watch/bracelet.
+ *
+ * Subi de 0,054/0,060 para 0,062/0,068 porque mesmo com GLBs justos o
+ * utilizador reportou que o relógio ficava visivelmente pequeno no pulso.
+ * O multiplicador de calibração (0,3–3×) continua disponível por cima.
  */
-const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.045;
-const OMAFIT_BRACELET_AR_WORLD_MAX_DIM = 0.052;
+const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.062;
+const OMAFIT_BRACELET_AR_WORLD_MAX_DIM = 0.068;
 
 /**
  * Comprimento real (m) do segmento punho→MCP-médio numa mão adulta.
@@ -116,7 +120,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 180;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_watch+glasses-sync-v5-syntaxfix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_wrist-occluder+anchor-at-wrist-v8";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -1390,7 +1394,17 @@ async function runArSession({
     },
   });
 
-  /** MindAR injeta `<video>` + canvas WebGL dentro de `mindarHost`. */
+  /**
+   * MindAR injeta `<video>` + canvas WebGL dentro de `mindarHost`.
+   *
+   * `overflow: hidden` é OBRIGATÓRIO: o MindAR dimensiona o `<video>` para
+   * "cover" (maior que o container numa das direcções) e usa top/left
+   * negativos para centrar. Se deixarmos `visible`, o vídeo transborda o
+   * modal (parece maior que devia). Se medirmos o container ANTES da
+   * animação/layout acabar, o MindAR calcula mal e a imagem fica "cortada
+   * do lado direito". A correcção é executar `_resize()` várias vezes
+   * depois do modal estabilizar (ver `lateMindarResizeTimerIds`).
+   */
   const arFit = el("div", {
     style: {
       position: "relative",
@@ -1606,7 +1620,12 @@ async function runArSession({
   }
 
   colContent.style.padding = "0";
-  colContent.style.overflow = "auto";
+  /**
+   * Contentor do modal: deixar `hidden` para que o conteúdo AR não transborde
+   * a caixa. O "cortado do lado direito" era causado por medições em momento
+   * errado no `_resize()` do MindAR — corrigido via `lateMindarResizeTimerIds`.
+   */
+  colContent.style.overflow = "hidden";
   colContent.style.overflowX = "hidden";
   colContent.style.flex = "1";
   colContent.style.display = "flex";
@@ -1623,6 +1642,8 @@ async function runArSession({
   let arEngineCleanup = null;
   /** Listeners de orientação/visibilidade adicionados dentro de `runArSession`. */
   let removeOrientationListeners = null;
+  /** Timeouts de `_resize` tardio (layout do modal / safe-area) — limpar no cleanup. */
+  let lateMindarResizeTimerIds = [];
 
   const cleanup = () => {
     try {
@@ -1663,6 +1684,16 @@ async function runArSession({
         /* ignore */
       }
       removeOrientationListeners = null;
+    }
+    if (Array.isArray(lateMindarResizeTimerIds) && lateMindarResizeTimerIds.length) {
+      for (const tid of lateMindarResizeTimerIds) {
+        try {
+          clearTimeout(tid);
+        } catch {
+          /* ignore */
+        }
+      }
+      lateMindarResizeTimerIds = [];
     }
   };
 
@@ -1978,15 +2009,28 @@ async function runArSession({
       }
     };
     /**
-     * Com o CSS global a forçar vídeo+canvas a `width/height: 100%; object-fit: cover`,
-     * o posicionamento já é robusto por si só — o `_resize` do MindAR só precisa
-     * correr para actualizar a matriz da câmara interna quando o aspecto do container
-     * muda (rotação de ecrã, etc). Dispensamos os timers arbitrários.
+     * `ResizeObserver` + `resize` + timeouts tardios: o MindAR mede `clientWidth`
+     * do container; se o modal ainda não terminou layout, o vídeo fica descentrado
+     * e parece “cortado” num dos lados.
      */
     arResizeObserver = new ResizeObserver(triggerMindarResize);
     arResizeObserver.observe(arWrap);
     arResizeObserver.observe(mindarHost);
     requestAnimationFrame(triggerMindarResize);
+    requestAnimationFrame(() => requestAnimationFrame(triggerMindarResize));
+    /** Timers espalhados até 2.5s para cobrir:
+     *  - fade-in do modal (~350ms);
+     *  - idle do layout (flexbox grid estabiliza);
+     *  - iOS Safari que pode reflowar após o `<video>` receber metadata.
+     *  Sem isto, o MindAR mede o container no momento errado e o vídeo
+     *  fica com `top/left` fora → aparece "cortado do lado direito". */
+    for (const ms of [32, 96, 220, 500, 900, 1500, 2500]) {
+      lateMindarResizeTimerIds.push(
+        setTimeout(() => {
+          triggerMindarResize();
+        }, ms),
+      );
+    }
     try {
       window.addEventListener("orientationchange", triggerMindarResize);
       if (screen?.orientation?.addEventListener) {
@@ -2232,6 +2276,32 @@ async function runArSession({
 
     const wearPosition = new GroupCtor();
     wearPosition.position.set(wearPosM.x, wearPosM.y, wearPosM.z);
+    /**
+     * SEM espelho de cena por defeito. O MindAR já inverte o frame antes da
+     * detecção quando `flipFace=true` (selfie default), e entrega a matriz
+     * da âncora no mesmo sistema de coordenadas do vídeo mostrado. Aplicar
+     * `scale.x = -1` a `wearPosition` duplicava o espelho e empurrava os
+     * óculos para fora do rosto (rodados e deslocados).
+     *
+     * Só respeitamos um override explícito em `data-ar-scene-x-mirror="1"`
+     * para lojas que precisem dele por causa de GLBs não-simétricos.
+     */
+    try {
+      const sxAttr = String(cfgAttr("arSceneXMirror", "")).trim().toLowerCase();
+      let flipSceneX = false;
+      if (/^(1|true|yes|on)$/.test(sxAttr)) flipSceneX = true;
+      try {
+        const q = new URLSearchParams(window.location?.search || "");
+        const qs = (q.get("omafit_ar_scene_x_mirror") || "").trim().toLowerCase();
+        if (qs === "1" || qs === "true") flipSceneX = true;
+        if (qs === "0" || qs === "false") flipSceneX = false;
+      } catch {
+        /* noop */
+      }
+      wearPosition.scale.set(flipSceneX ? -1 : 1, 1, 1);
+    } catch {
+      wearPosition.scale.set(1, 1, 1);
+    }
     wearPosition.add(calibRot);
 
     anchor.group.add(wearPosition);
@@ -2833,6 +2903,78 @@ async function runHandArSession({
   glbRoot.visible = false;
   calibRot.add(glbRoot);
 
+  /**
+   * === OCCLUDER DO ANTEBRAÇO ===
+   * Cilindro invisível que representa o braço do utilizador. Escreve no
+   * depth buffer mas NÃO pinta cor. Quando o GLB do relógio/pulseira
+   * renderiza, a sua metade de trás (strap que passa por detrás do pulso)
+   * falha o depth test e é descartada — dando a ilusão de estar DENTRO do
+   * braço em vez de flutuar à frente dele.
+   *
+   * Técnica: "ghost mesh occluder" — padrão em WebAR (AR.js, 8th Wall).
+   *
+   * Requisitos para funcionar:
+   *  • `colorWrite: false` + `depthWrite: true` → escreve só depth.
+   *  • `renderOrder` negativo → desenha ANTES do GLB.
+   *  • Raio do cilindro ≤ raio do pulso → strap dorsal (à frente) passa o
+   *    depth test; strap palmar (atrás) é ocluído. Z-fighting evitado com
+   *    `polygonOffset` + raio ligeiramente inferior ao do pulso real.
+   *  • Âncora com `matrixAutoUpdate = false` mas o occluder é filho, logo
+   *    herda a matriz via `updateMatrixWorld(true)`.
+   */
+  const OMAFIT_ARM_OCCLUDER_RADIUS_M = 0.022; // 22 mm (< pulso adulto típico 25-30 mm)
+  const OMAFIT_ARM_OCCLUDER_LENGTH_M = 0.4;   // 40 cm (cobre antebraço completo)
+  /** Offset do eixo do antebraço em relação à âncora (dorso do pulso).
+   *  Âncora está a +6 mm do dorso; eixo do braço está armRadius abaixo do dorso. */
+  const OMAFIT_ARM_OCCLUDER_Y_OFFSET_M = -(OMAFIT_ARM_OCCLUDER_RADIUS_M + 0.006);
+
+  const armOccluderGeom = new THREE.CylinderGeometry(
+    OMAFIT_ARM_OCCLUDER_RADIUS_M,
+    OMAFIT_ARM_OCCLUDER_RADIUS_M,
+    OMAFIT_ARM_OCCLUDER_LENGTH_M,
+    24,
+    1,
+    false,
+  );
+  const armOccluderMat = new THREE.MeshBasicMaterial({
+    colorWrite: false,
+    depthWrite: true,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    transparent: false,
+    /**
+     * polygonOffset POSITIVO empurra o depth do cilindro LIGEIRAMENTE
+     * para trás (z-value maior). Efeito: fragmentos do GLB que estão
+     * mesmo à frente do cilindro (strap dorsal tangencial) passam sempre
+     * o depth test (strap_z < cyl_z_offset). Fragmentos atrás do
+     * cilindro continuam a ser ocluídos (strap_z > cyl_z_offset).
+     * Elimina o z-fighting típico quando strap toca na superfície do
+     * braço sem impedir que a metade traseira seja ocluída.
+     */
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
+  });
+  const armOccluder = new THREE.Mesh(armOccluderGeom, armOccluderMat);
+  armOccluder.renderOrder = -100;
+  armOccluder.frustumCulled = false;
+  /** Eixo +Y do cilindro (default do Three) deve alinhar com -Z local da âncora
+   *  (direcção do cotovelo). setFromUnitVectors calcula o quaternion exacto. */
+  armOccluder.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(0, 0, -1),
+  );
+  /** Centro do cilindro: (0, −armR−6 mm, −L/2) em coord. locais da âncora.
+   *  Isto põe o eixo do braço abaixo do dorso por `armR+6 mm` (atravessando
+   *  o centro do pulso) e projecta-se para trás `L/2` a partir do pulso. */
+  armOccluder.position.set(
+    0,
+    OMAFIT_ARM_OCCLUDER_Y_OFFSET_M,
+    -OMAFIT_ARM_OCCLUDER_LENGTH_M / 2,
+  );
+  armOccluder.visible = false; // Só visível quando `anchor.visible = true`.
+  anchor.add(armOccluder);
+
   // Apply stored calibration to the transform hierarchy.
   const fix = parseEulerDegComponents(cfgAttr("arCanonicalFixYxz", "0, 0, 0"), 0, 0, 0);
   const wearXYZ = parseXyzMeters(cfgAttr("arMindarWearPosition", "0 0 0"), 0, 0, 0);
@@ -2936,6 +3078,13 @@ async function runHandArSession({
   let smoothInitialized = false;
   let lastFrameTs = -1;
 
+  /** Estado suavizado (EMA lenta) do occluder: raio do pulso e comprimento
+   *  do antebraço estimados por landmark-spacing. tau ≈ 800 ms (pessoa não
+   *  muda de pulso entre frames; suavizar fortemente elimina pulsar). */
+  let smoothWristRadius = OMAFIT_ARM_OCCLUDER_RADIUS_M;
+  let smoothForearmLength = OMAFIT_ARM_OCCLUDER_LENGTH_M;
+  let smoothOccluderInitialized = false;
+
   let running = true;
   let lastHandTimestamp = -1;
   let rafId = 0;
@@ -2965,7 +3114,7 @@ async function runHandArSession({
     return new THREE.Vector3((xNorm - 0.5) * wView, -(lm.y - 0.5) * hView, -zDist);
   }
 
-  function updateAnchorFromHand(lms, dtMs) {
+  function updateAnchorFromHand(lms, dtMs, handLabel) {
     /**
      * Profundidade: `zDist = L * focalNormalY / spanY`, onde:
      *   - L = 0,10 m (comprimento real punho→MCP-médio em adulto)
@@ -2997,17 +3146,47 @@ async function runHandArSession({
      *   Y = normal aprox. do plano palma/dorso  (cross com eixo pulso→MCPs)
      *   Z = X × Y                               ao longo do antebraço
      *
-     * Posição: pulso + 20 % do vector pulso→MCP-médio (w9−w0).
-     *   → Coloca a âncora ~2 cm em direcção à mão, onde o relógio assenta.
-     * Ajuste final em `wearX/Y/Z` (calibração) continua a funcionar em
-     * unidades de mundo (metros) via `wearPosition`.
+     * CORRECÇÃO DE LATERALIDADE (bug "relógio fora do pulso nos dois braços"):
+     *
+     * A fórmula Y = toMcp × X dá a normal do DORSO apenas quando X aponta
+     * de mindinho para índice NO SENTIDO ANATÓMICO da mão direita. Numa
+     * mão ESQUERDA, a ordem anatómica inverte-se e Y passa a apontar para
+     * a PALMA → o relógio fica do lado errado do pulso (atravessa o braço).
+     *
+     * A desprojecção com `xNorm = 1 - lm.x` em modo selfie já alinha a
+     * geometria 3D ao que o utilizador vê no ecrã, portanto a correcção
+     * é simplesmente: inverter X quando a mão for Esquerda.
+     *
+     * Fallback: se o MediaPipe não der lateralidade fiável, forçamos
+     * `tmpY.z > 0` (dorso virado ao ecrã) — garante que o relógio fica
+     * sempre do lado visível, independentemente da mão.
      */
     tmpX.subVectors(w5, w17).normalize();
     const toMcp = new THREE.Vector3().subVectors(w9, w0);
+    /** Primária: flip anatómico pela lateralidade do MediaPipe. */
+    if (handLabel === "Left") tmpX.negate();
     tmpY.crossVectors(toMcp, tmpX).normalize();
+    /**
+     * Fallback: se Y ainda apontar para o interior da câmara (−Z), inverte.
+     * Deadzone `-0.05` evita flip-flop quando a mão está quase perpendicular
+     * ao ecrã (Y.z perto de zero). Se a primária e o fallback dispararem
+     * ambos, o double-flip cancela e voltamos ao estado inicial — seguro.
+     */
+    if (tmpY.z < -0.05) {
+      tmpX.negate();
+      tmpY.crossVectors(toMcp, tmpX).normalize();
+    }
     tmpZ.crossVectors(tmpX, tmpY).normalize();
 
-    tmpPos.copy(w0).addScaledVector(toMcp, 0.2);
+    /**
+     * Posição: directamente no landmark do pulso (w0). Antes usava-se 30 %
+     * do vector punho→MCP, mas isso colocava o relógio na base dos nós dos
+     * dedos (na mão, não no pulso). MediaPipe `landmark[0]` está na prega
+     * do pulso, onde anatomicamente se usa o relógio. Elevar ~6 mm na
+     * normal dorsal para o mostrador assentar POR CIMA da pele, não dentro.
+     * Calibrações `wearZ` do lojista continuam a permitir ajuste fino.
+     */
+    tmpPos.copy(w0).addScaledVector(tmpY, 0.006);
 
     /**
      * EMA independente para posição e para cada eixo.
@@ -3038,14 +3217,56 @@ async function runHandArSession({
     anchor.matrixWorldNeedsUpdate = true;
     anchor.updateMatrixWorld(true);
 
+    /**
+     * === ESCALA DINÂMICA DO OCCLUDER ===
+     * Estimar raio real do pulso do utilizador a partir da largura detectada
+     * entre knuckle-indicador (w5) e knuckle-mindinho (w17). Razão anatómica
+     * típica: raio do pulso ≈ 35-40 % da largura entre knuckles.
+     *
+     * Clamp entre 18-32 mm cobre desde criança a adulto com pulso largo.
+     * Actualiza o scale Y do cilindro (ao longo do braço) para se manter
+     * proporcional — antebraços curtos (crianças) ficam com cilindro mais
+     * curto para não "flutuar" para lá do cotovelo virtual.
+     *
+     * EMA lento (tau = 800 ms) para não pulsar com o jitter dos landmarks.
+     */
+    const handKnuckleSpan = w5.distanceTo(w17);
+    const wristRadiusRaw = Math.max(0.018, Math.min(0.032, handKnuckleSpan * 0.38));
+    const forearmLengthRaw = Math.max(0.25, Math.min(0.5, handKnuckleSpan * 5.0));
+    if (!smoothOccluderInitialized) {
+      smoothWristRadius = wristRadiusRaw;
+      smoothForearmLength = forearmLengthRaw;
+      smoothOccluderInitialized = true;
+    } else {
+      const clampDtOcc = Math.max(8, Math.min(80, Number.isFinite(dtMs) ? dtMs : 16));
+      const aOcc = 1 - Math.exp(-clampDtOcc / 800);
+      smoothWristRadius += (wristRadiusRaw - smoothWristRadius) * aOcc;
+      smoothForearmLength += (forearmLengthRaw - smoothForearmLength) * aOcc;
+    }
+    /** Scale X,Z = raio (geometria tem raio=base 0.022; aplicamos factor). */
+    const radiusScale = smoothWristRadius / OMAFIT_ARM_OCCLUDER_RADIUS_M;
+    const lengthScale = smoothForearmLength / OMAFIT_ARM_OCCLUDER_LENGTH_M;
+    armOccluder.scale.set(radiusScale, lengthScale, radiusScale);
+    /** Re-posicionar: Y offset depende do raio (centro do braço = −raio−6 mm). */
+    armOccluder.position.y = -(smoothWristRadius + 0.006);
+    /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
+    armOccluder.position.z = -smoothForearmLength / 2;
+    armOccluder.updateMatrix();
+    armOccluder.updateMatrixWorld(true);
+
     if (debug) {
       console.debug("[omafit-ar] hand anchor", {
+        hand: handLabel || "?",
+        anchor: "w0 (wrist)",
+        wristR_mm: (smoothWristRadius * 1000).toFixed(1),
+        forearmL_cm: (smoothForearmLength * 100).toFixed(1),
         zDist: zDist.toFixed(3),
         spanY: spanY.toFixed(3),
         vidAR: videoAspect().toFixed(3),
         camAR: camera.aspect.toFixed(3),
         posY: smPos.y.toFixed(3),
         posZ: smPos.z.toFixed(3),
+        Yz: tmpY.z.toFixed(3),
       });
     }
   }
@@ -3074,15 +3295,30 @@ async function runHandArSession({
     }
 
     const landmarks = res?.landmarks?.[0];
+    /** Lateralidade devolvida pelo MediaPipe: "Left" | "Right" — essencial
+     *  para orientar o relógio correctamente nos dois pulsos. Em algumas
+     *  versões vem como `handednesses`, noutras como `handedness`. */
+    let handLabel = "Right";
+    try {
+      const hn = res?.handednesses?.[0]?.[0] || res?.handedness?.[0]?.[0];
+      if (hn && typeof hn.categoryName === "string") handLabel = hn.categoryName;
+    } catch {
+      /* ignore */
+    }
     if (landmarks && landmarks.length >= 18) {
       missedFrames = 0;
-      updateAnchorFromHand(landmarks, dtMs);
+      updateAnchorFromHand(landmarks, dtMs, handLabel);
       anchor.visible = true;
+      /** Occluder só é útil quando há mão detectada. Evita deixar cilindro
+       *  invisível a escrever depth no meio do ecrã quando a mão desaparece. */
+      armOccluder.visible = true;
     } else {
       missedFrames += 1;
       if (missedFrames > MISSED_HIDE_THRESHOLD) {
         anchor.visible = false;
+        armOccluder.visible = false;
         smoothInitialized = false;
+        smoothOccluderInitialized = false;
       }
     }
 
