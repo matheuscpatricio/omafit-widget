@@ -3,15 +3,29 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    color: #1A1A1A;
+    background-color: #FFFFFF;
   }
 
-  /* Landing page titles */
+  ::selection {
+    background-color: rgba(129, 7, 7, 0.15);
+    color: #1A1A1A;
+  }
+
+  /* Landing page titles (compat) */
   .landing-title {
-    font-family: 'Elms Sans', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
-
 }
 
 /* OMAFIT logo - Bungee (fora do @layer para maior especificidade sobre Tailwind) */
@@ -37,8 +51,8 @@
 
   /* Hide scrollbar for IE, Edge and Firefox */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   /* Fade in up animation */
@@ -57,7 +71,7 @@
     animation: fade-in-up 0.8s ease-out;
   }
 
-  /* Data-animate elements */
+  /* Data-animate elements (compat) */
   [data-animate] {
     opacity: 0;
     transform: translateY(30px);
@@ -101,7 +115,7 @@
     will-change: transform;
   }
 
-  /* Video text effect - video clipped inside text using canvas approach */
+  /* Video text effect */
   .video-text {
     position: relative;
     display: inline-block;
@@ -115,5 +129,20 @@
 
   .video-text-canvas {
     display: block;
+  }
+
+  /* Subtle grid backdrop */
+  .bg-hero-grid {
+    background-image:
+      linear-gradient(to right, rgba(26, 26, 26, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(26, 26, 26, 0.04) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* Radial spotlight para o hero */
+  .bg-hero-spotlight {
+    background:
+      radial-gradient(900px 480px at 50% -10%, rgba(129, 7, 7, 0.08), transparent 60%),
+      radial-gradient(600px 360px at 80% 10%, rgba(129, 7, 7, 0.05), transparent 60%);
   }
 }
