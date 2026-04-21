@@ -82,6 +82,14 @@ const MEDIAPIPE_WASM_BASE =
 const MEDIAPIPE_HAND_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task";
 
+/**
+ * Tamanho de mundo do GLB após normalizar pela bbox (`baseScale = … / maxDim`).
+ * **Obrigatório** coincidir com `PreviewModel` em `app.ar-eyewear_.calibrate.$assetId.jsx`
+ * (`0.16 / maxDim`) — valores antigos 0.07/0.085 no AR de mão desalinhavam relógio
+ * e pulseira da página de calibragem.
+ */
+const OMAFIT_HAND_AR_WORLD_MAX_DIM = 0.16;
+
 const Z_SHELL = 2147483640;
 
 /**
@@ -1262,10 +1270,15 @@ async function startMindARFaceWithReliableCamera(mindarThree) {
  */
 function fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost) {
   try {
-    const { scene, renderer } = mindarThree || {};
+    const { scene, renderer, cssRenderer } = mindarThree || {};
     if (scene && "background" in scene) scene.background = null;
     if (renderer && typeof renderer.setClearColor === "function") {
       renderer.setClearColor(0x000000, 0);
+    }
+    const cssEl = cssRenderer?.domElement;
+    if (cssEl) {
+      cssEl.style.backgroundColor = "transparent";
+      cssEl.style.pointerEvents = "none";
     }
     const video = mindarHost?.querySelector?.("video");
     if (video) {
@@ -1286,58 +1299,6 @@ function fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost) {
     }
   } catch (e) {
     console.warn("[omafit-ar] fixMindARFaceVideoBehindCanvas:", e?.message || e);
-  }
-}
-
-/**
- * Desenha o feed da câmara **dentro** do WebGL (`scene.background` + VideoTexture).
- * Não depende do <video> por baixo de canvas transparente — em muitos temas e em
- * Safari/iOS o compositor mostra o canvas opaco e o fundo fica preto (só GLB visível).
- * O elemento <video> mantém-se a decodificar (opacity:0, nunca display:none).
- */
-function applyOmafitMindARVideoAsSceneBackground(mindarThree, THREE, mirrorSelfie) {
-  const scene = mindarThree?.scene;
-  const renderer = mindarThree?.renderer;
-  const video =
-    mindarThree?.video ||
-    mindarThree?.container?.querySelector?.("video") ||
-    null;
-  const cssEl = mindarThree?.cssRenderer?.domElement;
-  if (cssEl) {
-    try {
-      cssEl.style.backgroundColor = "transparent";
-      cssEl.style.pointerEvents = "none";
-    } catch {
-      /* ignore */
-    }
-  }
-  if (!scene || !THREE || !video || !renderer) return null;
-  try {
-    const tex = new THREE.VideoTexture(video);
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    if (THREE.sRGBEncoding !== undefined && "encoding" in tex) {
-      tex.encoding = THREE.sRGBEncoding;
-    }
-    if (THREE.SRGBColorSpace !== undefined && "colorSpace" in tex) {
-      tex.colorSpace = THREE.SRGBColorSpace;
-    }
-    if (mirrorSelfie) {
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.repeat.x = -1;
-      tex.offset.x = 1;
-    }
-    scene.background = tex;
-    video.style.opacity = "0";
-    video.style.pointerEvents = "none";
-    renderer.setClearColor(0x000000, 1);
-    if (THREE.NoToneMapping !== undefined) {
-      renderer.toneMapping = THREE.NoToneMapping;
-    }
-    return tex;
-  } catch (e) {
-    console.warn("[omafit-ar] applyOmafitMindARVideoAsSceneBackground:", e?.message || e);
-    return null;
   }
 }
 
@@ -1394,6 +1355,7 @@ async function runArSession({
       position: "absolute",
       inset: "0",
       overflow: "hidden",
+      isolation: "isolate",
     },
   });
   arFit.appendChild(mindarHost);
@@ -1598,8 +1560,6 @@ async function runArSession({
   colContent.appendChild(arWrap);
 
   let mindarThree = null;
-  /** `VideoTexture` em `scene.background` quando o fundo DOM+canvas transparente falha. */
-  let mindarFaceSceneBgTex = null;
   let arResizeObserver = null;
   /**
    * Handler opcional instalado por motores alternativos (p.ex. MediaPipe
@@ -1620,19 +1580,6 @@ async function runArSession({
       arResizeObserver = null;
     }
     if (mindarThree) {
-      try {
-        if (mindarFaceSceneBgTex && mindarThree.scene) {
-          mindarThree.scene.background = null;
-          try {
-            mindarFaceSceneBgTex.dispose();
-          } catch {
-            /* ignore */
-          }
-          mindarFaceSceneBgTex = null;
-        }
-      } catch {
-        /* ignore */
-      }
       try {
         mindarThree.renderer?.setAnimationLoop(null);
       } catch {
@@ -1945,14 +1892,7 @@ async function runArSession({
         /* ignore */
       }
       try {
-        if (mindarThree) {
-          if (!mindarFaceSceneBgTex) {
-            fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
-          } else {
-            const ce = mindarThree.cssRenderer?.domElement;
-            if (ce) ce.style.backgroundColor = "transparent";
-          }
-        }
+        if (mindarThree) fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
       } catch {
         /* ignore */
       }
@@ -1967,17 +1907,12 @@ async function runArSession({
     });
 
     await startMindARFaceWithReliableCamera(mindarThree);
-    {
-      const mirrorSelfie = Boolean(mindarThree.shouldFaceUser && !disableFaceMirror);
-      mindarFaceSceneBgTex = applyOmafitMindARVideoAsSceneBackground(
-        mindarThree,
-        THREE,
-        mirrorSelfie,
-      );
-      if (!mindarFaceSceneBgTex) {
-        fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
-      }
-    }
+    /**
+     * Não usar `scene.background` + VideoTexture: isso altera o pipeline WebGL do
+     * MindAR e opacity 0 no elemento video pode quebrar faceMesh/detect (drawImage).
+     * Mantemos vídeo DOM atrás do canvas com limpeza transparente (ver loop).
+     */
+    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
 
     /**
      * Pipeline simples: rotação vem inteiramente do `data-ar-canonical-fix-yxz`
@@ -2431,6 +2366,14 @@ async function runArSession({
     const { renderer, scene, camera } = mindarThree;
     let firstAnchorMatrixLogged = false;
     renderer.setAnimationLoop(() => {
+      try {
+        if (scene && scene.background != null) scene.background = null;
+        if (renderer && typeof renderer.setClearColor === "function") {
+          renderer.setClearColor(0x000000, 0);
+        }
+      } catch {
+        /* ignore */
+      }
       if (!firstAnchorMatrixLogged) {
         try {
           const m = anchor.group.matrix?.elements;
@@ -2458,9 +2401,7 @@ async function runArSession({
       }
       renderer.render(scene, camera);
     });
-    if (!mindarFaceSceneBgTex) {
-      fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
-    }
+    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
 
     loading.style.display = "none";
 
@@ -2799,9 +2740,7 @@ async function runHandArSession({
         const size = new THREE.Vector3();
         bbox.getSize(size);
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
-        // Relógios típicos: ~0.05 m de largura; pulseiras: ~0.07 m.
-        const targetSize = accessoryType === "bracelet" ? 0.085 : 0.07;
-        baseScale = targetSize / maxDim;
+        baseScale = OMAFIT_HAND_AR_WORLD_MAX_DIM / maxDim;
         glbRoot.scale.setScalar(baseScale * (userScale > 0 ? userScale : 1));
 
         const center = new THREE.Vector3();
@@ -2957,8 +2896,7 @@ async function runHandArSession({
               const size = new THREE.Vector3();
               bbox.getSize(size);
               const maxDim = Math.max(size.x, size.y, size.z) || 1;
-              const targetSize = accessoryType === "bracelet" ? 0.085 : 0.07;
-              baseScale = targetSize / maxDim;
+              baseScale = OMAFIT_HAND_AR_WORLD_MAX_DIM / maxDim;
               const s = Number(cal?.scale);
               glbRoot.scale.setScalar(baseScale * (Number.isFinite(s) && s > 0 ? s : 1));
               const center = new THREE.Vector3();
