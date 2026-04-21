@@ -137,7 +137,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 130;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_arm-rotation-follows-naturally-v11.1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_inner-radius-slerp-handedness-v11.2";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -3072,6 +3072,52 @@ async function runHandArSession({
   const OMAFIT_DEFAULT_WRIST_R_M = 0.026;
 
   /**
+   * === CÁLCULO DO RAIO INTERNO REAL DO ANEL ===
+   *
+   * Depois de `fitWristGlb` ter alinhado o eixo do cilindro/anel com +Z
+   * local do GLB, esta função percorre TODOS os vértices das meshes e
+   * devolve a menor distância radial (√(x²+y²)) ao eixo — o RAIO INTERNO
+   * do anel.
+   *
+   * Diferença crucial vs `localRingR = medianDim/2`:
+   *   • `localRingR` é o raio do EIXO / SUPERFÍCIE EXTERNA (bbox)
+   *   • `localInnerR` é a face INTERNA (a que toca a pele)
+   *
+   * Escalar pelo eixo deixa a superfície interna dentro do pulso
+   * (material "enterrado" na pele). Escalar pelo raio INTERNO faz com
+   * que o anel encoste na pele com precisão milimétrica, do jeito que
+   * um relógio/pulseira real encaixa.
+   *
+   * Usa 2º percentil (não mínimo absoluto) para ignorar outliers
+   * como charms a pender dentro do anel, geometria de detalhe, etc.
+   * Assume que o eixo do anel passa pelo centro do bbox.
+   */
+  function computeLocalInnerRadius(glbScene, bbox) {
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    const distances = [];
+    const v = new THREE.Vector3();
+    glbScene.updateMatrixWorld(true);
+    glbScene.traverse((obj) => {
+      if (!obj.isMesh || !obj.geometry) return;
+      const pos = obj.geometry.attributes.position;
+      if (!pos) return;
+      obj.updateMatrixWorld(true);
+      const arr = pos.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        v.set(arr[i], arr[i + 1], arr[i + 2]).applyMatrix4(obj.matrixWorld);
+        const dx = v.x - center.x;
+        const dy = v.y - center.y;
+        distances.push(Math.sqrt(dx * dx + dy * dy));
+      }
+    });
+    if (distances.length < 10) return null;
+    distances.sort((a, b) => a - b);
+    const idx = Math.max(0, Math.floor(distances.length * 0.02));
+    return distances[idx];
+  }
+
+  /**
    * Ajusta uma GLB de pulso ao pulso em 3 passos:
    *
    *   1. Pulseira: detecta eixo do anel (dim mínima) e roda 90° para o
@@ -3224,11 +3270,8 @@ async function runHandArSession({
     /**
      * Após bracelete rodada OU relógio plano dobrado, o GLB é cilindrico
      * com eixo ao longo de +Z local. A mediana do bbox ≈ 2·localRingR
-     * (diâmetro do cilindro). Usa isto para a escala adaptativa.
-     *
-     * Para relógio NÃO-plano (já enrolado pela autoria, ratio < 2), usamos
-     * median/2 como estimativa do raio do anel. Funciona porque bbox.median
-     * é normalmente o diâmetro do anel.
+     * (raio do eixo central). Para relógio NÃO-plano (já enrolado pela
+     * autoria, ratio < 2), usamos median/2 como estimativa do raio.
      */
     const sorted = [size.x, size.y, size.z].sort((a, b) => a - b);
     const medianDim = sorted[1] || 1;
@@ -3238,14 +3281,36 @@ async function runHandArSession({
       : Math.max(medianDim / 2, 1e-6);
 
     /**
-     * baseScale inicial assume pulso adulto médio (26 mm). No tick/per-frame
-     * (ver updateAnchorFromHand), multiplicamos por (smoothWristR / 0.026)
-     * para o GLB ficar AJUSTADO ao utilizador actual.
+     * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
+     *
+     * `localRingR` é o raio do EIXO central. A superfície INTERNA do
+     * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
+     * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
+     * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
+     * a superfície interna fica exactamente na pele (encaixe perfeito).
+     *
+     * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
+     * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
+     * de 10% de espessura radial).
      */
-    const gapOffset =
-      accessoryType === "bracelet" ? 0.003 : 0; // 3 mm folga pulseira
-    const targetRingR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
-    const calcBaseScale = targetRingR / localRingR;
+    const computedInner = computeLocalInnerRadius(glbScene, bbox);
+    const localInnerR =
+      computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
+        ? computedInner
+        : Math.max(localRingR * 0.9, 1e-6);
+
+    /**
+     * === baseScale: ENCAIXE PELA SUPERFÍCIE INTERNA ===
+     *
+     * targetInnerR = wristR_default + gap (onde fica a face interna no mundo).
+     * scale = targetInnerR / localInnerR   (escalar pela INTERNA, não pelo eixo).
+     *
+     * Relógio: gap = 1 mm (folga mínima para a correia não enterrar na pele).
+     * Pulseira: gap = 2 mm (conforto, ainda wrap visível).
+     */
+    const gapOffset = accessoryType === "bracelet" ? 0.002 : 0.001;
+    const targetInnerR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
+    const calcBaseScale = targetInnerR / localInnerR;
 
     const finalMul =
       Number.isFinite(Number(calScale)) && Number(calScale) > 0
@@ -3264,6 +3329,7 @@ async function runHandArSession({
       maxDim,
       medianDim,
       localRingR,
+      localInnerR,
       didBend,
     };
   }
@@ -3274,10 +3340,12 @@ async function runHandArSession({
     arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "";
   const finalGlbUrl = buildGlbLoaderUrl(glbUrl, versionHint);
   let baseScale = 0.1;
-  /** Raio local do anel/cilindro wrap, em unidades GLB (pré-scale).
-   *  Usado para ajuste adaptativo de escala por frame baseado no
-   *  `smoothWristRadius` detectado, fazendo o GLB caber no pulso real. */
+  /** Raio local do anel/cilindro wrap (EIXO), em unidades GLB (pré-scale). */
   let localRingR = 0.025;
+  /** Raio local INTERNO real (superfície que toca a pele), unidades GLB.
+   *  Usado no ajuste adaptativo por frame: targetInnerR_mundo / localInnerR
+   *  dá o scale exacto para a face interna encostar à pele. */
+  let localInnerR = 0.022;
   /** Sinaliza se o relógio foi geometricamente dobrado à volta dum cilindro
    *  (GLB plano detectado). Usado só para logging. */
   let didBendWatch = false;
@@ -3300,19 +3368,25 @@ async function runHandArSession({
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
         localRingR = fitRes.localRingR;
+        localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
         didBendWatch = Boolean(fitRes.didBend);
 
         console.log("[omafit-ar] hand GLB fit", {
           accessoryType,
           strategy: fitRes.didBend
-            ? "watch BENT around cylinder → scale to user wristR (adaptive)"
+            ? "watch BENT → scale by INNER surface radius"
             : accessoryType === "bracelet"
-              ? "bracelet median/2 → ringR, scale to user wristR (adaptive)"
-              : "watch wrapped (no bend) → scale to user wristR (adaptive)",
+              ? "bracelet → scale by INNER surface radius"
+              : "watch wrapped → scale by INNER surface radius",
           baseScale: fitRes.baseScale,
           maxDim: fitRes.maxDim,
           medianDim: fitRes.medianDim,
-          localRingR: fitRes.localRingR,
+          localRingR_mm: (fitRes.localRingR * 1000).toFixed(1),
+          localInnerR_mm: ((fitRes.localInnerR || 0) * 1000).toFixed(1),
+          ringThickness_mm: (
+            (fitRes.localRingR - (fitRes.localInnerR || 0)) *
+            1000
+          ).toFixed(1),
           didBend: fitRes.didBend,
           defaultWristR_mm: Math.round(OMAFIT_DEFAULT_WRIST_R_M * 1000),
           effMaxMm: Math.round(
@@ -3357,6 +3431,14 @@ async function runHandArSession({
   const smY = new THREE.Vector3();
   const smZ = new THREE.Vector3();
   const smPos = new THREE.Vector3();
+  /** Quaternion suavizada (v11.2): SLERP em vez de LERP vector-a-vector.
+   *  SLERP preserva unit-length, mantém velocidade angular constante e
+   *  produz trajectórias geodésicas na esfera (= rotação visualmente
+   *  natural). LERP passa pelo interior da esfera, criando falsos
+   *  "escorregares" quando o utilizador roda o pulso. */
+  const smoothedQuat = new THREE.Quaternion();
+  const tmpQuat = new THREE.Quaternion();
+  const basisMat = new THREE.Matrix4();
   let smoothInitialized = false;
   let lastFrameTs = -1;
 
@@ -3372,6 +3454,29 @@ async function runHandArSession({
   let rafId = 0;
   let missedFrames = 0;
   const MISSED_HIDE_THRESHOLD = 6;
+
+  /**
+   * === ESTABILIDADE DE HANDEDNESS (v11.2) ===
+   *
+   * MediaPipe devolve "Left" | "Right" por frame com um score [0,1].
+   * Em frames raros a classificação oscila (ex.: pulso virado 90°, palm
+   * perpendicular à câmara), o que causa um flip de 180° no GLB porque
+   * `tmpX.negate()` inverte a paridade da base ortonormal.
+   *
+   * Estratégia de 2 camadas:
+   *   1) Threshold de confiança: só aceita nova label se score ≥ 0.75.
+   *      Frames com score baixo mantêm a última label conhecida.
+   *   2) Histerese por persistência: nova label só substitui a antiga
+   *      depois de 3 frames consecutivos concordantes. Flicker isolado
+   *      é ignorado.
+   *
+   * `lastHandScore` é exposto para debug/logging. */
+  let stableHandLabel = "Right";
+  let pendingHandLabel = "";
+  let pendingHandCount = 0;
+  let lastHandScore = 0;
+  const HANDEDNESS_SCORE_THRESHOLD = 0.75;
+  const HANDEDNESS_PERSIST_FRAMES = 3;
 
   /**
    * Desprojecta um landmark normalizado do MediaPipe (x,y ∈ [0,1]) para
@@ -3468,29 +3573,49 @@ async function runHandArSession({
     tmpPos.copy(w0).addScaledVector(tmpY, 0.006);
 
     /**
-     * EMA independente para posição e para cada eixo.
-     * `alpha = 1 - exp(-dt / tau)` → responde em ~tau ms, amortece jitter
-     * de frame (MediaPipe hand) que é tipicamente 1-2 px @ 30 fps.
+     * === SUAVIZAÇÃO DA ORIENTAÇÃO (v11.2: SLERP) ===
+     *
+     * Constrói quaternion do target (tmpX, tmpY, tmpZ) e interpola
+     * esfericamente da quaternion suavizada actual para o target.
+     *
+     * SLERP vs LERP-vector-a-vector:
+     *   • SLERP move no arco mais curto da esfera → rotação natural,
+     *     sem variação aparente de escala durante a transição.
+     *   • LERP passa pelo CORDA da esfera → durante a transição, os
+     *     eixos deixam de ser unitários (antes do .normalize()); depois
+     *     da normalização, a velocidade angular não é constante (mais
+     *     rápida no meio, lenta no início/fim). Visualmente, o GLB
+     *     "atrasa" no início e "ultrapassa" no fim do giro.
+     *
+     * Resultado: a rotação lateral do pulso (ex.: thumb para cima,
+     * thumb horizontal) é seguida de forma geodésica. O produto mostra
+     * progressivamente a lateral / traseira conforme o utilizador roda
+     * o braço, como se fosse real.
+     *
+     * Posição continua com EMA linear (mais estável para translação).
      */
     const clampDt = Math.max(8, Math.min(80, Number.isFinite(dtMs) ? dtMs : 16));
+    basisMat.makeBasis(tmpX, tmpY, tmpZ);
+    tmpQuat.setFromRotationMatrix(basisMat);
     if (!smoothInitialized) {
-      smX.copy(tmpX);
-      smY.copy(tmpY);
-      smZ.copy(tmpZ);
+      smoothedQuat.copy(tmpQuat);
       smPos.copy(tmpPos);
       smoothInitialized = true;
     } else {
       const aPos = 1 - Math.exp(-clampDt / OMAFIT_HAND_POS_TAU_MS);
       const aAxis = 1 - Math.exp(-clampDt / OMAFIT_HAND_AXIS_TAU_MS);
       smPos.lerp(tmpPos, aPos);
-      smX.lerp(tmpX, aAxis).normalize();
-      smY.lerp(tmpY, aAxis).normalize();
-      // Re-ortogonalizar: Z derivado de X×Y; Y re-derivado para manter base ortonormal.
-      smZ.crossVectors(smX, smY).normalize();
-      smY.crossVectors(smZ, smX).normalize();
+      smoothedQuat.slerp(tmpQuat, aAxis);
     }
 
-    tmpMat.makeBasis(smX, smY, smZ);
+    /** Extrai eixos da quaternion suavizada (para debug e para
+     *  componentes que dependam de smX/smY/smZ, como o fallback de escala). */
+    basisMat.makeRotationFromQuaternion(smoothedQuat);
+    smX.set(basisMat.elements[0], basisMat.elements[1], basisMat.elements[2]);
+    smY.set(basisMat.elements[4], basisMat.elements[5], basisMat.elements[6]);
+    smZ.set(basisMat.elements[8], basisMat.elements[9], basisMat.elements[10]);
+
+    tmpMat.copy(basisMat);
     tmpMat.setPosition(smPos);
     anchor.matrix.copy(tmpMat);
     anchor.matrixWorldNeedsUpdate = true;
@@ -3561,27 +3686,25 @@ async function runHandArSession({
     armOccluder.updateMatrixWorld(true);
 
     /**
-     * === ESCALA ADAPTATIVA DO GLB AO PULSO REAL ===
+     * === ESCALA ADAPTATIVA PELA SUPERFÍCIE INTERNA (v11.2) ===
      *
-     * O `baseScale` foi calculado em `fitWristGlb` assumindo pulso médio
-     * (OMAFIT_DEFAULT_WRIST_R_M = 26 mm). Agora que temos leitura estável
-     * do raio real deste utilizador (smoothWristRadius), multiplicamos
-     * baseScale por (wristR_real / wristR_default) para o GLB encaixar
-     * PERFEITAMENTE no pulso actual.
+     * O `baseScale` já é `targetInnerR_default / localInnerR` (calculado
+     * em `fitWristGlb`). Agora que temos leitura estável do raio real
+     * deste utilizador, multiplicamos por
      *
-     * Para pulseira: adiciona 3 mm de folga (accessoryType === "bracelet").
-     * Para relógio dobrado/enrolado: sem folga, straps tocam pele.
+     *     adaptMul = (smoothWristR + gap) / (defaultWristR + gap)
      *
-     * O resultado é um GLB que dinamicamente ajusta ao tamanho do pulso
-     * do utilizador — envolve por completo e sem gap. Se o utilizador
-     * afastar a mão da câmera, `smoothWristRadius` mantém-se (é medida
-     * em metros mundo, não em píxeis), portanto a escala é estável.
+     * para que a superfície INTERNA do GLB encoste à pele do utilizador.
+     * O resultado: não há "gap" visível porque o anel envolve o pulso
+     * exactamente à superfície, como um produto real no braço.
+     *
+     * gap: 1 mm p/ relógio (strap nunca enterra), 2 mm p/ pulseira (conforto).
      */
-    if (glbRoot && localRingR > 1e-6) {
-      const gapOffset = accessoryType === "bracelet" ? 0.003 : 0;
-      const targetRingR = smoothWristRadius + gapOffset;
+    if (glbRoot && localInnerR > 1e-6) {
+      const gapOffset = accessoryType === "bracelet" ? 0.002 : 0.001;
+      const targetInnerR = smoothWristRadius + gapOffset;
       const defaultTargetR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
-      const adaptMul = targetRingR / defaultTargetR;
+      const adaptMul = targetInnerR / defaultTargetR;
       const userMul =
         Number.isFinite(Number(userScale)) && Number(userScale) > 0
           ? Number(userScale)
@@ -3594,25 +3717,23 @@ async function runHandArSession({
         Number.isFinite(Number(userScale)) && Number(userScale) > 0
           ? Number(userScale)
           : 1;
-      const gapOffset = accessoryType === "bracelet" ? 0.003 : 0;
+      const gapOffset = accessoryType === "bracelet" ? 0.002 : 0.001;
       const adaptMul =
         (smoothWristRadius + gapOffset) /
         (OMAFIT_DEFAULT_WRIST_R_M + gapOffset);
       console.debug("[omafit-ar] hand anchor", {
         hand: handLabel || "?",
+        handScore: (lastHandScore || 0).toFixed(2),
         anchor: "w0 (wrist)",
         wristR_mm: (smoothWristRadius * 1000).toFixed(1),
         forearmL_cm: (smoothForearmLength * 100).toFixed(1),
         bent: didBendWatch,
+        localInnerR_mm: (localInnerR * 1000).toFixed(1),
         localRingR_mm: (localRingR * 1000).toFixed(1),
         adaptScale: adaptMul.toFixed(3),
         glbScale: (baseScale * userMul * adaptMul).toFixed(4),
+        finalInnerR_mm: (localInnerR * baseScale * userMul * adaptMul * 1000).toFixed(1),
         zDist: zDist.toFixed(3),
-        spanY: spanY.toFixed(3),
-        vidAR: videoAspect().toFixed(3),
-        camAR: camera.aspect.toFixed(3),
-        posY: smPos.y.toFixed(3),
-        posZ: smPos.z.toFixed(3),
         Yz: tmpY.z.toFixed(3),
       });
     }
@@ -3642,16 +3763,42 @@ async function runHandArSession({
     }
 
     const landmarks = res?.landmarks?.[0];
-    /** Lateralidade devolvida pelo MediaPipe: "Left" | "Right" — essencial
-     *  para orientar o relógio correctamente nos dois pulsos. Em algumas
-     *  versões vem como `handednesses`, noutras como `handedness`. */
-    let handLabel = "Right";
+    /**
+     * Lateralidade estabilizada (v11.2). Passa por 2 filtros antes de
+     * aceitar mudança: confiança ≥ 0.75 e persistência ≥ 3 frames. Isto
+     * impede que flicker de 1-2 frames cause flip de 180° no GLB quando
+     * o utilizador roda o pulso (pose lateral com palma perpendicular
+     * à câmara é tipicamente onde o score do MediaPipe cai).
+     */
     try {
       const hn = res?.handednesses?.[0]?.[0] || res?.handedness?.[0]?.[0];
-      if (hn && typeof hn.categoryName === "string") handLabel = hn.categoryName;
+      if (hn && typeof hn.categoryName === "string") {
+        const newLabel = hn.categoryName === "Left" ? "Left" : "Right";
+        const score = Number(hn.score) || 0;
+        lastHandScore = score;
+        if (score >= HANDEDNESS_SCORE_THRESHOLD) {
+          if (newLabel === stableHandLabel) {
+            pendingHandLabel = "";
+            pendingHandCount = 0;
+          } else {
+            if (newLabel === pendingHandLabel) {
+              pendingHandCount += 1;
+            } else {
+              pendingHandLabel = newLabel;
+              pendingHandCount = 1;
+            }
+            if (pendingHandCount >= HANDEDNESS_PERSIST_FRAMES) {
+              stableHandLabel = newLabel;
+              pendingHandLabel = "";
+              pendingHandCount = 0;
+            }
+          }
+        }
+      }
     } catch {
       /* ignore */
     }
+    const handLabel = stableHandLabel;
     if (landmarks && landmarks.length >= 18) {
       missedFrames = 0;
       updateAnchorFromHand(landmarks, dtMs, handLabel);
@@ -3704,6 +3851,7 @@ async function runHandArSession({
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               baseScale = fitRes.baseScale;
               localRingR = fitRes.localRingR;
+              localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
               didBendWatch = Boolean(fitRes.didBend);
               resolve();
             },
