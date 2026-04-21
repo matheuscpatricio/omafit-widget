@@ -1289,6 +1289,58 @@ function fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost) {
   }
 }
 
+/**
+ * Desenha o feed da câmara **dentro** do WebGL (`scene.background` + VideoTexture).
+ * Não depende do <video> por baixo de canvas transparente — em muitos temas e em
+ * Safari/iOS o compositor mostra o canvas opaco e o fundo fica preto (só GLB visível).
+ * O elemento <video> mantém-se a decodificar (opacity:0, nunca display:none).
+ */
+function applyOmafitMindARVideoAsSceneBackground(mindarThree, THREE, mirrorSelfie) {
+  const scene = mindarThree?.scene;
+  const renderer = mindarThree?.renderer;
+  const video =
+    mindarThree?.video ||
+    mindarThree?.container?.querySelector?.("video") ||
+    null;
+  const cssEl = mindarThree?.cssRenderer?.domElement;
+  if (cssEl) {
+    try {
+      cssEl.style.backgroundColor = "transparent";
+      cssEl.style.pointerEvents = "none";
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!scene || !THREE || !video || !renderer) return null;
+  try {
+    const tex = new THREE.VideoTexture(video);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    if (THREE.sRGBEncoding !== undefined && "encoding" in tex) {
+      tex.encoding = THREE.sRGBEncoding;
+    }
+    if (THREE.SRGBColorSpace !== undefined && "colorSpace" in tex) {
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    if (mirrorSelfie) {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.repeat.x = -1;
+      tex.offset.x = 1;
+    }
+    scene.background = tex;
+    video.style.opacity = "0";
+    video.style.pointerEvents = "none";
+    renderer.setClearColor(0x000000, 1);
+    if (THREE.NoToneMapping !== undefined) {
+      renderer.toneMapping = THREE.NoToneMapping;
+    }
+    return tex;
+  } catch (e) {
+    console.warn("[omafit-ar] applyOmafitMindARVideoAsSceneBackground:", e?.message || e);
+    return null;
+  }
+}
+
 async function runArSession({
   shell,
   mainRow,
@@ -1546,6 +1598,8 @@ async function runArSession({
   colContent.appendChild(arWrap);
 
   let mindarThree = null;
+  /** `VideoTexture` em `scene.background` quando o fundo DOM+canvas transparente falha. */
+  let mindarFaceSceneBgTex = null;
   let arResizeObserver = null;
   /**
    * Handler opcional instalado por motores alternativos (p.ex. MediaPipe
@@ -1566,6 +1620,19 @@ async function runArSession({
       arResizeObserver = null;
     }
     if (mindarThree) {
+      try {
+        if (mindarFaceSceneBgTex && mindarThree.scene) {
+          mindarThree.scene.background = null;
+          try {
+            mindarFaceSceneBgTex.dispose();
+          } catch {
+            /* ignore */
+          }
+          mindarFaceSceneBgTex = null;
+        }
+      } catch {
+        /* ignore */
+      }
       try {
         mindarThree.renderer?.setAnimationLoop(null);
       } catch {
@@ -1878,7 +1945,14 @@ async function runArSession({
         /* ignore */
       }
       try {
-        if (mindarThree) fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+        if (mindarThree) {
+          if (!mindarFaceSceneBgTex) {
+            fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+          } else {
+            const ce = mindarThree.cssRenderer?.domElement;
+            if (ce) ce.style.backgroundColor = "transparent";
+          }
+        }
       } catch {
         /* ignore */
       }
@@ -1893,7 +1967,17 @@ async function runArSession({
     });
 
     await startMindARFaceWithReliableCamera(mindarThree);
-    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+    {
+      const mirrorSelfie = Boolean(mindarThree.shouldFaceUser && !disableFaceMirror);
+      mindarFaceSceneBgTex = applyOmafitMindARVideoAsSceneBackground(
+        mindarThree,
+        THREE,
+        mirrorSelfie,
+      );
+      if (!mindarFaceSceneBgTex) {
+        fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+      }
+    }
 
     /**
      * Pipeline simples: rotação vem inteiramente do `data-ar-canonical-fix-yxz`
@@ -2374,7 +2458,9 @@ async function runArSession({
       }
       renderer.render(scene, camera);
     });
-    fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+    if (!mindarFaceSceneBgTex) {
+      fixMindARFaceVideoBehindCanvas(mindarThree, mindarHost);
+    }
 
     loading.style.display = "none";
 
