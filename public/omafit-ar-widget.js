@@ -116,7 +116,7 @@ const OMAFIT_HAND_AXIS_TAU_MS = 180;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_watch+glasses-sync-v4";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-21_watch+glasses-sync-v5-syntaxfix";
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -846,20 +846,12 @@ function injectGlobalStyles(root, primaryOverride) {
       background: transparent !important;
       background-color: transparent !important;
     }
-    /**
-     * NÃO sobrepor width/height/top/left do vídeo ou canvas do MindAR.
-     * A biblioteca calcula em `_resize()` posições em pixels para fazer
-     * object-fit: cover manual (top/left negativos para centrar o overflow).
-     * Critical: o canvas (renderer.domElement) tem dimensões nativas =
-     * videoWidth × videoHeight, e o Three.js câmara usa aspect = video aspect.
-     * Se forçarmos width/height:100% no canvas por CSS, o canvas "estica"
-     * ao container, mas as projeções 3D continuam calculadas para aspect do
-     * vídeo — resultado: óculos aparecem rodados/offset (visual "virado pro
-     * lado" que o utilizador reportou).
-     *
-     * Apenas forçamos o background a transparente (herda mas certinho) e o
-     * z-index correto (vídeo abaixo do canvas).
-     */
+    /* NAO sobrepor width/height/top/left do video ou canvas do MindAR.    */
+    /* A biblioteca calcula em _resize() posicoes em pixels para fazer       */
+    /* object-fit: cover manual (top/left negativos para centrar overflow).  */
+    /* Se forcarmos width/height:100% no canvas por CSS, o canvas "estica"   */
+    /* ao container mas as projecoes 3D continuam calculadas para o aspect   */
+    /* do video -> oculos aparecem rodados/offset ("virado pro lado").       */
   `;
   document.head.appendChild(s);
   const hasThemeFontFace = document.getElementById("omafit-ar-theme-font-face");
