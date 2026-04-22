@@ -1,6 +1,7 @@
 import { motion, type Variants } from 'framer-motion';
 import { Ruler, Shirt, Glasses, MessageSquare, Palette, Sparkles, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { BorderBeamCard } from './magic/BorderBeam';
 
 interface Feature {
   icon: LucideIcon;
@@ -65,7 +66,7 @@ const itemVariants: Variants = {
 
 export function Solution() {
   return (
-    <section id="solucao" className="relative py-20 sm:py-28 bg-white">
+    <section id="solucao" className="relative py-20 sm:py-28 overflow-hidden bg-gradient-to-b from-white via-rose-50/30 to-white">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -137,15 +138,8 @@ function FeatureCard({
       ? 'lg:col-span-3'
       : 'lg:col-span-3';
 
-  return (
-    <motion.div
-      variants={variants}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3 }}
-      className={`group relative rounded-2xl border border-black/5 p-6 sm:p-8 shadow-elegant hover:shadow-elegant-lg transition-shadow overflow-hidden ${spanClass} ${
-        feature.accent ? 'bg-gradient-to-br from-[#810707] to-[#4a0303] text-white' : 'bg-white'
-      }`}
-    >
+  const inner = (
+    <>
       {feature.accent && (
         <div
           className="absolute -top-32 -right-32 h-64 w-64 rounded-full opacity-30 blur-3xl pointer-events-none"
@@ -206,6 +200,36 @@ function FeatureCard({
           ))}
         </ul>
       </div>
+    </>
+  );
+
+  if (feature.accent) {
+    return (
+      <motion.div
+        variants={variants}
+        whileHover={{ y: -6, scale: 1.01 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+        className={`${spanClass}`}
+      >
+        <BorderBeamCard
+          duration={8}
+          className="shadow-brand-glow h-full"
+          innerClassName="relative overflow-hidden rounded-[14px] bg-gradient-to-br from-[#810707] to-[#4a0303] text-white p-6 sm:p-8 h-full min-h-[280px]"
+        >
+          {inner}
+        </BorderBeamCard>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      variants={variants}
+      whileHover={{ y: -6 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+      className={`group relative rounded-2xl border border-black/5 bg-white p-6 sm:p-8 shadow-elegant hover:shadow-elegant-lg transition-shadow overflow-hidden ${spanClass}`}
+    >
+      {inner}
     </motion.div>
   );
 }

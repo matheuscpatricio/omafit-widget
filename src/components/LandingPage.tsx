@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Lenis from '@studio-freight/lenis';
 import { supabase } from '../lib/supabase';
@@ -6,25 +6,32 @@ import { supabase } from '../lib/supabase';
 import { Navbar } from './landing/Navbar';
 import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
+import { ParallaxStoryBanner } from './landing/ParallaxStoryBanner';
 import { Solution } from './landing/Solution';
 import { Pricing } from './landing/Pricing';
 import { FAQ } from './landing/FAQ';
 import { FinalCTA } from './landing/FinalCTA';
 import { Footer } from './landing/Footer';
-import { PricingModal } from './PricingModal';
+import { LandingSEO } from './landing/LandingSEO';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
-  onLogin: () => void;
+  /** Mantido para compatibilidade com rotas existentes; o cabeçalho da landing não exibe login. */
+  onLogin?: () => void;
 }
 
-export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
+const paidPlanPriceIds: Record<'growth' | 'pro' | 'enterprise', string> = {
+  growth: 'growth',
+  pro: 'price_PRO_3000_IMAGES',
+  enterprise: 'enterprise',
+};
+
+export function LandingPage({ onGetStarted }: LandingPageProps) {
   const navigate = useNavigate();
-  const [showPricingModal, setShowPricingModal] = useState(false);
 
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.45,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     });
 
@@ -40,28 +47,19 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (showPricingModal) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [showPricingModal]);
-
   const handleInstallShopify = () => {
     onGetStarted('free');
   };
 
-  const handleSelectPro = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+  const handleSelectPaidPlan = async (plan: 'growth' | 'pro' | 'enterprise') => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (session) {
       navigate('/dashboard');
-    } else {
-      setShowPricingModal(true);
+      return;
     }
+    onGetStarted(paidPlanPriceIds[plan]);
   };
 
   const handleRequestDemo = () => {
@@ -74,14 +72,10 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
   const handleScheduleDemo = handleRequestDemo;
 
-  const handleSelectPlan = (priceId: string) => {
-    setShowPricingModal(false);
-    onGetStarted(priceId);
-  };
-
   return (
     <div className="min-h-screen bg-white text-ink-800 font-sans antialiased" style={{ colorScheme: 'light' }}>
-      <Navbar onInstall={handleInstallShopify} onLogin={onLogin} />
+      <LandingSEO />
+      <Navbar onInstall={handleInstallShopify} />
 
       <main className="relative">
         <Hero
@@ -91,12 +85,11 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
 
         <Pain />
 
+        <ParallaxStoryBanner />
+
         <Solution />
 
-        <Pricing
-          onSelectFree={handleInstallShopify}
-          onSelectPro={handleSelectPro}
-        />
+        <Pricing onSelectFree={handleInstallShopify} onSelectPaidPlan={handleSelectPaidPlan} />
 
         <FAQ />
 
@@ -107,13 +100,6 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
       </main>
 
       <Footer />
-
-      <PricingModal
-        isOpen={showPricingModal}
-        onClose={() => setShowPricingModal(false)}
-        onSelectPlan={handleSelectPlan}
-        locale="pt"
-      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { motion, type Variants } from 'framer-motion';
 import { ArrowRight, Calendar } from 'lucide-react';
 import { Button, ButtonLink } from '../ui/button';
-
+import { LANDING_IMAGES } from '../../lib/site';
 interface FinalCTAProps {
   onInstallShopify?: () => void;
   onScheduleDemo?: () => void;
@@ -30,8 +30,19 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
           whileInView="visible"
           viewport={{ once: true, margin: '-80px' }}
           variants={containerVariants}
-          className="relative rounded-3xl bg-ink-800 text-white overflow-hidden px-6 py-16 sm:px-12 sm:py-20 lg:px-20 lg:py-24"
+          className="relative rounded-3xl bg-ink-900 text-white overflow-hidden px-6 py-16 sm:px-12 sm:py-20 lg:px-20 lg:py-24"
         >
+          <img
+            src={LANDING_IMAGES.midBanner}
+            alt=""
+            role="presentation"
+            decoding="async"
+            width={1920}
+            height={640}
+            className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-overlay pointer-events-none"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-ink-900/95 via-ink-900/88 to-[#4a0303]/90" />
           {/* Decorative glows */}
           <div
             aria-hidden
@@ -72,8 +83,8 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
               variants={itemVariants}
               className="mt-6 text-lg text-white/70 leading-relaxed"
             >
-              Instale em 5 minutos, ganhe 50 imagens grátis e veja sua taxa de devolução cair já na
-              primeira semana. Sem cartão de crédito, sem compromisso.
+              Instale em 5 minutos, ative o plano On-Demand (5 acessórios AR) e veja a confiança do
+              cliente subir já na primeira semana. Sem cartão de crédito no On-Demand.
             </motion.p>
 
             <motion.div

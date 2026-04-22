@@ -26,7 +26,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Como funciona a cobrança por imagem? Preciso me comprometer mensalmente?',
-    a: 'Não. O plano Free é gratuito para instalar e inclui 50 imagens de try-on gratuitas por única vez. Após isso, você paga apenas US$ 0,18 por imagem gerada, sem mensalidade. Se sua loja escala, o plano Pro oferece 3.000 imagens inclusas/mês por US$ 300 com adicionais a US$ 0,08 — mais econômico a partir de ~1.700 imagens/mês.',
+    a: 'O plano On-Demand é gratuito para instalar: você tem 5 acessórios AR e paga US$ 0,18 por sessão de try-on conforme o uso. Os planos Growth (US$ 89, 700 sessões/mês, 20 AR), Pro (US$ 300, 3.000 sessões, 100 AR) e Enterprise (US$ 600, sessões e AR ilimitados) trazem pacotes mensais com previsibilidade. Sem taxas ocultas.',
   },
   {
     q: 'O Omafit afeta a velocidade de carregamento da minha loja?',

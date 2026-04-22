@@ -63,8 +63,12 @@ const itemVariants: Variants = {
 
 export function Pain() {
   return (
-    <section className="relative py-20 sm:py-28 bg-ink-50/40">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
+    <section className="relative py-20 sm:py-28 overflow-hidden bg-gradient-to-b from-ink-50/90 via-white to-ink-50/60">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(129,7,7,0.12),transparent)]"
+      />
+      <div className="relative z-[1] max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -109,10 +113,14 @@ export function Pain() {
               <motion.div
                 key={p.title}
                 variants={itemVariants}
-                whileHover={{ y: -4 }}
-                transition={{ duration: 0.3 }}
-                className="group relative bg-white rounded-2xl border border-black/5 p-6 sm:p-7 shadow-elegant hover:shadow-elegant-lg transition-shadow"
+                whileHover={{ y: -8, scale: 1.01 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+                className="group relative overflow-hidden rounded-2xl border border-black/10 bg-white/90 p-6 sm:p-7 shadow-elegant backdrop-blur-sm transition-shadow duration-300 hover:border-[#810707]/25 hover:shadow-[0_20px_50px_-12px_rgba(129,7,7,0.18)]"
               >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-gradient-to-br from-[#810707]/[0.06] via-transparent to-rose-200/20"
+                />
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="h-11 w-11 rounded-xl bg-ink-50 grid place-items-center">
@@ -131,7 +139,7 @@ export function Pain() {
                     </div>
                   </div>
                 </div>
-                <h3 className="mt-5 text-xl font-semibold text-ink-800 tracking-tight">
+                <h3 className="relative mt-5 text-xl font-semibold text-ink-800 tracking-tight">
                   {p.title}
                 </h3>
                 <p className="mt-2 text-[15px] text-ink-500 leading-relaxed">

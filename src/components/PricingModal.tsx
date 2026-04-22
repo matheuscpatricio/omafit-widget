@@ -80,8 +80,8 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {products.map((product, index) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5">
+            {products.map((product) => {
               const isPopular = product.id === 'prod_pro';
 
               return (
@@ -89,7 +89,7 @@ export function PricingModal({ isOpen, onClose, onSelectPlan, locale = 'pt' }: P
                   key={product.id}
                   className={`relative bg-white rounded-2xl border-2 transition-all hover:shadow-xl hover:-translate-y-1 ${
                     isPopular
-                      ? 'border-[#810707] shadow-lg scale-105'
+                      ? 'border-[#810707] shadow-lg ring-2 ring-[#810707]/15'
                       : 'border-gray-200'
                   }`}
                 >

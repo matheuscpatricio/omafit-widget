@@ -1,6 +1,6 @@
 import { motion, type Variants } from 'framer-motion';
 import { Check, Sparkles, ArrowRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button, ButtonLink } from '../ui/button';
 
@@ -14,17 +14,33 @@ interface BillingPlan {
   active: boolean;
 }
 
-interface PricingProps {
-  onSelectFree?: () => void;
-  onSelectPro?: () => void;
-}
+/** Sessões de try-on / mês (coluna `images_included` no Supabase). */
+const UNLIMITED_THRESHOLD = 500_000;
+
+const AR_ACCESSORIES: Record<string, number | 'unlimited'> = {
+  free: 5,
+  growth: 20,
+  pro: 100,
+  enterprise: 'unlimited',
+};
+
+const PLAN_ORDER = ['free', 'growth', 'pro', 'enterprise'] as const;
 
 const fallbackPlans: BillingPlan[] = [
   {
     name: 'free',
-    display_name: 'Free',
+    display_name: 'On-Demand',
     monthly_price: 0,
     images_included: 0,
+    price_per_extra_image: 0.18,
+    currency: 'USD',
+    active: true,
+  },
+  {
+    name: 'growth',
+    display_name: 'Growth',
+    monthly_price: 89,
+    images_included: 700,
     price_per_extra_image: 0.18,
     currency: 'USD',
     active: true,
@@ -38,11 +54,25 @@ const fallbackPlans: BillingPlan[] = [
     currency: 'USD',
     active: true,
   },
+  {
+    name: 'enterprise',
+    display_name: 'Enterprise',
+    monthly_price: 600,
+    images_included: 999_999,
+    price_per_extra_image: 0,
+    currency: 'USD',
+    active: true,
+  },
 ];
+
+interface PricingProps {
+  onSelectFree?: () => void;
+  onSelectPaidPlan?: (planName: 'growth' | 'pro' | 'enterprise') => void;
+}
 
 const containerVariants: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
+  visible: { transition: { staggerChildren: 0.08 } },
 };
 
 const itemVariants: Variants = {
@@ -54,8 +84,35 @@ const itemVariants: Variants = {
   },
 };
 
-export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
-  const [plans, setPlans] = useState<BillingPlan[]>(fallbackPlans);
+function mergePlansFromDb(
+  rows: BillingPlan[],
+): BillingPlan[] {
+  const byName = new Map(rows.map((p) => [p.name, p]));
+  return PLAN_ORDER.map((name) => {
+    const fromDb = byName.get(name);
+    const fallback = fallbackPlans.find((p) => p.name === name)!;
+    return fromDb ? { ...fallback, ...fromDb } : fallback;
+  });
+}
+
+function formatArCount(name: string): string {
+  const n = AR_ACCESSORIES[name];
+  if (n === 'unlimited') return 'Ilimitados';
+  return String(n);
+}
+
+function formatTryOnSessions(plan: BillingPlan): string {
+  if (plan.images_included >= UNLIMITED_THRESHOLD) {
+    return 'Sessões de try-on ilimitadas';
+  }
+  if (plan.name === 'free' || plan.images_included === 0) {
+    return 'Sessões de try-on sob demanda';
+  }
+  return `${plan.images_included.toLocaleString('pt-BR')} sessões de try-on / mês`;
+}
+
+export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
+  const [plans, setPlans] = useState<BillingPlan[]>(() => mergePlansFromDb([]));
 
   useEffect(() => {
     let cancelled = false;
@@ -63,15 +120,16 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
       try {
         const { data, error } = await supabase
           .from('billing_plans')
-          .select('name, display_name, monthly_price, images_included, price_per_extra_image, currency, active')
+          .select(
+            'name, display_name, monthly_price, images_included, price_per_extra_image, currency, active',
+          )
           .eq('active', true)
-          .in('name', ['free', 'pro']);
+          .in('name', [...PLAN_ORDER]);
         if (!cancelled && !error && data && data.length > 0) {
-          const sorted = [...data].sort((a, b) => a.monthly_price - b.monthly_price);
-          setPlans(sorted as BillingPlan[]);
+          setPlans(mergePlansFromDb(data as BillingPlan[]));
         }
       } catch {
-        /* mantém fallback */
+        /* fallback já aplicado */
       }
     }
     fetchPlans();
@@ -80,8 +138,10 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
     };
   }, []);
 
-  const freePlan = plans.find((p) => p.name === 'free') ?? fallbackPlans[0];
-  const proPlan = plans.find((p) => p.name === 'pro') ?? fallbackPlans[1];
+  const ordered = useMemo(
+    () => PLAN_ORDER.map((name) => plans.find((p) => p.name === name)).filter(Boolean) as BillingPlan[],
+    [plans],
+  );
 
   return (
     <section id="planos" className="relative py-20 sm:py-28 bg-ink-50/40">
@@ -105,16 +165,12 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
             className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-ink-800"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Escolha o Plano que{' '}
-            <span className="text-[#810707]">Impulsiona</span> o Seu Crescimento.
+            Escolha o Plano que <span className="text-[#810707]">Impulsiona</span> o Seu Crescimento.
           </motion.h2>
-          <motion.p
-            variants={itemVariants}
-            className="mt-5 text-lg text-ink-500 leading-relaxed"
-          >
-            Comece grátis com{' '}
-            <span className="font-semibold text-ink-800">50 imagens gratuitas</span>. Pague só pelo
-            que usar ou escale com o plano Pro. Sem taxas ocultas, sem surpresas.
+          <motion.p variants={itemVariants} className="mt-5 text-lg text-ink-500 leading-relaxed">
+            Do On-Demand ao Enterprise: sessões de try-on claras e limites de{' '}
+            <span className="font-semibold text-ink-800">acessórios AR</span> por plano (5 → 20 → 100 →
+            ilimitado).
           </motion.p>
         </motion.div>
 
@@ -123,130 +179,18 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
           whileInView="visible"
           viewport={{ once: true, margin: '-80px' }}
           variants={containerVariants}
-          className="mt-14 grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-5xl mx-auto"
+          className="mt-14 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5"
         >
-          {/* On-Demand / Free */}
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ y: -4 }}
-            transition={{ duration: 0.3 }}
-            className="relative bg-white rounded-3xl border border-black/5 p-8 sm:p-10 shadow-elegant hover:shadow-elegant-lg"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
-                  On-Demand
-                </div>
-                <h3 className="mt-2 text-2xl font-semibold text-ink-800 tracking-tight">
-                  {freePlan.display_name}
-                </h3>
-                <p className="mt-1 text-sm text-ink-500">
-                  Para começar sem compromisso e pagar apenas pelo uso.
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-xl bg-ink-50 grid place-items-center">
-                <Sparkles className="w-5 h-5 text-ink-700" />
-              </div>
-            </div>
-
-            <div className="mt-8 flex items-baseline gap-1.5">
-              <span className="text-5xl font-semibold text-ink-800 tracking-tight">Grátis</span>
-              <span className="text-sm text-ink-400">para instalar</span>
-            </div>
-
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-700">
-              <Check className="w-3.5 h-3.5" />
-              50 imagens grátis para começar
-            </div>
-
-            <ul className="mt-8 space-y-3">
-              <PricingBullet>Instalação gratuita na Shopify</PricingBullet>
-              <PricingBullet>50 imagens de try-on gratuitas (uma vez)</PricingBullet>
-              <PricingBullet>
-                US$ {freePlan.price_per_extra_image.toFixed(2)} por imagem adicional
-              </PricingBullet>
-              <PricingBullet>Medição precisa com MediaPipe</PricingBullet>
-              <PricingBullet>Widget personalizável</PricingBullet>
-              <PricingBullet>Dashboard com métricas</PricingBullet>
-            </ul>
-
-            <Button
-              variant="secondary"
-              size="lg"
-              className="mt-8 w-full"
-              onClick={onSelectFree}
-              type="button"
-            >
-              Começar grátis
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </motion.div>
-
-          {/* Pro */}
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ y: -4 }}
-            transition={{ duration: 0.3 }}
-            className="relative bg-ink-800 text-white rounded-3xl p-8 sm:p-10 shadow-brand-glow overflow-hidden"
-          >
-            <div
-              className="absolute -top-40 -right-40 h-80 w-80 rounded-full blur-3xl opacity-40"
-              style={{ background: 'radial-gradient(circle, rgba(129,7,7,0.8), transparent)' }}
+          {ordered.map((plan) => (
+            <PlanCard
+              key={plan.name}
+              plan={plan}
+              variants={itemVariants}
+              isPopular={plan.name === 'pro'}
+              onSelectFree={onSelectFree}
+              onSelectPaidPlan={onSelectPaidPlan}
             />
-            <div className="absolute top-5 right-5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#810707] px-3 py-1 text-[11px] font-bold uppercase tracking-wider">
-                <Sparkles className="w-3 h-3" />
-                Mais popular
-              </span>
-            </div>
-
-            <div className="relative">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
-                Assinatura mensal
-              </div>
-              <h3 className="mt-2 text-2xl font-semibold tracking-tight">{proPlan.display_name}</h3>
-              <p className="mt-1 text-sm text-white/60">
-                Para lojas em crescimento que querem previsibilidade e escala.
-              </p>
-
-              <div className="mt-8 flex items-baseline gap-1.5">
-                <span className="text-5xl font-semibold tracking-tight">
-                  US$ {proPlan.monthly_price}
-                </span>
-                <span className="text-sm text-white/60">/mês</span>
-              </div>
-
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/10 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur">
-                <Check className="w-3.5 h-3.5" />
-                {proPlan.images_included.toLocaleString('pt-BR')} imagens incluídas por mês
-              </div>
-
-              <ul className="mt-8 space-y-3">
-                <PricingBullet inverted>Tudo do plano Free</PricingBullet>
-                <PricingBullet inverted>
-                  {proPlan.images_included.toLocaleString('pt-BR')} imagens de try-on/mês inclusas
-                </PricingBullet>
-                <PricingBullet inverted>
-                  US$ {proPlan.price_per_extra_image.toFixed(2)} por imagem adicional
-                </PricingBullet>
-                <PricingBullet inverted>Assistente ChatGPT integrado</PricingBullet>
-                <PricingBullet inverted>Try-On fotorrealista + AR</PricingBullet>
-                <PricingBullet inverted>Suporte prioritário</PricingBullet>
-                <PricingBullet inverted>Analytics avançado</PricingBullet>
-              </ul>
-
-              <Button
-                variant="primary"
-                size="lg"
-                className="mt-8 w-full bg-[#810707] hover:bg-[#a00909]"
-                onClick={onSelectPro}
-                type="button"
-              >
-                Assinar Pro
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </motion.div>
+          ))}
         </motion.div>
 
         <motion.div
@@ -257,7 +201,7 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
           className="mt-10 text-center"
         >
           <p className="text-sm text-ink-500">
-            Precisa de mais volume ou integração customizada?{' '}
+            Dúvidas sobre faturamento ou volume?{' '}
             <ButtonLink
               variant="link"
               size="sm"
@@ -265,12 +209,168 @@ export function Pricing({ onSelectFree, onSelectPro }: PricingProps) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Fale com nosso time Enterprise
+              Fale com o time no WhatsApp
             </ButtonLink>
           </p>
         </motion.div>
       </div>
     </section>
+  );
+}
+
+function PlanCard({
+  plan,
+  variants,
+  isPopular,
+  onSelectFree,
+  onSelectPaidPlan,
+}: {
+  plan: BillingPlan;
+  variants: Variants;
+  isPopular: boolean;
+  onSelectFree?: () => void;
+  onSelectPaidPlan?: (planName: 'growth' | 'pro' | 'enterprise') => void;
+}) {
+  const isDark = isPopular;
+  const isFree = plan.name === 'free';
+  const arLabel = formatArCount(plan.name);
+  const sessionsLine = formatTryOnSessions(plan);
+
+  const cta = () => {
+    if (plan.name === 'free') {
+      onSelectFree?.();
+      return;
+    }
+    onSelectPaidPlan?.(plan.name as 'growth' | 'pro' | 'enterprise');
+  };
+
+  return (
+    <motion.div
+      variants={variants}
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.3 }}
+      className={`relative flex flex-col rounded-3xl border p-7 sm:p-8 min-h-[520px] ${
+        isDark
+          ? 'bg-ink-800 text-white border-transparent shadow-brand-glow overflow-hidden'
+          : 'bg-white border-black/5 shadow-elegant hover:shadow-elegant-lg'
+      }`}
+    >
+      {isPopular && (
+        <>
+          <div
+            className="absolute -top-32 -right-32 h-64 w-64 rounded-full blur-3xl opacity-40 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(129,7,7,0.85), transparent)' }}
+          />
+          <div className="absolute top-4 right-4 z-10">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#810707] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+              <Sparkles className="w-3 h-3" />
+              Popular
+            </span>
+          </div>
+        </>
+      )}
+
+      <div className={isPopular ? 'relative' : ''}>
+        <div
+          className={`text-[11px] font-semibold uppercase tracking-wider ${
+            isDark ? 'text-white/50' : 'text-ink-400'
+          }`}
+        >
+          {isFree ? 'On-Demand' : 'Assinatura mensal'}
+        </div>
+        <h3
+          className={`mt-2 text-xl font-semibold tracking-tight ${
+            isDark ? 'text-white' : 'text-ink-800'
+          }`}
+        >
+          {plan.display_name}
+        </h3>
+        <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-white/60' : 'text-ink-500'}`}>
+          {isFree
+            ? 'Comece sem mensalidade e escale conforme o uso.'
+            : plan.name === 'growth'
+            ? 'Para marcas em aceleração com volume moderado.'
+            : plan.name === 'pro'
+            ? 'Escala e previsibilidade para operações maduras.'
+            : 'Máximo de sessões e AR para grandes catálogos.'}
+        </p>
+
+        <div className="mt-6 flex items-baseline gap-1 flex-wrap">
+          {plan.monthly_price === 0 ? (
+            <span className={`text-4xl font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-800'}`}>
+              Grátis
+            </span>
+          ) : (
+            <>
+              <span className={`text-4xl font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-800'}`}>
+                US$ {plan.monthly_price}
+              </span>
+              <span className={`text-sm ${isDark ? 'text-white/60' : 'text-ink-400'}`}>/mês</span>
+            </>
+          )}
+        </div>
+
+        <div
+          className={`mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-medium ${
+            isDark
+              ? 'bg-white/10 border-white/10 text-white/90'
+              : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+          }`}
+        >
+          <Check className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>{sessionsLine}</span>
+        </div>
+
+        <ul className="mt-6 space-y-2.5 flex-1">
+          <PricingBullet inverted={isDark}>
+            {plan.name === 'free' && `${arLabel} acessórios AR incluídos`}
+            {plan.name === 'growth' && 'Até 20 acessórios AR incluídos / mês'}
+            {plan.name === 'pro' && 'Até 100 acessórios AR incluídos / mês'}
+            {plan.name === 'enterprise' && 'Acessórios AR ilimitados'}
+          </PricingBullet>
+          <PricingBullet inverted={isDark}>{sessionsLine}</PricingBullet>
+          {!isFree && plan.price_per_extra_image > 0 && (
+            <PricingBullet inverted={isDark}>
+              Sessões extras a US$ {plan.price_per_extra_image.toFixed(2)} cada
+            </PricingBullet>
+          )}
+          {isFree && (
+            <PricingBullet inverted={isDark}>
+              US$ {plan.price_per_extra_image.toFixed(2)} por sessão de try-on
+            </PricingBullet>
+          )}
+          <PricingBullet inverted={isDark}>Medição precisa (MediaPipe)</PricingBullet>
+          <PricingBullet inverted={isDark}>Try-on fotorrealista</PricingBullet>
+          <PricingBullet inverted={isDark}>Widget personalizável</PricingBullet>
+          {plan.name !== 'free' && (
+            <PricingBullet inverted={isDark}>Assistente ChatGPT integrado</PricingBullet>
+          )}
+          {(plan.name === 'pro' || plan.name === 'enterprise') && (
+            <PricingBullet inverted={isDark}>Suporte prioritário</PricingBullet>
+          )}
+        </ul>
+
+        <div className="mt-8">
+          {isFree ? (
+            <Button variant="secondary" size="lg" className="w-full" onClick={cta} type="button">
+              Começar grátis
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              className={`w-full ${isDark ? 'bg-[#810707] hover:bg-[#a00909]' : ''}`}
+              onClick={cta}
+              type="button"
+            >
+              {plan.name === 'enterprise' ? 'Assinar Enterprise' : 'Assinar plano'}
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -283,7 +383,7 @@ function PricingBullet({
 }) {
   return (
     <li
-      className={`flex items-start gap-2.5 text-[14px] leading-relaxed ${
+      className={`flex items-start gap-2.5 text-[13px] leading-relaxed ${
         inverted ? 'text-white/85' : 'text-ink-700'
       }`}
     >

@@ -36,6 +36,9 @@ export default {
         'float-slow': 'floatSlow 6s ease-in-out infinite',
         'float-medium': 'floatMedium 4s ease-in-out infinite',
         'gradient-x': 'gradientX 6s ease infinite',
+        marquee: 'marquee 28s linear infinite',
+        'marquee-reverse': 'marqueeReverse 28s linear infinite',
+        'shimmer-bg': 'shimmerBg 5s ease-in-out infinite',
       },
       keyframes: {
         spotlight: {
@@ -51,6 +54,18 @@ export default {
           '50%': { transform: 'translateY(-8px)' },
         },
         gradientX: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        marqueeReverse: {
+          '0%': { transform: 'translateX(-50%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        shimmerBg: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
         },
