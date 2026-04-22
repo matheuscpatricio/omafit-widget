@@ -14,7 +14,7 @@ interface BillingPlan {
   active: boolean;
 }
 
-/** Sessões de try-on / mês (coluna `images_included` no Supabase). */
+/** Imagens de try-on incluídas por mês (coluna `images_included` no Supabase). */
 const UNLIMITED_THRESHOLD = 500_000;
 
 const AR_ACCESSORIES: Record<string, number | 'unlimited'> = {
@@ -101,14 +101,14 @@ function formatArCount(name: string): string {
   return String(n);
 }
 
-function formatTryOnSessions(plan: BillingPlan): string {
+function formatTryOnImages(plan: BillingPlan): string {
   if (plan.images_included >= UNLIMITED_THRESHOLD) {
-    return 'Sessões de try-on ilimitadas';
+    return 'Imagens de try-on ilimitadas';
   }
   if (plan.name === 'free' || plan.images_included === 0) {
-    return 'Sessões de try-on sob demanda';
+    return 'Imagens de try-on sob demanda';
   }
-  return `${plan.images_included.toLocaleString('pt-BR')} sessões de try-on / mês`;
+  return `${plan.images_included.toLocaleString('pt-BR')} imagens de try-on / mês`;
 }
 
 export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
@@ -168,9 +168,10 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
             Escolha o Plano que <span className="text-[#810707]">Impulsiona</span> o Seu Crescimento.
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg text-ink-500 leading-relaxed">
-            Do On-Demand ao Enterprise: sessões de try-on claras e limites de{' '}
-            <span className="font-semibold text-ink-800">acessórios AR</span> por plano (5 → 20 → 100 →
-            ilimitado).
+            Do On-Demand ao Enterprise: pacotes claros de{' '}
+            <span className="font-semibold text-ink-800">imagens de try-on</span> (ex.: Pro com{' '}
+            <span className="font-semibold text-[#810707]">3.000 imagens</span> por US$ 300) e limites de{' '}
+            <span className="font-semibold text-ink-800">acessórios AR</span> (5 → 20 → 100 → ilimitado).
           </motion.p>
         </motion.div>
 
@@ -234,7 +235,7 @@ function PlanCard({
   const isDark = isPopular;
   const isFree = plan.name === 'free';
   const arLabel = formatArCount(plan.name);
-  const sessionsLine = formatTryOnSessions(plan);
+  const imagesLine = formatTryOnImages(plan);
 
   const cta = () => {
     if (plan.name === 'free') {
@@ -292,7 +293,7 @@ function PlanCard({
             ? 'Para marcas em aceleração com volume moderado.'
             : plan.name === 'pro'
             ? 'Escala e previsibilidade para operações maduras.'
-            : 'Máximo de sessões e AR para grandes catálogos.'}
+            : 'Máximo de imagens de try-on e AR para grandes catálogos.'}
         </p>
 
         <div className="mt-6 flex items-baseline gap-1 flex-wrap">
@@ -318,7 +319,7 @@ function PlanCard({
           }`}
         >
           <Check className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>{sessionsLine}</span>
+          <span>{imagesLine}</span>
         </div>
 
         <ul className="mt-6 space-y-2.5 flex-1">
@@ -328,15 +329,24 @@ function PlanCard({
             {plan.name === 'pro' && 'Até 100 acessórios AR incluídos / mês'}
             {plan.name === 'enterprise' && 'Acessórios AR ilimitados'}
           </PricingBullet>
-          <PricingBullet inverted={isDark}>{sessionsLine}</PricingBullet>
+          {plan.name === 'pro' && (
+            <PricingBullet inverted={isDark}>
+              Pro: faturamento fixo de US$ 300/mês pelas 3.000 imagens incluídas
+            </PricingBullet>
+          )}
+          {plan.name === 'enterprise' && (
+            <PricingBullet inverted={isDark}>
+              Enterprise: US$ 600/mês com imagens de try-on ilimitadas
+            </PricingBullet>
+          )}
           {!isFree && plan.price_per_extra_image > 0 && (
             <PricingBullet inverted={isDark}>
-              Sessões extras a US$ {plan.price_per_extra_image.toFixed(2)} cada
+              Imagens extras a US$ {plan.price_per_extra_image.toFixed(2)} cada
             </PricingBullet>
           )}
           {isFree && (
             <PricingBullet inverted={isDark}>
-              US$ {plan.price_per_extra_image.toFixed(2)} por sessão de try-on
+              US$ {plan.price_per_extra_image.toFixed(2)} por imagem de try-on adicional
             </PricingBullet>
           )}
           <PricingBullet inverted={isDark}>Medição precisa (MediaPipe)</PricingBullet>

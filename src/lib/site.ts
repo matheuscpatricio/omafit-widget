@@ -11,7 +11,12 @@ export function getSiteUrl(): string {
 }
 
 export const LANDING_IMAGES = {
+  /** Poster do vídeo do hero (carrega antes do MP4). */
   heroBanner: '/images/landing/hero-banner.png',
   midBanner: '/images/landing/mid-banner.png',
   ogImage: '/images/landing/og-omafit.png',
+} as const;
+
+export const LANDING_MEDIA = {
+  heroVideo: '/videos/hero.mp4',
 } as const;

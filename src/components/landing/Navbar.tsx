@@ -17,7 +17,6 @@ const links = [
 export function Navbar({ onInstall }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const heroNav = !scrolled;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -42,16 +41,14 @@ export function Navbar({ onInstall }: NavbarProps) {
         className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
           scrolled
             ? 'bg-white/90 backdrop-blur-2xl border-b border-black/10 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.08)]'
-            : 'bg-gradient-to-b from-black/40 via-black/15 to-transparent backdrop-blur-md'
+            : 'bg-white/70 backdrop-blur-xl border-b border-black/5'
         }`}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
           <div className="flex items-center justify-between h-16">
             <a href="#top" className="flex items-center gap-2 group">
               <span
-                className={`font-bungee text-[22px] tracking-tight transition-colors ${
-                  heroNav ? 'text-white drop-shadow-md' : 'text-ink-800'
-                }`}
+                className="font-bungee text-[22px] tracking-tight text-ink-800 transition-colors"
                 style={{ fontFamily: '"Bungee", sans-serif' }}
               >
                 OMAFIT
@@ -63,11 +60,7 @@ export function Navbar({ onInstall }: NavbarProps) {
                 <a
                   key={l.href}
                   href={l.href}
-                  className={`px-3.5 py-2 text-sm font-medium rounded-xl transition-all ${
-                    heroNav
-                      ? 'text-white/90 hover:text-white hover:bg-white/10'
-                      : 'text-ink-600 hover:text-ink-800 hover:bg-ink-50'
-                  }`}
+                  className="px-3.5 py-2 text-sm font-medium rounded-xl text-ink-600 transition-all hover:bg-ink-50 hover:text-ink-800"
                 >
                   {l.label}
                 </a>
@@ -77,15 +70,10 @@ export function Navbar({ onInstall }: NavbarProps) {
             <div className="hidden md:flex items-center gap-2">
               <ButtonLink
                 size="sm"
-                variant={heroNav ? 'secondary' : 'primary'}
+                variant="primary"
                 href="https://apps.shopify.com/omafit"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={
-                  heroNav
-                    ? '!border-white/40 !bg-white/10 !text-white shadow-lg hover:!bg-white/20 hover:!border-white/60'
-                    : ''
-                }
                 onClick={(e) => {
                   if (onInstall) {
                     e.preventDefault();
@@ -99,11 +87,7 @@ export function Navbar({ onInstall }: NavbarProps) {
 
             <button
               onClick={() => setMobileOpen(true)}
-              className={`md:hidden h-10 w-10 grid place-items-center rounded-xl transition-colors ${
-                heroNav
-                  ? 'text-white hover:bg-white/15'
-                  : 'text-ink-800 hover:bg-ink-50'
-              }`}
+              className="md:hidden grid h-10 w-10 place-items-center rounded-xl text-ink-800 transition-colors hover:bg-ink-50"
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />

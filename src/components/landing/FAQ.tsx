@@ -26,7 +26,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Como funciona a cobrança por imagem? Preciso me comprometer mensalmente?',
-    a: 'O plano On-Demand é gratuito para instalar: você tem 5 acessórios AR e paga US$ 0,18 por sessão de try-on conforme o uso. Os planos Growth (US$ 89, 700 sessões/mês, 20 AR), Pro (US$ 300, 3.000 sessões, 100 AR) e Enterprise (US$ 600, sessões e AR ilimitados) trazem pacotes mensais com previsibilidade. Sem taxas ocultas.',
+    a: 'O plano On-Demand é gratuito para instalar: 5 acessórios AR e US$ 0,18 por imagem de try-on adicional. Growth (US$ 89, 700 imagens/mês, 20 AR). O plano Pro custa US$ 300/mês e inclui 3.000 imagens de try-on (100 AR). O Enterprise custa US$ 600/mês com imagens de try-on e AR ilimitados. Sem taxas ocultas.',
   },
   {
     q: 'O Omafit afeta a velocidade de carregamento da minha loja?',
