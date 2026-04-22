@@ -3,6 +3,7 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import type { CarouselApi } from '../ui/carousel';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 import { cn } from '../../lib/utils';
+import { useIsMdUp } from '../../hooks/useMediaQuery';
 import { CtaBlockSurface } from './CtaBlockSurface';
 
 interface Feature {
@@ -117,6 +118,7 @@ function SolutionTripletCarousel() {
   const [selected, setSelected] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
+  const isMdUp = useIsMdUp();
 
   /** Embla v8: `breakpoints` ajusta opções por media query (reInit automático no resize). */
   const emblaOpts = useMemo(
@@ -159,6 +161,9 @@ function SolutionTripletCarousel() {
     return () => window.clearInterval(id);
   }, [api, reduceMotion, paused]);
 
+  /** Remonta o Embla ao cruzar md — troca entre 1 slide (mobile) e trio (desktop). */
+  const carouselKey = isMdUp ? 'solution-md' : 'solution-sm';
+
   return (
     <div
       className="relative w-full min-w-0 touch-manipulation"
@@ -167,19 +172,30 @@ function SolutionTripletCarousel() {
       aria-roledescription="carousel"
     >
       <Carousel
+        key={carouselKey}
         setApi={setApi}
         opts={emblaOpts}
         className="w-full min-w-0"
         aria-label="Recursos da solução Omafit"
       >
         <CarouselContent className="-ml-0 w-full min-w-0 will-change-transform">
-          {features.map((_, centerIndex) => (
-            <CarouselItem key={centerIndex} className="basis-full pl-0">
-              <div className="flex w-full min-w-0 items-stretch py-1 sm:py-2 md:min-h-[min(52vh,420px)] md:py-3">
-                <TripletSlide centerIndex={centerIndex} />
-              </div>
-            </CarouselItem>
-          ))}
+          {isMdUp
+            ? features.map((_, centerIndex) => (
+                <CarouselItem key={centerIndex} className="basis-full pl-0">
+                  <div className="flex w-full min-w-0 items-stretch py-1 sm:py-2 md:min-h-[min(52vh,420px)] md:py-3">
+                    <TripletSlide centerIndex={centerIndex} />
+                  </div>
+                </CarouselItem>
+              ))
+            : features.map((feature, i) => (
+                <CarouselItem key={feature.title} className="basis-full pl-0">
+                  <div className="flex w-full min-w-0 justify-center px-1 py-2 sm:px-2">
+                    <div className="w-full max-w-md">
+                      <SolutionPane feature={feature} placement="center" soloLayout />
+                    </div>
+                  </div>
+                </CarouselItem>
+              ))}
         </CarouselContent>
         <CarouselPrevious
           type="button"
@@ -231,10 +247,13 @@ function SolutionPane({
   feature,
   placement,
   className,
+  soloLayout,
 }: {
   feature: Feature;
   placement: 'left' | 'center' | 'right';
   className?: string;
+  /** Um cartão por slide (mobile): tipografia e padding confortáveis. */
+  soloLayout?: boolean;
 }) {
   const isCenter = placement === 'center';
   const highlight = Boolean(feature.accent && isCenter);
@@ -243,7 +262,8 @@ function SolutionPane({
     <>
       <span
         className={cn(
-          'inline-flex w-fit rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest sm:text-[10px]',
+          'inline-flex w-fit rounded-full border px-2 py-0.5 font-semibold uppercase tracking-widest',
+          soloLayout ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[10px]',
           highlight
             ? 'border-[#ff9696]/35 bg-white/10 text-[#ffdede]'
             : 'border-white/15 bg-white/5 text-white/80',
@@ -254,9 +274,11 @@ function SolutionPane({
       <h3
         className={cn(
           'mt-2 font-semibold tracking-tight text-white sm:mt-3',
-          isCenter
-            ? 'text-[0.8125rem] leading-snug sm:text-xl md:text-2xl'
-            : 'text-[9px] leading-tight sm:text-sm md:text-base',
+          soloLayout && 'text-lg leading-snug sm:text-xl md:text-2xl',
+          !soloLayout &&
+            isCenter &&
+            'text-[0.8125rem] leading-snug sm:text-xl md:text-2xl',
+          !soloLayout && !isCenter && 'text-[9px] leading-tight sm:text-sm md:text-base',
         )}
         style={{ letterSpacing: '-0.02em' }}
       >
@@ -265,22 +287,38 @@ function SolutionPane({
       <p
         className={cn(
           'mt-1.5 leading-relaxed text-white/75 sm:mt-2',
-          isCenter
-            ? 'text-[11px] sm:text-[15px]'
-            : 'line-clamp-2 text-[8.5px] sm:line-clamp-3 sm:text-xs md:line-clamp-4 md:text-[13px]',
+          soloLayout && 'text-sm sm:text-base',
+          !soloLayout && isCenter && 'text-[11px] sm:text-[15px]',
+          !soloLayout &&
+            !isCenter &&
+            'line-clamp-2 text-[8.5px] sm:line-clamp-3 sm:text-xs md:line-clamp-4 md:text-[13px]',
         )}
       >
         {feature.description}
       </p>
       <ul
         className={cn(
-          'mt-2 min-h-0 flex-1 space-y-1 text-white/85 sm:mt-3 sm:space-y-2',
-          isCenter ? 'text-[10px] sm:text-[13px]' : 'text-[8px] sm:text-[11px] md:text-[12px]',
+          'mt-2 min-h-0 flex-1 text-white/85 sm:mt-3',
+          soloLayout ? 'space-y-2 text-sm sm:text-[15px]' : 'space-y-1 sm:space-y-2',
+          !soloLayout && isCenter && 'text-[10px] sm:text-[13px]',
+          !soloLayout && !isCenter && 'text-[8px] sm:text-[11px] md:text-[12px]',
         )}
       >
         {feature.bullets.map((b) => (
-          <li key={b} className={cn('flex gap-1 leading-snug sm:gap-2', !isCenter && 'line-clamp-1 sm:line-clamp-2')}>
-            <span className="mt-1 h-0.5 w-0.5 shrink-0 rounded-full bg-[#ff9696]/90 sm:mt-1.5 sm:h-1 sm:w-1" aria-hidden />
+          <li
+            key={b}
+            className={cn(
+              'flex gap-1.5 leading-snug sm:gap-2',
+              !soloLayout && !isCenter && 'line-clamp-1 sm:line-clamp-2',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-1 shrink-0 rounded-full bg-[#ff9696]/90 sm:mt-1.5',
+                soloLayout ? 'h-1.5 w-1.5' : 'h-0.5 w-0.5 sm:h-1 sm:w-1',
+              )}
+              aria-hidden
+            />
             <span>{b}</span>
           </li>
         ))}
@@ -290,14 +328,23 @@ function SolutionPane({
 
   const surfaceClass = cn(
     'h-full min-h-0 w-full border border-white/10 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-black/30',
-    isCenter
-      ? 'rounded-xl sm:rounded-2xl md:rounded-3xl md:scale-[1.03]'
-      : 'rounded-lg opacity-[0.92] sm:rounded-xl sm:opacity-[0.9] md:rounded-2xl md:scale-[0.94]',
+    soloLayout && 'rounded-2xl sm:rounded-3xl',
+    !soloLayout &&
+      isCenter &&
+      'rounded-xl sm:rounded-2xl md:rounded-3xl md:scale-[1.03]',
+    !soloLayout &&
+      !isCenter &&
+      'rounded-lg opacity-[0.92] sm:rounded-xl sm:opacity-[0.9] md:rounded-2xl md:scale-[0.94]',
   );
 
-  const innerPad = isCenter
-    ? 'flex min-h-0 flex-col p-2.5 sm:p-4 md:min-h-[240px] md:p-6 lg:min-h-[260px] lg:p-8'
-    : 'flex min-h-0 flex-col p-1.5 sm:p-3 md:min-h-[180px] md:p-4 lg:min-h-[200px] lg:p-5';
+  const innerPad = cn(
+    'flex min-h-0 flex-col',
+    soloLayout && 'min-h-[280px] p-5 sm:min-h-[300px] sm:p-6 md:p-8',
+    !soloLayout &&
+      isCenter &&
+      'p-2.5 sm:p-4 md:min-h-[240px] md:p-6 lg:min-h-[260px] lg:p-8',
+    !soloLayout && !isCenter && 'p-1.5 sm:p-3 md:min-h-[180px] md:p-4 lg:min-h-[200px] lg:p-5',
+  );
 
   return (
     <div className={cn('flex min-h-0 min-w-0 flex-col', className)}>
