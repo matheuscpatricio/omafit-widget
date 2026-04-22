@@ -15,8 +15,10 @@ export const LANDING_IMAGES = {
   heroBanner: '/images/landing/hero-banner.png',
   /** Retrato: céu claro no topo — texto no mobile. */
   heroLifestyleRiver: '/images/landing/hero-lifestyle-river.png',
-  /** Paisagem: água turquesa à esquerda — texto no desktop. */
+  /** Paisagem: água turquesa à esquerda — uso em rotação desktop / referência. */
   heroLifestyleBeach: '/images/landing/hero-lifestyle-beach.png',
+  /** Retrato: trilho / natureza — rotação desktop. */
+  heroLifestyleBoardwalk: '/images/landing/hero-lifestyle-boardwalk.png',
   midBanner: '/images/landing/mid-banner.png',
   ogImage: '/images/landing/og-omafit.png',
 } as const;
