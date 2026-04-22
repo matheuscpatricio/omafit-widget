@@ -196,12 +196,13 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                         </h2>
                         <p
                           className={cn(
-                            'font-medium leading-snug text-white/95 [text-shadow:0_1px_14px_rgba(0,0,0,0.92)]',
+                            'leading-snug',
                             slide.subtleOverlay
-                              ? 'text-[11px] leading-[1.45] text-white/92 sm:text-[11.5px]'
-                              : slide.compact
-                                ? 'text-[12px] leading-relaxed'
-                                : 'text-[13px] leading-relaxed',
+                              ? 'text-[12px] font-semibold leading-[1.52] text-white sm:text-[13px] [text-shadow:0_1px_0_rgba(0,0,0,0.65),0_2px_14px_rgba(0,0,0,0.95),0_6px_28px_rgba(0,0,0,0.65)]'
+                              : cn(
+                                  'font-medium text-white/95 [text-shadow:0_1px_14px_rgba(0,0,0,0.92)]',
+                                  slide.compact ? 'text-[12px] leading-relaxed' : 'text-[13px] leading-relaxed',
+                                ),
                           )}
                         >
                           {slide.body}
