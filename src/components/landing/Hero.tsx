@@ -118,14 +118,14 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
     <section
       ref={sectionRef}
       id="top"
-      className="relative min-h-[100svh] min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-white pt-20 pb-10 sm:pt-24 sm:pb-12 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
+      className="relative min-h-[100svh] min-h-[100dvh] scroll-mt-16 overflow-x-hidden overflow-y-visible bg-white max-md:pt-0 pb-8 sm:pb-10 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
     >
       {/* Fora do contentor com padding: evita desvio (w-screen + translate) e faixa branca à esquerda */}
       <motion.div
         variants={itemVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10 mb-6 w-full min-w-0 md:hidden"
+        className="relative z-10 mb-4 w-full min-w-0 md:hidden"
       >
         <HeroMobileSlides onInstallShopify={onInstallShopify} onRequestDemo={onRequestDemo} />
       </motion.div>
