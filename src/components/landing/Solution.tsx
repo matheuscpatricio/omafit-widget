@@ -118,13 +118,19 @@ function SolutionTripletCarousel() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
 
+  /** Embla v8: `breakpoints` ajusta opções por media query (reInit automático no resize). */
   const emblaOpts = useMemo(
     () => ({
       align: 'center' as const,
       loop: true,
-      duration: reduceMotion ? 18 : 58,
+      duration: reduceMotion ? 18 : 56,
       skipSnaps: false,
       dragFree: false,
+      breakpoints: {
+        '(max-width: 767px)': {
+          duration: reduceMotion ? 14 : 40,
+        },
+      },
     }),
     [reduceMotion],
   );
@@ -169,7 +175,7 @@ function SolutionTripletCarousel() {
         <CarouselContent className="-ml-0 w-full min-w-0 will-change-transform">
           {features.map((_, centerIndex) => (
             <CarouselItem key={centerIndex} className="basis-full pl-0">
-              <div className="flex min-h-[min(68svh,560px)] w-full items-stretch md:min-h-[300px]">
+              <div className="flex w-full min-w-0 items-stretch py-1 sm:py-2 md:min-h-[min(52vh,420px)] md:py-3">
                 <TripletSlide centerIndex={centerIndex} />
               </div>
             </CarouselItem>
@@ -211,25 +217,12 @@ function TripletSlide({ centerIndex }: { centerIndex: number }) {
   const curr = features[centerIndex];
   const next = features[(centerIndex + 1) % n];
 
+  /* Sempre uma linha: esquerda | centro (maior) | direita — evita coluna no mobile (Embla já desliza o conjunto). */
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 md:flex-row md:items-stretch md:gap-4 lg:gap-5">
-      <SolutionPane
-        feature={curr}
-        placement="center"
-        className="order-1 w-full shrink-0 md:order-2 md:min-w-0 md:flex-[1.45]"
-      />
-      <div className="order-2 grid min-w-0 grid-cols-2 gap-2 md:contents">
-        <SolutionPane
-          feature={prev}
-          placement="left"
-          className="min-w-0 md:order-1 md:flex-[0.78]"
-        />
-        <SolutionPane
-          feature={next}
-          placement="right"
-          className="min-w-0 md:order-3 md:flex-[0.78]"
-        />
-      </div>
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-row items-stretch gap-1.5 sm:gap-2.5 md:gap-4 lg:gap-5">
+      <SolutionPane feature={prev} placement="left" className="min-w-0 flex-[0.74] sm:flex-[0.78]" />
+      <SolutionPane feature={curr} placement="center" className="z-[1] min-w-0 flex-[1.32] sm:flex-[1.42] md:flex-[1.45]" />
+      <SolutionPane feature={next} placement="right" className="min-w-0 flex-[0.74] sm:flex-[0.78]" />
     </div>
   );
 }
@@ -260,8 +253,10 @@ function SolutionPane({
       </span>
       <h3
         className={cn(
-          'mt-3 font-semibold tracking-tight text-white',
-          isCenter ? 'text-[1.05rem] leading-snug sm:text-xl md:text-2xl' : 'text-[11px] leading-tight sm:text-sm md:text-base',
+          'mt-2 font-semibold tracking-tight text-white sm:mt-3',
+          isCenter
+            ? 'text-[0.8125rem] leading-snug sm:text-xl md:text-2xl'
+            : 'text-[9px] leading-tight sm:text-sm md:text-base',
         )}
         style={{ letterSpacing: '-0.02em' }}
       >
@@ -269,21 +264,23 @@ function SolutionPane({
       </h3>
       <p
         className={cn(
-          'mt-2 leading-relaxed text-white/75',
-          isCenter ? 'text-[13px] sm:text-[15px]' : 'line-clamp-4 text-[10px] sm:text-xs md:text-[13px]',
+          'mt-1.5 leading-relaxed text-white/75 sm:mt-2',
+          isCenter
+            ? 'text-[11px] sm:text-[15px]'
+            : 'line-clamp-2 text-[8.5px] sm:line-clamp-3 sm:text-xs md:line-clamp-4 md:text-[13px]',
         )}
       >
         {feature.description}
       </p>
       <ul
         className={cn(
-          'mt-3 min-h-0 flex-1 space-y-1.5 text-white/85 sm:space-y-2',
-          isCenter ? 'text-[12px] sm:text-[13px]' : 'text-[10px] sm:text-[11px] md:text-[12px]',
+          'mt-2 min-h-0 flex-1 space-y-1 text-white/85 sm:mt-3 sm:space-y-2',
+          isCenter ? 'text-[10px] sm:text-[13px]' : 'text-[8px] sm:text-[11px] md:text-[12px]',
         )}
       >
         {feature.bullets.map((b) => (
-          <li key={b} className={cn('flex gap-2 leading-snug', !isCenter && 'line-clamp-2')}>
-            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#ff9696]/90" aria-hidden />
+          <li key={b} className={cn('flex gap-1 leading-snug sm:gap-2', !isCenter && 'line-clamp-1 sm:line-clamp-2')}>
+            <span className="mt-1 h-0.5 w-0.5 shrink-0 rounded-full bg-[#ff9696]/90 sm:mt-1.5 sm:h-1 sm:w-1" aria-hidden />
             <span>{b}</span>
           </li>
         ))}
@@ -293,10 +290,14 @@ function SolutionPane({
 
   const surfaceClass = cn(
     'h-full min-h-0 w-full border border-white/10 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-black/30',
-    isCenter ? 'rounded-2xl sm:rounded-3xl md:scale-[1.03]' : 'rounded-xl opacity-[0.9] sm:rounded-2xl md:scale-[0.94]',
+    isCenter
+      ? 'rounded-xl sm:rounded-2xl md:rounded-3xl md:scale-[1.03]'
+      : 'rounded-lg opacity-[0.92] sm:rounded-xl sm:opacity-[0.9] md:rounded-2xl md:scale-[0.94]',
   );
 
-  const innerPad = isCenter ? 'flex min-h-0 flex-col p-4 sm:p-6 md:min-h-[260px] md:p-8' : 'flex min-h-0 flex-col p-3 sm:p-4 md:min-h-[200px] md:p-5';
+  const innerPad = isCenter
+    ? 'flex min-h-0 flex-col p-2.5 sm:p-4 md:min-h-[240px] md:p-6 lg:min-h-[260px] lg:p-8'
+    : 'flex min-h-0 flex-col p-1.5 sm:p-3 md:min-h-[180px] md:p-4 lg:min-h-[200px] lg:p-5';
 
   return (
     <div className={cn('flex min-h-0 min-w-0 flex-col', className)}>
