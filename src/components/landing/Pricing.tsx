@@ -84,14 +84,24 @@ const itemVariants: Variants = {
   },
 };
 
-function mergePlansFromDb(
-  rows: BillingPlan[],
-): BillingPlan[] {
+/**
+ * Mescla linhas do Supabase com os defaults locais.
+ * Preços e volumes (`monthly_price`, `images_included`, `price_per_extra_image`) vêm sempre do fallback,
+ * alinhados ao Stripe e à copy da landing — evita mostrar valores desatualizados se o `billing_plans` no
+ * projeto ainda não foi migrado. Do DB usamos só metadados seguros (nome de exibição, moeda, ativo).
+ */
+function mergePlansFromDb(rows: BillingPlan[]): BillingPlan[] {
   const byName = new Map(rows.map((p) => [p.name, p]));
   return PLAN_ORDER.map((name) => {
     const fromDb = byName.get(name);
     const fallback = fallbackPlans.find((p) => p.name === name)!;
-    return fromDb ? { ...fallback, ...fromDb } : fallback;
+    if (!fromDb) return fallback;
+    return {
+      ...fallback,
+      display_name: fromDb.display_name?.trim() || fallback.display_name,
+      currency: fromDb.currency || fallback.currency,
+      active: fromDb.active,
+    };
   });
 }
 
@@ -331,12 +341,12 @@ function PlanCard({
           </PricingBullet>
           {plan.name === 'pro' && (
             <PricingBullet inverted={isDark}>
-              Pro: faturamento fixo de US$ 300/mês pelas 3.000 imagens incluídas
+              Faturamento fixo mensal — inclui 3.000 imagens de try-on
             </PricingBullet>
           )}
           {plan.name === 'enterprise' && (
             <PricingBullet inverted={isDark}>
-              Enterprise: US$ 600/mês com imagens de try-on ilimitadas
+              Faturamento fixo mensal — imagens de try-on e AR ilimitados
             </PricingBullet>
           )}
           {!isFree && plan.price_per_extra_image > 0 && (

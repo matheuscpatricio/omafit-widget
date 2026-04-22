@@ -11,12 +11,12 @@ export function getSiteUrl(): string {
 }
 
 export const LANDING_IMAGES = {
-  /** Poster do vídeo do hero (carrega antes do MP4). */
+  /** Hero legado / fallback para OG quando não houver outro asset. */
   heroBanner: '/images/landing/hero-banner.png',
+  /** Retrato: céu claro no topo — texto no mobile. */
+  heroLifestyleRiver: '/images/landing/hero-lifestyle-river.png',
+  /** Paisagem: água turquesa à esquerda — texto no desktop. */
+  heroLifestyleBeach: '/images/landing/hero-lifestyle-beach.png',
   midBanner: '/images/landing/mid-banner.png',
   ogImage: '/images/landing/og-omafit.png',
-} as const;
-
-export const LANDING_MEDIA = {
-  heroVideo: '/videos/hero.mp4',
 } as const;
