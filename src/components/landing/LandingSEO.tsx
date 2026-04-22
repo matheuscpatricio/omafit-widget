@@ -4,7 +4,7 @@ import { getSiteUrl, LANDING_IMAGES } from '../../lib/site';
 const DEFAULT_TITLE =
   'Omafit — Assistente de IA para moda na Shopify | Try-on, medidas e AR';
 const DEFAULT_DESC =
-  'Reduza devoluções e aumente conversão com try-on fotorrealista, medição MediaPipe, AR para acessórios e widget para Shopify. Plano Pro: US$ 300/mês com 3.000 imagens. Enterprise: US$ 600/mês. Também On-Demand e Growth.';
+  'Reduza devoluções e aumente conversão com try-on fotorrealista, medição MediaPipe, AR para acessórios e widget para Shopify. Instalação gratuita na Shopify; On-Demand com 50 sessões de try-on incluídas. Growth, Pro (US$ 300/mês, 3.000 imagens) e Enterprise (US$ 600/mês).';
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;

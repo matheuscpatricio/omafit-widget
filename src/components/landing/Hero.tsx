@@ -212,7 +212,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                   }}
                 >
                   Instalar Omafit na Shopify
-                  <span className="ml-0.5 text-xs font-normal text-white/80">(Grátis)</span>
+                  <span className="ml-0.5 text-xs font-normal text-white/80">(instalação grátis)</span>
                   <ArrowRight className="w-4 h-4" />
                 </ButtonLink>
 
@@ -238,10 +238,10 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-900/10 bg-white px-2.5 py-1 shadow-sm">
                   <Zap className="h-3.5 w-3.5 text-[#810707]" />
-                  On-Demand com 5 acessórios AR
+                  On-Demand: 50 sessões try-on incluídas
                 </span>
                 <span className="rounded-full border border-ink-900/10 bg-white px-2.5 py-1 shadow-sm">
-                  Sem cartão no On-Demand
+                  5 acessórios AR no On-Demand
                 </span>
               </motion.div>
             </div>

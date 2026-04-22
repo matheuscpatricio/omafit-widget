@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import type { CarouselApi } from '../ui/carousel';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 import { cn } from '../../lib/utils';
-import { BorderBeamCard } from './magic/BorderBeam';
+import { CtaBlockSurface } from './CtaBlockSurface';
 
 interface Feature {
   title: string;
   description: string;
   bullets: string[];
-  /** Cartão premium quando este recurso está no centro. */
   accent?: boolean;
 }
 
@@ -47,7 +46,8 @@ const features: Feature[] = [
   },
 ];
 
-const AUTO_MS = 4800;
+/** Intervalo entre avanços — maior que a animação Embla para não cortar o scroll. */
+const AUTO_MS = 6400;
 
 const containerVariants: Variants = {
   hidden: {},
@@ -65,7 +65,7 @@ const itemVariants: Variants = {
 
 export function Solution() {
   return (
-    <section id="solucao" className="relative overflow-hidden bg-gradient-to-b from-white via-rose-50/30 to-white py-20 sm:py-28">
+    <section id="solucao" className="relative overflow-hidden bg-white py-20 sm:py-28">
       <div className="relative z-[1] mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -118,6 +118,17 @@ function SolutionTripletCarousel() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
 
+  const emblaOpts = useMemo(
+    () => ({
+      align: 'center' as const,
+      loop: true,
+      duration: reduceMotion ? 18 : 58,
+      skipSnaps: false,
+      dragFree: false,
+    }),
+    [reduceMotion],
+  );
+
   const onSelect = useCallback((carouselApi: CarouselApi) => {
     if (!carouselApi) return;
     setSelected(carouselApi.selectedScrollSnap());
@@ -144,31 +155,33 @@ function SolutionTripletCarousel() {
 
   return (
     <div
-      className="relative w-full min-w-0"
+      className="relative w-full min-w-0 touch-manipulation"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
     >
       <Carousel
         setApi={setApi}
-        opts={{ align: 'center', loop: true, duration: 28 }}
+        opts={emblaOpts}
         className="w-full min-w-0"
         aria-label="Recursos da solução Omafit"
       >
-        <CarouselContent className="-ml-0 w-full min-w-0">
+        <CarouselContent className="-ml-0 w-full min-w-0 will-change-transform">
           {features.map((_, centerIndex) => (
             <CarouselItem key={centerIndex} className="basis-full pl-0">
-              <TripletSlide centerIndex={centerIndex} />
+              <div className="flex min-h-[min(68svh,560px)] w-full items-stretch md:min-h-[300px]">
+                <TripletSlide centerIndex={centerIndex} />
+              </div>
             </CarouselItem>
           ))}
         </CarouselContent>
         <CarouselPrevious
           type="button"
-          className="hidden border-[#810707]/20 bg-white/95 text-ink-800 shadow-md hover:bg-white sm:flex sm:h-10 sm:w-10"
+          className="left-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border-white/25 bg-ink-900/75 text-white shadow-lg backdrop-blur-sm hover:bg-ink-900/90 hover:text-white sm:left-2"
         />
         <CarouselNext
           type="button"
-          className="hidden border-[#810707]/20 bg-white/95 text-ink-800 shadow-md hover:bg-white sm:flex sm:h-10 sm:w-10"
+          className="right-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border-white/25 bg-ink-900/75 text-white shadow-lg backdrop-blur-sm hover:bg-ink-900/90 hover:text-white sm:right-2"
         />
       </Carousel>
 
@@ -199,33 +212,56 @@ function TripletSlide({ centerIndex }: { centerIndex: number }) {
   const next = features[(centerIndex + 1) % n];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl items-stretch justify-center gap-1.5 px-0 sm:gap-3 md:gap-5">
-      <SolutionPane feature={prev} placement="left" />
-      <SolutionPane feature={curr} placement="center" />
-      <SolutionPane feature={next} placement="right" />
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 md:flex-row md:items-stretch md:gap-4 lg:gap-5">
+      <SolutionPane
+        feature={curr}
+        placement="center"
+        className="order-1 w-full shrink-0 md:order-2 md:min-w-0 md:flex-[1.45]"
+      />
+      <div className="order-2 grid min-w-0 grid-cols-2 gap-2 md:contents">
+        <SolutionPane
+          feature={prev}
+          placement="left"
+          className="min-w-0 md:order-1 md:flex-[0.78]"
+        />
+        <SolutionPane
+          feature={next}
+          placement="right"
+          className="min-w-0 md:order-3 md:flex-[0.78]"
+        />
+      </div>
     </div>
   );
 }
 
-function SolutionPane({ feature, placement }: { feature: Feature; placement: 'left' | 'center' | 'right' }) {
+function SolutionPane({
+  feature,
+  placement,
+  className,
+}: {
+  feature: Feature;
+  placement: 'left' | 'center' | 'right';
+  className?: string;
+}) {
   const isCenter = placement === 'center';
-  const accentCenter = Boolean(feature.accent && isCenter);
+  const highlight = Boolean(feature.accent && isCenter);
 
   const shell = (
-    <div className="flex h-full min-h-0 flex-col">
+    <>
       <span
         className={cn(
-          'inline-flex w-fit rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest sm:text-[10px]',
-          accentCenter ? 'bg-white/15 text-white/90 ring-1 ring-white/25' : 'bg-[#810707]/10 text-[#810707]',
+          'inline-flex w-fit rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest sm:text-[10px]',
+          highlight
+            ? 'border-[#ff9696]/35 bg-white/10 text-[#ffdede]'
+            : 'border-white/15 bg-white/5 text-white/80',
         )}
       >
-        {accentCenter ? 'Destaque' : 'Recurso'}
+        {highlight ? 'Destaque' : 'Recurso'}
       </span>
       <h3
         className={cn(
-          'mt-3 font-semibold tracking-tight text-ink-800',
-          isCenter ? 'text-base leading-snug sm:text-xl md:text-2xl' : 'text-[11px] leading-tight sm:text-sm md:text-base',
-          accentCenter && 'text-white',
+          'mt-3 font-semibold tracking-tight text-white',
+          isCenter ? 'text-[1.05rem] leading-snug sm:text-xl md:text-2xl' : 'text-[11px] leading-tight sm:text-sm md:text-base',
         )}
         style={{ letterSpacing: '-0.02em' }}
       >
@@ -233,93 +269,40 @@ function SolutionPane({ feature, placement }: { feature: Feature; placement: 'le
       </h3>
       <p
         className={cn(
-          'mt-2 leading-relaxed',
-          isCenter ? 'text-[13px] text-ink-600 sm:text-[15px]' : 'line-clamp-4 text-[10px] text-ink-500 sm:text-xs md:text-[13px]',
-          accentCenter && 'text-white/85',
+          'mt-2 leading-relaxed text-white/75',
+          isCenter ? 'text-[13px] sm:text-[15px]' : 'line-clamp-4 text-[10px] sm:text-xs md:text-[13px]',
         )}
       >
         {feature.description}
       </p>
       <ul
         className={cn(
-          'mt-3 min-h-0 flex-1 space-y-1 sm:space-y-1.5',
-          isCenter ? 'space-y-1.5 sm:space-y-2' : 'space-y-1',
+          'mt-3 min-h-0 flex-1 space-y-1.5 text-white/85 sm:space-y-2',
+          isCenter ? 'text-[12px] sm:text-[13px]' : 'text-[10px] sm:text-[11px] md:text-[12px]',
         )}
       >
         {feature.bullets.map((b) => (
-          <li
-            key={b}
-            className={cn(
-              'flex gap-1.5 leading-snug sm:gap-2',
-              isCenter ? 'text-[12px] sm:text-[13px]' : 'text-[9px] sm:text-[11px] md:text-[12px]',
-              accentCenter ? 'text-white/90' : 'text-ink-600',
-              !isCenter && 'line-clamp-2',
-            )}
-          >
-            <span
-              className={cn(
-                'mt-1 h-1 w-1 shrink-0 rounded-full sm:mt-1.5',
-                accentCenter ? 'bg-white/80' : 'bg-[#810707]',
-              )}
-              aria-hidden
-            />
+          <li key={b} className={cn('flex gap-2 leading-snug', !isCenter && 'line-clamp-2')}>
+            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#ff9696]/90" aria-hidden />
             <span>{b}</span>
           </li>
         ))}
       </ul>
-    </div>
+    </>
   );
 
-  const sideWrap =
-    'min-w-0 max-w-[33%] flex-[0.82] origin-center scale-[0.92] opacity-[0.88] sm:max-w-none sm:flex-[0.78] sm:scale-[0.94] md:opacity-[0.9]';
-  const centerWrap =
-    'relative z-[2] min-w-0 flex-[1.36] sm:flex-[1.48] md:scale-[1.04] md:shadow-[0_18px_50px_-14px_rgba(129,7,7,0.22)]';
+  const surfaceClass = cn(
+    'h-full min-h-0 w-full border border-white/10 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-black/30',
+    isCenter ? 'rounded-2xl sm:rounded-3xl md:scale-[1.03]' : 'rounded-xl opacity-[0.9] sm:rounded-2xl md:scale-[0.94]',
+  );
 
-  if (accentCenter) {
-    return (
-      <div className={cn(centerWrap, 'flex min-h-[210px] flex-col md:min-h-[300px]')}>
-        <BorderBeamCard
-          duration={9}
-          className="h-full min-h-0 w-full flex-1 shadow-brand-glow"
-          innerClassName="relative flex h-full min-h-[210px] flex-col overflow-hidden rounded-[14px] bg-gradient-to-br from-[#810707] to-[#4a0303] p-3.5 text-left sm:min-h-[250px] sm:p-6 md:min-h-[300px] md:p-8"
-        >
-          {shell}
-        </BorderBeamCard>
-      </div>
-    );
-  }
-
-  if (isCenter) {
-    return (
-      <div
-        className={cn(
-          centerWrap,
-          'flex min-h-[210px] flex-col overflow-hidden rounded-xl border border-[#810707]/18 bg-gradient-to-br from-white via-white to-rose-50/55 p-3.5 shadow-md sm:rounded-2xl sm:p-5 md:min-h-[300px] md:p-7',
-        )}
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-50 bg-[radial-gradient(ellipse_at_35%_0%,rgba(129,7,7,0.08),transparent_58%)]"
-        />
-        <div className="relative flex h-full min-h-0 flex-col">{shell}</div>
-      </div>
-    );
-  }
+  const innerPad = isCenter ? 'flex min-h-0 flex-col p-4 sm:p-6 md:min-h-[260px] md:p-8' : 'flex min-h-0 flex-col p-3 sm:p-4 md:min-h-[200px] md:p-5';
 
   return (
-    <div
-      className={cn(
-        sideWrap,
-        'relative z-[1] flex flex-col overflow-hidden rounded-lg border border-[#810707]/10 bg-gradient-to-br from-white via-white to-rose-50/40 p-2.5 shadow-sm sm:rounded-xl sm:p-3.5 md:min-h-[240px] md:p-4',
-        placement === 'left' && 'origin-right',
-        placement === 'right' && 'origin-left',
-      )}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-35 bg-[radial-gradient(ellipse_at_30%_0%,rgba(129,7,7,0.06),transparent_55%)]"
-      />
-      <div className="relative flex h-full min-h-0 flex-col">{shell}</div>
+    <div className={cn('flex min-h-0 min-w-0 flex-col', className)}>
+      <CtaBlockSurface className={surfaceClass} contentClassName={innerPad}>
+        {shell}
+      </CtaBlockSurface>
     </div>
   );
 }

@@ -41,7 +41,7 @@ const fallbackPlans: BillingPlan[] = [
     display_name: 'Growth',
     monthly_price: 89,
     images_included: 700,
-    price_per_extra_image: 0.18,
+    price_per_extra_image: 0.12,
     currency: 'USD',
     active: true,
   },
@@ -116,7 +116,7 @@ function formatTryOnImages(plan: BillingPlan): string {
     return 'Imagens de try-on ilimitadas';
   }
   if (plan.name === 'free' || plan.images_included === 0) {
-    return 'Imagens de try-on sob demanda';
+    return '50 sessões de try-on incluídas para começar';
   }
   return `${plan.images_included.toLocaleString('pt-BR')} imagens de try-on / mês`;
 }
@@ -342,18 +342,23 @@ function PlanCard({
             : 'Máximo de imagens de try-on e AR para grandes catálogos.'}
         </p>
 
-        <div className="mt-6 flex items-baseline gap-1 flex-wrap">
+        <div className="mt-6 flex flex-col gap-1">
           {plan.monthly_price === 0 ? (
-            <span className={`text-4xl font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-800'}`}>
-              Grátis
-            </span>
-          ) : (
             <>
+              <span className={`text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? 'text-white' : 'text-ink-800'}`}>
+                Instalação grátis
+              </span>
+              <span className={`text-sm leading-snug ${isDark ? 'text-white/65' : 'text-ink-500'}`}>
+                Sem mensalidade fixa — pague só pelo que usar além das 50 sessões incluídas.
+              </span>
+            </>
+          ) : (
+            <div className="flex items-baseline gap-1 flex-wrap">
               <span className={`text-4xl font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-800'}`}>
                 US$ {plan.monthly_price}
               </span>
               <span className={`text-sm ${isDark ? 'text-white/60' : 'text-ink-400'}`}>/mês</span>
-            </>
+            </div>
           )}
         </div>
 
@@ -392,7 +397,7 @@ function PlanCard({
           )}
           {isFree && (
             <PricingBullet inverted={isDark}>
-              US$ {plan.price_per_extra_image.toFixed(2)} por imagem de try-on adicional
+              US$ {plan.price_per_extra_image.toFixed(2)} por sessão de try-on após as 50 incluídas
             </PricingBullet>
           )}
           <PricingBullet inverted={isDark}>Medição precisa (MediaPipe)</PricingBullet>
@@ -409,7 +414,7 @@ function PlanCard({
         <div className="mt-8">
           {isFree ? (
             <Button variant="secondary" size="lg" className="w-full" onClick={cta} type="button">
-              Começar grátis
+              Instalar grátis na Shopify
               <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (

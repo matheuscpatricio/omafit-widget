@@ -26,7 +26,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Como funciona a cobrança por imagem? Preciso me comprometer mensalmente?',
-    a: 'O plano On-Demand é gratuito para instalar: 5 acessórios AR e US$ 0,18 por imagem de try-on adicional. Growth (US$ 89, 700 imagens/mês, 20 AR). O plano Pro custa US$ 300/mês e inclui 3.000 imagens de try-on (100 AR). O Enterprise custa US$ 600/mês com imagens de try-on e AR ilimitados. Sem taxas ocultas.',
+    a: 'A instalação na Shopify é gratuita. No On-Demand você tem 50 sessões de try-on incluídas para começar, 5 acessórios AR e US$ 0,18 por sessão de try-on adicional. Growth: US$ 89/mês (700 imagens, 20 AR), imagens extras a US$ 0,12. Pro: US$ 300/mês com 3.000 imagens de try-on (100 AR). Enterprise: US$ 600/mês com try-on e AR ilimitados. Sem taxas ocultas.',
   },
   {
     q: 'O Omafit afeta a velocidade de carregamento da minha loja?',
@@ -34,7 +34,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Que tipo de suporte eu recebo após instalar?',
-    a: 'Clientes do plano Free têm acesso a documentação completa, tutoriais em vídeo e suporte por e-mail. Clientes Pro recebem suporte prioritário, onboarding guiado e canal direto via WhatsApp. Clientes Enterprise têm gerente de conta dedicado e SLA personalizado.',
+    a: 'Quem usa o On-Demand tem acesso a documentação completa, tutoriais em vídeo e suporte por e-mail. Clientes Pro recebem suporte prioritário, onboarding guiado e canal direto via WhatsApp. Clientes Enterprise têm gerente de conta dedicado e SLA personalizado.',
   },
   {
     q: 'Posso personalizar o visual do widget para combinar com minha marca?',
