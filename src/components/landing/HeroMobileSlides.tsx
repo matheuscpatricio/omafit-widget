@@ -34,20 +34,22 @@ type Slide = {
 
 const slides: Slide[] = [
   {
-    id: 'tryon',
-    image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Try-on fotorrealista',
+    id: 'widget',
+    image: LANDING_IMAGES.heroLifestyleBoardwalk,
+    badge: 'Shopify + AR',
     title: (
       <>
-        Menos devoluções,{' '}
-        <ShimmerHeading variant="light" className="!from-white !via-rose-100 !to-white">
-          mais confiança
-        </ShimmerHeading>
+        <span className="block text-balance text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.9)]">
+          Widget pronto,
+        </span>
+        <span className="mt-0.5 block text-balance text-xl font-bold leading-snug tracking-tight text-amber-100 [text-shadow:0_2px_28px_rgba(0,0,0,0.95)]">
+          marca sua
+        </span>
       </>
     ),
-    body:
-      'Visualize roupas, calçados e acessórios no corpo com IA fotorrealista — o cliente compra sabendo como fica.',
+    body: 'Instale na Shopify em minutos: provador, ChatGPT e 5 acessórios AR no plano gratuito.',
     topScrim: true,
+    compact: true,
   },
   {
     id: 'fit',
@@ -66,22 +68,20 @@ const slides: Slide[] = [
     topScrim: true,
   },
   {
-    id: 'widget',
-    image: LANDING_IMAGES.heroLifestyleBoardwalk,
-    badge: 'Shopify + AR',
+    id: 'tryon',
+    image: LANDING_IMAGES.heroLifestyleBeach,
+    badge: 'Try-on fotorrealista',
     title: (
       <>
-        <span className="block text-balance text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.9)]">
-          Widget pronto,
-        </span>
-        <span className="mt-0.5 block text-balance text-xl font-bold leading-snug tracking-tight text-amber-100 [text-shadow:0_2px_28px_rgba(0,0,0,0.95)]">
-          marca sua
-        </span>
+        Menos devoluções,{' '}
+        <ShimmerHeading variant="light" className="!from-white !via-rose-100 !to-white">
+          mais confiança
+        </ShimmerHeading>
       </>
     ),
-    body: 'Instale na Shopify em minutos: provador, ChatGPT e 5 acessórios AR no plano gratuito.',
+    body:
+      'Visualize roupas, calçados e acessórios no corpo com IA fotorrealista — o cliente compra sabendo como fica.',
     topScrim: true,
-    compact: true,
   },
 ];
 

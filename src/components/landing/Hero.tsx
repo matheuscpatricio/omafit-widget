@@ -14,9 +14,9 @@ interface HeroProps {
 }
 
 const HERO_SLIDES = [
-  LANDING_IMAGES.heroLifestyleBeach,
-  LANDING_IMAGES.heroLifestyleRiver,
   LANDING_IMAGES.heroLifestyleBoardwalk,
+  LANDING_IMAGES.heroLifestyleRiver,
+  LANDING_IMAGES.heroLifestyleBeach,
 ] as const;
 
 const SLIDE_MS = 5200;
