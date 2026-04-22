@@ -1,6 +1,7 @@
-import { motion, type Variants } from 'framer-motion';
+import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { Ruler, Shirt, Glasses, MessageSquare, Palette, Sparkles, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { BorderBeamCard } from './magic/BorderBeam';
 
 interface Feature {
@@ -126,6 +127,7 @@ function FeatureCard({
   variants: Variants;
 }) {
   const Icon = feature.icon;
+  const reduceMotion = useReducedMotion();
 
   // Grid asymmetric layout: primeiro full-wide na primeira linha,
   // depois 3 colunas, depois 2 colunas
@@ -133,68 +135,105 @@ function FeatureCard({
     index === 0
       ? 'lg:col-span-3 lg:row-span-2'
       : index === 1
-      ? 'lg:col-span-3'
-      : index === 2
-      ? 'lg:col-span-3'
-      : 'lg:col-span-3';
+        ? 'lg:col-span-3'
+        : index === 2
+          ? 'lg:col-span-3'
+          : 'lg:col-span-3';
+
+  const breathe = {
+    opacity: reduceMotion ? 0.5 : ([0.42, 0.72, 0.42] as const),
+    scale: reduceMotion ? 1 : ([1, 1.07, 1] as const),
+  };
 
   const inner = (
     <>
       {feature.accent && (
-        <div
-          className="absolute -top-32 -right-32 h-64 w-64 rounded-full opacity-30 blur-3xl pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.4), transparent)' }}
-        />
+        <>
+          <div
+            className="pointer-events-none absolute -right-32 -top-32 h-64 w-64 rounded-full opacity-30 blur-3xl"
+            style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.4), transparent)' }}
+          />
+          {!reduceMotion && (
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute -left-24 bottom-0 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12),transparent_68%)]"
+              animate={{ opacity: [0.25, 0.5, 0.25] }}
+              transition={{ duration: 6.5, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
+        </>
       )}
       <div className="relative">
-        <div className="flex items-center gap-3">
-          <div
-            className={`h-12 w-12 rounded-xl grid place-items-center ${
-              feature.accent
-                ? 'bg-white/15 text-white backdrop-blur'
-                : 'bg-[#810707]/5 text-[#810707]'
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-          </div>
+        <div className={cn('flex flex-wrap items-center gap-3', !feature.accent && 'pr-14')}>
+          {feature.accent ? (
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-white backdrop-blur">
+              <Icon className="h-5 w-5" />
+            </div>
+          ) : (
+            <motion.div
+              className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#810707] via-[#a01010] to-rose-400 p-[2.5px] shadow-[0_6px_20px_-6px_rgba(129,7,7,0.45)]"
+              whileHover={{ scale: 1.06, rotate: -2 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+            >
+              <div className="grid h-full w-full place-items-center rounded-[13px] bg-white">
+                <Icon className="h-5 w-5 text-[#810707]" />
+              </div>
+            </motion.div>
+          )}
           <span
-            className={`text-[11px] font-medium uppercase tracking-wider ${
-              feature.accent ? 'text-white/70' : 'text-ink-400'
-            }`}
+            className={cn(
+              'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest',
+              feature.accent ? 'bg-white/10 text-white/90 ring-1 ring-white/20' : 'bg-[#810707]/10 text-[#810707]',
+            )}
           >
-            Recurso · {String(index + 1).padStart(2, '0')}
+            {feature.accent ? 'Destaque' : 'Recurso'}
           </span>
         </div>
 
+        {!feature.accent && (
+          <div
+            className="pointer-events-none absolute right-4 top-4 flex h-10 w-10 select-none items-center justify-center rounded-xl bg-gradient-to-br from-[#810707] to-[#4a0303] text-sm font-bold text-white shadow-lg ring-2 ring-white/70"
+            aria-hidden
+          >
+            {String(index + 1).padStart(2, '0')}
+          </div>
+        )}
+
         <h3
-          className={`mt-5 text-xl sm:text-2xl font-semibold tracking-tight ${
-            feature.accent ? 'text-white' : 'text-ink-800'
-          }`}
+          className={cn(
+            'mt-5 text-xl font-semibold tracking-tight sm:text-2xl',
+            feature.accent ? 'text-white' : 'text-ink-800',
+          )}
           style={{ letterSpacing: '-0.02em' }}
         >
           {feature.title}
         </h3>
         <p
-          className={`mt-2 text-[15px] leading-relaxed ${
-            feature.accent ? 'text-white/80' : 'text-ink-500'
-          }`}
+          className={cn(
+            'mt-2 text-[15px] leading-relaxed',
+            feature.accent ? 'text-white/80' : 'text-ink-500',
+          )}
         >
           {feature.description}
         </p>
 
-        <ul className="mt-5 space-y-2">
+        <ul className="mt-5 space-y-2.5">
           {feature.bullets.map((b) => (
             <li
               key={b}
-              className={`flex items-center gap-2 text-[13px] ${
-                feature.accent ? 'text-white/90' : 'text-ink-600'
-              }`}
+              className={cn(
+                'flex items-start gap-2.5 text-[13px] transition-transform duration-300 group-hover:translate-x-0.5',
+                feature.accent ? 'text-white/90' : 'text-ink-600',
+              )}
             >
-              <Check
-                className={`w-4 h-4 flex-shrink-0 ${
-                  feature.accent ? 'text-white' : 'text-emerald-600'
-                }`}
-              />
+              <span
+                className={cn(
+                  'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full',
+                  feature.accent ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/15',
+                )}
+              >
+                <Check className="h-3 w-3" strokeWidth={2.5} />
+              </span>
               {b}
             </li>
           ))}
@@ -209,7 +248,7 @@ function FeatureCard({
         variants={variants}
         whileHover={{ y: -6, scale: 1.01 }}
         transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-        className={`${spanClass}`}
+        className={spanClass}
       >
         <BorderBeamCard
           duration={8}
@@ -225,10 +264,38 @@ function FeatureCard({
   return (
     <motion.div
       variants={variants}
-      whileHover={{ y: -6 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-      className={`group relative rounded-2xl border border-black/5 bg-white p-6 sm:p-8 shadow-elegant hover:shadow-elegant-lg transition-shadow overflow-hidden ${spanClass}`}
+      whileHover={{ y: -10 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      className={cn(
+        'group relative overflow-hidden rounded-2xl border border-[#810707]/12',
+        'bg-gradient-to-br from-white via-white to-rose-50/40',
+        'p-6 shadow-[0_4px_28px_-10px_rgba(129,7,7,0.14)] sm:p-8',
+        'transition-[border-color,box-shadow] duration-300',
+        'hover:border-[#810707]/28 hover:shadow-[0_22px_55px_-14px_rgba(129,7,7,0.22)]',
+        spanClass,
+      )}
     >
+      {!reduceMotion && (
+        <>
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(129,7,7,0.16),transparent_68%)]"
+            animate={breathe}
+            transition={{ duration: 5 + index * 0.65, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-8 -left-24 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(251,113,133,0.14),transparent_65%)]"
+            animate={{ opacity: reduceMotion ? 0.35 : ([0.28, 0.52, 0.28] as const) }}
+            transition={{
+              duration: 4.2 + index * 0.35,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: 0.6,
+            }}
+          />
+        </>
+      )}
       {inner}
     </motion.div>
   );
