@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, Play, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { Button, ButtonLink } from '../ui/button';
-import { WidgetMockup } from './WidgetMockup';
 import { LANDING_IMAGES } from '../../lib/site';
 import { Marquee } from './magic/Marquee';
 import { ShimmerHeading } from './magic/ShimmerHeading';
@@ -119,7 +118,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
     <section
       ref={sectionRef}
       id="top"
-      className="relative min-h-[100svh] min-h-[100dvh] overflow-hidden bg-white pt-20 pb-10 sm:pt-24 sm:pb-12 md:min-h-[92vh] md:pt-28 md:pb-16"
+      className="relative min-h-[100svh] min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-white pt-20 pb-10 sm:pt-24 sm:pb-12 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
     >
       <motion.div
         style={contentStyle}
@@ -131,7 +130,10 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           animate="visible"
           className="flex flex-col items-center text-center md:items-stretch md:text-left"
         >
-          <motion.div variants={itemVariants} className="mb-8 w-full md:hidden">
+          <motion.div
+            variants={itemVariants}
+            className="mb-6 w-full max-md:relative max-md:left-1/2 max-md:w-screen max-md:max-w-[100vw] max-md:-translate-x-1/2 md:hidden"
+          >
             <HeroMobileSlides
               onInstallShopify={onInstallShopify}
               onRequestDemo={onRequestDemo}
@@ -265,16 +267,6 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                   </span>
                 ))}
               </Marquee>
-            </div>
-          </motion.div>
-
-          <motion.div
-            variants={itemVariants}
-            className="mt-10 w-full max-w-[min(100%,520px)] sm:mt-14 md:mt-16 md:max-w-4xl md:mx-auto"
-          >
-            <div className="relative">
-              <div className="pointer-events-none absolute -inset-4 rounded-[32px] bg-gradient-to-tr from-[#810707]/12 via-transparent to-rose-300/15 blur-2xl sm:-inset-6 sm:rounded-[40px]" />
-              <WidgetMockup />
             </div>
           </motion.div>
         </motion.div>

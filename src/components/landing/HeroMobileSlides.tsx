@@ -27,8 +27,9 @@ type Slide = {
   badge: string;
   title: ReactNode;
   body: string;
-  /** Gradiente extra no topo para slides claros (água/céu). */
   topScrim?: boolean;
+  /** Copy mais curta + layout compacto (ex.: CTAs). */
+  compact?: boolean;
 };
 
 const slides: Slide[] = [
@@ -70,15 +71,17 @@ const slides: Slide[] = [
     badge: 'Shopify + AR',
     title: (
       <>
-        Widget pronto,{' '}
-        <ShimmerHeading variant="light" className="!from-amber-50 !via-white !to-amber-50">
+        <span className="block text-balance text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.9)]">
+          Widget pronto,
+        </span>
+        <span className="mt-0.5 block text-balance text-xl font-bold leading-snug tracking-tight text-amber-100 [text-shadow:0_2px_28px_rgba(0,0,0,0.95)]">
           marca sua
-        </ShimmerHeading>
+        </span>
       </>
     ),
-    body:
-      'Instale na Shopify em minutos: provador, assistente com ChatGPT e até 5 acessórios AR no plano gratuito.',
-    topScrim: false,
+    body: 'Instale na Shopify em minutos: provador, ChatGPT e 5 acessórios AR no plano gratuito.',
+    topScrim: true,
+    compact: true,
   },
 ];
 
@@ -105,23 +108,24 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
   return (
     <div className="w-full">
       <BorderBeamCard
-        className="mx-auto w-full max-w-[min(100%,340px)]"
-        innerClassName="bg-stone-950/40 p-[3px] ring-0"
+        className="w-full max-md:rounded-none"
+        innerClassName="bg-stone-950/40 p-0 ring-0 max-md:p-0"
         duration={8}
       >
-        <Card className="overflow-hidden border-0 bg-transparent shadow-none">
+        <Card className="overflow-hidden border-0 bg-transparent shadow-none rounded-none">
           <Carousel
             setApi={setApi}
             opts={{ align: 'start', loop: true }}
-            className="w-full"
+            className="relative w-full"
             aria-label="Destaques do Omafit"
           >
             <CarouselContent className="-ml-0">
               {slides.map((slide) => (
                 <CarouselItem key={slide.id} className="pl-0 basis-full">
                   <div
-                    className="relative mx-auto w-full overflow-hidden rounded-[13px] bg-stone-900"
-                    style={{ aspectRatio: '9 / 16' }}
+                    className={cn(
+                      'relative h-[min(100svh-5rem,920px)] min-h-[min(100svh-5rem,920px)] w-full overflow-hidden rounded-none bg-stone-900',
+                    )}
                   >
                     <img
                       src={slide.image}
@@ -132,39 +136,55 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                     />
                     {slide.topScrim && (
                       <div
-                        className="pointer-events-none absolute inset-x-0 top-0 h-[38%] bg-gradient-to-b from-black/55 via-black/20 to-transparent"
+                        className="pointer-events-none absolute inset-x-0 top-0 h-[32%] bg-gradient-to-b from-black/50 via-black/15 to-transparent"
                         aria-hidden
                       />
                     )}
                     <div
-                      className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.94)_0%,rgba(0,0,0,0.55)_46%,transparent_76%)]"
+                      className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.96)_0%,rgba(0,0,0,0.62)_38%,rgba(0,0,0,0.2)_62%,transparent_88%)]"
                       aria-hidden
                     />
 
-                    <div className="pointer-events-none absolute inset-0 flex flex-col justify-end p-5 pb-6 pt-16 text-left">
-                      <div className="space-y-3">
-                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur-md">
+                    <div
+                      className={cn(
+                        'pointer-events-none absolute inset-x-0 bottom-0 top-0 flex flex-col justify-end text-left',
+                        'px-4 pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] pt-10',
+                        slide.compact ? 'gap-2' : 'gap-0',
+                      )}
+                    >
+                      <div className={cn('space-y-2', slide.compact && 'space-y-1.5')}>
+                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur-md">
                           <Sparkles className="h-3 w-3 shrink-0 text-rose-200" />
                           {slide.badge}
                         </span>
-                        <h2 className="text-[1.35rem] font-semibold leading-tight tracking-tight text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
+                        <h2
+                          className={cn(
+                            'font-semibold leading-snug tracking-tight text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.88)]',
+                            slide.compact ? 'text-[1.2rem]' : 'text-[1.35rem]',
+                          )}
+                        >
                           {slide.title}
                         </h2>
-                        <p className="text-[13px] font-medium leading-relaxed text-white/92 [text-shadow:0_1px_12px_rgba(0,0,0,0.9)]">
+                        <p
+                          className={cn(
+                            'font-medium leading-snug text-white/95 [text-shadow:0_1px_14px_rgba(0,0,0,0.92)]',
+                            slide.compact ? 'text-[12px] leading-relaxed' : 'text-[13px] leading-relaxed',
+                          )}
+                        >
                           {slide.body}
                         </p>
                       </div>
 
                       {slide.id === 'widget' && (
                         <motion.div
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.15, duration: 0.4 }}
-                          className="pointer-events-auto mt-5 flex flex-col gap-2.5"
+                          transition={{ delay: 0.08, duration: 0.35 }}
+                          className="pointer-events-auto mt-3 flex flex-col gap-2"
                         >
                           <ButtonLink
                             variant="primary"
-                            size="lg"
+                            size="md"
                             href="https://apps.shopify.com/omafit"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -181,7 +201,7 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                           </ButtonLink>
                           <Button
                             variant="secondary"
-                            size="lg"
+                            size="md"
                             type="button"
                             className="w-full justify-center border-white/25 bg-white/95 text-ink-900 hover:bg-white"
                             onClick={onRequestDemo}
@@ -196,28 +216,31 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <CarouselPrevious className="left-2" />
-            <CarouselNext className="right-2" />
+            <CarouselPrevious className="left-1 top-[42%] max-md:top-[40%]" />
+            <CarouselNext className="right-1 top-[42%] max-md:top-[40%]" />
+            <div
+              className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex justify-center gap-2"
+              role="tablist"
+              aria-label="Slides do hero"
+            >
+              {slides.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === current}
+                  aria-label={`Ir para slide ${i + 1}`}
+                  className={cn(
+                    'pointer-events-auto h-2 rounded-full transition-all duration-300',
+                    i === current ? 'w-7 bg-[#810707]' : 'w-2 bg-white/50 hover:bg-white/70',
+                  )}
+                  onClick={() => api?.scrollTo(i)}
+                />
+              ))}
+            </div>
           </Carousel>
         </Card>
       </BorderBeamCard>
-
-      <div className="mt-4 flex justify-center gap-2" role="tablist" aria-label="Slides do hero">
-        {slides.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            role="tab"
-            aria-selected={i === current}
-            aria-label={`Ir para slide ${i + 1}`}
-            className={cn(
-              'h-2 rounded-full transition-all duration-300',
-              i === current ? 'w-7 bg-[#810707]' : 'w-2 bg-stone-300 hover:bg-stone-400',
-            )}
-            onClick={() => api?.scrollTo(i)}
-          />
-        ))}
-      </div>
     </div>
   );
 }
