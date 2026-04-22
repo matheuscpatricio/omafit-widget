@@ -30,20 +30,37 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.45,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-    });
+    let lenis: Lenis | null = null;
+    let rafId = 0;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
+    const startLenis = () => {
+      if (lenis) return;
+      lenis = new Lenis({
+        duration: 1.45,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      });
+      const raf = (time: number) => {
+        lenis?.raf(time);
+        rafId = requestAnimationFrame(raf);
+      };
+      rafId = requestAnimationFrame(raf);
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(() => startLenis(), { timeout: 1200 });
+    } else {
+      timeoutId = window.setTimeout(() => startLenis(), 400);
     }
-    const frame = requestAnimationFrame(raf);
 
     return () => {
-      cancelAnimationFrame(frame);
-      lenis.destroy();
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      cancelAnimationFrame(rafId);
+      lenis?.destroy();
     };
   }, []);
 

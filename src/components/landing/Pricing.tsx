@@ -126,7 +126,12 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let io: IntersectionObserver | undefined;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     async function fetchPlans() {
+      if (cancelled) return;
       try {
         const { data, error } = await supabase
           .from('billing_plans')
@@ -142,9 +147,40 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
         /* fallback já aplicado */
       }
     }
-    fetchPlans();
+
+    function scheduleFetch() {
+      if (cancelled) return;
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(() => void fetchPlans(), { timeout: 3500 });
+      } else {
+        timeoutId = window.setTimeout(() => void fetchPlans(), 1200);
+      }
+    }
+
+    const planosEl = document.getElementById('planos');
+    if (planosEl && typeof IntersectionObserver !== 'undefined') {
+      io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            io?.disconnect();
+            io = undefined;
+            scheduleFetch();
+          }
+        },
+        { rootMargin: '320px', threshold: 0 },
+      );
+      io.observe(planosEl);
+    } else {
+      scheduleFetch();
+    }
+
     return () => {
       cancelled = true;
+      io?.disconnect();
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
   }, []);
 

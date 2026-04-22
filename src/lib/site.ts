@@ -20,5 +20,7 @@ export const LANDING_IMAGES = {
   /** Retrato: trilho / natureza — rotação desktop. */
   heroLifestyleBoardwalk: '/images/landing/hero-lifestyle-boardwalk.png',
   midBanner: '/images/landing/mid-banner.png',
+  /** Versão WebP (prioridade no `<picture>` para menos bytes). */
+  midBannerWebp: '/images/landing/mid-banner.webp',
   ogImage: '/images/landing/og-omafit.png',
 } as const;

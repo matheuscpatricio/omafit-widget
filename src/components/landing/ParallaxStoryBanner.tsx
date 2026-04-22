@@ -29,16 +29,20 @@ export function ParallaxStoryBanner() {
           style={motionStyle}
           className="absolute inset-0 md:inset-[-6%] md:will-change-transform"
         >
-          <img
-            src={LANDING_IMAGES.midBanner}
-            alt="Experiência de provador virtual e realidade aumentada na moda online"
-            className="h-full w-full object-cover object-[center_20%] max-md:brightness-110 sm:object-center"
-            loading="lazy"
-            decoding="async"
-            sizes="(max-width: 768px) 100vw, min(1280px, 100vw)"
-            width={1920}
-            height={640}
-          />
+          <picture>
+            <source type="image/webp" srcSet={LANDING_IMAGES.midBannerWebp} />
+            <img
+              src={LANDING_IMAGES.midBanner}
+              alt="Experiência de provador virtual e realidade aumentada na moda online"
+              className="h-full w-full object-cover object-[center_20%] max-md:brightness-110 sm:object-center"
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
+              sizes="(max-width: 768px) 100vw, min(1280px, 100vw)"
+              width={1920}
+              height={640}
+            />
+          </picture>
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-[#810707]/35 max-md:from-black/55 max-md:via-black/35 md:from-black/85 md:via-black/55" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_50%,rgba(129,7,7,0.28),transparent_55%)] max-md:opacity-80" />
