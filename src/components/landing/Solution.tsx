@@ -25,7 +25,7 @@ const features: Feature[] = [
     title: 'Try-On Fotorrealista (Roupas e Calçados)',
     description:
       'IA generativa renderiza a peça no corpo do cliente com sombreamento, tecido e caimento realistas. Ele vê antes de comprar.',
-    bullets: ['Roupas femininas e masculinas', 'Calçados com visualização 360°', 'Qualidade fotográfica'],
+    bullets: ['Roupas femininas e masculinas', 'Calçados e acessórios no mesmo fluxo', 'Qualidade fotográfica'],
   },
   {
     title: 'Visualização AR (Óculos e Acessórios)',
@@ -38,6 +38,16 @@ const features: Feature[] = [
     description:
       'Um consultor de moda inteligente 24/7 que conhece seu catálogo, responde dúvidas e sugere combinações.',
     bullets: ['Conhece seu catálogo', 'Sugere looks completos', 'Fala a língua da sua marca'],
+  },
+  {
+    title: 'Analytics e ROI',
+    description:
+      'Painéis que ligam o uso do widget a resultados de negócio: estime o retorno sobre o investimento e acompanhe o perfil agregado de quem usa o provador — dados como altura, peso e biotipo médios da sua audiência, sempre anonimizados.',
+    bullets: [
+      'Modelos de ROI com conversão, ticket e devoluções',
+      'Médias de altura, peso e biotipo dos usuários',
+      'Funil de engajamento e sessões de try-on',
+    ],
   },
   {
     title: 'Widget Personalizável',

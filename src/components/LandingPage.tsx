@@ -8,6 +8,7 @@ import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
 import { ParallaxStoryBanner } from './landing/ParallaxStoryBanner';
 import { Solution } from './landing/Solution';
+import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
 import { FAQ } from './landing/FAQ';
 import { FinalCTA } from './landing/FinalCTA';
@@ -105,6 +106,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         <ParallaxStoryBanner />
 
         <Solution />
+
+        <ImpactStats />
 
         <Pricing onSelectFree={handleInstallShopify} onSelectPaidPlan={handleSelectPaidPlan} />
 

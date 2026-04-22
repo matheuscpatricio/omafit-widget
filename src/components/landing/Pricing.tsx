@@ -376,8 +376,8 @@ function PlanCard({
         <ul className="mt-6 space-y-2.5 flex-1">
           <PricingBullet inverted={isDark}>
             {plan.name === 'free' && `${arLabel} acessórios AR incluídos`}
-            {plan.name === 'growth' && 'Até 20 acessórios AR incluídos / mês'}
-            {plan.name === 'pro' && 'Até 100 acessórios AR incluídos / mês'}
+            {plan.name === 'growth' && 'Até 20 acessórios AR incluídos'}
+            {plan.name === 'pro' && 'Até 100 acessórios AR incluídos'}
             {plan.name === 'enterprise' && 'Acessórios AR ilimitados'}
           </PricingBullet>
           {plan.name === 'pro' && (
