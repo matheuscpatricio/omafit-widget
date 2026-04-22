@@ -106,20 +106,20 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
   }, [api, onSelect]);
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <BorderBeamCard
-        className="w-full max-md:rounded-none"
+        className="w-full min-w-0 max-md:rounded-none"
         innerClassName="bg-stone-950/40 p-0 ring-0 max-md:p-0"
         duration={8}
       >
-        <Card className="overflow-hidden border-0 bg-transparent shadow-none rounded-none">
+        <Card className="w-full min-w-0 overflow-hidden border-0 bg-transparent shadow-none rounded-none">
           <Carousel
             setApi={setApi}
             opts={{ align: 'start', loop: true }}
-            className="relative w-full"
+            className="relative w-full min-w-0"
             aria-label="Destaques do Omafit"
           >
-            <CarouselContent className="-ml-0">
+            <CarouselContent className="-ml-0 w-full min-w-0">
               {slides.map((slide) => (
                 <CarouselItem key={slide.id} className="pl-0 basis-full">
                   <div

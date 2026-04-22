@@ -120,6 +120,16 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
       id="top"
       className="relative min-h-[100svh] min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-white pt-20 pb-10 sm:pt-24 sm:pb-12 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
     >
+      {/* Fora do contentor com padding: evita desvio (w-screen + translate) e faixa branca à esquerda */}
+      <motion.div
+        variants={itemVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative z-10 mb-6 w-full min-w-0 md:hidden"
+      >
+        <HeroMobileSlides onInstallShopify={onInstallShopify} onRequestDemo={onRequestDemo} />
+      </motion.div>
+
       <motion.div
         style={contentStyle}
         className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 md:px-8 lg:px-10 max-md:!opacity-100"
@@ -130,16 +140,6 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           animate="visible"
           className="flex flex-col items-center text-center md:items-stretch md:text-left"
         >
-          <motion.div
-            variants={itemVariants}
-            className="mb-6 w-full max-md:relative max-md:left-1/2 max-md:w-screen max-md:max-w-[100vw] max-md:-translate-x-1/2 md:hidden"
-          >
-            <HeroMobileSlides
-              onInstallShopify={onInstallShopify}
-              onRequestDemo={onRequestDemo}
-            />
-          </motion.div>
-
           <div className="hidden w-full items-start gap-10 md:grid md:grid-cols-2 md:gap-8 lg:gap-12 lg:items-center">
             <div className="flex w-full max-w-2xl flex-col items-center justify-self-start md:max-w-none md:pr-2 lg:pr-6">
               <motion.div variants={itemVariants} className="flex w-full justify-center md:justify-start">
