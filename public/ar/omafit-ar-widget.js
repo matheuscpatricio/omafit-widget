@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-glasses-lite-defaults";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-projection-aspect-nonstrict";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -3880,24 +3880,46 @@ function omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, opts) {
    * Sem `videoWidth` ainda (antes de `loadedmetadata`), aplicamos só FOV/aspect
    * de recurso para o efeito ser visível logo.
    */
+  const Lsync = omafitSyncMindARFaceProjection;
   if (vw >= 2 && vh >= 2 && strict && typeof renderer.setSize === "function") {
     /**
      * Só redimensionar o buffer quando a resolução do stream muda — chamar
      * `setSize` a 30–60 Hz recria estado WebGL e trava telemóveis fracos.
      * `updateStyle=false`: o MindAR `_resize()` mantém o CSS do canvas.
      */
-    const L = omafitSyncMindARFaceProjection;
-    if (!L._buf || L._buf.w !== vw || L._buf.h !== vh) {
-      L._buf = { w: vw, h: vh };
+    if (!Lsync._buf || Lsync._buf.w !== vw || Lsync._buf.h !== vh) {
+      Lsync._buf = { w: vw, h: vh };
       renderer.setSize(vw, vh, false);
     }
   }
-  let aspect =
-    vw >= 2 && vh >= 2
-      ? vw / vh
-      : Number.isFinite(camera.aspect) && camera.aspect > 0
-        ? camera.aspect
-        : 9 / 16;
+  /**
+   * Com `strictVideoCanvasPixelMatch=false`, o MindAR dimensiona o buffer ao
+   * contentor (não à resolução intrínseca do vídeo). `camera.aspect` tem de
+   * seguir o **viewport WebGL** real; usar só `videoWidth/videoHeight` deixa
+   * o frustum desalinhado e o GLB pode ficar totalmente fora de vista.
+   */
+  let aspect = 9 / 16;
+  if (strict) {
+    if (vw >= 2 && vh >= 2) aspect = vw / vh;
+    else if (Number.isFinite(camera.aspect) && camera.aspect > 0) aspect = camera.aspect;
+  } else {
+    const dom = renderer.domElement;
+    const cw = dom ? Math.max(0, dom.clientWidth || 0) : 0;
+    const ch = dom ? Math.max(0, dom.clientHeight || 0) : 0;
+    if (cw >= 2 && ch >= 2) {
+      aspect = cw / ch;
+    } else if (typeof renderer.getDrawingBufferSize === "function") {
+      if (!Lsync._bufAspect) Lsync._bufAspect = new THREE.Vector2();
+      renderer.getDrawingBufferSize(Lsync._bufAspect);
+      if (Lsync._bufAspect.y >= 2) aspect = Lsync._bufAspect.x / Lsync._bufAspect.y;
+      else if (vw >= 2 && vh >= 2) aspect = vw / vh;
+      else if (Number.isFinite(camera.aspect) && camera.aspect > 0) aspect = camera.aspect;
+    } else if (vw >= 2 && vh >= 2) {
+      aspect = vw / vh;
+    } else if (Number.isFinite(camera.aspect) && camera.aspect > 0) {
+      aspect = camera.aspect;
+    }
+  }
   if (!Number.isFinite(aspect) || aspect <= 0) aspect = 9 / 16;
   camera.aspect = aspect;
   const fovLocked63 = opts?.lockWebcamFov63 === true;
@@ -4821,7 +4843,7 @@ async function runArSession({
         accessoryType === "glasses" &&
         !/^(0|false|off|no)$/i.test(String(cfgAttr("arFaceLockWebcamFov63", "1")).trim()),
       useOpenGlStyleProjection: !/^(0|false|off|no)$/i.test(
-        String(cfgAttr("arFaceOpenGlProjectionMatrix", "1")).trim(),
+        String(cfgAttr("arFaceOpenGlProjectionMatrix", "0")).trim(),
       ),
       principalShiftNdcLp: { x: 0, y: 0 },
       principalAlign168:
