@@ -2,20 +2,20 @@ import {
   applyGlassesAutoBind,
   computeGlassesCanonicalOffsetQuat,
   omafitApplyGlassesTripoOffsetContainer,
-} from "/ar/omafit-glasses-orient.js";
-import { omafitRecenterObject3Bbox } from "/ar/omafit-glb-bbox-center.js";
+} from "./omafit-glasses-orient.js";
+import { omafitRecenterObject3Bbox } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
   omafitBraceletWristAlignStep,
   omafitBraceletWristMetricsStep,
   omafitBraceletWristScaleWearStep,
   resetOmafitBraceletWristPlacementState,
-} from "/ar/omafit-bracelet-wrist-placement.js";
+} from "./omafit-bracelet-wrist-placement.js";
 import {
   createMindarGlassesPivotSmoother,
   mindarGlassesPivotSmootherStep,
   resetMindarGlassesPivotSmoother,
-} from "/ar/omafit-mindar-glasses-pivot-rig.js";
+} from "./omafit-mindar-glasses-pivot-rig.js";
 /**
  * MindAR óculos no tema (via bloco Omafit embed) — etapa "info" alinhada ao TryOnWidget + link como omafit-widget.js.
  * Fluxo: (1) modal info → (2) AR com câmera (MindAR.js face tracking + Three.js).
@@ -3258,6 +3258,28 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
         }
       );
     };
+    /**
+     * Iframe Netlify: a URL traz `arGlbUrl` mas pode existir `#omafit-widget-root`
+     * vazio (outro script, extensão, ou versão antiga). Sem este atalho o RAF
+     * espera `maxMs` e o ecrã fica em branco durante esse intervalo.
+     * (Duplicado de `hasArGlbUrlQueryParam` — essa função está declarada mais abaixo no ficheiro.)
+     */
+    let arGlbFromQuery = false;
+    try {
+      const q = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+      const v = q.get("arGlbUrl") || q.get("ar_glb_url");
+      arGlbFromQuery = Boolean(v && String(v).trim());
+    } catch {
+      arGlbFromQuery = false;
+    }
+    if (typeof window !== "undefined" && arGlbFromQuery) {
+      settle({
+        primary: "#810707",
+        linkText: "Experimentar virtualmente",
+        storeLogo: "",
+      });
+      return;
+    }
     if (typeof window !== "undefined") {
       window.addEventListener("omafit:widget-config", onEvt, { passive: true });
     }

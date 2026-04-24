@@ -652,22 +652,31 @@ export function WidgetPage() {
 
   const eyewearBootstrap =
     typeof window !== 'undefined' ? parseEyewearArBootstrapFromSearch(window.location.search) : null;
-  const showEyewearArNetlify =
-    typeof window !== 'undefined' &&
-    shouldBlockClothingTryonFromUrlParams() &&
-    eyewearBootstrap !== null;
+  /** Basta `arGlbUrl` na query — não exigir `omafit_mode`/heurísticas (URLs antigas ou mínimas). */
+  const showEyewearArNetlify = typeof window !== 'undefined' && eyewearBootstrap !== null;
 
   useEffect(() => {
     if (!showEyewearArNetlify) return;
     const SCRIPT_ID = 'omafit-ar-widget-module';
     const tryStart = () => {
-      window.__omafitArStart?.();
+      /** Dois rAF: garante que o `#omafit-ar-root` do React já está no DOM antes de `main()`. */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.__omafitArStart?.();
+        });
+      });
     };
     if (!document.getElementById(SCRIPT_ID)) {
       const s = document.createElement('script');
       s.id = SCRIPT_ID;
       s.type = 'module';
       s.src = `${window.location.origin}/ar/omafit-ar-widget.js`;
+      s.onerror = () => {
+        console.error(
+          '[Omafit] Falha ao carregar o módulo AR. Verifica rede (404) e se `public/ar/` está no deploy.',
+          s.src,
+        );
+      };
       s.onload = () => tryStart();
       document.body.appendChild(s);
     } else {
