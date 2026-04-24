@@ -667,7 +667,7 @@ export function WidgetPage() {
       const s = document.createElement('script');
       s.id = SCRIPT_ID;
       s.type = 'module';
-      s.src = `${window.location.origin}/omafit-ar-widget.js`;
+      s.src = `${window.location.origin}/ar/omafit-ar-widget.js`;
       s.onload = () => tryStart();
       document.body.appendChild(s);
     } else {
@@ -692,7 +692,7 @@ export function WidgetPage() {
 
   if (showEyewearArNetlify && eyewearBootstrap) {
     /** Propaga todos os data-ar-* recebidos via query string para o DOM onde
-     *  o `/omafit-ar-widget.js` hosteado lê — sem isto o widget cai em
+     *  o `/ar/omafit-ar-widget.js` hosteado lê — sem isto o widget cai em
      *  `glasses` por default (era esse o bug "conteúdo de óculos no relógio"). */
     const arExtraAttrs: Record<string, string> = {};
     if (eyewearBootstrap.accessoryType) arExtraAttrs['data-ar-accessory-type'] = eyewearBootstrap.accessoryType;

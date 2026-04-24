@@ -2,20 +2,20 @@ import {
   applyGlassesAutoBind,
   computeGlassesCanonicalOffsetQuat,
   omafitApplyGlassesTripoOffsetContainer,
-} from "./omafit-glasses-orient.js";
-import { omafitRecenterObject3Bbox } from "./omafit-glb-bbox-center.js";
+} from "/ar/omafit-glasses-orient.js";
+import { omafitRecenterObject3Bbox } from "/ar/omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
   omafitBraceletWristAlignStep,
   omafitBraceletWristMetricsStep,
   omafitBraceletWristScaleWearStep,
   resetOmafitBraceletWristPlacementState,
-} from "./omafit-bracelet-wrist-placement.js";
+} from "/ar/omafit-bracelet-wrist-placement.js";
 import {
   createMindarGlassesPivotSmoother,
   mindarGlassesPivotSmootherStep,
   resetMindarGlassesPivotSmoother,
-} from "./omafit-mindar-glasses-pivot-rig.js";
+} from "/ar/omafit-mindar-glasses-pivot-rig.js";
 /**
  * MindAR óculos no tema (via bloco Omafit embed) — etapa "info" alinhada ao TryOnWidget + link como omafit-widget.js.
  * Fluxo: (1) modal info → (2) AR com câmera (MindAR.js face tracking + Three.js).
