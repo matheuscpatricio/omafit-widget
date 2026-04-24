@@ -101,6 +101,11 @@ type EyewearArBootstrap = {
   preferredCamera?: string;
   mindarAnchor?: string;
   calibration?: string;
+  /** ID da variante Shopify (numérico) — obrigatório para carrinho / miniatura no iframe Netlify. */
+  variantId?: string;
+  /** Domínio da loja (`loja.myshopify.com`) — `fetch` do carrinho usa `https://{domínio}/cart/add.js`. */
+  shopDomain?: string;
+  productId?: string;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -122,20 +127,21 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     fontFamily = tryDecodeUrlParam(String(fontDirect).trim());
   }
   const configParam = q.get('config');
+  let configFromUrl: Record<string, unknown> | null = null;
   if (configParam) {
     try {
-      const config = JSON.parse(tryDecodeUrlParam(configParam)) as Record<string, unknown>;
-      if (typeof config.primaryColor === 'string' && config.primaryColor) {
-        primaryColor = config.primaryColor;
+      configFromUrl = JSON.parse(tryDecodeUrlParam(configParam)) as Record<string, unknown>;
+      if (typeof configFromUrl.primaryColor === 'string' && configFromUrl.primaryColor) {
+        primaryColor = configFromUrl.primaryColor;
       }
-      if (typeof config.storeLogo === 'string' && config.storeLogo.trim() !== '' && !storeLogo) {
-        storeLogo = config.storeLogo.trim();
+      if (typeof configFromUrl.storeLogo === 'string' && configFromUrl.storeLogo.trim() !== '' && !storeLogo) {
+        storeLogo = configFromUrl.storeLogo.trim();
       }
-      if (typeof config.fontFamily === 'string' && config.fontFamily.trim() !== '' && !fontFamily) {
-        fontFamily = config.fontFamily.trim();
+      if (typeof configFromUrl.fontFamily === 'string' && configFromUrl.fontFamily.trim() !== '' && !fontFamily) {
+        fontFamily = configFromUrl.fontFamily.trim();
       }
     } catch {
-      /* ignore */
+      configFromUrl = null;
     }
   }
 
@@ -166,6 +172,24 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   const preferredCamera = pickQ(['arPreferredCamera', 'ar_preferred_camera']).toLowerCase();
   const mindarAnchor = pickQ(['arMindarAnchor', 'ar_mindar_anchor']);
   const calibration = pickQ(['arOmafitCalibration', 'ar_omafit_calibration']);
+
+  let variantId = pickQ(['variant', 'variant_id', 'variantId']);
+  let shopDomain = pickQ(['shopDomain', 'shop_domain', 'shop']);
+  let productIdBootstrap = pickQ(['productId', 'product_id']);
+  if (configFromUrl) {
+    if (!variantId && typeof configFromUrl.variantId === 'string' && configFromUrl.variantId.trim()) {
+      variantId = configFromUrl.variantId.trim();
+    }
+    if (!variantId && typeof configFromUrl.variant_id === 'string' && String(configFromUrl.variant_id).trim()) {
+      variantId = String(configFromUrl.variant_id).trim();
+    }
+    if (!shopDomain && typeof configFromUrl.shopDomain === 'string' && configFromUrl.shopDomain.trim()) {
+      shopDomain = configFromUrl.shopDomain.trim();
+    }
+    if (!productIdBootstrap && typeof configFromUrl.productId === 'string' && String(configFromUrl.productId).trim()) {
+      productIdBootstrap = String(configFromUrl.productId).trim();
+    }
+  }
 
   /**
    * Link text default baseado no tipo de acessório — evita "Experimentar
@@ -218,6 +242,9 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     preferredCamera: preferredCamera || undefined,
     mindarAnchor: mindarAnchor || undefined,
     calibration: calibration || undefined,
+    variantId: variantId || undefined,
+    shopDomain: shopDomain || undefined,
+    productId: productIdBootstrap || undefined,
   };
 };
 
@@ -761,6 +788,9 @@ export function WidgetPage() {
           data-locale={eyewearBootstrap.locale}
           data-link-text={eyewearBootstrap.linkText}
           data-auto-open="1"
+          {...(eyewearBootstrap.variantId ? { 'data-variant-id': eyewearBootstrap.variantId } : {})}
+          {...(eyewearBootstrap.shopDomain ? { 'data-shop-domain': eyewearBootstrap.shopDomain } : {})}
+          {...(eyewearBootstrap.productId ? { 'data-product-id': eyewearBootstrap.productId } : {})}
           {...arExtraAttrs}
         />
       </div>
