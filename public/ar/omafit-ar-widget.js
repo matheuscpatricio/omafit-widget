@@ -3882,16 +3882,16 @@ function omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, opts) {
    * de recurso para o efeito ser visível logo.
    */
   if (vw >= 2 && vh >= 2 && strict && typeof renderer.setSize === "function") {
+    /**
+     * Buffer WebGL = resolução intrínseca do stream (nitidez + alinhamento com `camera`).
+     * `setSize(..., true)` aplica também CSS no canvas via Three.js.
+     *
+     * Não forçar `video.style.width/height` nem duplicar CSS no canvas: o MindAR
+     * `_resize()` dimensiona o `<video>` e `top`/`left` para efeito "cover" no
+     * host — reaplicar os pixels intrínsecos do frame a cada `onUpdate` deslocava
+     * o feed (faixa preta em cima ou à volta, câmara só numa banda).
+     */
     renderer.setSize(vw, vh, true);
-    if (video) {
-      video.style.width = `${vw}px`;
-      video.style.height = `${vh}px`;
-    }
-    const dom = renderer.domElement;
-    if (dom) {
-      dom.style.width = `${vw}px`;
-      dom.style.height = `${vh}px`;
-    }
   }
   let aspect =
     vw >= 2 && vh >= 2
@@ -4059,8 +4059,8 @@ async function runArSession({
       flex: "1 1 auto",
       display: "flex",
       flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: "stretch",
+      justifyContent: "flex-start",
       minHeight: "min(520px, 62dvh)",
       width: "100%",
       boxSizing: "border-box",
@@ -4083,7 +4083,7 @@ async function runArSession({
   const arFit = el("div", {
     style: {
       position: "relative",
-      flex: "1 1 auto",
+      flex: "1 1 0",
       width: "100%",
       minHeight: "min(520px, 62dvh)",
       overflow: "hidden",
