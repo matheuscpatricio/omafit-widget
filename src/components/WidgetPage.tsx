@@ -655,33 +655,57 @@ export function WidgetPage() {
   /** Basta `arGlbUrl` na query — não exigir `omafit_mode`/heurísticas (URLs antigas ou mínimas). */
   const showEyewearArNetlify = typeof window !== 'undefined' && eyewearBootstrap !== null;
 
+  const [arModuleBootError, setArModuleBootError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!showEyewearArNetlify) return;
-    const SCRIPT_ID = 'omafit-ar-widget-module';
+    setArModuleBootError(null);
+    let cancelled = false;
+    const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.js`;
     const tryStart = () => {
-      /** Dois rAF: garante que o `#omafit-ar-root` do React já está no DOM antes de `main()`. */
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          window.__omafitArStart?.();
+          if (cancelled) return;
+          try {
+            const start = (
+              window as Window & {
+                __omafitArStart?: () => void | Promise<void>;
+              }
+            ).__omafitArStart;
+            if (typeof start !== 'function') {
+              setArModuleBootError(
+                'O módulo AR carregou mas __omafitArStart não está disponível (avaliação do script falhou?).',
+              );
+              return;
+            }
+            void start();
+          } catch (e) {
+            setArModuleBootError(e instanceof Error ? e.message : String(e));
+          }
         });
       });
     };
-    if (!document.getElementById(SCRIPT_ID)) {
-      const s = document.createElement('script');
-      s.id = SCRIPT_ID;
-      s.type = 'module';
-      s.src = `${window.location.origin}/ar/omafit-ar-widget.js`;
-      s.onerror = () => {
-        console.error(
-          '[Omafit] Falha ao carregar o módulo AR. Verifica rede (404) e se `public/ar/` está no deploy.',
-          s.src,
-        );
-      };
-      s.onload = () => tryStart();
-      document.body.appendChild(s);
-    } else {
+
+    const load = async () => {
+      try {
+        await import(/* @vite-ignore */ arModuleUrl);
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setArModuleBootError(
+            `Não foi possível carregar o provador AR (${arModuleUrl}). ` +
+              `Confirma que a pasta dist/ar foi deployada. Detalhe: ${msg}`,
+          );
+        }
+        return;
+      }
       tryStart();
-    }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [showEyewearArNetlify]);
 
   if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams() && !eyewearBootstrap) {
@@ -715,6 +739,15 @@ export function WidgetPage() {
 
     return (
       <div className="min-h-screen bg-white" onContextMenu={(e) => e.preventDefault()}>
+        {arModuleBootError ? (
+          <div
+            className="max-w-lg mx-auto p-6 text-center text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg m-4"
+            role="alert"
+          >
+            <p className="font-semibold mb-2">Provador AR não arrancou</p>
+            <p className="text-left whitespace-pre-wrap break-words">{arModuleBootError}</p>
+          </div>
+        ) : null}
         <div
           id="omafit-ar-root"
           data-glb-url={eyewearBootstrap.glbUrl}

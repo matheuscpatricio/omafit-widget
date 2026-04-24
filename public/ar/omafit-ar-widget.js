@@ -4197,7 +4197,7 @@ async function runArSession({
           border:
             String(v.id) === String(currentVariantId)
               ? `3px solid ${primaryColor}`
-              : "2px solid rgba(255,255,255,0.5)`,
+              : "2px solid rgba(255,255,255,0.5)",
           background: "#fff",
           cursor: "pointer",
           padding: "2px",
@@ -9732,6 +9732,7 @@ async function main() {
   });
   // #endregion
 
+  try {
   injectGlobalStyles(root, primaryColor);
   getOmafitArModuleBundle().catch(() => {});
 
@@ -9808,6 +9809,11 @@ async function main() {
   }
 
   ensureArRootDomObserver();
+  } catch (e) {
+    __omafitArMainStarted = false;
+    __omafitArLastRootSig = "";
+    console.error("[omafit-ar] main(): falha ao montar UI (modal ou estilos).", e);
+  }
 }
 
 function hasArGlbUrlQueryParam() {
