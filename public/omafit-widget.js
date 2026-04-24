@@ -1,13 +1,9 @@
 // Omafit - Widget oficial adaptado para Theme App Extension
 (function () {
-  // Configuração global (será preenchida pela API)
-  let OMAFIT_CONFIG = null;
-  let fontsLoaded = false;
+  const OMAFIT_WIDGET_ORIGIN = 'https://omafit.netlify.app';
+  const OMAFIT_DEBUG = typeof window !== 'undefined' && (window.omafitDebug === true || /[?&]omafit_debug=1/.test(window.location.search));
 
-  var OMAFIT_DEBUG =
-    typeof window !== 'undefined' &&
-    (window.omafitDebug === true || /[?&]omafit_debug=1/.test(window.location.search));
-
+  /** Tipo/tags Shopify (Analytics/meta) ou JSON-LD — fallback quando o bloco AR não está no HTML. */
   function isLikelyEyewearFromShopifyDom() {
     var re =
       /eyewear|sunglass|óculos|oculos|gafa|gafas|eyeglass|eyeglasses|spectacle|optical|optica|optics|lunette|lunettes|brille|brillen|armaç|arma[cç]ao|armação|reading\s*glass/i;
@@ -39,6 +35,9 @@
     return false;
   }
 
+  /**
+   * Bloquear provador de roupa: bloco tema AR, GLB no DOM, ou produto/coleção claramente óculos.
+   */
   function isOmafitArEyewearPage() {
     if (document.getElementById('omafit-ar-block-placed')) return true;
     if (document.getElementById('omafit-suppress-clothing-widget')) return true;
@@ -71,6 +70,7 @@
     return "";
   }
 
+  /** Remove iframe / link de roupa injetados por este ficheiro (se AR óculos ficou ativo depois). */
   function removeClothingOmafitUi() {
     try {
       document.querySelectorAll('.omafit-modal-overlay').forEach(function (el) {
@@ -79,7 +79,7 @@
       document.querySelectorAll('.omafit-widget').forEach(function (w) {
         if (w.closest('#omafit-ar-root')) return;
         if (w.querySelector('.omafit-ar-try-on-link')) return;
-        if (w.querySelector('.omafit-try-on-link')) w.remove();
+        if (w.querySelector('.omafit-try-on-link') || w.querySelector('.omafit-try-on-cta')) w.remove();
       });
     } catch (e) {
       if (OMAFIT_DEBUG) console.warn('removeClothingOmafitUi', e);
@@ -101,6 +101,7 @@
     });
   }
 
+  /** Corrida: roupa pode injetar antes do DOM AR estar estável — revalidar várias vezes e observar mutações. */
   function scheduleArEyewearSuppression() {
     var delays = [0, 50, 150, 400, 1000, 2500, 5000, 8000, 12000];
     for (var i = 0; i < delays.length; i++) {
@@ -120,16 +121,52 @@
 
   scheduleArEyewearSuppression();
 
-  // Carregar fontes do Google Fonts APENAS quando o modal for aberto (preserva velocidade do site)
-  function loadFontsWhenNeeded() {
-    if (fontsLoaded) return;
-    fontsLoaded = true;
-    const fontsToLoad = [
-      'Outfit:wght@100..900',
-      'Playfair+Display:wght@400..900',
-      'Raleway:wght@100..900',
-      'Inter:opsz,wght@14..32,100..900'
-    ];
+  // Configuração global (será preenchida pela API)
+  let OMAFIT_CONFIG = null;
+
+  /** Expõe cor / texto / logo do admin no #omafit-widget-root para o MindAR (omafit-ar-widget.js) ler. */
+  function syncAdminBrandingToWidgetRoot(cfg) {
+    try {
+      if (!cfg) return;
+      var el = document.getElementById('omafit-widget-root');
+      if (!el) return;
+      var primary =
+        (cfg.colors && (cfg.colors.primary || cfg.colors.text)) || '#810707';
+      primary = String(primary || '').trim() || '#810707';
+      var link = String(cfg.linkText || '').trim() || 'Experimentar virtualmente';
+      var raw = cfg.storeLogo != null ? String(cfg.storeLogo).trim() : '';
+      var logo = '';
+      if (raw && /^https?:\/\//i.test(raw)) logo = raw;
+      el.setAttribute('data-omafit-admin-primary', primary);
+      el.setAttribute('data-omafit-admin-link-text', link);
+      if (logo) el.setAttribute('data-omafit-admin-store-logo', logo);
+      else el.removeAttribute('data-omafit-admin-store-logo');
+      var ep = String(cfg.embedPosition || cfg.embed_position || '').trim().toLowerCase();
+      el.setAttribute(
+        'data-omafit-embed-position',
+        ep === 'above_buy_buttons' ? 'above_buy_buttons' : 'below_buy_buttons'
+      );
+      var ct = String(cfg.ctaType || cfg.cta_type || '').trim().toLowerCase();
+      el.setAttribute('data-omafit-cta-type', ct === 'button' ? 'button' : 'link');
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(
+          new CustomEvent('omafit:widget-config', {
+            detail: { primary: primary, linkText: link, storeLogo: logo },
+          })
+        );
+      }
+    } catch (e) {}
+  }
+
+  // Carregar fontes do Google Fonts apenas quando o modal for aberto (evita bloquear carregamento inicial)
+  const fontsToLoad = [
+    'Outfit:wght@100..900',
+    'Playfair+Display:wght@400..900',
+    'Raleway:wght@100..900',
+    'Inter:opsz,wght@14..32,100..900'
+  ];
+
+  function loadOmafitFontsWhenNeeded() {
     fontsToLoad.forEach((font) => {
       const fontName = font.split(':')[0];
       if (!document.querySelector('link[href*="' + fontName + '"]')) {
@@ -141,15 +178,6 @@
     });
   }
 
-  // Preconnect para acelerar abertura do modal (executado no hover do link)
-  function preconnectWidget() {
-    if (document.querySelector('link[rel="preconnect"][href="https://omafit.netlify.app"]')) return;
-    const preconnect = document.createElement('link');
-    preconnect.rel = 'preconnect';
-    preconnect.href = 'https://omafit.netlify.app';
-    document.head.appendChild(preconnect);
-  }
-
   // Normalizar URLs
   function normalizeUrl(url) {
     if (!url) return null;
@@ -159,48 +187,67 @@
     return url;
   }
 
-  // Obter só imagens de produto, usando várias fontes de dados Shopify
-  function normalizeWidgetLanguage(languageValue) {
-    const raw = String(languageValue || '').trim().toLowerCase().replace('_', '-');
-    if (!raw) return null;
-    const normalized = raw.split('-')[0];
-    if (normalized === 'pt' || normalized === 'es' || normalized === 'en') {
-      return normalized;
-    }
-    if (raw === 'portuguese' || raw === 'portugues') return 'pt';
-    if (raw === 'spanish' || raw === 'espanol' || raw === 'español') return 'es';
-    if (raw === 'english' || raw === 'ingles' || raw === 'inglês') return 'en';
-    return null;
+  function decodeHtmlEntities(value) {
+    const raw = String(value || '');
+    if (!raw) return '';
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = raw;
+    return textarea.value || '';
   }
 
-  function getStoreLanguage(preferredLanguage) {
+  function normalizeProductDescriptionText(value) {
+    const raw = String(value || '');
+    if (!raw) return '';
+    const withoutHtml = raw.replace(/<[^>]*>/g, ' ');
+    const decoded = decodeHtmlEntities(withoutHtml);
+    return decoded.replace(/\s+/g, ' ').trim();
+  }
+
+  function sanitizeProductHandle(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw.split('?')[0].split('#')[0].trim();
+  }
+
+  function extractProductHandleFromPathname() {
     try {
-      const fromAdmin = normalizeWidgetLanguage(preferredLanguage);
-      if (fromAdmin) {
-        return fromAdmin;
-      }
-
-      // Regra principal: não cair para idioma da loja/site quando admin_locale existir
-      // mas estiver em formato inesperado. Nesses casos, usar inglês por segurança.
-      if (preferredLanguage) {
-        console.warn('⚠️ admin_locale inválido. Usando fallback "en":', preferredLanguage);
-        return 'en';
-      }
-
-      const fromShopify =
-        (window.Shopify && (window.Shopify.locale || window.Shopify.shopLocale)) ||
-        '';
-      const fromHtml = (document.documentElement && document.documentElement.lang) || '';
-      const fromNavigator = (navigator.language || navigator.userLanguage || '') || '';
-
-      const detected = normalizeWidgetLanguage(fromShopify || fromHtml || fromNavigator || 'en');
-      if (detected) {
-        return detected;
-      }
-      return 'en';
-    } catch (_error) {
-      return 'en';
+      const pathname = String(window.location.pathname || '');
+      const marker = '/products/';
+      const idx = pathname.indexOf(marker);
+      if (idx === -1) return '';
+      const rest = pathname.slice(idx + marker.length);
+      const handle = rest.split('/')[0];
+      return sanitizeProductHandle(decodeURIComponent(handle));
+    } catch (_err) {
+      return '';
     }
+  }
+
+  function extractDescriptionFromJsonLd() {
+    try {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const script of scripts) {
+        const raw = script.textContent || '';
+        if (!raw.trim()) continue;
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch (_err) {
+          continue;
+        }
+        const nodes = Array.isArray(data) ? data : [data];
+        for (const node of nodes) {
+          if (!node || typeof node !== 'object') continue;
+          const typeValue = Array.isArray(node['@type']) ? node['@type'].join(',') : String(node['@type'] || '');
+          if (typeValue.toLowerCase().indexOf('product') === -1) continue;
+          const desc = String(node.description || '').trim();
+          if (desc) return desc;
+        }
+      }
+    } catch (_err) {
+      // non-blocking
+    }
+    return '';
   }
 
   // Obter só imagens de produto, usando várias fontes de dados Shopify
@@ -322,30 +369,33 @@
   function getProductInfo() {
     let productId = '';
     let productName = '';
-    let productHandle = '';
     let productDescription = '';
+    let productDescriptionHtml = '';
+    let productHandle = '';
 
     // Pegar do elemento omafit-widget-root primeiro (prioridade)
     const rootElement = document.getElementById('omafit-widget-root');
     if (rootElement) {
       productId = rootElement.dataset.productId || '';
       productHandle = rootElement.dataset.productHandle || '';
+      productName = rootElement.dataset.productTitle || '';
+      productDescription = rootElement.dataset.productDescription || '';
+      productDescriptionHtml = rootElement.dataset.productDescriptionHtml || '';
     }
 
-    // Se não tiver, tentar window.meta.product
-    if (!productId && window.meta && window.meta.product) {
-      productId = window.meta.product.id;
-      productName = window.meta.product.title;
-      productDescription = window.meta.product.description || '';
+    // Complementar dados por window.meta.product (mesmo quando productId já existe)
+    if (window.meta && window.meta.product) {
+      productId = productId || window.meta.product.id;
+      productName = productName || window.meta.product.title;
+      productDescription = productDescription || window.meta.product.description || '';
+      productDescriptionHtml = productDescriptionHtml || window.meta.product.description || '';
     } else if (
-      !productId &&
       window.ShopifyAnalytics &&
       window.ShopifyAnalytics.meta &&
       window.ShopifyAnalytics.meta.product
     ) {
-      productId = window.ShopifyAnalytics.meta.product.id;
-      productName = window.ShopifyAnalytics.meta.product.name;
-      productDescription = window.ShopifyAnalytics.meta.product.description || '';
+      productId = productId || window.ShopifyAnalytics.meta.product.id;
+      productName = productName || window.ShopifyAnalytics.meta.product.name;
     }
 
     // Nome do produto
@@ -359,260 +409,424 @@
     // Descrição do produto
     if (!productDescription) {
       const descEl = document.querySelector(
-        '.product-single__description, .product__description, [itemprop="description"]'
+        '.product__description, .product-single__description, [itemprop="description"]'
       );
-      if (descEl) productDescription = descEl.textContent.trim();
+      if (descEl) {
+        productDescription = (descEl.textContent || '').trim();
+        productDescriptionHtml = productDescriptionHtml || (descEl.innerHTML || '');
+      }
+    }
+
+    if (!productDescription) {
+      const jsonLdDescription = extractDescriptionFromJsonLd();
+      if (jsonLdDescription) {
+        productDescription = jsonLdDescription;
+      }
+    }
+
+    if (!productDescription) {
+      const ogDescription = document.querySelector('meta[property="og:description"]');
+      if (ogDescription && ogDescription.content) {
+        productDescription = ogDescription.content.trim();
+      }
     }
 
     // Handle do produto
     if (!productHandle) {
-      const urlParts = window.location.pathname.split('/products/');
-      if (urlParts.length > 1) {
-        productHandle = urlParts[1].split('/')[0];
-      }
+      productHandle = extractProductHandleFromPathname();
     }
 
-    return { productId, productName, productHandle, productDescription };
-  }
-
-  function normalizeOptionValue(value) {
-    return String(value || '').trim();
-  }
-
-  function dedupeOptionList(values) {
-    const unique = [];
-    const seen = {};
-    (values || []).forEach(function (raw) {
-      const value = normalizeOptionValue(raw);
-      const key = value.toLowerCase();
-      if (!value || seen[key]) return;
-      seen[key] = true;
-      unique.push(value);
-    });
-    return unique;
-  }
-
-  function detectOptionKind(name) {
-    const normalized = String(name || '').toLowerCase();
-    if (/size|tamanho|talla|taille|größe|grosse/.test(normalized)) return 'size';
-    if (/color|cor|colour|couleur|farbe/.test(normalized)) return 'color';
-    return 'other';
-  }
-
-  function extractProductCatalog(productData) {
-    if (!productData || !Array.isArray(productData.variants)) {
-      return { sizes: [], colors: [], variants: [] };
-    }
-
-    const optionNames = Array.isArray(productData.options)
-      ? productData.options.map(function (option) {
-          if (typeof option === 'string') return option;
-          return option && option.name ? option.name : '';
-        })
-      : [];
-
-    const sizes = [];
-    const colors = [];
-    const variants = productData.variants.map(function (variant) {
-      const variantOptions = [variant.option1, variant.option2, variant.option3].map(normalizeOptionValue);
-      let size = '';
-      let color = '';
-
-      variantOptions.forEach(function (optionValue, index) {
-        const optionName = optionNames[index] || '';
-        const kind = detectOptionKind(optionName);
-        if (kind === 'size' && optionValue) size = optionValue;
-        if (kind === 'color' && optionValue) color = optionValue;
-      });
-
-      // Fallback leve quando não há nome de opção padronizado
-      if (!size) {
-        const inferredSize = variantOptions.find(function (optionValue) {
-          return /^(xxs|xs|s|m|l|xl|xxl|xxxl|[0-9]{2,3})$/i.test(optionValue);
-        });
-        if (inferredSize) size = inferredSize;
-      }
-
-      if (size) sizes.push(size);
-      if (color) colors.push(color);
-
-      return {
-        id: variant.id,
-        title: variant.title || '',
-        available: variant.available !== false,
-        size: size || null,
-        color: color || null,
-        options: variantOptions.filter(Boolean),
-      };
-    });
-
+    productHandle = sanitizeProductHandle(productHandle);
+    const finalDescriptionText = normalizeProductDescriptionText(productDescription);
+    const finalDescriptionHtml = String(productDescriptionHtml || '').trim();
     return {
-      sizes: dedupeOptionList(sizes),
-      colors: dedupeOptionList(colors),
-      variants: variants,
+      productId,
+      productName,
+      productDescription: finalDescriptionText,
+      productDescriptionHtml: finalDescriptionHtml,
+      productHandle
     };
   }
 
-  function getProductDataFromPage() {
+  async function enrichProductInfo(productInfo) {
     try {
-      if (window.meta && window.meta.product && Array.isArray(window.meta.product.variants)) {
-        return window.meta.product;
-      }
-    } catch (error) {
-      console.warn('⚠️ Não foi possível ler window.meta.product:', error);
-    }
+      const info = productInfo || {};
+      const handle = info.productHandle ? String(info.productHandle).trim() : '';
+      if (!handle) return info;
 
-    return null;
+      // Só consulta o endpoint da Shopify se faltar algum campo-chave
+      if (info.productName && info.productDescription) return info;
+
+      const response = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+      if (!response.ok) return info;
+
+      const data = await response.json();
+      const shopifyDescriptionHtml = typeof data?.description === 'string' ? data.description : '';
+      const shopifyDescriptionText = normalizeProductDescriptionText(shopifyDescriptionHtml);
+      const currentDescriptionText = normalizeProductDescriptionText(info.productDescription || '');
+      const currentDescriptionHtml = String(info.productDescriptionHtml || '').trim();
+      return {
+        productId: info.productId || data?.id || '',
+        productName: info.productName || data?.title || '',
+        productDescription: shopifyDescriptionText || currentDescriptionText,
+        productDescriptionHtml: shopifyDescriptionHtml || currentDescriptionHtml,
+        productHandle: handle
+      };
+    } catch (_err) {
+      return productInfo;
+    }
   }
 
-  async function getProductData(productHandle) {
-    const pageProductData = getProductDataFromPage();
-    if (pageProductData) return pageProductData;
-
-    if (!productHandle) return null;
-
+  function detectStoreDisplayName(shopDomain) {
     try {
-      const response = await fetch('/products/' + productHandle + '.js');
-      if (response.ok) {
-        return await response.json();
+      // 1) Meta OG costuma refletir o nome comercial da loja
+      const ogSiteName = document.querySelector('meta[property="og:site_name"]');
+      if (ogSiteName && ogSiteName.content && ogSiteName.content.trim()) {
+        return ogSiteName.content.trim();
       }
-    } catch (error) {
-      console.warn('⚠️ Não foi possível obter dados completos do produto:', error);
-    }
 
-    return null;
-  }
+      // 2) application-name (quando definido pelo tema)
+      const appName = document.querySelector('meta[name="application-name"]');
+      if (appName && appName.content && appName.content.trim()) {
+        return appName.content.trim();
+      }
 
-  function getSelectedVariantIdFromPage() {
-    try {
-      const urlVariantId = new URLSearchParams(window.location.search).get('variant');
-      if (urlVariantId) return String(urlVariantId).trim();
-    } catch (error) {
-      console.warn('⚠️ Não foi possível ler variant da URL:', error);
-    }
+      // 3) Título da página: "Produto - Nome da loja"
+      if (document.title && document.title.trim()) {
+        const title = document.title.trim();
+        const parts = title.split(' - ').map(function (p) { return p.trim(); }).filter(Boolean);
+        if (parts.length > 1) return parts[parts.length - 1];
+      }
 
-    const variantInput = document.querySelector(
-      'form[action*="/cart/add"] [name="id"], .product-form [name="id"], form.product-form [name="id"]'
-    );
-
-    if (variantInput && variantInput.value) {
-      return String(variantInput.value).trim();
+    } catch (_err) {
+      // non-blocking
     }
 
     return '';
   }
 
-  function extractSelectedVariantContext(productData) {
-    if (!productData || !Array.isArray(productData.variants)) {
-      return { selectedVariantId: '', selectedVariantOptions: {} };
+  function ensureStoreName(configObj) {
+    try {
+      const cfg = configObj || {};
+      const current = cfg.storeName ? String(cfg.storeName).trim() : '';
+      if (current) return current;
+
+      const domain = cfg.shopDomain ? String(cfg.shopDomain).trim() : '';
+      const detected = detectStoreDisplayName(domain);
+      if (detected && String(detected).trim()) return String(detected).trim();
+    } catch (_err) {
+      // non-blocking
+    }
+    return '';
+  }
+
+  function detectStoreLanguage() {
+    try {
+      var candidates = [
+        window.Shopify && window.Shopify.locale ? String(window.Shopify.locale) : '',
+        window.Shopify && window.Shopify.language ? String(window.Shopify.language) : '',
+        document.documentElement && document.documentElement.lang ? String(document.documentElement.lang) : '',
+        navigator.language ? String(navigator.language) : ''
+      ].map(function (v) { return String(v || '').trim(); }).filter(Boolean);
+
+      for (var i = 0; i < candidates.length; i += 1) {
+        var raw = candidates[i].replace('_', '-');
+        var normalized = raw.match(/^[a-z]{2}(-[A-Z]{2})?$/i) ? raw : '';
+        if (normalized) {
+          var parts = normalized.split('-');
+          var lang = (parts[0] || '').toLowerCase();
+          var region = parts[1] ? parts[1].toUpperCase() : '';
+          return region ? (lang + '-' + region) : lang;
+        }
+      }
+    } catch (_err) {
+      // non-blocking
+    }
+    return 'pt-BR';
+  }
+
+  function normalizeLanguageTag(value) {
+    try {
+      var raw = String(value || '').trim().replace('_', '-');
+      if (!raw) return '';
+      if (!/^[a-z]{2}(-[A-Z]{2})?$/i.test(raw)) return '';
+      var parts = raw.split('-');
+      var lang = (parts[0] || '').toLowerCase();
+      var region = parts[1] ? parts[1].toUpperCase() : '';
+      return region ? (lang + '-' + region) : lang;
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  function normalizeOptionName(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function isSizeOptionName(name) {
+    const n = normalizeOptionName(name);
+    return (
+      n === 'size' ||
+      n === 'tamanho' ||
+      n === 'talla' ||
+      n === 'taille' ||
+      n.indexOf('size') !== -1 ||
+      n.indexOf('tamanho') !== -1 ||
+      n.indexOf('talla') !== -1 ||
+      n.indexOf('taille') !== -1
+    );
+  }
+
+  function isColorOptionName(name) {
+    const n = normalizeOptionName(name);
+    return n === 'color' || n === 'cor' || n === 'colour' || n === 'couleur';
+  }
+
+  function inferSizeValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const n = raw.toLowerCase();
+    if (/^(pp|p|m|g|gg|xg|xs|s|l|xl|xxl|xxxl)$/.test(n)) return raw;
+    if (/^\d{1,3}(\s?(br|eu|us))?$/i.test(raw)) return raw;
+    return '';
+  }
+
+  async function fetchProductJsonByHandle(productHandle) {
+    const handle = sanitizeProductHandle(productHandle);
+    if (!handle) return null;
+    try {
+      const res = await fetch('/products/' + encodeURIComponent(handle) + '.js');
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  async function getCurrentProductData(productInfo) {
+    const info = productInfo || getProductInfo();
+    const handle = sanitizeProductHandle(info && info.productHandle ? info.productHandle : '');
+    const byHandle = await fetchProductJsonByHandle(handle);
+    if (byHandle && Array.isArray(byHandle.variants) && byHandle.variants.length > 0) {
+      return byHandle;
     }
 
-    const selectedVariantId = getSelectedVariantIdFromPage();
-    const optionNames = Array.isArray(productData.options)
-      ? productData.options.map(function (option) {
-          if (typeof option === 'string') return normalizeOptionValue(option);
-          return normalizeOptionValue(option && option.name ? option.name : '');
-        })
-      : [];
-
-    const selectedVariant =
-      productData.variants.find(function (variant) {
-        return String(variant.id) === String(selectedVariantId);
-      }) || (productData.variants.length === 1 ? productData.variants[0] : null);
-
-    const selectedVariantOptions = {};
-
-    if (selectedVariant) {
-      [selectedVariant.option1, selectedVariant.option2, selectedVariant.option3].forEach(function (optionValue, index) {
-        const optionName = optionNames[index] || '';
-        const normalizedValue = normalizeOptionValue(optionValue);
-        if (!optionName || !normalizedValue) return;
-        selectedVariantOptions[optionName] = normalizedValue;
-      });
+    if (window.meta && window.meta.product && Array.isArray(window.meta.product.variants)) {
+      const p = window.meta.product;
+      return {
+        id: p.id,
+        title: p.title || '',
+        description: p.description || '',
+        options: p.options || [],
+        variants: p.variants || []
+      };
     }
+
+    if (
+      window.ShopifyAnalytics &&
+      window.ShopifyAnalytics.meta &&
+      window.ShopifyAnalytics.meta.product &&
+      Array.isArray(window.ShopifyAnalytics.meta.product.variants)
+    ) {
+      const p = window.ShopifyAnalytics.meta.product;
+      return {
+        id: p.id,
+        title: p.name || '',
+        description: '',
+        options: p.options || [],
+        variants: p.variants || []
+      };
+    }
+
+    return null;
+  }
+
+  function buildProductVariantCatalog(productData) {
+    const emptyCatalog = { sizes: [], colors: [], variants: [] };
+    if (!productData || !Array.isArray(productData.variants) || productData.variants.length === 0) {
+      return emptyCatalog;
+    }
+
+    const options = Array.isArray(productData.options) ? productData.options : [];
+    const optionNames = options.map(function (opt) {
+      return typeof opt === 'string' ? opt : (opt && opt.name ? String(opt.name) : '');
+    });
+    const sizeOptionIndex = optionNames.findIndex(isSizeOptionName);
+    const colorOptionIndex = optionNames.findIndex(isColorOptionName);
+    const sizeSet = new Set();
+    const colorSet = new Set();
+
+    const variants = productData.variants.map(function (variant) {
+      const values = [variant.option1, variant.option2, variant.option3]
+        .map(function (v) { return String(v || '').trim(); });
+
+      const namedOptions = {};
+      for (let i = 0; i < values.length; i += 1) {
+        if (!values[i]) continue;
+        const key = optionNames[i] || ('option' + (i + 1));
+        namedOptions[key] = values[i];
+      }
+
+      if (sizeOptionIndex >= 0 && values[sizeOptionIndex]) {
+        sizeSet.add(values[sizeOptionIndex]);
+      }
+      if (colorOptionIndex >= 0 && values[colorOptionIndex]) {
+        colorSet.add(values[colorOptionIndex]);
+      }
+
+      if (sizeOptionIndex < 0) {
+        values.forEach(function (v) {
+          const inferred = inferSizeValue(v);
+          if (inferred) sizeSet.add(inferred);
+        });
+      }
+
+      if (colorOptionIndex < 0) {
+        values.forEach(function (v) {
+          if (!v) return;
+          const inferredSize = inferSizeValue(v);
+          if (!inferredSize) colorSet.add(v);
+        });
+      }
+
+      return {
+        id: variant.id,
+        title: variant.title || '',
+        available: !!variant.available,
+        options: namedOptions
+      };
+    });
 
     return {
-      selectedVariantId: selectedVariant ? String(selectedVariant.id) : '',
-      selectedVariantOptions: selectedVariantOptions,
+      sizes: Array.from(sizeSet),
+      colors: Array.from(colorSet),
+      variants: variants
     };
   }
 
-  // Buscar um produto complementar de uma coleção (diferente da atual, ou qualquer se não houver atual)
+  function getSelectedVariantIdFromPage() {
+    try {
+      var variantFromUrl = new URLSearchParams(window.location.search).get('variant');
+      if (variantFromUrl && String(variantFromUrl).trim()) {
+        return String(variantFromUrl).trim();
+      }
+    } catch (_err) {
+      // non-blocking
+    }
+
+    try {
+      var variantInput = document.querySelector(
+        'form[action*="/cart/add"] [name="id"], .product-form [name="id"], form.product-form [name="id"]'
+      );
+      if (variantInput && variantInput.value && String(variantInput.value).trim()) {
+        return String(variantInput.value).trim();
+      }
+    } catch (_err) {
+      // non-blocking
+    }
+
+    return '';
+  }
+
+  function getSelectedVariantContext(productData) {
+    var emptyContext = { selectedVariantId: '', selectedVariantOptions: {} };
+    if (!productData || !Array.isArray(productData.variants) || productData.variants.length === 0) {
+      return emptyContext;
+    }
+
+    var selectedVariantId = getSelectedVariantIdFromPage();
+    var selectedVariant = productData.variants.find(function (variant) {
+      return String(variant && variant.id ? variant.id : '') === selectedVariantId;
+    }) || null;
+
+    if (!selectedVariant && productData.variants.length === 1) {
+      selectedVariant = productData.variants[0];
+      selectedVariantId = String(selectedVariant && selectedVariant.id ? selectedVariant.id : '');
+    }
+
+    if (!selectedVariant) {
+      return emptyContext;
+    }
+
+    var optionNames = Array.isArray(productData.options)
+      ? productData.options.map(function (opt) {
+          return typeof opt === 'string' ? String(opt) : (opt && opt.name ? String(opt.name) : '');
+        })
+      : [];
+
+    var selectedVariantOptions = {};
+    [selectedVariant.option1, selectedVariant.option2, selectedVariant.option3].forEach(function (value, index) {
+      var normalizedValue = String(value || '').trim();
+      var optionName = String(optionNames[index] || ('option' + (index + 1))).trim();
+      if (!normalizedValue || !optionName) return;
+      selectedVariantOptions[optionName] = normalizedValue;
+    });
+
+    return {
+      selectedVariantId: selectedVariantId,
+      selectedVariantOptions: selectedVariantOptions
+    };
+  }
+
+  async function getCurrentProductVariantCatalog(productInfo) {
+    const productData = await getCurrentProductData(productInfo);
+    return buildProductVariantCatalog(productData);
+  }
+
+  // Buscar um produto complementar da MESMA coleção do produto atual
   async function getComplementaryProduct(currentCollectionHandle) {
     try {
-      const collectionsResponse = await fetch('/collections.json');
-      if (!collectionsResponse.ok) {
-        console.warn('⚠️ Não foi possível buscar coleções');
+      if (!currentCollectionHandle) {
+        console.warn('⚠️ Collection handle atual não informado; não será sugerido produto de outra coleção.');
         return null;
       }
 
-      const collectionsData = await collectionsResponse.json();
-      const collections = collectionsData.collections || [];
+      const productInfo = getProductInfo();
+      const currentProductHandle = productInfo && productInfo.productHandle ? productInfo.productHandle : '';
 
-      if (collections.length === 0) {
-        console.log('⚠️ Nenhuma coleção encontrada');
+      // Buscar produtos apenas da coleção atual
+      const collectionProductsResponse = await fetch(`/collections/${currentCollectionHandle}/products.json?limit=20`);
+      if (!collectionProductsResponse.ok) {
+        console.warn('⚠️ Não foi possível buscar produtos da coleção atual');
         return null;
       }
 
-      // Coleções candidatas: diferentes da atual; se não há atual, todas
-      let complementaryCollections = collections.filter(function (coll) {
-        return coll.handle;
+      const collectionProductsData = await collectionProductsResponse.json();
+      const products = collectionProductsData.products || [];
+
+      if (products.length === 0) {
+        console.log('⚠️ Nenhum produto encontrado na coleção atual');
+        return null;
+      }
+
+      // Evitar recomendar o próprio produto atual
+      var candidateProducts = products.filter(function (p) {
+        return p && p.handle && p.handle !== currentProductHandle;
       });
-      if (currentCollectionHandle) {
-        complementaryCollections = complementaryCollections.filter(
-          function (coll) { return coll.handle !== currentCollectionHandle; }
-        );
-      }
 
-      if (complementaryCollections.length === 0) {
-        console.log('⚠️ Nenhuma coleção complementar encontrada');
+      if (candidateProducts.length === 0) {
+        console.log('⚠️ Não há produto complementar na mesma coleção (apenas o produto atual).');
         return null;
       }
 
-      try {
-        // Selecionar uma coleção complementar aleatória
-        const randomCollection = complementaryCollections[Math.floor(Math.random() * complementaryCollections.length)];
-        console.log('🎲 Coleção complementar selecionada:', randomCollection.handle);
+      // Selecionar um produto aleatório da mesma coleção
+      const randomProduct = candidateProducts[Math.floor(Math.random() * candidateProducts.length)];
+      const productUrl = `/products/${randomProduct.handle}`;
+      const fullProductUrl = window.location.origin + productUrl;
 
-        // Buscar produtos dessa coleção
-        const collectionProductsResponse = await fetch(`/collections/${randomCollection.handle}/products.json?limit=10`);
-        if (!collectionProductsResponse.ok) {
-          console.warn('⚠️ Não foi possível buscar produtos da coleção complementar');
-          return null;
-        }
+      console.log('✅ Produto complementar encontrado na mesma coleção:', {
+        title: randomProduct.title,
+        handle: randomProduct.handle,
+        url: fullProductUrl,
+        collectionHandle: currentCollectionHandle
+      });
 
-        const collectionProductsData = await collectionProductsResponse.json();
-        const products = collectionProductsData.products || [];
-
-        if (products.length === 0) {
-          console.log('⚠️ Nenhum produto encontrado na coleção complementar');
-          return null;
-        }
-
-        // Selecionar um produto aleatório
-        const randomProduct = products[Math.floor(Math.random() * products.length)];
-        
-        // Construir URL do produto
-        const productUrl = `/products/${randomProduct.handle}`;
-        const fullProductUrl = window.location.origin + productUrl;
-
-        console.log('✅ Produto complementar encontrado:', {
-          title: randomProduct.title,
-          handle: randomProduct.handle,
-          url: fullProductUrl,
-          collection: randomCollection.title
-        });
-
-        return {
-          title: randomProduct.title,
-          handle: randomProduct.handle,
-          url: fullProductUrl,
-          collectionTitle: randomCollection.title
-        };
-      } catch (error) {
-        console.error('❌ Erro ao buscar produto complementar:', error);
-        return null;
-      }
+      return {
+        title: randomProduct.title,
+        handle: randomProduct.handle,
+        url: fullProductUrl,
+        collectionTitle: currentCollectionHandle
+      };
     } catch (error) {
       console.error('❌ Erro geral ao buscar produto complementar:', error);
       return null;
@@ -625,10 +839,12 @@
       const rootElement = document.getElementById('omafit-widget-root');
       let shopDomain = '';
       let publicId = '';
+      let shopNameFromRoot = '';
 
       if (rootElement) {
         shopDomain = rootElement.dataset.shopDomain || '';
         publicId = rootElement.dataset.publicId || '';
+        shopNameFromRoot = rootElement.dataset.shopName || '';
         
         // Se shop.domain retornar apenas o nome da loja (sem .myshopify.com), adicionar
         if (shopDomain && !shopDomain.includes('.')) {
@@ -681,6 +897,11 @@
         }
       }
 
+      // Fallback final: usar hostname atual (suporta domínio customizado da loja)
+      if (!shopDomain && window.location && window.location.hostname) {
+        shopDomain = window.location.hostname;
+      }
+
       console.log('🔍 Shop domain detectado:', shopDomain);
 
       if (!shopDomain) {
@@ -689,9 +910,8 @@
         return {
           publicId: publicId || 'wgt_pub_default',
           linkText: 'Experimentar virtualmente',
-          storeName: '',
+          storeName: shopNameFromRoot || '',
           storeLogo: '',
-          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -701,7 +921,9 @@
           },
           shopDomain: '',
           widgetEnabled: true,
-          isActive: true
+          isActive: true,
+          embedPosition: 'below_buy_buttons',
+          ctaType: 'link'
         };
       }
 
@@ -715,24 +937,45 @@
         'Authorization': `Bearer ${supabaseAnonKey}`,
         'Content-Type': 'application/json'
       };
+      var selectWidgetCfgFull =
+        'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,embed_position,cta_type,created_at,updated_at';
+      var selectWidgetCfgLegacy =
+        'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,created_at,updated_at';
+      var selectWidgetCfgNoExcluded =
+        'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,admin_locale,created_at,updated_at';
+
       let configResponse = await fetch(
-        `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,created_at,updated_at`,
+        `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=${selectWidgetCfgFull}`,
         { headers: configHeaders }
       );
       if (!configResponse.ok) {
-        const configErrorText = await configResponse.text().catch(function () { return ''; });
-        const missingExcludedColumn =
+        var errT = await configResponse.text().catch(function () { return ''; });
+        if (
           configResponse.status === 400 &&
-          configErrorText &&
-          configErrorText.indexOf('excluded_collections') !== -1;
-        if (missingExcludedColumn) {
-          console.warn('⚠️ Coluna excluded_collections não encontrada no banco. Repetindo busca sem essa coluna.');
+          errT &&
+          (errT.indexOf('embed_position') !== -1 || errT.indexOf('cta_type') !== -1)
+        ) {
+          console.warn('⚠️ Colunas embed_position/cta_type ausentes. Repetindo busca sem elas.');
           configResponse = await fetch(
-            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=id,shop_domain,link_text,store_logo,primary_color,widget_enabled,admin_locale,created_at,updated_at`,
+            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=${selectWidgetCfgLegacy}`,
             { headers: configHeaders }
           );
-        } else {
-          console.warn('⚠️ Não foi possível buscar configuração do Supabase. Status:', configResponse.status, configErrorText);
+          if (!configResponse.ok) {
+            errT = await configResponse.text().catch(function () { return ''; });
+          }
+        }
+        if (!configResponse.ok && configResponse.status === 400 && errT && errT.indexOf('excluded_collections') !== -1) {
+          console.warn('⚠️ Coluna excluded_collections não encontrada no banco. Repetindo busca sem essa coluna.');
+          configResponse = await fetch(
+            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=${selectWidgetCfgNoExcluded}`,
+            { headers: configHeaders }
+          );
+          if (!configResponse.ok) {
+            errT = await configResponse.text().catch(function () { return ''; });
+          }
+        }
+        if (!configResponse.ok) {
+          console.warn('⚠️ Não foi possível buscar configuração do Supabase. Status:', configResponse.status, errT);
         }
       }
 
@@ -780,7 +1023,7 @@
               }
               
               // Só verificar status se widget_keys foi encontrado
-              // Se status não existir/for inesperado, tratamos como ativo para manter compatibilidade
+              // Se não encontrou, permitir funcionar (pode ser primeira instalação)
               if (widgetKeyData[0].status === 'inactive') {
                 isWidgetActive = false;
                 console.warn('⚠️ Widget encontrado em widget_keys mas status=inactive');
@@ -919,12 +1162,27 @@
       });
       
       // Mapear campos do banco de dados para o formato esperado pelo widget
+      var rawEmbed = config && (config.embed_position != null ? config.embed_position : config.embedPosition);
+      var rawCta = config && (config.cta_type != null ? config.cta_type : config.ctaType);
+      var normEmbed =
+        String(rawEmbed || '')
+          .trim()
+          .toLowerCase() === 'above_buy_buttons'
+          ? 'above_buy_buttons'
+          : 'below_buy_buttons';
+      var normCta = String(rawCta || '').trim().toLowerCase() === 'button' ? 'button' : 'link';
+
       const mappedConfig = {
         publicId: validPublicId,
         linkText: config?.link_text || 'Experimentar virtualmente',
-        storeName: config?.store_name || '',
+        storeName:
+          shopNameFromRoot ||
+          config?.store_name ||
+          config?.storeName ||
+          config?.shop_name ||
+          config?.name ||
+          '',
         storeLogo: config?.store_logo || '',
-        adminLocale: config?.admin_locale || 'en',
         fontFamily: 'inherit', // Usar fonte da loja automaticamente
         colors: {
           primary: config?.primary_color || '#810707',
@@ -932,11 +1190,15 @@
           text: config?.primary_color || '#810707',
           overlay: (config?.primary_color || '#810707') + 'CC'
         },
+        adminLocale: config?.admin_locale || '',
         shopDomain: shopDomain,
         widgetEnabled: finalWidgetEnabled,
         isActive: isWidgetActive,
-        excludedCollections: excludedCollections
+        excludedCollections: excludedCollections,
+        embedPosition: normEmbed,
+        ctaType: normCta
       };
+      mappedConfig.storeName = ensureStoreName(mappedConfig);
       
       console.log('✅ Configuração mapeada:', {
         linkText: mappedConfig.linkText,
@@ -952,9 +1214,8 @@
       return {
         publicId: 'wgt_pub_default',
         linkText: 'Experimentar virtualmente',
-        storeName: '',
+        storeName: shopNameFromRoot || '',
         storeLogo: '',
-        adminLocale: 'en',
         fontFamily: 'inherit', // Usar fonte da loja automaticamente
         colors: {
           primary: '#810707',
@@ -964,7 +1225,9 @@
         },
         shopDomain: '',
         widgetEnabled: true,
-        isActive: true
+        isActive: true,
+        embedPosition: 'below_buy_buttons',
+        ctaType: 'link'
       };
     }
   }
@@ -981,6 +1244,13 @@
       const coll = typeof collectionHandle === 'string' ? collectionHandle : '';
       let genderToFetch = gender;
       if (gender !== 'male' && gender !== 'female') genderToFetch = 'unisex';
+
+      const normalizeMeasurementRefs = function (refs, collectionType) {
+        if (collectionType === 'footwear') {
+          return Array.isArray(refs) && refs.length === 1 ? refs : ['tamanho_pe'];
+        }
+        return Array.isArray(refs) && refs.length === 3 ? refs : ['peito', 'cintura', 'quadril'];
+      };
 
       const response = await fetch(
         `${supabaseUrl}/rest/v1/size_charts?shop_domain=eq.${encodeURIComponent(shopDomain)}&collection_handle=eq.${encodeURIComponent(coll)}&gender=eq.${genderToFetch}&select=sizes,measurement_refs,collection_type,collection_elasticity`,
@@ -1000,9 +1270,7 @@
             sizes: data[0].sizes,
               collectionType: data[0].collection_type || '',
               collectionElasticity: data[0].collection_elasticity || '',
-            measurementRefs: Array.isArray(data[0].measurement_refs) && data[0].measurement_refs.length === 3
-              ? data[0].measurement_refs
-              : ['peito', 'cintura', 'quadril']
+            measurementRefs: normalizeMeasurementRefs(data[0].measurement_refs, data[0].collection_type || '')
           };
         }
       }
@@ -1025,9 +1293,7 @@
               sizes: unisexData[0].sizes,
               collectionType: unisexData[0].collection_type || '',
               collectionElasticity: unisexData[0].collection_elasticity || '',
-              measurementRefs: Array.isArray(unisexData[0].measurement_refs) && unisexData[0].measurement_refs.length === 3
-                ? unisexData[0].measurement_refs
-                : ['peito', 'cintura', 'quadril']
+              measurementRefs: normalizeMeasurementRefs(unisexData[0].measurement_refs, unisexData[0].collection_type || '')
             };
           }
         }
@@ -1055,7 +1321,7 @@
 
       const parseCollectionType = function (rows) {
         if (!Array.isArray(rows) || rows.length === 0) return '';
-        const validTypes = ['upper', 'lower', 'full'];
+        const validTypes = ['upper', 'lower', 'full', 'footwear'];
         for (const row of rows) {
           if (row && validTypes.indexOf(row.collection_type) !== -1) {
             return row.collection_type;
@@ -1094,6 +1360,22 @@
 
       return '';
     } catch (_error) {
+      return '';
+    }
+  }
+
+  // Buscar nome/título da coleção atual a partir do handle
+  async function fetchCollectionTitle(collectionHandle) {
+    try {
+      const coll = typeof collectionHandle === 'string' ? collectionHandle : '';
+      if (!coll) return '';
+
+      const response = await fetch(`/collections/${encodeURIComponent(coll)}.json`);
+      if (!response.ok) return '';
+
+      const data = await response.json();
+      return (data && data.collection && data.collection.title) ? String(data.collection.title) : '';
+    } catch (_err) {
       return '';
     }
   }
@@ -1226,12 +1508,17 @@
       }
       return;
     }
-    loadFontsWhenNeeded();
+    // Carregar fontes apenas quando o usuário abre o modal (não bloqueia carregamento da página)
+    loadOmafitFontsWhenNeeded();
+
     // Se configuração não estiver carregada, tentar carregar agora
     if (!OMAFIT_CONFIG) {
       console.warn('⚠️ Omafit: configuração não carregada, tentando carregar agora...');
       try {
         OMAFIT_CONFIG = await fetchOmafitConfig();
+        if (OMAFIT_CONFIG) {
+          OMAFIT_CONFIG.storeName = ensureStoreName(OMAFIT_CONFIG);
+        }
         if (!OMAFIT_CONFIG) {
           console.error('❌ Não foi possível carregar configuração do Omafit');
           // Usar configuração padrão
@@ -1240,7 +1527,6 @@
             linkText: 'Experimentar virtualmente',
             storeName: '',
             storeLogo: '',
-            adminLocale: 'en',
             fontFamily: 'inherit',
             colors: {
               primary: '#810707',
@@ -1259,7 +1545,6 @@
           linkText: 'Experimentar virtualmente',
           storeName: '',
           storeLogo: '',
-          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -1271,7 +1556,10 @@
         };
       }
     }
-    
+
+    OMAFIT_CONFIG.storeName = ensureStoreName(OMAFIT_CONFIG);
+    syncAdminBrandingToWidgetRoot(OMAFIT_CONFIG);
+
     console.log('📦 OMAFIT_CONFIG antes de abrir modal:', OMAFIT_CONFIG);
 
     const productImage = getProductImageFromPage();
@@ -1286,10 +1574,15 @@
     const allProductImages = await getOnlyProductImages();
     console.log('📸 Total de imagens encontradas:', allProductImages.length);
 
-    const productInfo = getProductInfo();
-    const productData = await getProductData(productInfo.productHandle);
-    const productCatalog = productData ? extractProductCatalog(productData) : { sizes: [], colors: [], variants: [] };
-    const currentProductSelection = extractSelectedVariantContext(productData);
+    let productInfo = getProductInfo();
+    productInfo = await enrichProductInfo(productInfo);
+    const productVariantCatalog = await getCurrentProductVariantCatalog(productInfo);
+    const currentProductData = await getCurrentProductData(productInfo);
+    const currentVariantSelection = getSelectedVariantContext(currentProductData);
+    if (!productInfo.productDescription && currentProductData && currentProductData.description) {
+      productInfo.productDescription = normalizeProductDescriptionText(currentProductData.description);
+      productInfo.productDescriptionHtml = String(currentProductData.description || '').trim();
+    }
     const isMobile = window.innerWidth <= 768;
 
     const overlay = document.createElement('div');
@@ -1336,23 +1629,62 @@
 
     const detectedFontFamily = getStoreFontFamily();
 
-    // Montar configuração - NÃO incluir storeLogo (base64) na URL para evitar 414
-    // O widget buscará do Supabase usando shopDomain
+    function getStoreFontStack() {
+      try {
+        var b = document.body;
+        if (b) {
+          var ff = window.getComputedStyle(b).fontFamily;
+          if (ff && ff !== 'inherit') return ff;
+        }
+      } catch (e) {}
+      return detectedFontFamily;
+    }
+
+    var widgetRootBrand = document.getElementById('omafit-widget-root');
+    var widgetAdminLogo =
+      widgetRootBrand && widgetRootBrand.getAttribute('data-omafit-admin-store-logo')
+        ? String(widgetRootBrand.getAttribute('data-omafit-admin-store-logo')).trim()
+        : '';
+    var arRootForBranding = document.getElementById('omafit-ar-root');
+    var arLogoFromDom =
+      widgetAdminLogo ||
+      (arRootForBranding && arRootForBranding.dataset && arRootForBranding.dataset.storeLogo
+        ? String(arRootForBranding.dataset.storeLogo).trim()
+        : '');
+    var arFontFromDom =
+      arRootForBranding && arRootForBranding.dataset && arRootForBranding.dataset.fontFamily
+        ? String(arRootForBranding.dataset.fontFamily).trim()
+        : '';
+
+    var storeLogoUrlForConfig = '';
+    var cfgLogo = OMAFIT_CONFIG.storeLogo ? String(OMAFIT_CONFIG.storeLogo) : '';
+    if (cfgLogo && /^https?:\/\//i.test(cfgLogo)) {
+      storeLogoUrlForConfig = cfgLogo;
+    } else if (arLogoFromDom && /^https?:\/\//i.test(arLogoFromDom)) {
+      storeLogoUrlForConfig = arLogoFromDom;
+    }
+
+    // Montar configuração — inclui storeLogo só se for URL (para o provador AR no iframe ler do config)
+    // Base64 continua só via postMessage para o TryOn de roupa.
     const config = {
       storeName: OMAFIT_CONFIG.storeName || '',
       primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-      // storeLogo será enviado via postMessage
-      fontFamily: detectedFontFamily, // Usar fonte detectada da loja
+      storeLogo: storeLogoUrlForConfig,
+      fontFamily: arFontFromDom || getStoreFontStack(),
       fontWeight: OMAFIT_CONFIG.fontWeight || '',
       fontStyle: OMAFIT_CONFIG.fontStyle || ''
     };
 
     // Garantir que shopDomain está disponível
     const shopDomain = OMAFIT_CONFIG.shopDomain || '';
-    const shopNameFromDomain = shopDomain ? shopDomain.replace(/\.myshopify\.com$/i, '') : '';
+    const storeLanguage =
+      normalizeLanguageTag(OMAFIT_CONFIG.adminLocale) ||
+      normalizeLanguageTag(detectStoreLanguage()) ||
+      'pt-BR';
+    const detectedStoreName = detectStoreDisplayName(shopDomain);
     const resolvedStoreName =
       (OMAFIT_CONFIG.storeName && String(OMAFIT_CONFIG.storeName).trim()) ||
-      shopNameFromDomain ||
+      (detectedStoreName && String(detectedStoreName).trim()) ||
       '';
     config.storeName = resolvedStoreName;
     const rootEl = document.getElementById('omafit-widget-root');
@@ -1377,6 +1709,7 @@
         return String(s || '').toLowerCase();
       };
 
+      // Se existe "cuecas-slips", descarta "cuecas" (refinamento por prefixo + - ou _)
       const isRefinementOf = function (maybeRefined, base) {
         const x = lower(maybeRefined);
         const b = lower(base);
@@ -1395,6 +1728,7 @@
 
       const candidates = filtered.length > 0 ? filtered : unique;
 
+      // Mais segmentos (-/_), maior comprimento; empate mantém ordem de aparição.
       const scored = candidates.map(function (h, idx) {
         const normalized = lower(h);
         const tokenCount = normalized.split(/[-_]+/).filter(Boolean).length;
@@ -1423,10 +1757,16 @@
       productCollectionHandles: productCollectionHandles,
       selected: collectionHandle || ''
     });
+    let collectionTitle = (rootEl && rootEl.dataset && rootEl.dataset.collectionTitle) ? rootEl.dataset.collectionTitle : '';
     const defaultGender = (rootEl && rootEl.dataset && rootEl.dataset.defaultGender) ? rootEl.dataset.defaultGender : '';
+    if (!collectionTitle && collectionHandle) {
+      collectionTitle = await fetchCollectionTitle(collectionHandle);
+    }
     const collectionType = await fetchCollectionType(shopDomain, collectionHandle);
-    const collectionElasticity = await fetchCollectionElasticity(shopDomain, collectionHandle);
-    const storeLanguage = getStoreLanguage(OMAFIT_CONFIG.adminLocale);
+    let collectionElasticity = await fetchCollectionElasticity(shopDomain, collectionHandle);
+    if (collectionType === 'footwear') {
+      collectionElasticity = '';
+    }
     
     // Buscar produto complementar (usa coleção atual se houver; senão busca de qualquer coleção)
     const complementaryProduct = await getComplementaryProduct(collectionHandle);
@@ -1446,32 +1786,54 @@
       primaryColor: config.primaryColor,
       storeName: config.storeName
     });
-    console.log('🎨 Catálogo de variantes do produto:', {
-      sizes: productCatalog.sizes.length,
-      colors: productCatalog.colors.length,
-      variants: productCatalog.variants.length
+    console.log('🧩 Catálogo de variantes extraído:', {
+      sizes: productVariantCatalog.sizes.length,
+      colors: productVariantCatalog.colors.length,
+      variants: productVariantCatalog.variants.length
     });
 
     // Construir URL apenas com dados essenciais (evitar 414 URI Too Long)
     const publicIdToUse = OMAFIT_CONFIG.publicId || 'wgt_pub_default';
     console.log('🔑 PublicId sendo usado:', publicIdToUse);
     
+    const productDescriptionFull = normalizeProductDescriptionText(
+      productInfo.productDescription ||
+      (currentProductData && currentProductData.description ? currentProductData.description : '')
+    );
+    const productDescriptionHtml = String(
+      productInfo.productDescriptionHtml ||
+      (currentProductData && currentProductData.description ? currentProductData.description : '') ||
+      ''
+    ).trim();
+    const productDescriptionForUrl = productDescriptionFull.slice(0, 500);
+    const variantCatalogList = Array.isArray(productVariantCatalog.variants) ? productVariantCatalog.variants : [];
+    const availableSizesList = Array.isArray(productVariantCatalog.sizes) ? productVariantCatalog.sizes : [];
+    const availableColorsList = Array.isArray(productVariantCatalog.colors) ? productVariantCatalog.colors : [];
+
+    const widgetPath = collectionType === 'footwear' ? '/widget-shoes' : '/widget';
+
     let widgetUrl =
-      'https://omafit.netlify.app/widget' +
+      'https://omafit.netlify.app' + widgetPath +
       '?productImage=' + encodeURIComponent(productImage) +
       '&productId=' + encodeURIComponent(productInfo.productId || 'unknown') +
       '&productName=' + encodeURIComponent(productInfo.productName || 'Produto') +
+      (productDescriptionForUrl ? '&productDescription=' + encodeURIComponent(productDescriptionForUrl) : '') +
+      (productDescriptionForUrl ? '&product_description=' + encodeURIComponent(productDescriptionForUrl) : '') +
       '&publicId=' + encodeURIComponent(publicIdToUse) +
       '&shopDomain=' + encodeURIComponent(shopDomain) +
       '&shop_domain=' + encodeURIComponent(shopDomain) +
-      '&language=' + encodeURIComponent(storeLanguage) +
-      '&adminLocale=' + encodeURIComponent(storeLanguage) +
       '&shopName=' + encodeURIComponent(resolvedStoreName) +
       '&shop_name=' + encodeURIComponent(resolvedStoreName) +
+      '&storeName=' + encodeURIComponent(resolvedStoreName) +
+      '&store_name=' + encodeURIComponent(resolvedStoreName) +
+      '&language=' + encodeURIComponent(storeLanguage) +
+      '&locale=' + encodeURIComponent(storeLanguage) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
       (productCollectionHandles.length
         ? '&collectionHandles=' + encodeURIComponent(productCollectionHandles.join(','))
         : '') +
+      (collectionTitle ? '&collectionTitle=' + encodeURIComponent(collectionTitle) : '') +
+      (collectionTitle ? '&collectionName=' + encodeURIComponent(collectionTitle) : '') +
       (defaultGender ? '&defaultGender=' + encodeURIComponent(defaultGender) : '') +
       (collectionType ? '&collectionType=' + encodeURIComponent(collectionType) : '') +
       (collectionElasticity ? '&collectionElasticity=' + encodeURIComponent(collectionElasticity) : '') +
@@ -1504,6 +1866,36 @@
     var glbPass = getOmafitArGlbUrlFromDom();
     if (glbPass) {
       widgetUrl += '&arGlbUrl=' + encodeURIComponent(glbPass) + '&omafit_mode=eyewear_ar';
+      /**
+       * Propaga ao iframe Netlify todos os `data-ar-*` emitidos pelo Liquid —
+       * sem eles o widget interno cai em `glasses` por default e mostra
+       * textos de óculos para relógios/pulseiras/colares. Ler `arRoot` em
+       * vez de `rootEl` porque o bloco AR é independente do bloco tamanho.
+       */
+      try {
+        var arRoot = document.getElementById('omafit-ar-root');
+        if (arRoot) {
+          var passAttr = function (queryKey, dataKey) {
+            var v = (arRoot.getAttribute(dataKey) || '').trim();
+            if (v) widgetUrl += '&' + queryKey + '=' + encodeURIComponent(v);
+          };
+          passAttr('arAccessoryType', 'data-ar-accessory-type');
+          passAttr('arCategoryPath', 'data-ar-category-path');
+          passAttr('arProductType', 'data-ar-product-type');
+          passAttr('arProductTags', 'data-ar-product-tags');
+          passAttr('arTrackingStack', 'data-ar-tracking-stack');
+          passAttr('arPreferredCamera', 'data-ar-preferred-camera');
+          passAttr('arMindarAnchor', 'data-ar-mindar-anchor');
+          passAttr('arGlassesLocalFineXyz', 'data-ar-glasses-local-fine-xyz');
+          passAttr('arGlassesManualCalibOffset', 'data-ar-glasses-manual-calib-offset');
+          passAttr('arGlassesManualCalibScale', 'data-ar-glasses-manual-calib-scale');
+          passAttr('arGlassesManualCalibUi', 'data-ar-glasses-manual-calib-ui');
+          passAttr('arGlassesPivotRotDeg', 'data-ar-glasses-pivot-rot-deg');
+          passAttr('arOmafitCalibration', 'data-ar-omafit-calibration');
+        }
+      } catch (e) {
+        if (OMAFIT_DEBUG) console.warn('Omafit: propagar data-ar-* para iframe falhou', e);
+      }
     }
 
     iframe.src = widgetUrl;
@@ -1560,185 +1952,211 @@
       // Enviar dados grandes via postMessage para evitar URL muito longa
       try {
         // Enviar collectionHandle e defaultGender para o app Netlify usar ao buscar tabela de medidas no Supabase
-        iframe.contentWindow.postMessage({
+        const sharedWidgetData = {
+          productDescription: productDescriptionFull,
+          product_description: productDescriptionFull,
+          productDescriptionHtml: productDescriptionHtml,
+          product_description_html: productDescriptionHtml,
+          selectedImage: productImage || '',
+          selected_image: productImage || '',
+          productImage: productImage || '',
+          product_image: productImage || '',
+          variantCatalog: variantCatalogList,
+          variant_catalog: variantCatalogList,
+          availableSizes: availableSizesList,
+          available_sizes: availableSizesList,
+          availableColors: availableColorsList,
+          available_colors: availableColorsList,
+          sizes: availableSizesList,
+          colors: availableColorsList,
+          variants: variantCatalogList,
+          productCatalog: productVariantCatalog,
+          product_catalog: productVariantCatalog,
+          selectedVariantId: currentVariantSelection.selectedVariantId,
+          selected_variant_id: currentVariantSelection.selectedVariantId,
+          selectedVariantOptions: currentVariantSelection.selectedVariantOptions,
+          selected_variant_options: currentVariantSelection.selectedVariantOptions
+        };
+
+        const sendWidgetPayloads = function () {
+          if (!iframe.contentWindow) return;
+
+          iframe.contentWindow.postMessage({
           type: 'omafit-context',
+          language: storeLanguage,
+          locale: storeLanguage,
+          storeLanguage: storeLanguage,
+          shopName: resolvedStoreName,
+          shop_name: resolvedStoreName,
+          storeName: resolvedStoreName,
+          store_name: resolvedStoreName,
+          productName: productInfo.productName || '',
+          product_name: productInfo.productName || '',
+          ...sharedWidgetData,
           collectionHandle: typeof collectionHandle === 'string' ? collectionHandle : '',
           collectionHandles: productCollectionHandles,
+          collectionTitle: typeof collectionTitle === 'string' ? collectionTitle : '',
+          collectionName: typeof collectionTitle === 'string' ? collectionTitle : '',
           defaultGender: typeof defaultGender === 'string' ? defaultGender : '',
           collectionType: typeof collectionType === 'string' ? collectionType : '',
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
-          language: storeLanguage,
-          adminLocale: storeLanguage,
           complementaryProduct: complementaryProduct || null,
           recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
-          productName: productInfo.productName || '',
-          product_name: productInfo.productName || '',
-          productDescription: productInfo.productDescription || '',
-          product_description: productInfo.productDescription || '',
-          productCatalog: productCatalog,
-          selectedVariantId: currentProductSelection.selectedVariantId,
-          selectedVariantOptions: currentProductSelection.selectedVariantOptions
-        }, 'https://omafit.netlify.app');
+          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+          }, OMAFIT_WIDGET_ORIGIN);
 
-        // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
-        if (complementaryProduct) {
-          iframe.contentWindow.postMessage({
-            type: 'omafit-complementary-product',
-            complementaryProduct: {
-              title: complementaryProduct.title,
-              handle: complementaryProduct.handle,
-              url: complementaryProduct.url,
-              collectionTitle: complementaryProduct.collectionTitle
-            },
-            recommendedProductName: complementaryProduct.title,
-            recommendedProductUrl: complementaryProduct.url
-          }, 'https://omafit.netlify.app');
-          console.log('📤 Produto complementar enviado via postMessage (recommendedProductName/Url):', complementaryProduct.title, complementaryProduct.url);
-        }
+          // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
+          if (complementaryProduct) {
+            iframe.contentWindow.postMessage({
+              type: 'omafit-complementary-product',
+              complementaryProduct: {
+                title: complementaryProduct.title,
+                handle: complementaryProduct.handle,
+                url: complementaryProduct.url,
+                collectionTitle: complementaryProduct.collectionTitle
+              },
+              recommendedProductName: complementaryProduct.title,
+              recommendedProductUrl: complementaryProduct.url
+            }, OMAFIT_WIDGET_ORIGIN);
+          }
+
+          // Enviar todas as imagens do produto (não apenas as 3 primeiras)
+          if (allProductImages.length > 3) {
+            iframe.contentWindow.postMessage({
+              type: 'omafit-product-images',
+              images: allProductImages
+            }, OMAFIT_WIDGET_ORIGIN);
+          }
+
+          // Enviar logo se existir (base64 pode ser muito grande para URL)
+          if (OMAFIT_CONFIG.storeLogo) {
+            const logoSize = OMAFIT_CONFIG.storeLogo.length;
+            const logoPreview = OMAFIT_CONFIG.storeLogo.substring(0, 50) + '...';
+            
+            // Validar logo antes de enviar (aceita URL ou base64)
+            const isUrl = OMAFIT_CONFIG.storeLogo.startsWith('http://') || 
+                         OMAFIT_CONFIG.storeLogo.startsWith('https://');
+            const isBase64 = OMAFIT_CONFIG.storeLogo.startsWith('data:image/') && 
+                            OMAFIT_CONFIG.storeLogo.includes('base64,') &&
+                            logoSize > 500; // Logo muito pequeno pode estar truncado
+            const isValidLogo = isUrl || isBase64;
+            
+            if (isValidLogo) {
+              // Enviar logo separadamente
+              iframe.contentWindow.postMessage({
+                type: 'omafit-store-logo',
+                logo: OMAFIT_CONFIG.storeLogo
+              }, OMAFIT_WIDGET_ORIGIN);
+              
+              // Também incluir logo na atualização de configuração
+              iframe.contentWindow.postMessage({
+                type: 'omafit-config-update',
+                language: storeLanguage,
+                locale: storeLanguage,
+                storeLanguage: storeLanguage,
+                primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
+                storeName: resolvedStoreName,
+                store_name: resolvedStoreName,
+                shopName: resolvedStoreName,
+                shop_name: resolvedStoreName,
+                productName: productInfo.productName || '',
+                product_name: productInfo.productName || '',
+                ...sharedWidgetData,
+                storeLogo: OMAFIT_CONFIG.storeLogo, // Incluir logo na configuração também
+                fontFamily: detectedFontFamily, // Enviar fonte detectada
+                shopDomain: shopDomain,
+                collectionHandle: collectionHandle || '',
+                collectionHandles: productCollectionHandles,
+                collectionTitle: collectionTitle || '',
+                collectionName: collectionTitle || '',
+                defaultGender: defaultGender || '',
+                collectionType: collectionType || '',
+                collectionElasticity: collectionElasticity || '',
+                complementaryProduct: complementaryProduct || null,
+                recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
+                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+              }, OMAFIT_WIDGET_ORIGIN);
+            } else {
+              // Enviar atualização de configuração sem logo (logo inválido)
+              iframe.contentWindow.postMessage({
+                type: 'omafit-config-update',
+                language: storeLanguage,
+                locale: storeLanguage,
+                storeLanguage: storeLanguage,
+                primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
+                storeName: resolvedStoreName,
+                store_name: resolvedStoreName,
+                shopName: resolvedStoreName,
+                shop_name: resolvedStoreName,
+                productName: productInfo.productName || '',
+                product_name: productInfo.productName || '',
+                ...sharedWidgetData,
+                fontFamily: detectedFontFamily,
+                shopDomain: shopDomain,
+                collectionHandle: collectionHandle || '',
+                collectionHandles: productCollectionHandles,
+                collectionTitle: collectionTitle || '',
+                collectionName: collectionTitle || '',
+                defaultGender: defaultGender || '',
+                collectionType: collectionType || '',
+                collectionElasticity: collectionElasticity || '',
+                complementaryProduct: complementaryProduct || null,
+                recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
+                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+              }, OMAFIT_WIDGET_ORIGIN);
+            }
+          } else {
+            // Enviar atualização de configuração sem logo
+            iframe.contentWindow.postMessage({
+              type: 'omafit-config-update',
+              language: storeLanguage,
+              locale: storeLanguage,
+              storeLanguage: storeLanguage,
+              primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
+              storeName: resolvedStoreName,
+              store_name: resolvedStoreName,
+              shopName: resolvedStoreName,
+              shop_name: resolvedStoreName,
+              productName: productInfo.productName || '',
+              product_name: productInfo.productName || '',
+              ...sharedWidgetData,
+              fontFamily: detectedFontFamily, // Enviar fonte detectada
+              shopDomain: shopDomain,
+              collectionHandle: collectionHandle || '',
+              collectionHandles: productCollectionHandles,
+              collectionTitle: collectionTitle || '',
+              collectionName: collectionTitle || '',
+              defaultGender: defaultGender || '',
+              collectionType: collectionType || '',
+              collectionElasticity: collectionElasticity || '',
+              complementaryProduct: complementaryProduct || null,
+              recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
+              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+            }, OMAFIT_WIDGET_ORIGIN);
+          }
+        };
+
+        // Primeira entrega + retries para cobrir timing de mount no iframe.
+        sendWidgetPayloads();
+        setTimeout(sendWidgetPayloads, 350);
+        setTimeout(sendWidgetPayloads, 1200);
+        setTimeout(sendWidgetPayloads, 2500);
+
+        console.log('📤 Payload completo enviado ao widget:', {
+          variant_catalog: variantCatalogList.length,
+          available_sizes: availableSizesList.length,
+          available_colors: availableColorsList.length,
+          product_description: productDescriptionFull ? '✅' : '❌'
+        });
 
         if (collectionHandle || defaultGender || complementaryProduct) {
-          console.log('📤 Contexto enviado via postMessage:', { 
-            collectionHandle: collectionHandle || '(vazio)', 
+          console.log('📤 Contexto enviado via postMessage:', {
+            collectionHandle: collectionHandle || '(vazio)',
+            collectionTitle: collectionTitle || '(vazio)',
             defaultGender: defaultGender || '(vazio)',
             collectionType: collectionType || '(vazio)',
             collectionElasticity: collectionElasticity || '(vazio)',
             complementaryProduct: complementaryProduct ? complementaryProduct.url : '(nenhum)'
-          });
-        }
-
-        // Enviar todas as imagens do produto (não apenas as 3 primeiras)
-        if (allProductImages.length > 3) {
-          iframe.contentWindow.postMessage({
-            type: 'omafit-product-images',
-            images: allProductImages
-          }, 'https://omafit.netlify.app');
-          console.log('📤 Enviadas', allProductImages.length, 'imagens via postMessage');
-        }
-        
-        // Enviar logo se existir (base64 pode ser muito grande para URL)
-        if (OMAFIT_CONFIG.storeLogo) {
-          const logoSize = OMAFIT_CONFIG.storeLogo.length;
-          const logoPreview = OMAFIT_CONFIG.storeLogo.substring(0, 50) + '...';
-          
-          // Validar logo antes de enviar (aceita URL ou base64)
-          const isUrl = OMAFIT_CONFIG.storeLogo.startsWith('http://') || 
-                       OMAFIT_CONFIG.storeLogo.startsWith('https://');
-          const isBase64 = OMAFIT_CONFIG.storeLogo.startsWith('data:image/') && 
-                          OMAFIT_CONFIG.storeLogo.includes('base64,') &&
-                          logoSize > 500; // Logo muito pequeno pode estar truncado
-          const isValidLogo = isUrl || isBase64;
-          
-          if (isValidLogo) {
-            // Enviar logo separadamente
-            iframe.contentWindow.postMessage({
-              type: 'omafit-store-logo',
-              logo: OMAFIT_CONFIG.storeLogo
-            }, 'https://omafit.netlify.app');
-            console.log('📤 Logo enviado via postMessage (tamanho:', logoSize, 'chars, preview:', logoPreview, ')');
-            
-            // Também incluir logo na atualização de configuração
-            iframe.contentWindow.postMessage({
-              type: 'omafit-config-update',
-              primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-              storeName: OMAFIT_CONFIG.storeName || '',
-              storeLogo: OMAFIT_CONFIG.storeLogo, // Incluir logo na configuração também
-              fontFamily: detectedFontFamily, // Enviar fonte detectada
-              language: storeLanguage,
-              adminLocale: storeLanguage,
-              shopDomain: shopDomain,
-              collectionHandle: collectionHandle || '',
-              collectionHandles: productCollectionHandles,
-              defaultGender: defaultGender || '',
-              collectionType: collectionType || '',
-              collectionElasticity: collectionElasticity || '',
-              complementaryProduct: complementaryProduct || null,
-              recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
-              productName: productInfo.productName || '',
-              product_name: productInfo.productName || '',
-              productDescription: productInfo.productDescription || '',
-              product_description: productInfo.productDescription || '',
-              productCatalog: productCatalog,
-              selectedVariantId: currentProductSelection.selectedVariantId,
-              selectedVariantOptions: currentProductSelection.selectedVariantOptions
-            }, 'https://omafit.netlify.app');
-            console.log('📤 Configuração enviada via postMessage (com logo):', {
-              primaryColor: OMAFIT_CONFIG.colors?.primary,
-              storeName: OMAFIT_CONFIG.storeName,
-              storeLogo: '✅ Presente (' + logoSize + ' chars)',
-              fontFamily: detectedFontFamily
-            });
-          } else {
-            console.warn('⚠️ Logo inválido (nem URL nem base64 válido):', {
-              isUrl: isUrl,
-              isBase64: isBase64,
-              tamanho: logoSize,
-              preview: logoPreview
-            });
-            
-            // Enviar atualização de configuração sem logo (logo inválido)
-            iframe.contentWindow.postMessage({
-              type: 'omafit-config-update',
-              primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-              storeName: OMAFIT_CONFIG.storeName || '',
-              fontFamily: detectedFontFamily,
-              language: storeLanguage,
-              adminLocale: storeLanguage,
-              shopDomain: shopDomain,
-              collectionHandle: collectionHandle || '',
-              collectionHandles: productCollectionHandles,
-              defaultGender: defaultGender || '',
-              collectionType: collectionType || '',
-              collectionElasticity: collectionElasticity || '',
-              complementaryProduct: complementaryProduct || null,
-              recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
-              productName: productInfo.productName || '',
-              product_name: productInfo.productName || '',
-              productDescription: productInfo.productDescription || '',
-              product_description: productInfo.productDescription || '',
-              productCatalog: productCatalog,
-              selectedVariantId: currentProductSelection.selectedVariantId,
-              selectedVariantOptions: currentProductSelection.selectedVariantOptions
-            }, 'https://omafit.netlify.app');
-            console.log('📤 Configuração enviada via postMessage (sem logo - inválido):', {
-              primaryColor: OMAFIT_CONFIG.colors?.primary,
-              fontFamily: detectedFontFamily
-            });
-          }
-        } else {
-          console.warn('⚠️ Logo não encontrado em OMAFIT_CONFIG.storeLogo');
-          console.warn('⚠️ OMAFIT_CONFIG completo:', OMAFIT_CONFIG);
-          
-          // Enviar atualização de configuração sem logo
-          iframe.contentWindow.postMessage({
-            type: 'omafit-config-update',
-            primaryColor: OMAFIT_CONFIG.colors?.primary || '#810707',
-            storeName: OMAFIT_CONFIG.storeName || '',
-            fontFamily: detectedFontFamily,
-            language: storeLanguage,
-            adminLocale: storeLanguage,
-            shopDomain: shopDomain,
-            collectionHandle: collectionHandle || '',
-            collectionHandles: productCollectionHandles,
-            defaultGender: defaultGender || '',
-            collectionType: collectionType || '',
-            collectionElasticity: collectionElasticity || '',
-            complementaryProduct: complementaryProduct || null,
-            recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-            recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
-            productName: productInfo.productName || '',
-            product_name: productInfo.productName || '',
-            productDescription: productInfo.productDescription || '',
-            product_description: productInfo.productDescription || '',
-            productCatalog: productCatalog,
-            selectedVariantId: currentProductSelection.selectedVariantId,
-            selectedVariantOptions: currentProductSelection.selectedVariantOptions
-          }, 'https://omafit.netlify.app');
-          console.log('📤 Configuração enviada via postMessage (sem logo):', {
-            primaryColor: OMAFIT_CONFIG.colors?.primary,
-            fontFamily: detectedFontFamily
           });
         }
       } catch (e) {
@@ -1857,6 +2275,595 @@
     }, 10);
   };
 
+  // --- Add to cart (mensagens do iframe) ---
+  // Recebe type: "omafit-add-to-cart-request" e responde com "omafit-add-to-cart-result".
+  // Origens permitidas: OMAFIT_CART_ALLOWED_ORIGINS. Idempotência por requestId.
+  // Origens permitidas para add-to-cart (remover localhost em produção)
+  const OMAFIT_CART_ALLOWED_ORIGINS = [
+    'https://omafit.netlify.app',
+    'https://omafit.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ];
+  const OMAFIT_PROCESSED_REQUEST_IDS = new Set();
+  const OMAFIT_REQUEST_ID_MAX_AGE_MS = 5 * 60 * 1000;
+  let OMAFIT_LAST_REQUEST_ID_CLEANUP = 0;
+  const OMAFIT_CART_SECTION_IDS = [
+    'cart-drawer',
+    'cart-icon-bubble',
+    'cart-live-region-text',
+    'main-cart-items',
+    'main-cart-footer'
+  ];
+
+  function isValidAddToCartMessage(event) {
+    if (!event || !event.data || event.data.type !== 'omafit-add-to-cart-request') {
+      return false;
+    }
+    if (OMAFIT_CART_ALLOWED_ORIGINS.indexOf(event.origin) === -1) {
+      console.warn('[OmafitCart] Origem não permitida:', event.origin);
+      return false;
+    }
+    var p = event.data.payload && typeof event.data.payload === 'object' ? event.data.payload : event.data;
+    var requestId = p && (p.requestId !== undefined ? p.requestId : event.data.requestId);
+    if (!p || typeof requestId === 'undefined') {
+      console.warn('[OmafitCart] Payload inválido: requestId obrigatório');
+      return false;
+    }
+    if (!p.product || typeof p.product.id === 'undefined' || !p.product.name) {
+      console.warn('[OmafitCart] Payload inválido: product.id e product.name obrigatórios');
+      return false;
+    }
+    if (!p.selection || typeof p.selection !== 'object') {
+      console.warn('[OmafitCart] Payload inválido: selection obrigatório');
+      return false;
+    }
+    if (p.shop_domain !== undefined && typeof p.shop_domain !== 'string') {
+      return false;
+    }
+    return true;
+  }
+
+  function normalizeText(value) {
+    if (value == null) return '';
+    return String(value).trim().toLowerCase();
+  }
+
+  function normalizeSize(size) {
+    var n = normalizeText(size);
+    if (!n) return '';
+    n = n.replace(/(\d+)\s*br\s*$/i, '$1 br');
+    const aliasMap = {
+      'pp': 'pp', 'p': 'p', 'xs': 'xs', 's': 's', 'm': 'm', 'g': 'g', 'l': 'l', 'gg': 'gg', 'xg': 'xg',
+      'xl': 'xl', 'xxl': 'xxl', 'xxxl': 'xxxl',
+      '36': '36', '38': '38', '40': '40', '42': '42', '44': '44', '46': '46', '48': '48',
+      '36 br': '36', '38 br': '38', '40 br': '40', '42 br': '42', '44 br': '44', '46 br': '46', '48 br': '48'
+    };
+    return aliasMap[n] || n;
+  }
+
+  function extractColorCandidatesFromVariant(variant) {
+    const candidates = { optionValues: [], imageUrl: null };
+    if (!variant) return candidates;
+    [variant.option1, variant.option2, variant.option3].forEach(function (opt) {
+      if (opt) candidates.optionValues.push(normalizeText(opt));
+    });
+    var img = variant.featured_image || variant.featured_image_url;
+    if (img && (img.src || img.url)) {
+      candidates.imageUrl = normalizeUrl(img.src || img.url) || null;
+    }
+    return candidates;
+  }
+
+  function getVariantsByImageFromProduct(productData, selectionImageUrl) {
+    if (!productData || !selectionImageUrl) return [];
+    var normalizedSel = normalizeUrl(selectionImageUrl);
+    var variantIds = new Set();
+    var images = productData.images || productData.media || [];
+    images.forEach(function (img) {
+      var src = (img.src || img.url || (img.preview_image && img.preview_image.src)) || '';
+      if (normalizeUrl(src) === normalizedSel && Array.isArray(img.variant_ids)) {
+        img.variant_ids.forEach(function (vid) { variantIds.add(vid); });
+      }
+    });
+    return (productData.variants || []).filter(function (v) { return variantIds.has(v.id); });
+  }
+
+  function hexToColorNames(hex) {
+    if (!hex || typeof hex !== 'string') return [];
+    var h = hex.replace(/^#/, '').toLowerCase();
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var map = {
+      '000000': ['preto', 'black'], 'ffffff': ['branco', 'white'], 'fff': ['branco', 'white'],
+      '808080': ['cinza', 'gray', 'grey'], 'c0c0c0': ['cinza', 'silver'],
+      '800000': ['marrom', 'brown'], 'a52a2a': ['marrom', 'brown'],
+      'ff0000': ['vermelho', 'red'], 'f00': ['vermelho', 'red'],
+      'ffa500': ['laranja', 'orange'], 'ffd700': ['dourado', 'gold'],
+      'ffff00': ['amarelo', 'yellow'], 'ff0': ['amarelo', 'yellow'],
+      '008000': ['verde', 'green'], '00ff00': ['verde', 'green'],
+      '0000ff': ['azul', 'blue'], '00f': ['azul', 'blue'],
+      '4b0082': ['indigo'], '8b00ff': ['violeta', 'violet'],
+      'ff00ff': ['magenta'], 'f0f': ['magenta'],
+      'ffc0cb': ['rosa', 'pink'], 'deb887': ['bege', 'beige'], 'f5f5dc': ['bege', 'beige'],
+      'daa520': ['dourado', 'gold'], '000080': ['azul marinho', 'navy']
+    };
+    return map[h] || [];
+  }
+
+  function resolveVariantFromSelection(productDataOrArg, selectionArg) {
+    var productData = productDataOrArg;
+    var selection = selectionArg;
+    if (productDataOrArg && typeof productDataOrArg === 'object' && productDataOrArg.productData !== undefined) {
+      productData = productDataOrArg.productData;
+      selection = productDataOrArg.selection || {};
+    }
+    if (!productData || !Array.isArray(productData.variants) || productData.variants.length === 0) {
+      return { variant: null, error: 'Produto sem variantes' };
+    }
+    selection = selection || {};
+    var variants = productData.variants;
+    var options = productData.options || [];
+    var currentVariantContext = getSelectedVariantContext(productData);
+    var sizeOptionIndex = options.findIndex(function (o) {
+      return isSizeOptionName(typeof o === 'string' ? o : (o && o.name));
+    });
+    var colorOptionIndex = options.findIndex(function (o) {
+      var name = normalizeText(typeof o === 'string' ? o : (o && o.name));
+      return name === 'color' || name === 'cor' || name === 'colour' || name === 'couleur';
+    });
+
+    var explicitOptionName = selection.variant_option_name || '';
+    var requestedSelectedOptions = selection.selected_options && typeof selection.selected_options === 'object'
+      ? selection.selected_options
+      : {};
+    var selectedOptions = Object.assign({}, currentVariantContext.selectedVariantOptions || {}, requestedSelectedOptions);
+    var explicitOptionValue = explicitOptionName && selectedOptions[explicitOptionName] !== undefined
+      ? selectedOptions[explicitOptionName]
+      : '';
+    if (!explicitOptionValue) {
+      Object.keys(selectedOptions).some(function (key) {
+        if (isSizeOptionName(key) && selectedOptions[key] !== undefined && selectedOptions[key] !== null && String(selectedOptions[key]).trim()) {
+          explicitOptionValue = selectedOptions[key];
+          return true;
+        }
+        return false;
+      });
+    }
+    var wantedSize = normalizeSize(explicitOptionValue || selection.recommended_size || selection.recommended_size_label);
+    var selectionImageUrl = selection.image_url ? normalizeUrl(selection.image_url) : null;
+    var selectionColorHex = (selection.color_hex && String(selection.color_hex).trim()) ? String(selection.color_hex).trim().toLowerCase() : null;
+
+    var bySize = variants;
+    if (sizeOptionIndex >= 0 && wantedSize) {
+      bySize = variants.filter(function (v) {
+        var opt = v['option' + (sizeOptionIndex + 1)];
+        return normalizeSize(opt) === wantedSize || normalizeText(opt) === wantedSize;
+      });
+      if (bySize.length === 0) {
+        bySize = variants;
+      }
+    }
+
+    var byExplicitOptions = [];
+    var explicitNonSizeOptionNames = Object.keys(selectedOptions).filter(function (key) {
+      return !isSizeOptionName(key) && selectedOptions[key] !== undefined && selectedOptions[key] !== null && String(selectedOptions[key]).trim();
+    });
+
+    if (explicitNonSizeOptionNames.length > 0) {
+      byExplicitOptions = bySize.filter(function (variant) {
+        return explicitNonSizeOptionNames.every(function (optionName) {
+          var optionIndex = options.findIndex(function (opt) {
+            var candidate = typeof opt === 'string' ? opt : (opt && opt.name);
+            return normalizeText(candidate) === normalizeText(optionName);
+          });
+
+          if (optionIndex < 0) return true;
+
+          var variantValue = variant['option' + (optionIndex + 1)];
+          return normalizeText(variantValue) === normalizeText(selectedOptions[optionName]);
+        });
+      });
+
+      if (byExplicitOptions.length === 0) {
+        byExplicitOptions = bySize;
+      }
+    }
+
+    var pool = byExplicitOptions.length > 0 ? byExplicitOptions : bySize;
+
+    var byImage = [];
+    if (selectionImageUrl && pool.length > 0) {
+      byImage = pool.filter(function (v) {
+        var c = extractColorCandidatesFromVariant(v);
+        return c.imageUrl && c.imageUrl === selectionImageUrl;
+      });
+      if (byImage.length === 0) {
+        var byProductImage = getVariantsByImageFromProduct(productData, selectionImageUrl);
+        byImage = pool.filter(function (v) { return byProductImage.some(function (vi) { return vi.id === v.id; }); });
+      }
+    }
+
+    var byColorHex = [];
+    if (byImage.length === 0 && selectionColorHex && colorOptionIndex >= 0 && pool.length > 0) {
+      var inferredColorNames = hexToColorNames(selectionColorHex);
+      if (inferredColorNames.length > 0) {
+        var nameSet = new Set(inferredColorNames.map(normalizeText));
+        byColorHex = pool.filter(function (v) {
+          var colorVal = v['option' + (colorOptionIndex + 1)];
+          return colorVal && nameSet.has(normalizeText(colorVal));
+        });
+      }
+    }
+
+    var chosen = null;
+    if (byImage.length > 0) {
+      chosen = byImage.find(function (v) { return v.available; }) || byImage[0];
+    }
+    if (!chosen && byColorHex.length > 0) {
+      chosen = byColorHex.find(function (v) { return v.available; }) || byColorHex[0];
+    }
+    if (!chosen && pool.length > 0) {
+      chosen = pool.find(function (v) { return v.available; }) || pool[0];
+    }
+    if (!chosen && variants.length > 0) {
+      chosen = variants.find(function (v) { return v.available; }) || variants[0];
+    }
+
+    if (!chosen) {
+      return { variant: null, error: 'Nenhuma variante disponível para a seleção' };
+    }
+    return { variant: chosen, error: null };
+  }
+
+  function addToCart(params) {
+    var variantId = params.variantId;
+    var quantity = Math.max(1, parseInt(params.quantity, 10) || 1);
+    var properties = params.properties || {};
+    const requestBody = {
+      id: variantId,
+      quantity: quantity,
+      properties: properties,
+      sections: OMAFIT_CART_SECTION_IDS,
+      sections_url: window.location.pathname || '/'
+    };
+    return fetch('/cart/add.js', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    })
+      .then(function (res) {
+        return res.text().then(function (body) {
+          console.log('[OmafitCart] /cart/add.js status:', res.status);
+          console.log('[OmafitCart] /cart/add.js body:', body);
+          var parsed = null;
+          try { parsed = body ? JSON.parse(body) : {}; } catch (_) { parsed = {}; }
+          if (res.ok) {
+            return { success: true, cart: parsed, variantId: variantId };
+          }
+          var msg = (parsed && (parsed.description || parsed.message)) || ('Erro ao adicionar ao carrinho (HTTP ' + res.status + ')');
+          return { success: false, message: msg, status: res.status, body: parsed };
+        });
+      })
+      .catch(function (err) {
+        return { success: false, message: 'Erro de rede ao adicionar ao carrinho', debug: { reason: err && err.message } };
+      });
+  }
+
+  function waitMs(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function renderThemeCartFromResponse(addResponse) {
+    if (!addResponse || !addResponse.sections) return false;
+    var cartUi = document.querySelector('cart-drawer') || document.querySelector('cart-notification');
+    if (!cartUi || typeof cartUi.renderContents !== 'function') return false;
+    try {
+      cartUi.renderContents(addResponse);
+      console.log('[OmafitCart] UI de carrinho atualizada via renderContents do tema.');
+      return true;
+    } catch (e) {
+      console.warn('[OmafitCart] Falha ao usar renderContents do tema:', e);
+      return false;
+    }
+  }
+
+  async function fetchUpdatedCart() {
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        var url = '/cart.js?_=' + Date.now() + '_' + attempt;
+        var res = await fetch(url, {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) {
+          console.warn('[OmafitCart] /cart.js status inválido:', res.status, 'tentativa', attempt + 1);
+        } else {
+          var cart = await res.json();
+          // Em alguns temas o primeiro GET após add ainda pode vir desatualizado.
+          if (cart && typeof cart.item_count === 'number' && cart.item_count > 0) return cart;
+          if (attempt === 2) return cart || null;
+        }
+      } catch (e) {
+        console.warn('[OmafitCart] Erro ao buscar /cart.js (tentativa ' + (attempt + 1) + '):', e);
+      }
+      await waitMs(180);
+    }
+    return null;
+  }
+
+  function replaceSectionInDom(sectionId, sectionHtml) {
+    if (!sectionHtml) return false;
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(sectionHtml, 'text/html');
+    var sectionSelector = '#shopify-section-' + sectionId;
+    var currentSection = document.querySelector(sectionSelector);
+    var newSection = doc.querySelector(sectionSelector);
+
+    if (currentSection && newSection) {
+      currentSection.replaceWith(newSection);
+      return true;
+    }
+
+    // Fallback para temas que retornam snippet sem wrapper da section.
+    var fallbackTargets = {
+      'cart-icon-bubble': '#cart-icon-bubble, .cart-count-bubble, [data-cart-icon-bubble]',
+      'cart-live-region-text': '#cart-live-region-text, [data-cart-live-region-text]',
+      'cart-drawer': 'cart-drawer, #CartDrawer, .drawer--cart, [data-cart-drawer]'
+    };
+    var targetSelector = fallbackTargets[sectionId];
+    if (!targetSelector) return false;
+    var target = document.querySelector(targetSelector);
+    if (!target) return false;
+    var bodyHtml = (doc.body && doc.body.innerHTML) ? doc.body.innerHTML : sectionHtml;
+    target.innerHTML = bodyHtml;
+    return true;
+  }
+
+  async function refreshThemeCartSections() {
+    var sectionIds = OMAFIT_CART_SECTION_IDS;
+    try {
+      var sectionsParam = sectionIds.map(function (id) { return encodeURIComponent(id); }).join(',');
+      var res = await fetch('/?sections=' + sectionsParam + '&_=' + Date.now(), {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) {
+        console.warn('[OmafitCart] Falha ao buscar sections do carrinho:', res.status);
+        return null;
+      }
+      var sections = await res.json();
+      if (!sections || typeof sections !== 'object') return null;
+
+      var replacedCount = 0;
+      sectionIds.forEach(function (id) {
+        if (replaceSectionInDom(id, sections[id])) replacedCount += 1;
+      });
+      console.log('[OmafitCart] Section Rendering aplicado. Sections atualizadas:', replacedCount);
+      return sections;
+    } catch (e) {
+      console.warn('[OmafitCart] Erro ao aplicar Section Rendering API:', e);
+      return null;
+    }
+  }
+
+  function notifyThemeCartUpdate(cart) {
+    try {
+      if (window.Shopify && typeof window.Shopify.onCartUpdate === 'function') {
+        window.Shopify.onCartUpdate(cart || null);
+        console.log('[OmafitCart] Shopify.onCartUpdate disparado.');
+      }
+    } catch (e) {
+      console.warn('[OmafitCart] Erro ao disparar Shopify.onCartUpdate:', e);
+    }
+  }
+
+  function dispatchCartUpdatedEvents(cart) {
+    var detail = { source: 'omafit_tryon', cart: cart || null };
+    var eventNames = [
+      'cart:refresh',
+      'cart:updated',
+      'cart-updated',
+      'cart:change',
+      'theme:cart:refresh'
+    ];
+    eventNames.forEach(function (name) {
+      try { document.dispatchEvent(new CustomEvent(name, { detail: detail })); } catch (_) {}
+      try { window.dispatchEvent(new CustomEvent(name, { detail: detail })); } catch (_) {}
+    });
+    console.log('[OmafitCart] Eventos de atualização de carrinho disparados:', eventNames);
+  }
+
+  function openCartDrawerIfRequested(shouldOpenDrawer) {
+    if (!shouldOpenDrawer) return;
+    try {
+      document.dispatchEvent(new CustomEvent('cart:open', { detail: { source: 'omafit_tryon' } }));
+      document.dispatchEvent(new CustomEvent('cart-drawer:open', { detail: { source: 'omafit_tryon' } }));
+      window.dispatchEvent(new CustomEvent('cart:open', { detail: { source: 'omafit_tryon' } }));
+      window.dispatchEvent(new CustomEvent('cart-drawer:open', { detail: { source: 'omafit_tryon' } }));
+    } catch (_) {}
+
+    var drawerToggle = document.querySelector(
+      '[data-cart-drawer-toggle], [data-cart-toggle], .js-cart-toggle, button[aria-controls*="CartDrawer"], button[aria-label*="cart"], button[aria-label*="Cart"]'
+    );
+    if (drawerToggle && typeof drawerToggle.click === 'function') {
+      drawerToggle.click();
+      console.log('[OmafitCart] Drawer de carrinho aberto via toggle do tema.');
+      return;
+    }
+    console.log('[OmafitCart] Solicitação para abrir drawer enviada, sem toggle detectado.');
+  }
+
+  function postResultToIframe(targetWindow, targetOrigin, resultPayload) {
+    if (!targetWindow || !targetWindow.postMessage) return;
+    var payload = resultPayload && typeof resultPayload === 'object' ? resultPayload : {};
+    var finalMessage = {
+      type: 'omafit-add-to-cart-result',
+      payload: {
+        requestId: payload.requestId,
+        success: !!payload.success,
+        message: payload.message || '',
+        cart: payload.cart,
+        variantId: payload.variantId,
+        debug: payload.debug
+      }
+    };
+    console.log('[OmafitCart] resultado enviado iframe:', finalMessage);
+    try {
+      targetWindow.postMessage(finalMessage, targetOrigin);
+    } catch (e) {
+      console.warn('[OmafitCart] Erro ao enviar resultado ao iframe:', e);
+    }
+  }
+
+  async function fetchProductWithVariants() {
+    const info = getProductInfo();
+    const handle = (info.productHandle || '').trim();
+    if (!handle) return null;
+    try {
+      const res = await fetch('/products/' + encodeURIComponent(handle) + '.js');
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('[OmafitCart] Erro ao buscar produto:', e);
+      return null;
+    }
+  }
+
+  window.addEventListener('message', async function (event) {
+    if (!isValidAddToCartMessage(event)) return;
+
+    var payload = event.data.payload && typeof event.data.payload === 'object' ? event.data.payload : event.data;
+    var requestId = payload.requestId !== undefined ? payload.requestId : event.data.requestId;
+    var source = event.source;
+    var origin = event.origin;
+
+    if (OMAFIT_PROCESSED_REQUEST_IDS.has(requestId)) {
+      console.log('[OmafitCart] Requisição duplicada ignorada:', requestId);
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: 'Requisição duplicada',
+        debug: { reason: 'idempotency' }
+      });
+      return;
+    }
+    if (Date.now() - OMAFIT_LAST_REQUEST_ID_CLEANUP > OMAFIT_REQUEST_ID_MAX_AGE_MS) {
+      OMAFIT_PROCESSED_REQUEST_IDS.clear();
+      OMAFIT_LAST_REQUEST_ID_CLEANUP = Date.now();
+    }
+    OMAFIT_PROCESSED_REQUEST_IDS.add(requestId);
+
+    const selection = payload.selection || {};
+    const quantity = payload.quantity === undefined ? 1 : Math.max(0, parseInt(payload.quantity, 10) || 1);
+    const shopDomain = payload.shop_domain;
+    const metadata = payload.metadata || {};
+    const shouldOpenDrawer = !!(payload.open_cart_drawer || metadata.open_cart_drawer);
+
+    console.log('[OmafitCart] Add-to-cart solicitado:', requestId, payload.product);
+
+    var productData = await fetchProductWithVariants();
+    if (!productData) {
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: 'Produto não encontrado na página atual',
+        debug: { reason: 'product_fetch' }
+      });
+      return;
+    }
+
+    var payloadProductId = String(payload.product.id || '').replace(/^.*\/(\d+)$/, '$1');
+    var currentProductId = String(productData.id || '').replace(/^.*\/(\d+)$/, '$1');
+    if (payloadProductId && currentProductId && payloadProductId !== currentProductId) {
+      console.warn('[OmafitCart] product.id do payload não corresponde ao produto da página:', payloadProductId, 'vs', currentProductId);
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: 'Produto da solicitação não corresponde à página atual',
+        debug: { reason: 'product_mismatch' }
+      });
+      return;
+    }
+
+    var resolved = resolveVariantFromSelection({ productData: productData, selection: selection });
+    if (resolved.error || !resolved.variant) {
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: resolved.error || 'Variante não encontrada',
+        debug: { reason: 'variant_resolution' }
+      });
+      return;
+    }
+
+    var variantId = resolved.variant.id;
+    console.log('[OmafitCart] variantId final:', variantId);
+    // Não enviar metadados internos como line item properties do Shopify,
+    // para evitar exibição no carrinho/checkout.
+    var properties = {};
+    var cartLanguage =
+      normalizeLanguageTag(metadata.language) ||
+      normalizeLanguageTag(OMAFIT_CONFIG.adminLocale) ||
+      normalizeLanguageTag(detectStoreLanguage()) ||
+      '';
+
+    if (resolved.variant.available === false) {
+      var unavailableMessage =
+        cartLanguage === 'es'
+          ? 'La variante seleccionada está agotada.'
+          : cartLanguage === 'en'
+            ? 'The selected variant is sold out.'
+            : 'A variante selecionada está esgotada.';
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: unavailableMessage,
+        variantId: variantId,
+        variant_status: 'sold_out',
+        inventory_status: 'unavailable',
+        debug: {
+          reason: 'variant_unavailable',
+          variantTitle: resolved.variant.title || ''
+        }
+      });
+      return;
+    }
+
+    var addResult = await addToCart({ variantId: variantId, quantity: quantity || 1, properties: properties });
+
+    if (addResult.success) {
+      var renderedByTheme = renderThemeCartFromResponse(addResult.cart);
+      var updatedCart = await fetchUpdatedCart();
+      if (!renderedByTheme) {
+        await refreshThemeCartSections();
+      }
+      notifyThemeCartUpdate(updatedCart || addResult.cart || null);
+      dispatchCartUpdatedEvents(updatedCart || addResult.cart || null);
+      openCartDrawerIfRequested(shouldOpenDrawer);
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: true,
+        message: 'Adicionado ao carrinho',
+        cart: updatedCart || addResult.cart,
+        variantId: variantId
+      });
+    } else {
+      postResultToIframe(source, origin, {
+        requestId: requestId,
+        success: false,
+        message: addResult.message || 'Erro ao adicionar ao carrinho',
+        variantId: variantId,
+        debug: addResult.debug || (addResult.body ? { body: addResult.body } : undefined)
+      });
+    }
+  });
+
   // Criar o link do widget
   function createOmafitLink() {
     const link = document.createElement('a');
@@ -1881,7 +2888,7 @@
     link.addEventListener('mouseenter', function () {
       this.style.opacity = '0.7';
       this.style.textDecorationThickness = '2px';
-      preconnectWidget();
+      omafitTryOnPreconnect();
     });
     link.addEventListener('mouseleave', function () {
       this.style.opacity = '1';
@@ -1899,7 +2906,90 @@
     return link;
   }
 
-  // Criar link Omafit logo abaixo do botão "Adicionar ao carrinho"
+  function omafitTryOnPreconnect() {
+    if (!document.querySelector('link[rel="preconnect"][href="' + OMAFIT_WIDGET_ORIGIN + '"]')) {
+      const preconnect = document.createElement('link');
+      preconnect.rel = 'preconnect';
+      preconnect.href = OMAFIT_WIDGET_ORIGIN;
+      preconnect.crossOrigin = 'anonymous';
+      document.head.appendChild(preconnect);
+    }
+  }
+
+  /** Botão pill com logo + texto (alternativa ao link). */
+  function createOmafitButton() {
+    const primaryColor = OMAFIT_CONFIG?.colors?.primary || OMAFIT_CONFIG?.colors?.text || '#810707';
+    const label = OMAFIT_CONFIG?.linkText || 'Experimentar virtualmente';
+    const logoRaw = OMAFIT_CONFIG?.storeLogo != null ? String(OMAFIT_CONFIG.storeLogo).trim() : '';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'omafit-try-on-cta omafit-try-on-cta-button';
+    btn.setAttribute('aria-label', label);
+    btn.style.fontFamily = OMAFIT_CONFIG?.fontFamily || 'inherit';
+    btn.style.display = 'inline-flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.gap = '10px';
+    btn.style.padding = '12px 22px';
+    btn.style.borderRadius = '9999px';
+    btn.style.border = '2px solid ' + primaryColor;
+    btn.style.background = '#ffffff';
+    btn.style.color = primaryColor;
+    btn.style.cursor = 'pointer';
+    btn.style.fontSize = '15px';
+    btn.style.fontWeight = '600';
+    btn.style.lineHeight = '1.25';
+    btn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+    btn.style.transition = 'opacity 0.2s ease, transform 0.15s ease';
+    btn.style.maxWidth = '100%';
+
+    if (logoRaw && /^https?:\/\//i.test(logoRaw)) {
+      const img = document.createElement('img');
+      img.src = logoRaw;
+      img.alt = '';
+      img.width = 32;
+      img.height = 32;
+      img.style.width = '32px';
+      img.style.height = '32px';
+      img.style.objectFit = 'contain';
+      img.style.borderRadius = '6px';
+      img.style.flexShrink = '0';
+      btn.appendChild(img);
+    }
+
+    const span = document.createElement('span');
+    span.textContent = label;
+    span.style.textAlign = 'center';
+    btn.appendChild(span);
+
+    btn.addEventListener('mouseenter', function () {
+      btn.style.opacity = '0.9';
+      btn.style.transform = 'translateY(-1px)';
+      omafitTryOnPreconnect();
+    });
+    btn.addEventListener('mouseleave', function () {
+      btn.style.opacity = '1';
+      btn.style.transform = 'none';
+    });
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (isOmafitArEyewearPage() && !getOmafitArGlbUrlFromDom()) return;
+      if (typeof window.openOmafitModal === 'function') {
+        window.openOmafitModal();
+      }
+    });
+
+    return btn;
+  }
+
+  function createOmafitCta() {
+    const mode = String(OMAFIT_CONFIG?.ctaType || OMAFIT_CONFIG?.cta_type || '').trim().toLowerCase();
+    if (mode === 'button') return createOmafitButton();
+    return createOmafitLink();
+  }
+
+  // Inserir CTA do widget (link ou botão) na página de produto
   function insertOmafitLinkUnderAddToCart() {
     if (isOmafitArEyewearPage() && !getOmafitArGlbUrlFromDom()) {
       removeClothingOmafitUi();
@@ -1912,17 +3002,25 @@
       OMAFIT_CONFIG = {
         linkText: 'Experimentar virtualmente',
         colors: { primary: '#810707', text: '#810707' },
-        adminLocale: 'en',
         fontFamily: 'inherit',
-        shopDomain: ''
+        shopDomain: '',
+        embedPosition: 'below_buy_buttons',
+        ctaType: 'link'
       };
     }
+    syncAdminBrandingToWidgetRoot(OMAFIT_CONFIG);
 
-    // Verificar se já existe um link Omafit (evitar duplicatas)
-    if (document.querySelector('.omafit-try-on-link')) {
-      console.log('✅ Link Omafit já existe na página');
+    if (document.querySelector('.omafit-widget')) {
+      console.log('✅ Widget Omafit já existe na página');
       return;
     }
+
+    const embedPos =
+      String(OMAFIT_CONFIG.embedPosition || OMAFIT_CONFIG.embed_position || '')
+        .trim()
+        .toLowerCase() === 'above_buy_buttons'
+        ? 'above_buy_buttons'
+        : 'below_buy_buttons';
 
     // Tentar alguns seletores comuns de botão de carrinho
     const addToCartSelectors = [
@@ -1965,82 +3063,99 @@
       }
     }
 
-    // Criar container e link
     const container = document.createElement('div');
     container.className = 'omafit-widget';
     container.style.textAlign = 'center';
-    container.style.marginTop = '16px';
-    container.style.marginBottom = '24px';
+    if (embedPos === 'above_buy_buttons') {
+      container.style.marginTop = '0';
+      container.style.marginBottom = '16px';
+    } else {
+      container.style.marginTop = '16px';
+      container.style.marginBottom = '24px';
+    }
 
-    const link = createOmafitLink();
-    container.appendChild(link);
+    container.appendChild(createOmafitCta());
+
+    function insertContainerFallback() {
+      const root = document.getElementById('omafit-widget-root');
+      if (root) {
+        root.appendChild(container);
+        console.log('✅ Widget inserido no root element');
+      } else {
+        document.body.appendChild(container);
+        console.log('✅ Widget inserido no body (fallback)');
+      }
+    }
 
     if (addToCartButton) {
-      // Priorizar posicionamento abaixo do "Compre já", para ficar abaixo dos dois CTAs.
-      let anchorElement = null;
-
-      const closestForm = addToCartButton.closest('form');
-      const closestProductBlock =
-        addToCartButton.closest('.product-form') ||
-        addToCartButton.closest('.product') ||
-        addToCartButton.closest('[class*="product"]');
-
-      // Busca "Compre já" em raízes mais próximas primeiro (evita pegar botão de outra seção).
-      const searchRoots = [
-        closestForm?.parentElement || null,
-        closestForm || null,
-        closestProductBlock || null,
-        document
-      ].filter(Boolean);
-
-      for (const root of searchRoots) {
-        const foundBuyNow = findFirstVisible(buyNowSelectors, root);
-        if (foundBuyNow?.element) {
-          anchorElement = foundBuyNow.element;
-          console.log('✅ Botão/contêiner "Compre já" encontrado com seletor:', foundBuyNow.selector);
-          break;
-        }
-      }
-
-      // Se não encontrar "Compre já", mantém comportamento antigo (abaixo do adicionar ao carrinho).
-      if (!anchorElement) {
-        anchorElement = addToCartButton;
-      }
-
-      if (anchorElement.parentNode) {
-        anchorElement.parentNode.insertBefore(container, anchorElement.nextSibling);
-        console.log('✅ Widget inserido abaixo dos botões de compra');
-      } else {
-        // fallback: tenta inserir no root, se existir
-        const root = document.getElementById('omafit-widget-root');
-        if (root) {
-          root.appendChild(container);
-          console.log('✅ Widget inserido no root element');
+      if (embedPos === 'above_buy_buttons') {
+        if (addToCartButton.parentNode) {
+          addToCartButton.parentNode.insertBefore(container, addToCartButton);
+          console.log('✅ Widget inserido acima dos botões de compra');
         } else {
-          document.body.appendChild(container);
-          console.log('✅ Widget inserido no body (fallback)');
+          insertContainerFallback();
+        }
+      } else {
+        let anchorElement = null;
+
+        const closestForm = addToCartButton.closest('form');
+        const closestProductBlock =
+          addToCartButton.closest('.product-form') ||
+          addToCartButton.closest('.product') ||
+          addToCartButton.closest('[class*="product"]');
+
+        const searchRoots = [
+          closestForm?.parentElement || null,
+          closestForm || null,
+          closestProductBlock || null,
+          document
+        ].filter(Boolean);
+
+        for (const root of searchRoots) {
+          const foundBuyNow = findFirstVisible(buyNowSelectors, root);
+          if (foundBuyNow?.element) {
+            anchorElement = foundBuyNow.element;
+            console.log('✅ Botão/contêiner "Compre já" encontrado com seletor:', foundBuyNow.selector);
+            break;
+          }
+        }
+
+        if (!anchorElement) {
+          anchorElement = addToCartButton;
+        }
+
+        if (anchorElement.parentNode) {
+          anchorElement.parentNode.insertBefore(container, anchorElement.nextSibling);
+          console.log('✅ Widget inserido abaixo dos botões de compra');
+        } else {
+          insertContainerFallback();
         }
       }
     } else {
       console.warn('⚠️ Omafit: botão "Adicionar ao carrinho" não encontrado. Tentando inserir no formulário de produto...');
-      
-      // Tentar encontrar formulário de produto
+
       const productForm = document.querySelector('form[action*="/cart/add"], .product-form, form.product-form');
       if (productForm) {
-        productForm.appendChild(container);
+        if (embedPos === 'above_buy_buttons' && productForm.firstChild) {
+          productForm.insertBefore(container, productForm.firstChild);
+        } else {
+          productForm.appendChild(container);
+        }
         console.log('✅ Widget inserido no formulário de produto');
         return;
       }
-      
-      // Último fallback: inserir em qualquer elemento de produto
+
       const productSection = document.querySelector('.product, .product-single, [class*="product"]');
       if (productSection) {
-        productSection.appendChild(container);
+        if (embedPos === 'above_buy_buttons' && productSection.firstChild) {
+          productSection.insertBefore(container, productSection.firstChild);
+        } else {
+          productSection.appendChild(container);
+        }
         console.log('✅ Widget inserido na seção de produto');
         return;
       }
-      
-      // Inserir no body como último recurso
+
       document.body.appendChild(container);
       console.log('✅ Widget inserido no body (último recurso)');
     }
@@ -2078,7 +3193,8 @@
       '    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;' +
       '  }' +
       '}' +
-      '.omafit-try-on-link:focus {' +
+      '.omafit-try-on-link:focus,' +
+      '.omafit-try-on-cta:focus {' +
       '  outline: 2px solid ' + (OMAFIT_CONFIG.colors?.primary || OMAFIT_CONFIG.colors?.text || '#810707') + ';' +
       '  outline-offset: 2px;' +
       '}';
@@ -2090,15 +3206,16 @@
     try {
       if (isOmafitArEyewearPage() && !getOmafitArGlbUrlFromDom()) {
         removeClothingOmafitUi();
-        if (OMAFIT_DEBUG) {
-          console.log('Omafit: provador AR óculos (sem GLB) — widget de roupa não é carregado.');
-        }
+        console.log('Omafit: provador AR óculos (sem GLB) — widget de roupa não é carregado.');
         return;
       }
       console.log('🚀 Inicializando Omafit...');
 
       // Buscar configuração via API
       OMAFIT_CONFIG = await fetchOmafitConfig();
+      if (OMAFIT_CONFIG) {
+        OMAFIT_CONFIG.storeName = ensureStoreName(OMAFIT_CONFIG);
+      }
 
       if (!OMAFIT_CONFIG) {
         console.error('❌ Falha ao carregar configuração do Omafit');
@@ -2108,7 +3225,6 @@
           linkText: 'Experimentar virtualmente',
           storeName: '',
           storeLogo: '',
-          adminLocale: 'en',
           fontFamily: 'inherit',
           colors: {
             primary: '#810707',
@@ -2118,9 +3234,14 @@
           },
           shopDomain: '',
           widgetEnabled: true,
-          isActive: true
+          isActive: true,
+          embedPosition: 'below_buy_buttons',
+          ctaType: 'link'
         };
       }
+
+      OMAFIT_CONFIG.storeName = ensureStoreName(OMAFIT_CONFIG);
+      syncAdminBrandingToWidgetRoot(OMAFIT_CONFIG);
 
       console.log('✅ Configuração carregada:', OMAFIT_CONFIG);
 
@@ -2149,45 +3270,49 @@
             publicId: 'wgt_pub_default',
             linkText: 'Experimentar virtualmente',
             colors: { primary: '#810707', text: '#810707' },
-            adminLocale: 'en',
             fontFamily: 'inherit',
             shopDomain: '',
             widgetEnabled: true,
-            isActive: true
+            isActive: true,
+            embedPosition: 'below_buy_buttons',
+            ctaType: 'link'
           };
         }
         // Verificar se está habilitado mesmo no fallback
         if (OMAFIT_CONFIG.widgetEnabled !== false && OMAFIT_CONFIG.isActive !== false) {
           insertOmafitLinkUnderAddToCart();
         }
+        syncAdminBrandingToWidgetRoot(OMAFIT_CONFIG);
       } catch (err) {
         console.error('❌ Erro crítico ao inserir widget:', err);
       }
     }
   }
 
-  // Inicializar widget (defer para preservar velocidade do site)
+  // Inicializar widget (deferido para não bloquear carregamento da página)
   function startInit() {
-    function runInit() {
+    function doInit() {
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', runInit);
-        return;
-      }
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(initOmafit, { timeout: 2500 });
+        document.addEventListener('DOMContentLoaded', initOmafit);
       } else {
-        setTimeout(initOmafit, 150);
+        setTimeout(initOmafit, 50);
       }
     }
-    runInit();
+
+    // Usar requestIdleCallback quando disponível para não competir com recursos críticos
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(function() { doInit(); }, { timeout: 2000 });
+    } else {
+      doInit();
+    }
   }
 
   startInit();
   
   // Também tentar após um delay (para temas que carregam conteúdo dinamicamente)
   setTimeout(function() {
-    if (isOmafitArEyewearPage() && !getOmafitArGlbUrlFromDom()) return;
-    if (!document.querySelector('.omafit-try-on-link')) {
+    if (isOmafitArEyewearPage()) return;
+    if (!document.querySelector('.omafit-widget')) {
       console.log('🔄 Tentando inicializar novamente (retry)...');
       initOmafit();
     }
@@ -2196,8 +3321,8 @@
   // Observar mudanças no DOM (para SPAs)
   if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver(function(mutations) {
-      if (isOmafitArEyewearPage() && !getOmafitArGlbUrlFromDom()) return;
-      if (!document.querySelector('.omafit-try-on-link')) {
+      if (isOmafitArEyewearPage()) return;
+      if (!document.querySelector('.omafit-widget')) {
         const hasProductForm = document.querySelector('form[action*="/cart/add"], button[name="add"]');
         if (hasProductForm) {
           console.log('🔄 Novo conteúdo detectado, tentando inserir widget...');
