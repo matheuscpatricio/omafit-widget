@@ -240,15 +240,14 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-variant-cart-zfix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-glasses-prod-no-pivot-test";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
- * `glassesPivot` e usa `OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES` (valores pedidos
- * para teste no dispositivo). `rot*` em **graus** (Euler XYZ), como o resto
- * do pipeline (`rotY = 180` ≡ π rad).
+ * `glassesPivot` e usa `OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES` — só para debug local.
+ * Em produção deve ser `false` senão o GLB pode ficar fora do sítio esperado.
  */
-const OMAFIT_GLASSES_PIVOT_DIRECT_TEST = true;
+const OMAFIT_GLASSES_PIVOT_DIRECT_TEST = false;
 const OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES = {
   offsetX: -0.015,
   offsetY: -0.01,
@@ -3392,7 +3391,7 @@ function injectGlobalStyles(root, primaryOverride) {
       z-index: 120 !important;
       pointer-events: auto !important;
     }
-    /* Controlo de rotação GLB: irmão de .omafit-ar-fit, fora de overflow:hidden do vídeo. */
+    /* Controlo opcional de rotação GLB (só se data-ar-glasses-screen-rot=1). */
     .omafit-ar-shell .omafit-ar-glasses-screen-rot,
     [data-omafit="glasses-screen-rot"] {
       z-index: 50 !important;
@@ -3883,15 +3882,14 @@ function omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, opts) {
    */
   if (vw >= 2 && vh >= 2 && strict && typeof renderer.setSize === "function") {
     /**
-     * Buffer WebGL = resolução intrínseca do stream (nitidez + alinhamento com `camera`).
-     * `setSize(..., true)` aplica também CSS no canvas via Three.js.
+     * Buffer WebGL = resolução intrínseca do stream (FOV/aspect alinhados ao vídeo).
+     * `updateStyle=false`: o MindAR `_resize()` controla CSS do canvas no host;
+     * com `true`, o canvas ficava em px intrínsecos (ex. 1920×1080) por cima do
+     * layout do MindAR → recorte errado e o GLB parecia “invisível”.
      *
-     * Não forçar `video.style.width/height` nem duplicar CSS no canvas: o MindAR
-     * `_resize()` dimensiona o `<video>` e `top`/`left` para efeito "cover" no
-     * host — reaplicar os pixels intrínsecos do frame a cada `onUpdate` deslocava
-     * o feed (faixa preta em cima ou à volta, câmara só numa banda).
+     * Não tocar no `<video>` aqui (ver comentário anterior sobre object-fit cover).
      */
-    renderer.setSize(vw, vh, true);
+    renderer.setSize(vw, vh, false);
   }
   let aspect =
     vw >= 2 && vh >= 2
@@ -5398,10 +5396,13 @@ async function runArSession({
     const tripDegX = tripOffUseAuto || !Number.isFinite(tripOffParts[1]) ? 0 : tripOffParts[1];
     const tripDegZ = tripOffUseAuto || !Number.isFinite(tripOffParts[2]) ? 0 : tripOffParts[2];
 
-    /** Botões +/− no ecrã: `data-ar-glasses-screen-rot="0"` desliga. Query: `?omafit_ar_glasses_screen_rot=0|1`. */
-    const screenRotAttr = String(cfgAttr("arGlassesScreenRot", "1")).trim().toLowerCase();
+    /**
+     * Painel +/- de rotação no ecrã: **desligado por defeito** (`data-ar-glasses-screen-rot="1"` para ligar).
+     * Query: `?omafit_ar_glasses_screen_rot=0|1`.
+     */
+    const screenRotAttr = String(cfgAttr("arGlassesScreenRot", "0")).trim().toLowerCase();
     let useGlassesScreenRot =
-      accessoryType === "glasses" && !/^(0|off|false|no)$/.test(screenRotAttr);
+      accessoryType === "glasses" && /^(1|on|true|yes)$/.test(screenRotAttr);
     try {
       const q = new URLSearchParams(window.location?.search || "");
       const qv = (q.get("omafit_ar_glasses_screen_rot") || "").trim().toLowerCase();
