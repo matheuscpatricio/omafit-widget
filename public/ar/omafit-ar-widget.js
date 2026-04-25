@@ -78,19 +78,23 @@ import {
  *
  * 4) Escala — CRÍTICO:
  *    `anchor.group.matrix` multiplica os filhos por `faceScale` (ver `controller.js:
- *    getLandmarkMatrix: fm * s`). `faceScale` vem do canonical face do MediaPipe e é
- *    ~14 "unidades canónicas" (largura da cara).
- *    Portanto, para obter óculos ~1× a largura da cara, o GLB precisa estar em ~1 unidade
- *    de largura no espaço local da âncora. Logo: `baseUnitScale = 1/maxDim × modelScaleMul`.
+ *    getLandmarkMatrix: fm * s`). O `estimateResult.faceScale` do MindAR
+ *    (`estimator.js`: `rightMost.x − leftMost.x` em `metricLandmarks`) está no **mesmo
+ *    espaço 3D** que a distância bochecha–bochecha (234–454). Não misturar essas
+ *    grandezas com `wideDim` em **metros** do GLB — o quociente `cw / wideDim` explodia
+ *    a escala. A escala por frame usa `cw / faceScale` (adimensional) × `baseUnitScale`.
+ *    `baseUnitScale = 1/maxDim × modelScaleMul` mantém o GLB ~1 unidade de âncora.
  *    (O `0.085` antigo produzia óculos com ~1cm num rosto de 14 — invisível.)
  *
  * 5) GLB tem qualquer orientação — o lojista calibra na ferramenta visual do admin.
  *
  * Oclusão WebAR (Three.js): máscara facial só depth — `MeshBasicMaterial` com
- * `colorWrite: false`, `depthWrite: true`, renderOrder abaixo do GLB; ver
- * https://threejs.org/docs/#api/en/materials/Material.depthWrite e guias
- * MindAR (malha 468 + âncora). `frustumCulled = false` nos oclusores dinâmicos
- * evita culling com bbox desactualizada após deformação.
+ * `colorWrite: false`, `depthWrite: true`, renderOrder abaixo do GLB; o depth buffer
+ * grava a silhueta da face (malha 468 MindAR) para o GLB não “pintar” por cima do nariz
+ * ou pestanas. Limitações: sem stencil por cabelo fino, sem SSAO facial; oclusores são
+ * aproximações da superfície. Ver
+ * https://threejs.org/docs/#api/en/materials/Material.depthWrite e MindAR `addFaceMesh`.
+ * `frustumCulled = false` nos oclusores dinâmicos evita culling com bbox desactualizada.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -240,7 +244,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-wide-dim-max";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_glasses-scale-faceScale";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -310,6 +314,8 @@ const OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF = 1.02;
 const OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR = 1.05;
 /** EMA só na largura bochecha (estabilidade da escala anatómica). */
 const OMAFIT_FACE_CHEEK_WIDTH_SMOOTH = 0.18;
+/** Lerp do `faceScale` MindAR (mesmo espaço que `metricLandmarks`) — reduz jitter na escala. */
+const OMAFIT_FACE_FS_SCALE_SMOOTH = 0.2;
 /** Modelo Image Segmenter (multiclasse: cabelo, pele, roupa, …) — mesmo runtime WASM que HandLandmarker. */
 const OMAFIT_IMAGE_SEG_SELFIE_MULTICLASS_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite";
@@ -6120,11 +6126,10 @@ async function runArSession({
       const szW = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szW);
       /**
-       * Escala anatómica: `s ≈ factor * dist(234–454) / wideDim` (cada frame).
-       * Só `max(sz.x, sz.z)` assumia que a largura da armação está sempre no plano XZ.
-       * Após `computeGlassesCanonicalOffsetQuat` / bind, a largura útil pode cair
-       * no eixo **Y**; escolher X ou Z podia ser a **espessura** (~mm) → `wideDim`
-       * minúsculo → óculos gigantes. Usamos o maior dos três eixos da bbox.
+       * Largura de referência do GLB (metros, pré-escala): `max(sz.x, sz.y, sz.z)` da bbox.
+       * Só `max(sz.x, sz.z)` podia apanhar a **espessura** da armação → `wideDim` minúsculo.
+       * A escala **por frame** não divide `cw` por `wideDim` (unidades incompatíveis com
+       * `metricLandmarks`); usa `estimateResult.faceScale` — ver loop `onUpdate`.
        */
       glassesWideDimPreScale = Math.max(szW.x, szW.y, szW.z, 1e-6);
     }
@@ -6544,6 +6549,7 @@ async function runArSession({
       smoothInitialized: false,
       cheekRefWidth: null,
       smoothedCheekW: null,
+      smoothedFaceScale: null,
       glassesWideDimPreScale,
       modelScaleMul,
       glassesAnatomicWidthFactor,
@@ -6672,6 +6678,7 @@ async function runArSession({
           st.smoothInitialized = false;
           st.lmSmoother?.reset();
           st.smoothedCheekW = null;
+          st.smoothedFaceScale = null;
           st.cheekBasisValid = false;
           if (st.glassesCheekOrthogonalBasis && faceParentGroup) {
             faceParentGroup.matrix.identity();
@@ -6934,7 +6941,29 @@ async function runArSession({
             const wideDim = st.glassesWideDimPreScale;
             const factor = st.glassesAnatomicWidthFactor || OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR;
             const mulScale = st.modelScaleMul || 1;
-            if (typeof wideDim === "number" && wideDim > 1e-6) {
+            const fsRaw = Number(est?.faceScale);
+            if (Number.isFinite(fsRaw) && fsRaw > 1e-8) {
+              if (
+                !(typeof st.smoothedFaceScale === "number") ||
+                !Number.isFinite(st.smoothedFaceScale)
+              ) {
+                st.smoothedFaceScale = fsRaw;
+              } else {
+                st.smoothedFaceScale = THREE.MathUtils.lerp(
+                  st.smoothedFaceScale,
+                  fsRaw,
+                  OMAFIT_FACE_FS_SCALE_SMOOTH,
+                );
+              }
+            }
+            const fsUse = Number(st.smoothedFaceScale);
+            if (Number.isFinite(fsUse) && fsUse > 1e-8) {
+              const cheekToFace = cwUse / fsUse;
+              const s = baseUnitScale * mulScale * factor * cheekToFace;
+              if (Number.isFinite(s) && s > 1e-8) {
+                glasses.scale.setScalar(s);
+              }
+            } else if (typeof wideDim === "number" && wideDim > 1e-6) {
               const s = ((factor * cwUse) / wideDim) * mulScale;
               if (Number.isFinite(s) && s > 1e-8) {
                 glasses.scale.setScalar(s);
