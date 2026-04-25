@@ -6,25 +6,25 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'link';
 type Size = 'sm' | 'md' | 'lg' | 'xl' | 'icon';
 
 const base =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium tracking-tight ' +
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[6px] font-bricolage font-medium tracking-[0.05em] ' +
   'transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
-  'focus-visible:ring-[#810707] focus-visible:ring-offset-white disabled:opacity-50 disabled:pointer-events-none ' +
+  'focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-[var(--color-bg-light)] disabled:opacity-50 disabled:pointer-events-none ' +
   'select-none will-change-transform';
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-[#810707] text-white shadow-[0_1px_2px_rgba(26,26,26,0.06),0_8px_24px_-4px_rgba(129,7,7,0.35)] ' +
-    'hover:bg-[#6b0505] active:bg-[#4a0303]',
+    'border border-transparent bg-[#D96845] text-[#F6F0E2] shadow-[0_1px_2px_rgba(0,0,0,0.18)] ' +
+    'hover:bg-[var(--color-accent-dark)] active:opacity-95',
   secondary:
-    'bg-white text-[#1A1A1A] border border-[#1A1A1A]/10 shadow-sm ' +
-    'hover:bg-[#1A1A1A]/[0.03] hover:border-[#1A1A1A]/20',
+    'border border-[#D96845] bg-transparent text-[#D96845] shadow-none ' +
+    'hover:bg-[#D96845]/[0.08] hover:text-[#D96845]',
   outline:
-    'bg-transparent text-[#1A1A1A] border border-[#1A1A1A]/15 ' +
-    'hover:bg-[#1A1A1A]/[0.04] hover:border-[#1A1A1A]/25',
+    'border border-[#D96845] bg-transparent text-[#D96845] shadow-none ' +
+    'hover:bg-[#D96845]/[0.08] hover:text-[#D96845]',
   ghost:
-    'bg-transparent text-[#1A1A1A] hover:bg-[#1A1A1A]/[0.05]',
+    'border border-transparent bg-transparent text-[var(--color-text-light)] hover:bg-[var(--color-text-light)]/[0.08]',
   link:
-    'bg-transparent text-[#810707] underline-offset-4 hover:underline px-0',
+    'bg-transparent text-[var(--color-accent)] underline-offset-4 hover:underline px-0',
 };
 
 const sizes: Record<Size, string> = {

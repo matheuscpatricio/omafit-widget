@@ -15,7 +15,7 @@ type CtaBlockSurfaceProps = {
  */
 export function CtaBlockSurface({ children, className, contentClassName }: CtaBlockSurfaceProps) {
   return (
-    <div className={cn('relative overflow-hidden bg-ink-900 text-white', className)}>
+    <div className={cn('relative overflow-hidden bg-oma-canvas text-oma-cream', className)}>
       <picture className="pointer-events-none absolute inset-0 block">
         <source srcSet={LANDING_IMAGES.midBannerWebp} type="image/webp" />
         <img
@@ -29,16 +29,16 @@ export function CtaBlockSurface({ children, className, contentClassName }: CtaBl
           loading="lazy"
         />
       </picture>
-      <div className="absolute inset-0 bg-gradient-to-br from-ink-900/95 via-ink-900/88 to-[#4a0303]/90" />
+      <div className="absolute inset-0 bg-gradient-to-br from-oma-canvas/98 via-oma-elevated/95 to-oma-accent-dark/40" />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-40 -top-40 h-[min(100%,480px)] w-[min(100%,480px)] rounded-full opacity-40 blur-3xl sm:h-[480px] sm:w-[480px]"
-        style={{ background: 'radial-gradient(circle, rgba(129,7,7,0.8), transparent)' }}
+        className="pointer-events-none absolute -left-40 -top-40 h-[min(100%,480px)] w-[min(100%,480px)] rounded-full opacity-45 blur-3xl sm:h-[480px] sm:w-[480px]"
+        style={{ background: 'radial-gradient(circle, rgba(217,104,69,0.55), transparent)' }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-40 -right-40 h-[min(100%,480px)] w-[min(100%,480px)] rounded-full opacity-30 blur-3xl sm:h-[480px] sm:w-[480px]"
-        style={{ background: 'radial-gradient(circle, rgba(129,7,7,0.6), transparent)' }}
+        className="pointer-events-none absolute -bottom-40 -right-40 h-[min(100%,480px)] w-[min(100%,480px)] rounded-full opacity-35 blur-3xl sm:h-[480px] sm:w-[480px]"
+        style={{ background: 'radial-gradient(circle, rgba(91,175,138,0.35), transparent)' }}
       />
       <div
         aria-hidden

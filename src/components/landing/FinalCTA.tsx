@@ -23,7 +23,7 @@ const itemVariants: Variants = {
 
 export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
   return (
-    <section className="relative py-20 sm:py-28 overflow-hidden bg-white">
+    <section className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -38,9 +38,9 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
             <div className="relative mx-auto max-w-3xl text-center">
             <motion.span
               variants={itemVariants}
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 backdrop-blur px-3 py-1 text-[12px] font-medium text-white/80"
+              className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-cream/15 bg-oma-cream/5 px-3 py-1 text-[12px] font-medium text-oma-cream/80 backdrop-blur"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#810707]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
               Comece hoje mesmo
             </motion.span>
 
@@ -50,13 +50,13 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
               style={{ letterSpacing: '-0.035em' }}
             >
               Não Deixe Mais Vendas Escaparem. <br className="hidden sm:block" />
-              <span className="text-white/60">Transforme Sua Loja</span>{' '}
-              <span className="text-[#ff9696] bg-clip-text">Hoje.</span>
+              <span className="text-oma-cream/60">Transforme Sua Loja</span>{' '}
+              <span className="landing-tagline text-oma-accent">Hoje.</span>
             </motion.h2>
 
             <motion.p
               variants={itemVariants}
-              className="mt-6 text-lg text-white/70 leading-relaxed"
+              className="mt-6 text-lg leading-relaxed text-oma-cream/70"
             >
               Instale em 5 minutos — a instalação na Shopify é gratuita. No On-Demand você começa com 50
               sessões de try-on incluídas e 5 acessórios AR; depois, paga só pelo volume extra que precisar.
@@ -80,17 +80,11 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
                 }}
               >
                 Instalar Omafit na Shopify
-                <span className="text-xs font-normal text-white/75">(instalação grátis)</span>
+                <span className="text-xs font-normal text-oma-cream/75">(instalação grátis)</span>
                 <ArrowRight className="w-4 h-4" />
               </ButtonLink>
 
-              <Button
-                variant="secondary"
-                size="xl"
-                onClick={onScheduleDemo}
-                type="button"
-                className="bg-white/10 text-white border-white/20 hover:bg-white/15 hover:border-white/30 backdrop-blur"
-              >
+              <Button variant="secondary" size="xl" onClick={onScheduleDemo} type="button">
                 <Calendar className="w-4 h-4" />
                 Agendar Demonstração Personalizada
               </Button>
@@ -98,7 +92,7 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
 
             <motion.div
               variants={itemVariants}
-              className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] text-white/50"
+              className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] text-oma-cream/50"
             >
               <span>✓ 5 minutos de setup</span>
               <span>✓ 50 sessões de try-on incluídas no On-Demand</span>

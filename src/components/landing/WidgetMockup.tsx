@@ -18,7 +18,7 @@ export function WidgetMockup() {
         transition={{ duration: 1.4, delay: 0.4 }}
         style={{
           background:
-            'radial-gradient(60% 60% at 50% 40%, rgba(129,7,7,0.18) 0%, rgba(129,7,7,0.06) 45%, transparent 70%)',
+            'radial-gradient(60% 60% at 50% 40%, rgba(217,104,69,0.2) 0%, rgba(91,175,138,0.08) 45%, transparent 70%)',
         }}
       />
 
@@ -40,7 +40,7 @@ export function WidgetMockup() {
               src={FALLBACK_IMAGE}
               onError={() => setImgFailed(true)}
               alt="Mockup do widget Omafit"
-              className="w-full h-auto rounded-3xl shadow-[0_40px_80px_-20px_rgba(26,26,26,0.35)] ring-1 ring-black/5"
+              className="h-auto w-full rounded-3xl shadow-[0_40px_80px_-20px_rgba(22,16,10,0.45)] ring-1 ring-oma-line/40"
               draggable={false}
             />
           )}
@@ -57,27 +57,27 @@ function CSSMockup() {
   return (
     <div className="relative">
       {/* Browser chrome */}
-      <div className="rounded-3xl overflow-hidden ring-1 ring-black/5 shadow-[0_40px_80px_-20px_rgba(26,26,26,0.35)] bg-white">
-        <div className="flex items-center gap-1.5 px-4 py-3 bg-[#FAFAFA] border-b border-black/5">
+      <div className="overflow-hidden rounded-3xl bg-oma-parchment shadow-[0_40px_80px_-20px_rgba(22,16,10,0.45)] ring-1 ring-oma-line/40">
+        <div className="flex items-center gap-1.5 border-b border-oma-line/40 bg-oma-light/80 px-4 py-3">
           <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-          <div className="ml-4 flex-1 h-6 rounded-md bg-white border border-black/5 text-[11px] text-ink-400 flex items-center px-3">
+          <div className="ml-4 flex h-6 flex-1 items-center rounded-md border border-oma-line/40 bg-oma-parchment px-3 font-dm-mono text-[11px] text-oma-muted">
             sualoja.com/produto/vestido-midi
           </div>
         </div>
 
         {/* Store content com widget Omafit */}
-        <div className="grid grid-cols-12 gap-4 p-5 bg-white">
+        <div className="grid grid-cols-12 gap-4 bg-oma-parchment p-5">
           {/* Produto */}
           <div className="col-span-5">
-            <div className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-ink-100 to-ink-200 relative overflow-hidden">
+            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gradient-to-br from-oma-light to-oma-parchment">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.9),transparent_60%)]" />
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                <span className="text-[10px] font-medium text-ink-600 bg-white/80 backdrop-blur px-2 py-1 rounded-full">
+                <span className="rounded-full bg-oma-parchment/90 px-2 py-1 text-[10px] font-medium text-oma-ink backdrop-blur">
                   Vestido Midi
                 </span>
-                <span className="text-[10px] font-semibold text-[#810707] bg-white/80 backdrop-blur px-2 py-1 rounded-full">
+                <span className="rounded-full bg-oma-parchment/90 px-2 py-1 font-dm-mono text-[10px] font-semibold text-[#5BAF8A] backdrop-blur">
                   R$ 289
                 </span>
               </div>
@@ -87,19 +87,19 @@ function CSSMockup() {
           {/* Widget Omafit */}
           <div className="col-span-7 flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-[#810707] flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-oma-accent">
+                <Sparkles className="h-4 w-4 text-oma-cream" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-ink-800 leading-none">
+                <p className="text-[11px] font-semibold leading-none text-oma-ink">
                   Omafit Assistant
                 </p>
-                <p className="text-[9px] text-ink-400 mt-0.5">
+                <p className="mt-0.5 text-[9px] text-oma-muted">
                   Seu tamanho, sua confiança
                 </p>
               </div>
-              <span className="ml-auto text-[9px] font-medium text-emerald-600 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="ml-auto flex items-center gap-1 font-dm-mono text-[9px] font-medium text-oma-tech">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-oma-tech" />
                 Ativo
               </span>
             </div>
@@ -112,13 +112,13 @@ function CSSMockup() {
             </div>
 
             {/* CTA mock */}
-            <div className="mt-1 rounded-lg bg-gradient-to-r from-[#810707] to-[#6b0505] p-0.5">
-              <div className="rounded-[7px] bg-white px-3 py-2 flex items-center justify-between">
+            <div className="mt-1 rounded-lg bg-gradient-to-r from-oma-accent to-oma-accentDark p-0.5">
+              <div className="flex items-center justify-between rounded-[7px] bg-oma-parchment px-3 py-2">
                 <div>
-                  <p className="text-[10px] font-semibold text-ink-800">Recomendado: M</p>
-                  <p className="text-[9px] text-ink-400">caimento preciso no peito e quadril</p>
+                  <p className="text-[10px] font-semibold text-oma-ink">Recomendado: M</p>
+                  <p className="text-[9px] text-oma-muted">caimento preciso no peito e quadril</p>
                 </div>
-                <button className="text-[10px] font-semibold text-white bg-[#810707] px-3 py-1.5 rounded-md">
+                <button className="rounded-md bg-oma-accent px-3 py-1.5 text-[10px] font-semibold text-oma-cream">
                   Adicionar
                 </button>
               </div>
@@ -132,14 +132,14 @@ function CSSMockup() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 1.1, duration: 0.6 }}
-        className="absolute -left-6 sm:-left-10 top-16 bg-white rounded-2xl shadow-elegant-lg border border-black/5 px-3 py-2.5 flex items-center gap-2"
+        className="absolute -left-6 top-16 flex items-center gap-2 rounded-2xl border border-oma-line/40 bg-oma-parchment px-3 py-2.5 shadow-elegant-lg sm:-left-10"
       >
-        <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
-          <Check className="w-4 h-4 text-emerald-600" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-oma-tech/15">
+          <Check className="h-4 w-4 text-oma-tech" />
         </div>
         <div>
-          <p className="text-[11px] font-semibold text-ink-800 leading-none">-42%</p>
-          <p className="text-[9px] text-ink-400 mt-0.5">devoluções</p>
+          <p className="font-dm-mono text-[11px] font-semibold leading-none text-[#5BAF8A]">-42%</p>
+          <p className="mt-0.5 text-[9px] text-oma-muted">devoluções</p>
         </div>
       </motion.div>
 
@@ -148,14 +148,14 @@ function CSSMockup() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 1.3, duration: 0.6 }}
-        className="absolute -right-4 sm:-right-8 bottom-10 bg-white rounded-2xl shadow-elegant-lg border border-black/5 px-3 py-2.5 flex items-center gap-2"
+        className="absolute -right-4 bottom-10 flex items-center gap-2 rounded-2xl border border-oma-line/40 bg-oma-parchment px-3 py-2.5 shadow-elegant-lg sm:-right-8"
       >
-        <div className="h-8 w-8 rounded-xl bg-[#810707]/10 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-[#810707]" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-oma-accent/15">
+          <Sparkles className="h-4 w-4 text-oma-accent" />
         </div>
         <div>
-          <p className="text-[11px] font-semibold text-ink-800 leading-none">+28%</p>
-          <p className="text-[9px] text-ink-400 mt-0.5">conversão</p>
+          <p className="font-dm-mono text-[11px] font-semibold leading-none text-[#5BAF8A]">+28%</p>
+          <p className="mt-0.5 text-[9px] text-oma-muted">conversão</p>
         </div>
       </motion.div>
     </div>
@@ -179,28 +179,28 @@ function MockStep({
     <div
       className={`flex items-center gap-2.5 rounded-xl px-3 py-2 border ${
         done
-          ? 'bg-ink-50/80 border-black/5'
+          ? 'border-oma-line/40 bg-oma-light/90'
           : active
-          ? 'bg-[#810707]/[0.03] border-[#810707]/20'
-          : 'bg-white border-black/5'
+          ? 'border-oma-accent/25 bg-oma-accent/[0.06]'
+          : 'border-oma-line/40 bg-oma-parchment'
       }`}
     >
       <div
         className={`h-6 w-6 rounded-lg flex items-center justify-center ${
           done
-            ? 'bg-emerald-100 text-emerald-600'
+            ? 'bg-oma-tech/15 text-oma-tech'
             : active
-            ? 'bg-[#810707] text-white'
-            : 'bg-ink-100 text-ink-500'
+            ? 'bg-oma-accent text-oma-cream'
+            : 'bg-oma-light text-oma-muted'
         }`}
       >
         {done ? <Check className="w-3 h-3" /> : icon}
       </div>
       <div className="flex-1 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-ink-700">{label}</span>
+        <span className="text-[11px] font-medium text-oma-ink">{label}</span>
         <span
-          className={`text-[10px] ${
-            done ? 'text-emerald-600 font-semibold' : active ? 'text-[#810707] font-semibold' : 'text-ink-400'
+          className={`font-dm-mono text-[10px] ${
+            done ? 'font-semibold text-[#5BAF8A]' : active ? 'font-semibold text-[#5BAF8A]' : 'text-oma-muted'
           }`}
         >
           {value}

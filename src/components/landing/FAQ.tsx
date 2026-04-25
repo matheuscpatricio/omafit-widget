@@ -60,7 +60,7 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="relative py-20 sm:py-28 bg-white">
+    <section id="faq" className="relative bg-oma-canvas py-20 sm:py-28">
       <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -71,21 +71,21 @@ export function FAQ() {
         >
           <motion.span
             variants={itemVariants}
-            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-ink-50 px-3 py-1 text-[12px] font-medium text-ink-700"
+            className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-elevated/80 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-ink-400" />
+            <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
             Tire suas dúvidas
           </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-ink-800"
+            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
             Perguntas Frequentes.
           </motion.h2>
           <motion.p
             variants={itemVariants}
-            className="mt-5 text-lg text-ink-500"
+            className="mt-5 text-lg text-oma-muted"
           >
             Tudo que você precisa saber sobre instalação, segurança, integração e suporte.
           </motion.p>
@@ -96,7 +96,7 @@ export function FAQ() {
           whileInView="visible"
           viewport={{ once: true, margin: '-80px' }}
           variants={containerVariants}
-          className="mt-12 divide-y divide-black/5 border-y border-black/5"
+          className="mt-12 divide-y divide-oma-line/40 border-y border-oma-line/40"
         >
           {faqs.map((item, i) => {
             const isOpen = openIndex === i;
@@ -109,7 +109,7 @@ export function FAQ() {
                 >
                   <span
                     className={`text-base sm:text-lg font-medium transition-colors ${
-                      isOpen ? 'text-ink-800' : 'text-ink-700 group-hover:text-ink-800'
+                      isOpen ? 'text-oma-cream' : 'text-oma-cream/85 group-hover:text-oma-cream'
                     }`}
                     style={{ letterSpacing: '-0.01em' }}
                   >
@@ -120,8 +120,8 @@ export function FAQ() {
                     transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                     className={`flex-shrink-0 h-8 w-8 grid place-items-center rounded-full transition-colors ${
                       isOpen
-                        ? 'bg-[#810707] text-white'
-                        : 'bg-ink-50 text-ink-600 group-hover:bg-ink-100'
+                        ? 'bg-oma-accent text-oma-cream'
+                        : 'bg-oma-elevated text-oma-muted group-hover:bg-oma-line/30'
                     }`}
                   >
                     {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -136,7 +136,7 @@ export function FAQ() {
                       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <p className="pb-6 pr-10 text-[15px] leading-relaxed text-ink-500">
+                      <p className="pb-6 pr-10 text-[15px] leading-relaxed text-oma-muted">
                         {item.a}
                       </p>
                     </motion.div>
@@ -154,11 +154,11 @@ export function FAQ() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-12 text-center"
         >
-          <p className="text-sm text-ink-500">
+          <p className="text-sm text-oma-muted">
             Ainda tem dúvidas?{' '}
             <a
               href="mailto:contato@omafit.co"
-              className="font-medium text-[#810707] hover:underline underline-offset-4"
+              className="font-medium text-oma-accent hover:underline underline-offset-4"
             >
               Fale com nosso time →
             </a>

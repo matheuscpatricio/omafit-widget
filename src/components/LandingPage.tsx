@@ -91,7 +91,10 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   const handleScheduleDemo = handleRequestDemo;
 
   return (
-    <div className="min-h-screen bg-white text-ink-800 font-sans antialiased" style={{ colorScheme: 'light' }}>
+    <div
+      className="landing-page min-h-screen bg-oma-canvas text-oma-cream antialiased"
+      style={{ colorScheme: 'dark' }}
+    >
       <LandingSEO />
       <Navbar onInstall={handleInstallShopify} />
 

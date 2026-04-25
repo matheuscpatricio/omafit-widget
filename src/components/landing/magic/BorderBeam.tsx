@@ -33,7 +33,7 @@ export function BorderBeamCard({
           className="pointer-events-none absolute left-1/2 top-1/2 h-[280%] w-[280%] -translate-x-1/2 -translate-y-1/2 opacity-80 motion-reduce:hidden"
           style={{
             background:
-              'conic-gradient(from 0deg, transparent, rgba(129,7,7,0.35), rgba(255,140,140,0.65), rgba(129,7,7,0.45), transparent 55%)',
+              'conic-gradient(from 0deg, transparent, rgba(217,104,69,0.4), rgba(91,175,138,0.45), rgba(217,104,69,0.35), transparent 55%)',
           }}
           animate={{ rotate: 360 }}
           transition={{ duration, repeat: Infinity, ease: 'linear' }}
@@ -44,7 +44,7 @@ export function BorderBeamCard({
           'relative z-[1] h-full w-full',
           flush
             ? 'rounded-none bg-transparent ring-0'
-            : 'rounded-[14px] bg-white ring-1 ring-black/[0.04]',
+            : 'rounded-[14px] bg-oma-parchment ring-1 ring-oma-line/40',
           innerClassName,
         )}
       >

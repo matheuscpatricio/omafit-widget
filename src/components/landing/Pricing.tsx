@@ -190,7 +190,7 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
   );
 
   return (
-    <section id="planos" className="relative py-20 sm:py-28 bg-ink-50/40">
+    <section id="planos" className="relative bg-oma-canvas py-20 sm:py-28">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -201,23 +201,23 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
         >
           <motion.span
             variants={itemVariants}
-            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-[12px] font-medium text-ink-700"
+            className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-elevated/80 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#810707]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
             Planos transparentes
           </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-ink-800"
+            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Escolha o Plano que <span className="text-[#810707]">Impulsiona</span> o Seu Crescimento.
+            Escolha o Plano que <span className="text-oma-accent">Impulsiona</span> o Seu Crescimento.
           </motion.h2>
-          <motion.p variants={itemVariants} className="mt-5 text-lg text-ink-500 leading-relaxed">
+          <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
             Do On-Demand ao Enterprise: pacotes claros de{' '}
-            <span className="font-semibold text-ink-800">imagens de try-on</span> (ex.: Pro com{' '}
-            <span className="font-semibold text-[#810707]">3.000 imagens</span> por US$ 300) e limites de{' '}
-            <span className="font-semibold text-ink-800">acessórios AR</span> (5 → 20 → 100 → ilimitado).
+            <span className="font-semibold text-oma-cream">imagens de try-on</span> (ex.: Pro com{' '}
+            <span className="font-semibold text-oma-accent">3.000 imagens</span> por US$ 300) e limites de{' '}
+            <span className="font-semibold text-oma-cream">acessórios AR</span> (5 → 20 → 100 → ilimitado).
           </motion.p>
         </motion.div>
 
@@ -247,7 +247,7 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
           viewport={{ once: true }}
           className="mt-10 text-center"
         >
-          <p className="text-sm text-ink-500">
+          <p className="text-sm text-oma-muted">
             Dúvidas sobre faturamento ou volume?{' '}
             <ButtonLink
               variant="link"
@@ -296,20 +296,20 @@ function PlanCard({
       variants={variants}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex flex-col rounded-3xl border p-7 sm:p-8 min-h-[520px] ${
+      className={`relative flex min-h-[520px] flex-col rounded-3xl border p-7 sm:p-8 ${
         isDark
-          ? 'bg-ink-800 text-white border-transparent shadow-brand-glow overflow-hidden'
-          : 'bg-white border-black/5 shadow-elegant hover:shadow-elegant-lg'
+          ? 'overflow-hidden border border-oma-line/40 bg-oma-elevated text-oma-cream shadow-brand-glow'
+          : 'border border-oma-line/40 bg-oma-parchment shadow-elegant hover:shadow-elegant-lg'
       }`}
     >
       {isPopular && (
         <>
           <div
             className="absolute -top-32 -right-32 h-64 w-64 rounded-full blur-3xl opacity-40 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(129,7,7,0.85), transparent)' }}
+            style={{ background: 'radial-gradient(circle, rgba(217,104,69,0.55), transparent)' }}
           />
           <div className="absolute top-4 right-4 z-10">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#810707] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="inline-flex items-center gap-1 rounded-full bg-oma-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-oma-cream">
               <Sparkles className="w-3 h-3" />
               Popular
             </span>
@@ -320,19 +320,19 @@ function PlanCard({
       <div className={isPopular ? 'relative' : ''}>
         <div
           className={`text-[11px] font-semibold uppercase tracking-wider ${
-            isDark ? 'text-white/50' : 'text-ink-400'
+            isDark ? 'text-oma-cream/50' : 'text-oma-muted'
           }`}
         >
           {isFree ? 'On-Demand' : 'Assinatura mensal'}
         </div>
         <h3
           className={`mt-2 text-xl font-semibold tracking-tight ${
-            isDark ? 'text-white' : 'text-ink-800'
+            isDark ? 'text-oma-cream' : 'text-oma-ink'
           }`}
         >
           {plan.display_name}
         </h3>
-        <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-white/60' : 'text-ink-500'}`}>
+        <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-oma-cream/60' : 'text-oma-muted'}`}>
           {isFree
             ? 'Comece sem mensalidade e escale conforme o uso.'
             : plan.name === 'growth'
@@ -345,28 +345,26 @@ function PlanCard({
         <div className="mt-6 flex flex-col gap-1">
           {plan.monthly_price === 0 ? (
             <>
-              <span className={`text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? 'text-white' : 'text-ink-800'}`}>
+              <span className={`text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? 'text-oma-cream' : 'text-oma-ink'}`}>
                 Instalação grátis
               </span>
-              <span className={`text-sm leading-snug ${isDark ? 'text-white/65' : 'text-ink-500'}`}>
+              <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
                 Sem mensalidade fixa — pague só pelo que usar além das 50 sessões incluídas.
               </span>
             </>
           ) : (
             <div className="flex items-baseline gap-1 flex-wrap">
-              <span className={`text-4xl font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink-800'}`}>
+              <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
                 US$ {plan.monthly_price}
               </span>
-              <span className={`text-sm ${isDark ? 'text-white/60' : 'text-ink-400'}`}>/mês</span>
+              <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mês</span>
             </div>
           )}
         </div>
 
         <div
-          className={`mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-medium ${
-            isDark
-              ? 'bg-white/10 border-white/10 text-white/90'
-              : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+          className={`mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-oma-line/40 px-3 py-1.5 font-dm-mono text-[12px] font-medium text-[#5BAF8A] ${
+            isDark ? 'bg-oma-cream/[0.08]' : 'bg-oma-light/80'
           }`}
         >
           <Check className="w-3.5 h-3.5 flex-shrink-0" />
@@ -421,7 +419,7 @@ function PlanCard({
             <Button
               variant="primary"
               size="lg"
-              className={`w-full ${isDark ? 'bg-[#810707] hover:bg-[#a00909]' : ''}`}
+              className="w-full"
               onClick={cta}
               type="button"
             >
@@ -445,12 +443,12 @@ function PricingBullet({
   return (
     <li
       className={`flex items-start gap-2.5 text-[13px] leading-relaxed ${
-        inverted ? 'text-white/85' : 'text-ink-700'
+        inverted ? 'text-oma-cream/85' : 'text-oma-ink'
       }`}
     >
       <span
         className={`mt-0.5 h-5 w-5 rounded-full flex-shrink-0 grid place-items-center ${
-          inverted ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-600'
+          inverted ? 'bg-oma-cream/10 text-oma-cream' : 'bg-oma-tech/12 text-oma-tech'
         }`}
       >
         <Check className="w-3 h-3" strokeWidth={3} />

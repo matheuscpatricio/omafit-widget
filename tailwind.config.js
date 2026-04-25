@@ -4,6 +4,20 @@ export default {
   theme: {
     extend: {
       colors: {
+        /** Tokens da nova identidade (variáveis em :root) */
+        oma: {
+          canvas: 'var(--color-bg-primary)',
+          elevated: 'var(--color-bg-secondary)',
+          light: 'var(--color-bg-light)',
+          parchment: 'var(--color-bg-parchment)',
+          accent: 'var(--color-accent)',
+          accentDark: 'var(--color-accent-dark)',
+          tech: 'var(--color-tech)',
+          ink: 'var(--color-text-dark)',
+          cream: 'var(--color-text-light)',
+          muted: 'var(--color-text-muted)',
+          line: 'var(--color-border)',
+        },
         brand: {
           DEFAULT: '#810707',
           50: '#fdf2f2',
@@ -73,8 +87,10 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         inter: ['Inter', 'sans-serif'],
-        heading: ['Inter', 'BBH Sans Bartle', 'sans-serif'],
-        body: ['Inter', 'Rubik', 'sans-serif'],
+        /** Landing Omafit */
+        gloock: ['Gloock', 'Georgia', 'serif'],
+        bricolage: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        'dm-mono': ['"DM Mono"', 'ui-monospace', 'monospace'],
         bungee: ['Bungee', 'sans-serif'],
       },
       letterSpacing: {
@@ -85,10 +101,11 @@ export default {
       boxShadow: {
         'elegant': '0 1px 2px rgba(26,26,26,0.04), 0 8px 24px rgba(26,26,26,0.06)',
         'elegant-lg': '0 1px 2px rgba(26,26,26,0.04), 0 24px 60px -12px rgba(26,26,26,0.12)',
-        'brand-glow': '0 10px 40px -10px rgba(129,7,7,0.45)',
+        'brand-glow': '0 10px 40px -10px rgba(217,104,69,0.42)',
       },
       backgroundImage: {
-        'grid-faint': 'linear-gradient(to right, rgba(26,26,26,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(26,26,26,0.05) 1px, transparent 1px)',
+        'grid-faint':
+          'linear-gradient(to right, rgba(246,240,226,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(246,240,226,0.08) 1px, transparent 1px)',
       },
     },
   },

@@ -63,10 +63,10 @@ const itemVariants: Variants = {
 
 export function Pain() {
   return (
-    <section className="relative py-20 sm:py-28 overflow-hidden bg-gradient-to-b from-ink-50/90 via-white to-ink-50/60">
+    <section className="relative overflow-hidden bg-gradient-to-b from-oma-elevated via-oma-canvas to-oma-elevated py-20 sm:py-28">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(129,7,7,0.12),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(217,104,69,0.14),transparent)] opacity-[0.45]"
       />
       <div className="relative z-[1] max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <motion.div
@@ -78,22 +78,22 @@ export function Pain() {
         >
           <motion.span
             variants={itemVariants}
-            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-[12px] font-medium text-ink-700"
+            className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-parchment/90 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-ink-400" />
+            <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
             O problema
           </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-ink-800"
+            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
             Você Conhece Essas Dores? <br className="hidden sm:block" />
-            <span className="text-ink-400">Seus Clientes Também.</span>
+            <span className="text-oma-muted">Seus Clientes Também.</span>
           </motion.h2>
           <motion.p
             variants={itemVariants}
-            className="mt-5 text-lg text-ink-500 leading-relaxed"
+            className="mt-5 text-lg leading-relaxed text-oma-muted"
           >
             Toda loja de moda online enfrenta os mesmos quatro inimigos silenciosos que corroem
             margem, reputação e confiança.
@@ -115,34 +115,34 @@ export function Pain() {
                 variants={itemVariants}
                 whileHover={{ y: -8, scale: 1.01 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                className="group relative overflow-hidden rounded-2xl border border-black/10 bg-white/90 p-6 sm:p-7 shadow-elegant backdrop-blur-sm transition-shadow duration-300 hover:border-[#810707]/25 hover:shadow-[0_20px_50px_-12px_rgba(129,7,7,0.18)]"
+                className="group relative overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-parchment/95 p-6 shadow-elegant backdrop-blur-sm transition-shadow duration-300 hover:border-oma-accent/35 hover:shadow-[0_20px_50px_-12px_rgba(217,104,69,0.2)] sm:p-7"
               >
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-gradient-to-br from-[#810707]/[0.06] via-transparent to-rose-200/20"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-oma-accent/[0.07] via-transparent to-oma-tech/[0.08] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 />
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-ink-50 grid place-items-center">
-                      <Icon className="w-5 h-5 text-ink-700" />
+                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-oma-light">
+                      <Icon className="h-5 w-5 text-oma-accentDark" />
                     </div>
-                    <span className="text-[11px] font-medium text-ink-400 uppercase tracking-wider">
+                    <span className="font-dm-mono text-[11px] font-medium uppercase tracking-wider text-oma-muted">
                       Dor #{i + 1}
                     </span>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-semibold text-[#810707] tracking-tight">
+                    <div className="font-dm-mono text-2xl font-semibold tracking-tight text-[#5BAF8A]">
                       {p.stat}
                     </div>
-                    <div className="text-[11px] text-ink-400 leading-tight mt-0.5 max-w-[130px]">
+                    <div className="mt-0.5 max-w-[130px] text-[11px] leading-tight text-oma-muted">
                       {p.statLabel}
                     </div>
                   </div>
                 </div>
-                <h3 className="relative mt-5 text-xl font-semibold text-ink-800 tracking-tight">
+                <h3 className="relative mt-5 text-xl font-semibold tracking-tight text-oma-ink">
                   {p.title}
                 </h3>
-                <p className="mt-2 text-[15px] text-ink-500 leading-relaxed">
+                <p className="mt-2 text-[15px] leading-relaxed text-oma-muted">
                   {p.description}
                 </p>
               </motion.div>

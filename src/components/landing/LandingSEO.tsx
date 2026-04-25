@@ -56,7 +56,7 @@ export function LandingSEO() {
     ].join(', '));
     upsertMeta('name', 'robots', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
     upsertMeta('name', 'author', 'Omafit');
-    upsertMeta('name', 'theme-color', '#810707');
+    upsertMeta('name', 'theme-color', '#D96845');
 
     upsertMeta('property', 'og:type', 'website');
     upsertMeta('property', 'og:locale', 'pt_BR');

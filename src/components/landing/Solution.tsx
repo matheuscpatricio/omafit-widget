@@ -76,7 +76,7 @@ const itemVariants: Variants = {
 
 export function Solution() {
   return (
-    <section id="solucao" className="relative overflow-hidden bg-white py-20 sm:py-28">
+    <section id="solucao" className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="relative z-[1] mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
         <motion.div
           initial="hidden"
@@ -87,20 +87,20 @@ export function Solution() {
         >
           <motion.span
             variants={itemVariants}
-            className="inline-flex items-center gap-2 rounded-full border border-[#810707]/20 bg-[#810707]/5 px-3 py-1 text-[12px] font-medium text-[#810707]"
+            className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-accent/10 px-3 py-1 text-[12px] font-medium text-oma-accent"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#810707]" aria-hidden />
+            <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" aria-hidden />
             A solução
           </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-3xl font-semibold tracking-tight text-ink-800 sm:text-4xl lg:text-5xl"
+            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
             Omafit: A Inteligência que Transforma{' '}
-            <span className="text-[#810707]">Dúvida em Confiança</span> e Vendas.
+            <span className="text-oma-accent">Dúvida em Confiança</span> e Vendas.
           </motion.h2>
-          <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-ink-500">
+          <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
             Uma suíte completa de IA visual para moda, acessórios e calçados. Plug-and-play na sua Shopify,
             invisível para o cliente, inesquecível no resultado.
           </motion.p>
@@ -209,11 +209,11 @@ function SolutionTripletCarousel() {
         </CarouselContent>
         <CarouselPrevious
           type="button"
-          className="left-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border-white/25 bg-ink-900/75 text-white shadow-lg backdrop-blur-sm hover:bg-ink-900/90 hover:text-white sm:left-2"
+          className="left-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream sm:left-2"
         />
         <CarouselNext
           type="button"
-          className="right-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border-white/25 bg-ink-900/75 text-white shadow-lg backdrop-blur-sm hover:bg-ink-900/90 hover:text-white sm:right-2"
+          className="right-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream sm:right-2"
         />
       </Carousel>
 
@@ -227,7 +227,7 @@ function SolutionTripletCarousel() {
             aria-label={`Ir para conjunto ${i + 1}`}
             className={cn(
               'h-2 rounded-full transition-all duration-300',
-              i === selected ? 'w-8 bg-[#810707]' : 'w-2 bg-ink-200 hover:bg-ink-300',
+              i === selected ? 'w-8 bg-oma-accent' : 'w-2 bg-oma-line hover:bg-oma-muted/80',
             )}
             onClick={() => api?.scrollTo(i)}
           />
@@ -275,15 +275,15 @@ function SolutionPane({
           'inline-flex w-fit rounded-full border px-2 py-0.5 font-semibold uppercase tracking-widest',
           soloLayout ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[10px]',
           highlight
-            ? 'border-[#ff9696]/35 bg-white/10 text-[#ffdede]'
-            : 'border-white/15 bg-white/5 text-white/80',
+            ? 'border-oma-accent/40 bg-oma-accent/15 text-oma-cream'
+            : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/80',
         )}
       >
         {highlight ? 'Destaque' : 'Recurso'}
       </span>
       <h3
         className={cn(
-          'mt-2 font-semibold tracking-tight text-white sm:mt-3',
+          'mt-2 font-semibold tracking-tight text-oma-cream sm:mt-3',
           soloLayout && 'text-lg leading-snug sm:text-xl md:text-2xl',
           !soloLayout &&
             isCenter &&
@@ -296,7 +296,7 @@ function SolutionPane({
       </h3>
       <p
         className={cn(
-          'mt-1.5 leading-relaxed text-white/75 sm:mt-2',
+          'mt-1.5 leading-relaxed text-oma-cream/75 sm:mt-2',
           soloLayout && 'text-sm sm:text-base',
           !soloLayout && isCenter && 'text-[11px] sm:text-[15px]',
           !soloLayout &&
@@ -308,7 +308,7 @@ function SolutionPane({
       </p>
       <ul
         className={cn(
-          'mt-2 min-h-0 flex-1 text-white/85 sm:mt-3',
+          'mt-2 min-h-0 flex-1 text-oma-cream/85 sm:mt-3',
           soloLayout ? 'space-y-2 text-sm sm:text-[15px]' : 'space-y-1 sm:space-y-2',
           !soloLayout && isCenter && 'text-[10px] sm:text-[13px]',
           !soloLayout && !isCenter && 'text-[8px] sm:text-[11px] md:text-[12px]',
@@ -324,7 +324,7 @@ function SolutionPane({
           >
             <span
               className={cn(
-                'mt-1 shrink-0 rounded-full bg-[#ff9696]/90 sm:mt-1.5',
+                'mt-1 shrink-0 rounded-full bg-oma-accent/90 sm:mt-1.5',
                 soloLayout ? 'h-1.5 w-1.5' : 'h-0.5 w-0.5 sm:h-1 sm:w-1',
               )}
               aria-hidden
@@ -337,7 +337,7 @@ function SolutionPane({
   );
 
   const surfaceClass = cn(
-    'h-full min-h-0 w-full border border-white/10 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-black/30',
+    'h-full min-h-0 w-full border border-oma-line/40 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-oma-line/40',
     soloLayout && 'rounded-2xl sm:rounded-3xl',
     !soloLayout &&
       isCenter &&

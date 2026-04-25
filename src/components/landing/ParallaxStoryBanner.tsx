@@ -21,7 +21,7 @@ export function ParallaxStoryBanner() {
   return (
     <section
       ref={ref}
-      className="relative mx-3 my-6 max-w-7xl overflow-hidden rounded-2xl border border-black/10 bg-ink-900 shadow-elegant-lg sm:mx-4 sm:my-8 sm:rounded-3xl md:mx-6 lg:mx-auto lg:my-10"
+      className="relative mx-3 my-6 max-w-7xl overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated shadow-elegant-lg sm:mx-4 sm:my-8 sm:rounded-3xl md:mx-6 lg:mx-auto lg:my-10"
     >
       {/* Mobile-first: altura confortável em telas estreitas; banda larga no desktop */}
       <div className="relative aspect-[4/5] w-full min-h-[220px] overflow-hidden rounded-2xl sm:aspect-[5/4] sm:min-h-[260px] md:aspect-[21/9] md:min-h-[280px] md:rounded-3xl lg:min-h-[300px]">
@@ -44,8 +44,8 @@ export function ParallaxStoryBanner() {
             />
           </picture>
         </motion.div>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-[#810707]/35 max-md:from-black/55 max-md:via-black/35 md:from-black/85 md:via-black/55" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_50%,rgba(129,7,7,0.28),transparent_55%)] max-md:opacity-80" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-[rgba(217,104,69,0.32)] max-md:from-black/55 max-md:via-black/35 md:from-black/85 md:via-black/55" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_50%,rgba(217,104,69,0.22),transparent_55%)] max-md:opacity-80" />
 
         <div className="relative z-10 flex h-full min-h-[inherit] flex-col items-start justify-end px-5 pb-8 pt-10 sm:justify-center sm:px-8 sm:py-10 md:px-12 md:py-12 lg:px-16">
           <motion.p
@@ -53,7 +53,7 @@ export function ParallaxStoryBanner() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.65 }}
-            className="max-w-xl text-xs font-semibold uppercase tracking-[0.18em] text-white/90 sm:text-sm md:tracking-[0.2em]"
+            className="landing-tagline max-w-xl text-xs font-semibold uppercase tracking-[0.18em] text-oma-cream/90 sm:text-sm md:tracking-[0.2em]"
           >
             Experiência imersiva
           </motion.p>
@@ -62,7 +62,7 @@ export function ParallaxStoryBanner() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.06 }}
-            className="mt-2 max-w-xl text-2xl font-semibold leading-tight tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.5)] sm:max-w-2xl sm:text-3xl md:mt-3 md:text-4xl lg:text-5xl"
+            className="mt-2 max-w-xl text-2xl font-semibold leading-tight tracking-tight text-oma-cream [text-shadow:0_2px_16px_rgba(0,0,0,0.5)] sm:max-w-2xl sm:text-3xl md:mt-3 md:text-4xl lg:text-5xl"
           >
             <ShimmerHeading variant="light">Do clique à confiança — em segundos.</ShimmerHeading>
           </motion.h2>
@@ -71,7 +71,7 @@ export function ParallaxStoryBanner() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.65, delay: 0.12 }}
-            className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-white/95 sm:text-base md:text-lg"
+            className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-oma-cream/95 sm:text-base md:text-lg"
           >
             Try-on fotorrealista, medidas precisas e AR no mesmo fluxo fluido que seus clientes já
             conhecem no celular.

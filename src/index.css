@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Identidade visual Omafit (landing e componentes que usam tokens `oma-*`) */
+:root {
+  --color-bg-primary: #16100a;
+  --color-bg-secondary: #241a10;
+  --color-bg-light: #f6f0e2;
+  --color-bg-parchment: #ede5d2;
+  --color-accent: #d96845;
+  --color-accent-dark: #b8522e;
+  --color-tech: #5baf8a;
+  --color-text-light: #f6f0e2;
+  --color-text-dark: #16100a;
+  --color-text-muted: #7a6a58;
+  --color-border: #3a2e22;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -17,13 +32,27 @@
   }
 
   ::selection {
-    background-color: rgba(129, 7, 7, 0.15);
-    color: #1A1A1A;
+    background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+    color: var(--color-text-dark);
   }
 
-  /* Landing page titles (compat) */
+  /* Landing Omafit: corpo Bricolage; títulos Gloock; taglines Gloock itálico (ver .landing-tagline) */
+  .landing-page {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  }
+
+  .landing-page :where(h1, h2, h3, h4, h5, h6) {
+    font-family: 'Gloock', Georgia, serif;
+    font-style: normal;
+  }
+
+  .landing-tagline {
+    font-family: 'Gloock', Georgia, serif;
+    font-style: italic;
+  }
+
   .landing-title {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Gloock', Georgia, serif;
     letter-spacing: -0.02em;
   }
 }

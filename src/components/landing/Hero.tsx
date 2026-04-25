@@ -73,7 +73,7 @@ function HeroDesktopRotator() {
 
   return (
     <div className="relative w-full">
-      <div className="relative aspect-[3/4] min-h-[280px] w-full max-h-[min(78vh,720px)] overflow-hidden rounded-3xl border border-black/[0.06] bg-stone-100 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.18)]">
+      <div className="relative aspect-[3/4] min-h-[280px] w-full max-h-[min(78vh,720px)] overflow-hidden rounded-3xl border border-oma-line/40 bg-oma-elevated shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)]">
         <AnimatePresence initial={false} mode="sync">
           <motion.img
             key={active}
@@ -93,7 +93,7 @@ function HeroDesktopRotator() {
           <span
             key={i}
             className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === active ? 'w-6 bg-[#810707]' : 'w-1.5 bg-stone-300'
+              i === active ? 'w-6 bg-oma-accent' : 'w-1.5 bg-oma-muted/50'
             }`}
           />
         ))}
@@ -118,7 +118,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
     <section
       ref={sectionRef}
       id="top"
-      className="relative min-h-[100svh] min-h-[100dvh] scroll-mt-16 overflow-x-hidden overflow-y-visible bg-white max-md:pt-0 pb-8 sm:pb-10 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
+      className="relative min-h-[100svh] min-h-[100dvh] scroll-mt-16 overflow-x-hidden overflow-y-visible bg-oma-canvas max-md:pt-0 pb-8 sm:pb-10 md:min-h-[92vh] md:overflow-hidden md:pt-28 md:pb-16"
     >
       {/* Fora do contentor com padding: evita desvio (w-screen + translate) e faixa branca à esquerda */}
       <motion.div
@@ -143,8 +143,8 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           <div className="hidden w-full items-start gap-10 md:grid md:grid-cols-2 md:gap-8 lg:gap-12 lg:items-center">
             <div className="flex w-full max-w-2xl flex-col items-center justify-self-start md:max-w-none md:pr-2 lg:pr-6">
               <motion.div variants={itemVariants} className="flex w-full justify-center md:justify-start">
-                <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#810707]/25 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-900 shadow-sm sm:px-3.5 sm:text-[12px]">
-                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#810707]" />
+                <span className="landing-tagline inline-flex max-w-full items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-elevated px-3 py-1.5 text-[11px] font-semibold text-oma-cream shadow-sm sm:px-3.5 sm:text-[12px]">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-oma-tech" />
                   <span className="text-left leading-snug md:text-left">
                     IA fotorrealista · provador inteligente · AR
                   </span>
@@ -153,17 +153,17 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
 
               <motion.h1
                 variants={itemVariants}
-                className="mt-5 max-w-[20rem] text-[1.6rem] font-semibold leading-[1.14] tracking-tight text-ink-950 sm:max-w-none sm:text-4xl sm:leading-[1.08] md:mt-6 md:max-w-none md:text-[2.35rem] md:leading-[1.1] lg:text-5xl xl:text-[3.25rem] xl:leading-[1.08]"
+                className="mt-5 max-w-[20rem] text-[1.6rem] font-semibold leading-[1.14] tracking-tight text-oma-cream sm:max-w-none sm:text-4xl sm:leading-[1.08] md:mt-6 md:max-w-none md:text-[2.35rem] md:leading-[1.1] lg:text-5xl xl:text-[3.25rem] xl:leading-[1.08]"
                 style={{ letterSpacing: '-0.035em' }}
               >
                 O Fim Definitivo das Devoluções e o Início da{' '}
                 <span className="relative inline-block">
-                  <ShimmerHeading variant="dark" className="!from-[#810707] !via-[#a01010] !to-[#810707]">
+                  <ShimmerHeading variant="dark" className="italic">
                     Confiança
                   </ShimmerHeading>
                   <svg
                     aria-hidden
-                    className="absolute -bottom-1.5 left-0 w-full text-[#810707]/80 md:-bottom-2"
+                    className="absolute -bottom-1.5 left-0 w-full text-oma-accent/85 md:-bottom-2"
                     viewBox="0 0 200 12"
                     preserveAspectRatio="none"
                   >
@@ -184,10 +184,10 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
               </motion.h1>
 
               <motion.div variants={itemVariants} className="mt-5 w-full sm:mt-6 md:mt-5">
-                <p className="text-left text-[15px] font-semibold leading-[1.68] text-ink-800 sm:text-[17px] lg:text-lg">
+                <p className="text-left text-[15px] font-semibold leading-[1.68] text-oma-muted sm:text-[17px] lg:text-lg">
                   O Omafit é o assistente inteligente que usa{' '}
-                  <span className="font-bold text-[#6d0505]">IA fotorrealista</span> e{' '}
-                  <span className="font-bold text-[#6d0505]">medição precisa</span> para garantir o
+                  <span className="font-bold text-oma-accent">IA fotorrealista</span> e{' '}
+                  <span className="font-bold text-oma-tech">medição precisa</span> para garantir o
                   caimento perfeito em roupas, calçados e acessórios. Reduza custos, aumente vendas e
                   encante seus clientes.
                 </p>
@@ -203,7 +203,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                   href="https://apps.shopify.com/omafit"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full shadow-[0_8px_28px_-4px_rgba(129,7,7,0.4)] sm:w-auto"
+                  className="w-full shadow-[0_8px_28px_-4px_rgba(217,104,69,0.45)] sm:w-auto"
                   onClick={(e) => {
                     if (onInstallShopify) {
                       e.preventDefault();
@@ -212,7 +212,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                   }}
                 >
                   Instalar Omafit na Shopify
-                  <span className="ml-0.5 text-xs font-normal text-white/80">(instalação grátis)</span>
+                  <span className="ml-0.5 text-xs font-normal text-oma-cream/85">(instalação grátis)</span>
                   <ArrowRight className="w-4 h-4" />
                 </ButtonLink>
 
@@ -221,7 +221,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                   size="lg"
                   onClick={onRequestDemo}
                   type="button"
-                  className="w-full border-ink-900/15 bg-white text-ink-900 shadow-sm hover:bg-stone-50 sm:w-auto"
+                  className="w-full sm:w-auto"
                 >
                   <Play className="w-4 h-4" />
                   Ver Demonstração Personalizada
@@ -230,17 +230,17 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
 
               <motion.div
                 variants={itemVariants}
-                className="mt-6 flex flex-wrap items-center justify-center gap-2 text-[12px] text-ink-800 sm:gap-x-4 sm:text-[13px] md:mt-6 md:justify-start"
+                className="mt-6 flex flex-wrap items-center justify-center gap-2 text-[12px] text-oma-cream sm:gap-x-4 sm:text-[13px] md:mt-6 md:justify-start"
               >
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-900/10 bg-white px-2.5 py-1 shadow-sm">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-oma-line/40 bg-oma-elevated px-2.5 py-1 shadow-sm">
+                  <ShieldCheck className="h-3.5 w-3.5 text-oma-tech" />
                   Setup em 5 minutos
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-900/10 bg-white px-2.5 py-1 shadow-sm">
-                  <Zap className="h-3.5 w-3.5 text-[#810707]" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-oma-line/40 bg-oma-elevated px-2.5 py-1 shadow-sm">
+                  <Zap className="h-3.5 w-3.5 text-oma-accent" />
                   On-Demand: 50 sessões try-on incluídas
                 </span>
-                <span className="rounded-full border border-ink-900/10 bg-white px-2.5 py-1 shadow-sm">
+                <span className="rounded-full border border-oma-line/40 bg-oma-elevated px-2.5 py-1 shadow-sm">
                   5 acessórios AR no On-Demand
                 </span>
               </motion.div>
@@ -255,14 +255,14 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           </div>
 
           <motion.div variants={itemVariants} className="mt-8 w-full max-w-4xl sm:mt-10 md:mt-12 md:mx-auto">
-            <div className="rounded-2xl border border-ink-900/10 bg-white/95 py-2 shadow-inner backdrop-blur-sm">
-              <Marquee speed="slow" className="text-ink-800">
+            <div className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 py-2 shadow-inner backdrop-blur-sm">
+              <Marquee speed="slow" className="text-oma-cream">
                 {marqueeItems.map((label) => (
                   <span
                     key={label}
                     className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium tracking-tight sm:text-sm"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#810707]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
                     {label}
                   </span>
                 ))}

@@ -47,7 +47,9 @@ const slides: Slide[] = [
     title: (
       <span className="block text-balance">
         O Fim Definitivo das Devoluções e o Início da{' '}
-        <span className="font-bold text-amber-100 [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">Confiança</span>
+        <span className="landing-tagline font-bold text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
+          Confiança
+        </span>
         {' '}na Moda Online.
       </span>
     ),
@@ -65,7 +67,7 @@ const slides: Slide[] = [
     title: (
       <>
         Caimento certo com{' '}
-        <ShimmerHeading variant="light" className="!from-white !via-sky-100 !to-white">
+        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-tech !to-oma-cream">
           MediaPipe
         </ShimmerHeading>
       </>
@@ -81,7 +83,7 @@ const slides: Slide[] = [
     title: (
       <>
         Menos devoluções,{' '}
-        <ShimmerHeading variant="light" className="!from-white !via-rose-100 !to-white">
+        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-accent !to-oma-cream">
           mais confiança
         </ShimmerHeading>
       </>
@@ -132,7 +134,7 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                 <CarouselItem key={slide.id} className="pl-0 basis-full">
                   <div
                     className={cn(
-                      'relative h-[min(100svh,920px)] min-h-[min(100svh,920px)] w-full overflow-hidden rounded-none bg-stone-900',
+                      'relative h-[min(100svh,920px)] min-h-[min(100svh,920px)] w-full overflow-hidden rounded-none bg-oma-canvas',
                     )}
                   >
                     <img
@@ -176,14 +178,14 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                         )}
                       >
                         {!slide.hideBadge && (
-                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur-md">
-                            <Sparkles className="h-3 w-3 shrink-0 text-rose-200" />
+                          <span className="landing-tagline inline-flex max-w-full items-center gap-1.5 rounded-full border border-oma-cream/25 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-oma-cream backdrop-blur-md">
+                            <Sparkles className="h-3 w-3 shrink-0 text-oma-tech" />
                             {slide.badge}
                           </span>
                         )}
                         <h2
                           className={cn(
-                            'tracking-tight text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.9)]',
+                            'tracking-tight text-oma-cream [text-shadow:0_1px_14px_rgba(0,0,0,0.9)]',
                             slide.subtleOverlay
                               ? 'text-[0.9375rem] font-semibold leading-[1.3] sm:text-[1rem]'
                               : cn(
@@ -198,9 +200,9 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                           className={cn(
                             'leading-snug',
                             slide.subtleOverlay
-                              ? 'text-[12px] font-semibold leading-[1.52] text-white sm:text-[13px] [text-shadow:0_1px_0_rgba(0,0,0,0.65),0_2px_14px_rgba(0,0,0,0.95),0_6px_28px_rgba(0,0,0,0.65)]'
+                              ? 'text-[12px] font-semibold leading-[1.52] text-oma-cream sm:text-[13px] [text-shadow:0_1px_0_rgba(0,0,0,0.65),0_2px_14px_rgba(0,0,0,0.95),0_6px_28px_rgba(0,0,0,0.65)]'
                               : cn(
-                                  'font-medium text-white/95 [text-shadow:0_1px_14px_rgba(0,0,0,0.92)]',
+                                  'font-medium text-oma-cream/95 [text-shadow:0_1px_14px_rgba(0,0,0,0.92)]',
                                   slide.compact ? 'text-[12px] leading-relaxed' : 'text-[13px] leading-relaxed',
                                 ),
                           )}
@@ -240,7 +242,7 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                             variant="secondary"
                             size="md"
                             type="button"
-                            className="w-full justify-center border-white/25 bg-white/95 text-ink-900 hover:bg-white"
+                            className="w-full justify-center border-oma-cream/25 bg-oma-parchment text-oma-ink hover:bg-oma-light"
                             onClick={onRequestDemo}
                           >
                             <Play className="h-4 w-4" />
@@ -269,7 +271,7 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                   aria-label={`Ir para slide ${i + 1}`}
                   className={cn(
                     'pointer-events-auto h-2 rounded-full transition-all duration-300',
-                    i === current ? 'w-7 bg-[#810707]' : 'w-2 bg-white/50 hover:bg-white/70',
+                    i === current ? 'w-7 bg-oma-accent' : 'w-2 bg-oma-cream/45 hover:bg-oma-cream/65',
                   )}
                   onClick={() => api?.scrollTo(i)}
                 />
