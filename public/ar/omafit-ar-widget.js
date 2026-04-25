@@ -101,10 +101,10 @@ import {
  *
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
  * Tripo, bind automático, strip roll. `calibRot` identidade; `wearPosition` (0,0,0); pivot
- * filho directo de `anchor.group` — **posição+rotação** da cabeça só no MindAR (`anchor.group`).
- * No load: `glasses.rotation.set(π/2, π, 0)` (uma vez). Cada frame: `glassesPivot.position` fixa,
- * `scale.setScalar((faceWidth/10)*targetFactor/modelWidth)`; sem `makeBasis` / quaternions a
- * partir de landmarks no pivot. Incompatível com estrutural e geometria.
+ * filho directo de `anchor.group`. **Mesh** `glasses`: só `quaternion.identity()` (sem Euler fixo).
+ * **Pivot**: cada frame `makeBasis(eyeDir, trueUp, forward)` a partir de 263−33 + `(0,1,0)`
+ * (Gram-Schmidt, `forward.z>0` → flip), `quaternion.setFromRotationMatrix`; posição fixa e
+ * escala `(faceWidth/10)*targetFactor/modelWidth`. Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -254,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-stable-anchor-pivot";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-pivot-eye-basis";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1876,6 +1876,77 @@ function omafitGlassesManualInterpupillaryDistance(lm, smoother) {
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
   return omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_EYE_L_OUT, OMAFIT_FACE_LM_EYE_R_OUT);
+}
+
+/** Scratch: base olhos → rotação do pivot manual (evita alocações por frame). */
+let _omafitManualEyeL = null;
+let _omafitManualEyeR = null;
+let _omafitManualEyeDir = null;
+let _omafitManualEyeUp = null;
+let _omafitManualEyeFwd = null;
+let _omafitManualEyeTrueUp = null;
+let _omafitManualEyePar = null;
+let _omafitManualEyeRotMat = null;
+
+/**
+ * Modo manual MindAR: alinha `glassesPivot` à base dos olhos (263→33 = +X), Y cima do rosto,
+ * Z para frente (MindAR: se `forward.z > 0`, inverte). Mesh não é rodado aqui.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} glassesPivot
+ * @param {any} lm `metricLandmarks`
+ * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
+ * @returns {boolean} `true` se a rotação do pivot foi actualizada
+ */
+function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother) {
+  if (!THREE || !glassesPivot || !lm) return false;
+  if (!_omafitManualEyeL) _omafitManualEyeL = new THREE.Vector3();
+  if (!_omafitManualEyeR) _omafitManualEyeR = new THREE.Vector3();
+  if (!_omafitManualEyeDir) _omafitManualEyeDir = new THREE.Vector3();
+  if (!_omafitManualEyeUp) _omafitManualEyeUp = new THREE.Vector3();
+  if (!_omafitManualEyeFwd) _omafitManualEyeFwd = new THREE.Vector3();
+  if (!_omafitManualEyeTrueUp) _omafitManualEyeTrueUp = new THREE.Vector3();
+  if (!_omafitManualEyePar) _omafitManualEyePar = new THREE.Vector3();
+  if (!_omafitManualEyeRotMat) _omafitManualEyeRotMat = new THREE.Matrix4();
+
+  const fillEye = (idx, out) => {
+    const p = smoother?.get(idx);
+    if (p) {
+      out.set(p.x, p.y, p.z);
+      return true;
+    }
+    const a = lm[idx];
+    if (!a) return false;
+    out.set(a[0], a[1], a[2]);
+    return true;
+  };
+  if (!fillEye(OMAFIT_FACE_LM_EYE_L_OUT, _omafitManualEyeL)) return false;
+  if (!fillEye(OMAFIT_FACE_LM_EYE_R_OUT, _omafitManualEyeR)) return false;
+
+  const eyeDir = _omafitManualEyeDir.subVectors(_omafitManualEyeL, _omafitManualEyeR);
+  if (eyeDir.lengthSq() < 1e-14) return false;
+  eyeDir.normalize();
+
+  const up = _omafitManualEyeUp.set(0, 1, 0);
+  _omafitManualEyePar.copy(eyeDir).multiplyScalar(up.dot(eyeDir));
+  up.sub(_omafitManualEyePar);
+  if (up.lengthSq() < 1e-14) return false;
+  up.normalize();
+
+  const forward = _omafitManualEyeFwd.crossVectors(eyeDir, up);
+  if (forward.lengthSq() < 1e-14) return false;
+  forward.normalize();
+  if (forward.z > 0) {
+    forward.multiplyScalar(-1);
+  }
+
+  const trueUp = _omafitManualEyeTrueUp.crossVectors(forward, eyeDir);
+  if (trueUp.lengthSq() < 1e-14) return false;
+  trueUp.normalize();
+
+  _omafitManualEyeRotMat.makeBasis(eyeDir, trueUp, forward);
+  glassesPivot.quaternion.setFromRotationMatrix(_omafitManualEyeRotMat);
+  return true;
 }
 
 /**
@@ -6702,7 +6773,8 @@ async function runArSession({
         glasses.position.set(0, 0, 0);
         glasses.scale.set(1, 1, 1);
         glasses.rotation.order = "XYZ";
-        glasses.rotation.set(Math.PI / 2, Math.PI, 0);
+        glasses.rotation.set(0, 0, 0);
+        glasses.quaternion.identity();
         glasses.updateMatrix();
       } else {
         glasses.position.set(0, 0, 0);
@@ -6733,9 +6805,8 @@ async function runArSession({
         glassesPivot.add(axesH);
       }
       if (glassesManualMindarRig && glassesPivot) {
-        console.log("[omafit-ar] glasses manual MindAR — init (rotação fixa no mesh; pivot no anchor)", {
+        console.log("[omafit-ar] glasses manual MindAR — init (mesh identidade; pivot = base olhos no onUpdate)", {
           build: OMAFIT_AR_WIDGET_BUILD,
-          meshRot: { x: Math.PI / 2, y: Math.PI, z: 0 },
           pivotPos: { x: 0, y: -0.03, z: -0.08 },
         });
       }
@@ -7398,9 +7469,13 @@ async function runArSession({
             } else {
               glassesPivot.scale.setScalar(1);
             }
+            omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, st.lmSmoother);
+            if (glasses) {
+              glasses.quaternion.identity();
+            }
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
-              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (pivot pos/escala)", {
+              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (pivot pos/escala/base olhos)", {
                 faceInterpupillary: faceW,
                 faceWidthNormalized: Number.isFinite(faceW) ? faceW / 10 : null,
                 modelWidth: modelW,
