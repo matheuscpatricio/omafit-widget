@@ -254,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-pipeline-log-default-manual-embed";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-hydrate-url-root-first";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1253,6 +1253,36 @@ function omafitUpgradeShopifyMediaToHttps(url) {
     /* ignore */
   }
   return s;
+}
+
+/**
+ * Garante `data-ar-glasses-manual-mindar-rig` no `#omafit-ar-root` **antes** de `cfgAttr`:
+ * query `?arGlassesManualMindarRig=1` (iframe Netlify); se `data-ar-accessory-type` é
+ * `glasses` e o attr ainda está vazio → `"1"`.
+ *
+ * @param {HTMLElement | null} root
+ */
+function omafitHydrateArRootManualRigFromUrl(root) {
+  if (!root || !root.dataset) return;
+  try {
+    const q = new URLSearchParams(typeof window !== "undefined" ? window.location.search || "" : "");
+    const fromQ = (q.get("arGlassesManualMindarRig") || q.get("ar_glasses_manual_mindar_rig") || "").trim();
+    if (fromQ && /^(1|true|yes|on)$/i.test(fromQ)) {
+      root.dataset.arGlassesManualMindarRig = "1";
+      return;
+    }
+    if (fromQ && /^(0|false|off|no)$/i.test(fromQ)) {
+      root.dataset.arGlassesManualMindarRig = "0";
+      return;
+    }
+  } catch {
+    /* ignore */
+  }
+  const acc = String(root.dataset.arAccessoryType || "").trim().toLowerCase();
+  const cur = String(root.dataset.arGlassesManualMindarRig ?? "").trim();
+  if (!cur && acc === "glasses") {
+    root.dataset.arGlassesManualMindarRig = "1";
+  }
 }
 
 /**
@@ -5116,10 +5146,28 @@ async function runArSession({
      */
     const arCfg = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
     const embedCfg = typeof document !== "undefined" ? document.getElementById("omafit-widget-root") : null;
+    if (arCfg) {
+      omafitHydrateArRootManualRigFromUrl(arCfg);
+      try {
+        console.log("Manual rig attr:", arCfg.dataset.arGlassesManualMindarRig);
+      } catch {
+        /* ignore */
+      }
+    }
     function cfgAttrDispatch(camelKey, fallback = "") {
-      const ek = embedCfg?.dataset?.[camelKey];
+      const embedEl = typeof document !== "undefined" ? document.getElementById("omafit-widget-root") : null;
+      const rootEl = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+      /** Modo manual: o tema (`#omafit-ar-root`) ganha ao `#omafit-widget-root` (evita embed vazio a sombrear). */
+      if (camelKey === "arGlassesManualMindarRig") {
+        const rk = rootEl?.dataset?.[camelKey];
+        if (rk !== undefined && String(rk).trim() !== "") return String(rk).trim();
+        const ek = embedEl?.dataset?.[camelKey];
+        if (ek !== undefined && String(ek).trim() !== "") return String(ek).trim();
+        return String(fallback ?? "").trim();
+      }
+      const ek = embedEl?.dataset?.[camelKey];
       if (ek !== undefined && String(ek).trim() !== "") return String(ek).trim();
-      const ak = arCfg?.dataset?.[camelKey];
+      const ak = rootEl?.dataset?.[camelKey];
       if (ak !== undefined && String(ak).trim() !== "") return String(ak).trim();
       return String(fallback ?? "").trim();
     }
@@ -5257,11 +5305,20 @@ async function runArSession({
       threeMod.default && typeof threeMod.default.Group === "function" ? threeMod.default : threeMod;
     const { GLTFLoader } = gltfModule;
     const MindARThree = mindFaceMod.MindARThree || mindFaceMod.default;
-    /** Valor não vazio em `#omafit-widget-root` sobrepõe `#omafit-ar-root` (evita só o wear no embed e o resto “partido”). */
+    /** Lê sempre o DOM actual; mod rig manual: `#omafit-ar-root` primeiro (ver `cfgAttrDispatch`). */
     function cfgAttr(camelKey, fallback = "") {
-      const ek = embedCfg?.dataset?.[camelKey];
+      const embedEl = typeof document !== "undefined" ? document.getElementById("omafit-widget-root") : null;
+      const rootEl = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+      if (camelKey === "arGlassesManualMindarRig") {
+        const rk = rootEl?.dataset?.[camelKey];
+        if (rk !== undefined && String(rk).trim() !== "") return String(rk).trim();
+        const ek = embedEl?.dataset?.[camelKey];
+        if (ek !== undefined && String(ek).trim() !== "") return String(ek).trim();
+        return String(fallback ?? "").trim();
+      }
+      const ek = embedEl?.dataset?.[camelKey];
       if (ek !== undefined && String(ek).trim() !== "") return String(ek).trim();
-      const ak = arCfg?.dataset?.[camelKey];
+      const ak = rootEl?.dataset?.[camelKey];
       if (ak !== undefined && String(ak).trim() !== "") return String(ak).trim();
       return String(fallback ?? "").trim();
     }
@@ -11064,6 +11121,14 @@ if (typeof document !== "undefined") {
     window.clearTimeout(__omafitArSectionTimer);
     __omafitArSectionTimer = window.setTimeout(() => {
       const r = document.getElementById("omafit-ar-root");
+      if (r) {
+        omafitHydrateArRootManualRigFromUrl(r);
+        try {
+          console.log("Manual rig attr:", r.dataset.arGlassesManualMindarRig);
+        } catch {
+          /* ignore */
+        }
+      }
       const g = r && (r.dataset.glbUrl || r.getAttribute("data-glb-url") || "").trim();
       if (!r || !g) return;
       __omafitArMainStarted = false;
@@ -11117,6 +11182,12 @@ function bootOmafitArWidget() {
     const root = document.getElementById("omafit-ar-root");
     const glb = omafitReadGlbUrlFromRootOrQuery();
     if (root && glb) {
+      omafitHydrateArRootManualRigFromUrl(root);
+      try {
+        console.log("Manual rig attr:", root.dataset.arGlassesManualMindarRig);
+      } catch {
+        /* ignore */
+      }
       // #region agent log
       let h = "";
       try {
