@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_webgl2-hair-cal-https";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_cavity-frag-vviewpos";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -2407,9 +2407,10 @@ function omafitDisposeGlassesContactRig(rig) {
  */
 function omafitPatchGlassesMaterialsLocalCavityAo(THREE, root, intensity) {
   if (!THREE || !root || !(intensity > 0)) return;
+  /** Só varyings do fragmento: `position` não existe aqui (só no vertex). Usamos `vViewPosition` (Three.js). */
   const inj = `float omafitNdV=abs(dot(normalize(normal),normalize(-vViewPosition)));
 float omafitCav=smoothstep(0.22,0.94,1.0-omafitNdV);
-float omafitTmp=(1.0-smoothstep(0.05,0.14,abs(position.x)))*smoothstep(-0.02,0.06,position.z);
+float omafitTmp=(1.0-smoothstep(0.05,0.14,abs(vViewPosition.x)))*smoothstep(-0.02,0.06,vViewPosition.z);
 diffuseColor.rgb*=mix(1.0,${1 - intensity},0.55*omafitCav+0.35*omafitTmp);`;
   root.traverse((ch) => {
     if (!ch.isMesh) return;
