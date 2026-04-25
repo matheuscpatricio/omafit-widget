@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_ar-new-window-fallback";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_webgl2-hair-cal-https";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1071,6 +1071,26 @@ function omafitAbsolutizeGlbUrlMaybe(raw) {
     }
   }
   return u;
+}
+
+/** Evita mixed content no iframe HTTPS (imagem do produto às vezes vem em `http://cdn.shopify.com`). */
+function omafitUpgradeShopifyMediaToHttps(url) {
+  const s = String(url || "").trim();
+  if (!s) return s;
+  if (s.startsWith("//")) return `https:${s}`;
+  try {
+    if (/^http:\/\/cdn\.shopify\.com\//i.test(s)) {
+      return `https://${s.slice("http://".length)}`;
+    }
+    const u = new URL(s);
+    if (u.protocol === "http:" && /\.shopify\.com$/i.test(u.hostname)) {
+      u.protocol = "https:";
+      return u.toString();
+    }
+  } catch {
+    /* ignore */
+  }
+  return s;
 }
 
 /**
@@ -2399,7 +2419,9 @@ diffuseColor.rgb*=mix(1.0,${1 - intensity},0.55*omafitCav+0.35*omafitTmp);`;
       if (!("roughness" in mat) || typeof mat.onBeforeCompile !== "function") continue;
       mat.userData = mat.userData || {};
       mat.userData.omafitCavityPatched = true;
-      mat.onBeforeCompile = (shader) => {
+      const prevCav = mat.onBeforeCompile;
+      mat.onBeforeCompile = function omafitCavityOnBeforeCompile(shader, renderer) {
+        if (typeof prevCav === "function") prevCav.call(this, shader, renderer);
         if (shader.fragmentShader.includes("omafitNdV")) return;
         const needle = "#include <output_fragment>";
         if (shader.fragmentShader.includes(needle)) {
@@ -2438,6 +2460,9 @@ function installGlassesTempleHairMaskOnMaterial(THREE, material, hairUniforms) {
     shader.uniforms.uOmafitHairMask = hairUniforms.uOmafitHairMask;
     shader.uniforms.uOmafitHairMirror = hairUniforms.uOmafitHairMirror;
     shader.uniforms.uOmafitHairThreshold = hairUniforms.uOmafitHairThreshold;
+    const isW2 = renderer?.capabilities?.isWebGL2 === true;
+    /** WebGL2 / GLSL3: `texture()`; WebGL1: `texture2D()`. */
+    const hairSample = isW2 ? "texture(uOmafitHairMask, uvh).r" : "texture2D(uOmafitHairMask, uvh).r";
     shader.vertexShader = shader.vertexShader.replace(
       "#include <common>",
       [
@@ -2461,7 +2486,7 @@ function installGlassesTempleHairMaskOnMaterial(THREE, material, hairUniforms) {
         "vec2 uvh = vOmafitHairUv;",
         "if (uOmafitHairMirror.x > 0.5) uvh.x = 1.0 - uvh.x;",
         "if (uOmafitHairMirror.y > 0.5) uvh.y = 1.0 - uvh.y;",
-        "float __omafitHair = texture2D(uOmafitHairMask, uvh).r;",
+        `float __omafitHair = ${hairSample};`,
         "if (__omafitHair > uOmafitHairThreshold) discard;",
       ].join("\n"),
     );
@@ -3717,6 +3742,7 @@ function buildInfoModal({
   onClose,
   onStartAr,
 }) {
+  const productImgHttps = omafitUpgradeShopifyMediaToHttps(productImage);
   // #region agent log
   __omafitArDbgLog({
     location: "omafit-ar-widget.js:buildInfoModal",
@@ -3871,9 +3897,9 @@ function buildInfoModal({
       background: "#f3f4f6",
     },
   });
-  if (productImage) {
+  if (productImgHttps) {
     const pi = el("img", {
-      src: productImage,
+      src: productImgHttps,
       alt: productTitle,
       style: { width: "100%", height: "auto", display: "block", objectFit: "contain" },
     });
@@ -3900,13 +3926,13 @@ function buildInfoModal({
     },
     className: "omafit-ar-mobile-img",
   });
-  if (productImage) {
+  if (productImgHttps) {
     const mimg = el("div", {
       style: { borderRadius: "16px", overflow: "hidden", background: "#f3f4f6" },
     });
     mimg.appendChild(
       el("img", {
-        src: productImage,
+        src: productImgHttps,
         alt: productTitle,
         style: { width: "100%", height: "auto", display: "block" },
       }),
@@ -5082,12 +5108,22 @@ async function runArSession({
     function parseOmafitCalibrationRaw(raw) {
       if (!raw) return null;
       let v = raw;
-      try { v = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
-      if (v && typeof v === "object" && v.value !== undefined) {
-        try { v = typeof v.value === "string" ? JSON.parse(v.value) : v.value; } catch { /* noop */ }
+      try {
+        v = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch {
+        return null;
       }
-      if (v && typeof v === "object" && !Array.isArray(v)) return v;
-      return null;
+      if (v && typeof v === "object" && v.value !== undefined) {
+        try {
+          v = typeof v.value === "string" ? JSON.parse(v.value) : v.value;
+        } catch {
+          /* noop */
+        }
+      }
+      if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+      /** Liquid `| json` sobre o drop do metafield (não o `.value`) → erro Shopify. */
+      if (typeof v.error === "string" && Object.keys(v).length <= 2) return null;
+      return v;
     }
     function applyOmafitCalibration(cal, el) {
       const target = el || arCfg;
@@ -10119,7 +10155,7 @@ async function main() {
       .trim()
       .replace(/[<>]/g, "") || "#810707";
   const productTitle = root.dataset.productTitle || "Produto";
-  const productImage = root.dataset.productImage || "";
+  const productImage = omafitUpgradeShopifyMediaToHttps(root.dataset.productImage || "");
   const rootLogo = (root.dataset.storeLogo || root.getAttribute("data-store-logo") || "").trim();
   let logoUrl = (rootLogo || adminBrand?.storeLogo || "").trim();
   if (logoUrl.startsWith("//")) logoUrl = `https:${logoUrl}`;

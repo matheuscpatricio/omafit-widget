@@ -79,6 +79,41 @@ const tryDecodeUrlParam = (value: string | null): string => {
   }
 };
 
+const upgradeShopifyMediaToHttps = (url: string): string => {
+  const s = String(url || '').trim();
+  if (!s) return s;
+  if (s.startsWith('//')) return `https:${s}`;
+  try {
+    if (/^http:\/\/cdn\.shopify\.com\//i.test(s)) {
+      return `https://${s.slice('http://'.length)}`;
+    }
+    const u = new URL(s);
+    if (u.protocol === 'http:' && /\.shopify\.com$/i.test(u.hostname)) {
+      u.protocol = 'https:';
+      return u.toString();
+    }
+  } catch {
+    /* ignore */
+  }
+  return s;
+};
+
+/** Resíduo de `{{ metafield | json }}` no drop (Shopify) — não serializar o objeto metafield. */
+const sanitizeArCalibrationQuery = (raw: string): string => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  try {
+    const o = JSON.parse(s) as Record<string, unknown>;
+    if (o && typeof o === 'object' && typeof o.error === 'string') {
+      const keys = Object.keys(o);
+      if (keys.length <= 2 && keys.includes('error')) return '';
+    }
+  } catch {
+    return s;
+  }
+  return s;
+};
+
 type EyewearArBootstrap = {
   glbUrl: string;
   productTitle: string;
@@ -146,7 +181,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   }
 
   const productTitle = tryDecodeUrlParam(q.get('productName')) || 'Produto';
-  const productImage = tryDecodeUrlParam(q.get('productImage')) || '';
+  const productImage = upgradeShopifyMediaToHttps(tryDecodeUrlParam(q.get('productImage')) || '');
   const lang =
     normalizeWidgetLanguage(
       q.get('adminLocale') ||
@@ -171,7 +206,8 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   const trackingStack = pickQ(['arTrackingStack', 'ar_tracking_stack']).toLowerCase();
   const preferredCamera = pickQ(['arPreferredCamera', 'ar_preferred_camera']).toLowerCase();
   const mindarAnchor = pickQ(['arMindarAnchor', 'ar_mindar_anchor']);
-  const calibration = pickQ(['arOmafitCalibration', 'ar_omafit_calibration']);
+  const calibrationRaw = pickQ(['arOmafitCalibration', 'ar_omafit_calibration']);
+  const calibration = sanitizeArCalibrationQuery(calibrationRaw);
 
   let variantId = pickQ(['variant', 'variant_id', 'variantId']);
   let shopDomain = pickQ(['shopDomain', 'shop_domain', 'shop']);
@@ -241,7 +277,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     trackingStack: trackingStack || undefined,
     preferredCamera: preferredCamera || undefined,
     mindarAnchor: mindarAnchor || undefined,
-    calibration: calibration || undefined,
+    calibration: (calibration && calibration.trim()) || undefined,
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,

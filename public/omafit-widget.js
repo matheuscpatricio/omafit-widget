@@ -181,8 +181,21 @@
   // Normalizar URLs
   function normalizeUrl(url) {
     if (!url) return null;
-    if (url.startsWith('//')) {
-      return 'https:' + url;
+    var s = String(url).trim();
+    if (s.startsWith('//')) {
+      return 'https:' + s;
+    }
+    if (/^http:\/\/cdn\.shopify\.com\//i.test(s)) {
+      return 'https://' + s.slice('http://'.length);
+    }
+    try {
+      var u = new URL(s);
+      if (u.protocol === 'http:' && /\.shopify\.com$/i.test(u.hostname)) {
+        u.protocol = 'https:';
+        return u.toString();
+      }
+    } catch (e) {
+      /* ignore */
     }
     return url;
   }
