@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_cavity-frag-vviewpos";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-wide-dim-max";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -6119,10 +6119,14 @@ async function runArSession({
       glasses.updateMatrixWorld(true);
       const szW = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szW);
-      glassesWideDimPreScale = Math.max(
-        glassesFaceWideAxisX ? szW.x : szW.z,
-        1e-6,
-      );
+      /**
+       * Escala anatómica: `s ≈ factor * dist(234–454) / wideDim` (cada frame).
+       * Só `max(sz.x, sz.z)` assumia que a largura da armação está sempre no plano XZ.
+       * Após `computeGlassesCanonicalOffsetQuat` / bind, a largura útil pode cair
+       * no eixo **Y**; escolher X ou Z podia ser a **espessura** (~mm) → `wideDim`
+       * minúsculo → óculos gigantes. Usamos o maior dos três eixos da bbox.
+       */
+      glassesWideDimPreScale = Math.max(szW.x, szW.y, szW.z, 1e-6);
     }
 
     /** Colar: separar corrente vs pingente para escala radial (k,1,k) sem esticar o pingente. */
