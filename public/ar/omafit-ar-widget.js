@@ -554,7 +554,7 @@ let _omafitManualMatQuat = null;
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
  * @param {import("three").Object3D} glasses
- * @param {import("three").Vector3} pivotPos
+ * @param {import("three").Vector3 | { x?: number, y?: number, z?: number }} pivotPos
  * @param {number} pivotScaleScalar
  * @param {string} fixEulerPreset `a`–`e`
  */
@@ -574,7 +574,15 @@ function omafitApplyGlassesManualPivotModelMatrixOverride(
   glasses.matrixAutoUpdate = false;
   glassesPivot.matrix.identity();
   glasses.matrix.identity();
-  _omafitManualMatPos.copy(pivotPos);
+  if (pivotPos instanceof THREE.Vector3) {
+    _omafitManualMatPos.copy(pivotPos);
+  } else {
+    _omafitManualMatPos.set(
+      pivotPos.x || 0,
+      pivotPos.y || 0,
+      pivotPos.z || 0,
+    );
+  }
   const s =
     Number.isFinite(Number(pivotScaleScalar)) && Number(pivotScaleScalar) > 0
       ? Number(pivotScaleScalar)
@@ -6242,8 +6250,17 @@ async function runArSession({
           return Number.isFinite(s) && s > 0 ? s : 120;
         })()
       : 120;
+    /** `parseXyzMeters` devolve `{x,y,z}` plano — o pipeline manual usa `.clone()` / `copy` como `Vector3`. */
     const glassesManualPivotPosVec = glassesManualMindarRig
-      ? parseXyzMeters(cfgAttr("arGlassesManualPivotPos", "0 -0.04 -0.1"), 0, -0.04, -0.1)
+      ? (() => {
+          const p = parseXyzMeters(
+            cfgAttr("arGlassesManualPivotPos", "0 -0.04 -0.1"),
+            0,
+            -0.04,
+            -0.1,
+          );
+          return new THREE.Vector3(p.x, p.y, p.z);
+        })()
       : null;
     const glassesManualFixEulerPreset = glassesManualMindarRig
       ? String(cfgAttr("arGlassesManualFixEulerPreset", "a")).trim().toLowerCase()
@@ -7005,10 +7022,16 @@ async function runArSession({
         accessoryType === "glasses" && !glassesManualMindarRig ? glassesModelUnitScale : 1,
       glassesManualMindarRig: !!glassesManualMindarRig,
       glassesManualPivotScale: glassesManualMindarRig ? glassesManualPivotScale : 120,
-      glassesManualPivotPos:
-        glassesManualMindarRig && glassesManualPivotPosVec
-          ? glassesManualPivotPosVec.clone()
-          : new THREE.Vector3(),
+      glassesManualPivotPos: (() => {
+        if (!glassesManualMindarRig || !glassesManualPivotPosVec) {
+          return new THREE.Vector3();
+        }
+        let v = glassesManualPivotPosVec;
+        if (!(v instanceof THREE.Vector3)) {
+          v = new THREE.Vector3(v.x || 0, v.y || 0, v.z || 0);
+        }
+        return v.clone();
+      })(),
       glassesManualMindarFinalLogged: false,
       glassesManualFixEulerPreset: glassesManualMindarRig ? glassesManualFixEulerPreset : "a",
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
