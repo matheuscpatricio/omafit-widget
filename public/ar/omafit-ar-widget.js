@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_iframe-allow-camera-star";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_ar-new-window-fallback";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -3195,6 +3195,11 @@ const COPY = {
     errGeneric: "AR indisponível neste dispositivo.",
     errHttps: "Abre a loja em HTTPS (ou localhost). Sem contexto seguro o browser não pede a câmera.",
     errMediaDevices: "Este browser não expõe a câmera aqui. Experimenta Chrome/Edge actualizado ou outro perfil.",
+    arOpenNewWindowCta: "Abrir AR numa nova janela (recomendado no desktop)",
+    arPopupBlocked:
+      "O navegador bloqueou a janela nova. Permita pop-ups para o domínio do widget (ex.: omafit.netlify.app) e tente de novo.",
+    arWindowModeBanner:
+      "Janela dedicada ao AR: use «Começar experiência AR» e autorize a câmara quando o browser pedir.",
     addToCart: "Adicionar ao carrinho",
     addedToCart: "Adicionado!",
     addToCartError: "Erro ao adicionar",
@@ -3251,6 +3256,11 @@ const COPY = {
     errGeneric: "AR unavailable on this device.",
     errHttps: "Open the store over HTTPS (or localhost). Without a secure context the browser won't prompt for the camera.",
     errMediaDevices: "This browser doesn't expose the camera here. Try an updated Chrome/Edge or another profile.",
+    arOpenNewWindowCta: "Open AR in a new window (recommended on desktop)",
+    arPopupBlocked:
+      "The browser blocked the new window. Allow pop-ups for the widget domain (e.g. omafit.netlify.app) and try again.",
+    arWindowModeBanner:
+      "Dedicated AR window: tap “Start AR experience” and allow the camera when the browser asks.",
     addToCart: "Add to cart",
     addedToCart: "Added!",
     addToCartError: "Error adding",
@@ -3307,6 +3317,11 @@ const COPY = {
     errGeneric: "AR no disponible en este dispositivo.",
     errHttps: "Abre la tienda en HTTPS (o localhost). Sin contexto seguro el navegador no pedirá la cámara.",
     errMediaDevices: "Este navegador no expone la cámara aquí. Prueba Chrome/Edge actualizado u otro perfil.",
+    arOpenNewWindowCta: "Abrir AR en una ventana nueva (recomendado en escritorio)",
+    arPopupBlocked:
+      "El navegador bloqueó la ventana emergente. Permita ventanas emergentes para el dominio del widget (p. ej. omafit.netlify.app) e inténtelo de nuevo.",
+    arWindowModeBanner:
+      "Ventana dedicada al AR: pulse «Empezar experiencia AR» y permita la cámara cuando el navegador lo pida.",
     addToCart: "Añadir al carrito",
     addedToCart: "¡Añadido!",
     addToCartError: "Error al añadir",
@@ -3979,12 +3994,43 @@ function buildInfoModal({
     cta.style.filter = "none";
     cta.style.boxShadow = "none";
   });
-  cta.addEventListener("click", () => onStartAr(shell, mainRow, colContent, header));
+  cta.addEventListener("click", () => {
+    if (!omafitArDocumentAllowsCamera()) {
+      omafitArOpenSessionInNewWindow(t, onClose);
+      return;
+    }
+    onStartAr(shell, mainRow, colContent, header);
+  });
 
   const privacy = el("p", {
     textContent: t.privacy,
     style: { margin: 0, textAlign: "center", color: "#6b7280", fontSize: "0.875rem", lineHeight: "1.4" },
   });
+
+  try {
+    const sp = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+    if (sp.get("omafit_ar_window") === "1") {
+      colContent.appendChild(
+        el("div", {
+          role: "status",
+          textContent: t.arWindowModeBanner || "",
+          style: {
+            background: "#dbeafe",
+            color: "#1e3a8a",
+            padding: "10px 12px",
+            borderRadius: "8px",
+            marginBottom: "12px",
+            fontSize: "0.95rem",
+            lineHeight: "1.45",
+            textAlign: "center",
+            border: "1px solid #93c5fd",
+          },
+        }),
+      );
+    }
+  } catch {
+    /* ignore */
+  }
 
   colContent.appendChild(mobileImgWrap);
   colContent.appendChild(titleBlock);
@@ -4174,10 +4220,99 @@ function omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, opts) {
   return true;
 }
 
+/**
+ * `document.permissionsPolicy.allowsFeature("camera")` reflecte o efeito
+ * combinado de cabeçalhos + iframe `allow`. Se for `false`, `getUserMedia`
+ * falha sem prompt útil — abrimos o mesmo URL numa janela de primeiro nível.
+ */
+function omafitArDocumentAllowsCamera() {
+  try {
+    const pp = document.permissionsPolicy;
+    if (pp && typeof pp.allowsFeature === "function") {
+      return pp.allowsFeature("camera") === true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const fp = document.featurePolicy;
+    if (fp && typeof fp.allowsFeature === "function") {
+      return fp.allowsFeature("camera") === true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
+function omafitArOpenSessionInNewWindow(t, onCloseModal) {
+  try {
+    const href = typeof location !== "undefined" ? location.href : "";
+    const u = new URL(href || "https://omafit.netlify.app/", href || undefined);
+    u.searchParams.set("omafit_ar_window", "1");
+    const w = window.open(
+      u.toString(),
+      "_blank",
+      "noopener,noreferrer,width=540,height=940",
+    );
+    if (w) {
+      try {
+        w.focus();
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (typeof onCloseModal === "function") onCloseModal();
+      } catch {
+        /* ignore */
+      }
+    } else if (typeof alert === "function") {
+      alert(t?.arPopupBlocked || "Permita pop-ups para este site e tente de novo.");
+    }
+  } catch (e) {
+    console.warn("[omafit-ar] omafitArOpenSessionInNewWindow", e);
+  }
+}
+
+function omafitArAppendNewWindowFallbackButton(loadingEl, t, onCloseModal) {
+  if (!loadingEl || !t) return;
+  const btn = el("button", {
+    type: "button",
+    textContent: t.arOpenNewWindowCta || "Abrir AR numa nova janela",
+    style: {
+      marginTop: "4px",
+      padding: "12px 18px",
+      borderRadius: "8px",
+      border: "none",
+      cursor: "pointer",
+      fontWeight: "600",
+      fontSize: "1rem",
+      background: "#2563eb",
+      color: "#fff",
+      maxWidth: "min(340px, 92vw)",
+    },
+  });
+  btn.addEventListener("click", () => {
+    omafitArOpenSessionInNewWindow(t, onCloseModal);
+  });
+  loadingEl.appendChild(btn);
+}
+
 async function startMindARFaceWithReliableCamera(mindarThree) {
   const md = navigator.mediaDevices;
   if (!md || typeof md.getUserMedia !== "function") {
-    await mindarThree.start();
+    try {
+      await mindarThree.start();
+    } catch (err) {
+      const wrapped =
+        err === undefined || err === null
+          ? new DOMException(
+              "MindAR: arranque falhou (sem detalhe). Câmara pode estar bloqueada por Permissions-Policy neste documento.",
+              "NotAllowedError",
+            )
+          : err;
+      throw wrapped;
+    }
     return;
   }
   const orig = md.getUserMedia.bind(md);
@@ -4225,7 +4360,18 @@ async function startMindARFaceWithReliableCamera(mindarThree) {
     return orig(constraints);
   };
   try {
-    await mindarThree.start();
+    try {
+      await mindarThree.start();
+    } catch (err) {
+      const wrapped =
+        err === undefined || err === null
+          ? new DOMException(
+              "MindAR: arranque falhou (sem detalhe). Câmara pode estar bloqueada por Permissions-Policy neste documento.",
+              "NotAllowedError",
+            )
+          : err;
+      throw wrapped;
+    }
   } finally {
     patchActive = false;
     md.getUserMedia = orig;
@@ -7694,6 +7840,8 @@ async function runArSession({
       /permissions policy violation|camera is not allowed|not allowed in this document|feature policy/i.test(
         msg,
       );
+    const isMindarCameraPolicy =
+      /MindAR: arranque falhou|rejeição vazia|Permissions-Policy neste documento/i.test(msg);
     const isGlb =
       /glb|gltf|fetch|load|404|403|network|failed to fetch|http/i.test(msg) &&
       !/face|landmarker|wasm|vision|tensorflow|mind|tfjs|facemesh/i.test(msg);
@@ -7701,10 +7849,14 @@ async function runArSession({
       loading.textContent = t.errHttps || t.errGeneric;
     } else if (/mediaDevices|getUserMedia/i.test(msg)) {
       loading.textContent = t.errMediaDevices || t.errGeneric;
-    } else if (isPolicyViolation) {
+    } else if (isPolicyViolation || isMindarCameraPolicy) {
       loading.textContent = t.errCameraEmbed || t.errCamera || t.errGeneric;
+      omafitArAppendNewWindowFallbackButton(loading, t, onClose);
+    } else if (isCam) {
+      loading.textContent = t.errCamera || t.errGeneric;
+      omafitArAppendNewWindowFallbackButton(loading, t, onClose);
     } else {
-      loading.textContent = isCam ? t.errCamera : isGlb ? t.errGlb : t.errFace;
+      loading.textContent = isGlb ? t.errGlb : t.errFace;
     }
     cleanup();
   }
