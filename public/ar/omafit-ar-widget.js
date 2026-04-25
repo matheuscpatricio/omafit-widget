@@ -102,8 +102,9 @@ import {
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
  * Tripo, bind automático, strip roll. `calibRot` identidade; `wearPosition` (0,0,0); pivot
  * filho directo de `anchor.group`. **Mesh** `glasses`: só `quaternion.identity()` (sem Euler fixo).
- * **Pivot**: cada frame `makeBasis(eyeDir, trueUp, forward)` a partir de 263−33 + `(0,1,0)`
- * (Gram-Schmidt, `forward.z>0` → flip), `quaternion.setFromRotationMatrix`; posição fixa e
+ * **Pivot**: cada frame `makeBasis(eyeDir, trueUp, forward)` com `forward = up×eyeDir`,
+ * `trueUp = eyeDir×forward`, flip de X se `eyeDir.x>0`, `forward.z>0` → flip; rotação via
+ * `quaternion.setFromRotationMatrix`. Posição fixa e
  * escala `(faceWidth/10)*targetFactor/modelWidth`. Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
@@ -254,7 +255,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-pivot-eye-basis";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-eye-basis-rh-fix";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1889,8 +1890,10 @@ let _omafitManualEyePar = null;
 let _omafitManualEyeRotMat = null;
 
 /**
- * Modo manual MindAR: alinha `glassesPivot` à base dos olhos (263→33 = +X), Y cima do rosto,
- * Z para frente (MindAR: se `forward.z > 0`, inverte). Mesh não é rodado aqui.
+ * Modo manual MindAR: base **right-handed** no pivot — X = interpupilar (direita→esquerda do
+ * utilizador), Y = `eyeDir × forward`, Z = `up × eyeDir` (forward para fora do rosto; flip se
+ * `forward.z > 0`). Rotação via `quaternion.setFromRotationMatrix` (equivalente a
+ * `setRotationFromMatrix` no pivot). Mesh não é rodado aqui.
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
@@ -1926,6 +1929,10 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   const eyeDir = _omafitManualEyeDir.subVectors(_omafitManualEyeL, _omafitManualEyeR);
   if (eyeDir.lengthSq() < 1e-14) return false;
   eyeDir.normalize();
+  /** +X da armação: da direita do rosto → esquerda (evita espelho / GLB invertido). */
+  if (eyeDir.x > 0) {
+    eyeDir.multiplyScalar(-1);
+  }
 
   const up = _omafitManualEyeUp.set(0, 1, 0);
   _omafitManualEyePar.copy(eyeDir).multiplyScalar(up.dot(eyeDir));
@@ -1933,14 +1940,14 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   if (up.lengthSq() < 1e-14) return false;
   up.normalize();
 
-  const forward = _omafitManualEyeFwd.crossVectors(eyeDir, up);
+  const forward = _omafitManualEyeFwd.crossVectors(up, eyeDir);
   if (forward.lengthSq() < 1e-14) return false;
   forward.normalize();
   if (forward.z > 0) {
     forward.multiplyScalar(-1);
   }
 
-  const trueUp = _omafitManualEyeTrueUp.crossVectors(forward, eyeDir);
+  const trueUp = _omafitManualEyeTrueUp.crossVectors(eyeDir, forward);
   if (trueUp.lengthSq() < 1e-14) return false;
   trueUp.normalize();
 
