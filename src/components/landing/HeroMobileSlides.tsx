@@ -41,7 +41,7 @@ type Slide = {
 const slides: Slide[] = [
   {
     id: 'intro',
-    image: LANDING_IMAGES.heroLifestyleBoardwalk,
+    image: LANDING_IMAGES.heroLifestyleRiver,
     badge: 'Omafit',
     hideBadge: true,
     title: (
@@ -62,7 +62,7 @@ const slides: Slide[] = [
   },
   {
     id: 'fit',
-    image: LANDING_IMAGES.heroLifestyleRiver,
+    image: LANDING_IMAGES.heroLifestyleBoardwalk,
     badge: 'Medição precisa',
     title: (
       <>

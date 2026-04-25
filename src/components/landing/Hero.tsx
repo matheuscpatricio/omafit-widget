@@ -14,8 +14,8 @@ interface HeroProps {
 }
 
 const HERO_SLIDES = [
-  LANDING_IMAGES.heroLifestyleBoardwalk,
   LANDING_IMAGES.heroLifestyleRiver,
+  LANDING_IMAGES.heroLifestyleBoardwalk,
   LANDING_IMAGES.heroLifestyleBeach,
 ] as const;
 
