@@ -1909,8 +1909,25 @@
       }
     }
 
+    (function setIframeCameraDelegation() {
+      var embedOrigin = 'https://omafit.netlify.app';
+      try {
+        var wu = new URL(widgetUrl);
+        embedOrigin = wu.origin;
+      } catch (eAllow) {
+        if (OMAFIT_DEBUG) console.warn('Omafit: URL do widget para allow=', eAllow);
+      }
+      var allowVal =
+        'camera ' +
+        embedOrigin +
+        '; microphone ' +
+        embedOrigin +
+        '; fullscreen ' +
+        embedOrigin;
+      iframe.setAttribute('allow', allowVal);
+      iframe.allow = allowVal;
+    })();
     iframe.src = widgetUrl;
-    iframe.allow = 'camera; microphone; fullscreen';
     iframe.style.cssText =
       'width: 95vw;' +
       'max-width: 1000px;' +
@@ -2747,6 +2764,53 @@
   }
 
   window.addEventListener('message', async function (event) {
+    /** Carrinho AR (variant id): iframe Netlify não pode `fetch` cross-origin a `/cart/add.js`. */
+    if (event && event.data && event.data.type === 'omafit-ar-cart-add-variant') {
+      if (OMAFIT_CART_ALLOWED_ORIGINS.indexOf(event.origin) === -1) {
+        console.warn('[OmafitCart] AR cart: origem não permitida:', event.origin);
+        return;
+      }
+      var arP = event.data.payload && typeof event.data.payload === 'object' ? event.data.payload : {};
+      var arReqId = arP.requestId != null ? String(arP.requestId) : '';
+      var arVid = Number(arP.variantId);
+      var arQty = arP.quantity === undefined ? 1 : Math.max(1, parseInt(arP.quantity, 10) || 1);
+      var arReply = function (ok, msg) {
+        try {
+          if (event.source && event.source.postMessage) {
+            event.source.postMessage(
+              {
+                type: 'omafit-ar-cart-add-result',
+                requestId: arReqId,
+                success: !!ok,
+                message: msg || ''
+              },
+              event.origin
+            );
+          }
+        } catch (eAr) {
+          console.warn('[OmafitCart] AR cart: resposta ao iframe falhou', eAr);
+        }
+      };
+      if (!arReqId || !Number.isFinite(arVid) || arVid < 1) {
+        arReply(false, 'payload_inválido');
+        return;
+      }
+      var arAdd = await addToCart({ variantId: arVid, quantity: arQty, properties: {} });
+      if (arAdd.success) {
+        var arRendered = renderThemeCartFromResponse(arAdd.cart);
+        var arUpdatedCart = await fetchUpdatedCart();
+        if (!arRendered) {
+          await refreshThemeCartSections();
+        }
+        notifyThemeCartUpdate(arUpdatedCart || arAdd.cart || null);
+        dispatchCartUpdatedEvents(arUpdatedCart || arAdd.cart || null);
+        arReply(true, '');
+      } else {
+        arReply(false, arAdd.message || 'Erro ao adicionar ao carrinho');
+      }
+      return;
+    }
+
     if (!isValidAddToCartMessage(event)) return;
 
     var payload = event.data.payload && typeof event.data.payload === 'object' ? event.data.payload : event.data;

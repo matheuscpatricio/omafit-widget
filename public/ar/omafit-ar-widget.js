@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_cart-strip-raised";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_policy-cart-postmsg";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1146,6 +1146,71 @@ function omafitShopifyCartAddJsUrlFromArRoot() {
   } catch {
     return "/cart/add.js";
   }
+}
+
+/**
+ * Carrinho no iframe Netlify: `fetch` cross-origin para `…/cart/add.js` falha (CORS).
+ * Quando há `window.parent` (widget aberto na loja Shopify), pedimos ao tema
+ * (`omafit-widget.js`) que faça `POST /cart/add.js` na mesma origem da loja.
+ */
+function omafitArPostCartAddVariant(variantId) {
+  const vid = Number(variantId);
+  if (!Number.isFinite(vid) || vid < 1) {
+    return Promise.reject(new Error("variantId inválido"));
+  }
+  if (typeof window === "undefined" || !window.parent || window.parent === window) {
+    const cartUrl = omafitShopifyCartAddJsUrlFromArRoot();
+    return fetch(cartUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ id: vid, quantity: 1 }] }),
+      mode: "cors",
+      credentials: "omit",
+    }).then((res) => {
+      if (!res.ok) throw new Error(res.statusText || String(res.status));
+      return { success: true };
+    });
+  }
+  const requestId = `ar-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn) => {
+      if (settled) return;
+      settled = true;
+      try {
+        window.removeEventListener("message", onMsg);
+      } catch {
+        /* ignore */
+      }
+      try {
+        clearTimeout(tid);
+      } catch {
+        /* ignore */
+      }
+      fn();
+    };
+    const onMsg = (ev) => {
+      if (!ev || !ev.data || ev.data.type !== "omafit-ar-cart-add-result") return;
+      if (String(ev.data.requestId || "") !== requestId) return;
+      if (ev.data.success) {
+        done(() => resolve({ success: true, message: ev.data.message || "" }));
+      } else {
+        done(() => reject(new Error(ev.data.message || "carrinho_recusado")));
+      }
+    };
+    window.addEventListener("message", onMsg, false);
+    const tid = window.setTimeout(() => {
+      done(() => reject(new Error("carrinho_timeout")));
+    }, 15000);
+    try {
+      window.parent.postMessage(
+        { type: "omafit-ar-cart-add-variant", payload: { requestId, variantId: vid, quantity: 1 } },
+        "*",
+      );
+    } catch (e) {
+      done(() => reject(e));
+    }
+  });
 }
 
 /** Pré-carrega Three + GLTFLoader + MindAR no load da página — evita que o 1.º `await import()` no clique expire o gesto e bloqueie `getUserMedia` no desktop. */
@@ -3123,6 +3188,8 @@ const COPY = {
     linkTextFallback: "Experimentar óculos (AR)",
     arLoading: "A iniciar câmera e modelo 3D…",
     errCamera: "Permita o uso da câmera para o provador AR.",
+    errCameraEmbed:
+      "A câmara está bloqueada neste iframe (política do browser ou da loja). Atualize o tema Omafit, abra o provador noutro browser ou use o telemóvel.",
     errFace: "Não foi possível carregar a detecção facial.",
     errGlb: "Não foi possível carregar o modelo 3D (GLB). Verifique se o ficheiro está público e acessível.",
     errGeneric: "AR indisponível neste dispositivo.",
@@ -3177,6 +3244,8 @@ const COPY = {
     linkTextFallback: "Try glasses on (AR)",
     arLoading: "Starting camera and 3D model…",
     errCamera: "Allow camera access for AR try-on.",
+    errCameraEmbed:
+      "Camera is blocked in this iframe (browser or store policy). Update the Omafit theme, try another browser, or use a phone.",
     errFace: "Could not load face detection.",
     errGlb: "Could not load the 3D model (GLB). Check that the file is public and reachable.",
     errGeneric: "AR unavailable on this device.",
@@ -3231,6 +3300,8 @@ const COPY = {
     linkTextFallback: "Probar gafas (AR)",
     arLoading: "Iniciando cámara y modelo 3D…",
     errCamera: "Permite el acceso a la cámara para el probador AR.",
+    errCameraEmbed:
+      "La cámara está bloqueada en este iframe (política del navegador o de la tienda). Actualiza el tema Omafit, prueba otro navegador o usa el móvil.",
     errFace: "No se pudo cargar la detección facial.",
     errGlb: "No se pudo cargar el modelo 3D (GLB). Comprueba que el archivo sea público y accesible.",
     errGeneric: "AR no disponible en este dispositivo.",
@@ -4469,15 +4540,7 @@ async function runArSession({
       cartBtn.disabled = true;
       cartBtn.textContent = "…";
       try {
-        const cartUrl = omafitShopifyCartAddJsUrlFromArRoot();
-        const res = await fetch(cartUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: [{ id: Number(currentVariantId), quantity: 1 }] }),
-          mode: "cors",
-          credentials: "omit",
-        });
-        if (!res.ok) throw new Error(res.statusText);
+        await omafitArPostCartAddVariant(Number(currentVariantId));
         cartBtn.textContent = t.addedToCart || "Added!";
         setTimeout(() => { cartBtn.textContent = t.addToCart; cartBtn.disabled = false; }, 2000);
       } catch {
@@ -4527,15 +4590,7 @@ async function runArSession({
       singleCartBtn.disabled = true;
       singleCartBtn.textContent = "…";
       try {
-        const cartUrl = omafitShopifyCartAddJsUrlFromArRoot();
-        const res = await fetch(cartUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: [{ id: Number(vid), quantity: 1 }] }),
-          mode: "cors",
-          credentials: "omit",
-        });
-        if (!res.ok) throw new Error(res.statusText);
+        await omafitArPostCartAddVariant(Number(vid));
         singleCartBtn.textContent = t.addedToCart || "Added!";
         setTimeout(() => { singleCartBtn.textContent = t.addToCart; singleCartBtn.disabled = false; }, 2000);
       } catch {
@@ -7619,13 +7674,18 @@ async function runArSession({
     });
   } catch (e) {
     console.error("[omafit-ar]", e);
+    const errName = e && typeof e === "object" && "name" in e ? String(e.name || "") : "";
     const isCam =
-      e.name === "NotAllowedError" ||
-      e.name === "PermissionDeniedError" ||
-      e.name === "OverconstrainedError" ||
-      e.name === "NotFoundError" ||
-      e.name === "AbortError";
-    const msg = String(e?.message || e || "");
+      errName === "NotAllowedError" ||
+      errName === "PermissionDeniedError" ||
+      errName === "OverconstrainedError" ||
+      errName === "NotFoundError" ||
+      errName === "AbortError";
+    const msg = String((e && e.message) || e || "");
+    const isPolicyViolation =
+      /permissions policy violation|camera is not allowed|not allowed in this document|feature policy/i.test(
+        msg,
+      );
     const isGlb =
       /glb|gltf|fetch|load|404|403|network|failed to fetch|http/i.test(msg) &&
       !/face|landmarker|wasm|vision|tensorflow|mind|tfjs|facemesh/i.test(msg);
@@ -7633,6 +7693,8 @@ async function runArSession({
       loading.textContent = t.errHttps || t.errGeneric;
     } else if (/mediaDevices|getUserMedia/i.test(msg)) {
       loading.textContent = t.errMediaDevices || t.errGeneric;
+    } else if (isPolicyViolation) {
+      loading.textContent = t.errCameraEmbed || t.errCamera || t.errGeneric;
     } else {
       loading.textContent = isCam ? t.errCamera : isGlb ? t.errGlb : t.errFace;
     }
