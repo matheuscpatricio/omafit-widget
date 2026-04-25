@@ -101,11 +101,10 @@ import {
  *
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
  * `modelScaleMul`, `calRotDeg` no GLB, Tripo, bind, strip roll e lock de horizonte no pivot;
- * `calibRot` fica em identidade; `wearPosition` em (0,0,0). Correcção de eixos do GLB **uma
- * vez no load**: `quaternion.multiply(fixQuat)` com Euler preset `a`–`e` (`data-ar-glasses-manual-fix-euler-preset`):
- * A (π/2,π,0), B (-π/2,π,0), C (π/2,0,π), D (0,π,π/2), E (0,π,-π/2). Sem `rotation.set` no mesh
- * em runtime; pivot sem `rotation.set` no loop. Escala/pos no pivot via attrs. Incompatível
- * com estrutural e geometria.
+ * `calibRot` identidade; `wearPosition` (0,0,0). **Cada frame**: `glassesPivot.matrix.compose`
+ * (pos/attrs, quaternion de Euler preset `a`–`e`, escala uniforme attrs) + `glasses.matrix`
+ * identidade; `matrixAutoUpdate = false` — sem `rotation.set` / `scale.set` no pivot ou mesh.
+ * Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -255,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-fix-euler-abcde";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-matrix-compose-every-frame";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -541,6 +540,52 @@ function omafitGlassesManualFixEulerForPreset(THREE, preset) {
   if (p === "e") return new THREE.Euler(0, PI, -PI / 2, "XYZ");
   /** A: π/2, π, 0 */
   return new THREE.Euler(PI / 2, PI, 0, "XYZ");
+}
+
+/** Reutilização: `matrix.compose` por frame sem alocar `Vector3`/`Quaternion`. */
+let _omafitManualMatPos = null;
+let _omafitManualMatScale = null;
+let _omafitManualMatQuat = null;
+
+/**
+ * Modo manual MindAR: **só** `matrix` no pivot + identidade no mesh — ignora pos/rot/scale
+ * automáticos do widget. Sem `rotation.set` / `scale.set` no pivot ou modelo.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} glassesPivot
+ * @param {import("three").Object3D} glasses
+ * @param {import("three").Vector3} pivotPos
+ * @param {number} pivotScaleScalar
+ * @param {string} fixEulerPreset `a`–`e`
+ */
+function omafitApplyGlassesManualPivotModelMatrixOverride(
+  THREE,
+  glassesPivot,
+  glasses,
+  pivotPos,
+  pivotScaleScalar,
+  fixEulerPreset,
+) {
+  if (!THREE || !glassesPivot || !glasses || !pivotPos) return;
+  if (!_omafitManualMatPos) _omafitManualMatPos = new THREE.Vector3();
+  if (!_omafitManualMatScale) _omafitManualMatScale = new THREE.Vector3();
+  if (!_omafitManualMatQuat) _omafitManualMatQuat = new THREE.Quaternion();
+  glassesPivot.matrixAutoUpdate = false;
+  glasses.matrixAutoUpdate = false;
+  glassesPivot.matrix.identity();
+  glasses.matrix.identity();
+  _omafitManualMatPos.copy(pivotPos);
+  const s =
+    Number.isFinite(Number(pivotScaleScalar)) && Number(pivotScaleScalar) > 0
+      ? Number(pivotScaleScalar)
+      : 120;
+  _omafitManualMatScale.set(s, s, s);
+  const fixEuler = omafitGlassesManualFixEulerForPreset(THREE, fixEulerPreset);
+  _omafitManualMatQuat.setFromEuler(fixEuler);
+  glassesPivot.matrix.compose(_omafitManualMatPos, _omafitManualMatQuat, _omafitManualMatScale);
+  glassesPivot.matrixWorldNeedsUpdate = true;
+  glasses.matrixWorldNeedsUpdate = true;
+  glassesPivot.updateMatrixWorld(true);
 }
 
 /**
@@ -6362,42 +6407,13 @@ async function runArSession({
     if (glassesManualMindarRig) {
       omafitApplyGlassesManualMindarCenterMesh(THREE, glasses);
       glasses.updateMatrixWorld(true);
-      const boxPre = new THREE.Box3().setFromObject(glasses);
-      const szPre = new THREE.Vector3();
-      boxPre.getSize(szPre);
-      console.log("BBOX SIZE:", boxPre.getSize(new THREE.Vector3()));
-      const maxPre = Math.max(szPre.x, szPre.y, szPre.z);
-      const domPre =
-        szPre.x >= szPre.y && szPre.x >= szPre.z ? "x" : szPre.y >= szPre.z ? "y" : "z";
-      console.log(
-        "[omafit-ar] manual rig: eixo dominante bbox (pré-fixQuat; pós-alinhamento ideal largura≈X):",
-        domPre,
-        { x: szPre.x, y: szPre.y, z: szPre.z, max: maxPre },
-      );
-      /** Um só `multiply` no load — trocar preset `a`…`e` para alinhar ao teu GLB. */
-      const fixEuler = omafitGlassesManualFixEulerForPreset(THREE, glassesManualFixEulerPreset);
-      const fixQuat = new THREE.Quaternion().setFromEuler(fixEuler);
-      glasses.quaternion.multiply(fixQuat);
-      glasses.updateMatrix();
-      glasses.updateMatrixWorld(true);
-      const boxPost = new THREE.Box3().setFromObject(glasses);
-      console.log("BBOX SIZE:", boxPost.getSize(new THREE.Vector3()));
+      const boxMan = new THREE.Box3().setFromObject(glasses);
       const szMan = new THREE.Vector3();
-      boxPost.getSize(szMan);
+      boxMan.getSize(szMan);
       glassesFaceWideAxisX = szMan.x >= szMan.z;
-      console.log("MODEL QUAT:", glasses.quaternion);
-      console.log("[omafit-ar] glasses manual MindAR rig (fixQuat uma vez)", {
+      console.log("[omafit-ar] glasses manual MindAR (centro GLB; transform só matrix.compose)", {
+        bboxSize: { x: szMan.x, y: szMan.y, z: szMan.z },
         fixEulerPreset: glassesManualFixEulerPreset,
-        fixEuler: { x: fixEuler.x, y: fixEuler.y, z: fixEuler.z, order: fixEuler.order },
-        pivotScale: glassesManualPivotScale,
-        pivotPos: glassesManualPivotPosVec
-          ? {
-              x: glassesManualPivotPosVec.x,
-              y: glassesManualPivotPosVec.y,
-              z: glassesManualPivotPosVec.z,
-            }
-          : null,
-        note: "calibRot identidade; wear 0; sem rotation.set no mesh; pivot sem rotação em runtime",
       });
     }
 
@@ -6419,7 +6435,7 @@ async function runArSession({
      * `scale = anatomicFactor * dist(234,454) / wideDim * modelScaleMul`.
      */
     let glassesWideDimPreScale = null;
-    if (accessoryType === "glasses") {
+    if (accessoryType === "glasses" && !glassesManualMindarRig) {
       glasses.updateMatrixWorld(true);
       const szW = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szW);
@@ -6446,7 +6462,7 @@ async function runArSession({
      *    (proporção ao rosto); **pivot** = multiplicador da loja (`cfg.scale`, 0.25–4).
      *    Ver MindAR 1.2.5 `getLandmarkMatrix` (`fm[i]*s`). */
     let maxDimForBase = maxDim;
-    if (accessoryType === "glasses") {
+    if (accessoryType === "glasses" && !glassesManualMindarRig) {
       glasses.updateMatrixWorld(true);
       const bLive = new THREE.Box3().setFromObject(glasses);
       if (typeof bLive.isEmpty === "function" && !bLive.isEmpty()) {
@@ -6462,9 +6478,7 @@ async function runArSession({
         ? baseUnitScale / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE
         : 1;
     if (accessoryType === "glasses") {
-      if (glassesManualMindarRig) {
-        glasses.scale.set(1, 1, 1);
-      } else {
+      if (!glassesManualMindarRig) {
         glasses.scale.setScalar(glassesStructuralMindarRig ? 1 : baseUnitScale);
       }
     } else {
@@ -6620,11 +6634,10 @@ async function runArSession({
           0,
         );
         glassesPivot.scale.setScalar(1);
-      } else if (glassesManualMindarRig && glassesManualPivotPosVec) {
-        glassesPivot.position.copy(glassesManualPivotPosVec);
-        glassesPivot.rotation.order = "XYZ";
-        glassesPivot.rotation.set(0, 0, 0);
-        glassesPivot.scale.setScalar(glassesManualPivotScale);
+      } else if (glassesManualMindarRig) {
+        /** Posição/rotação/escala finais só via `matrix.compose` (init + cada `onUpdate`). */
+        glassesPivot.matrixAutoUpdate = false;
+        glassesPivot.matrix.identity();
       } else if (glassesGeometryAnchor && glassesGeometryPivotPosTemplate) {
         glassesPivot.position.copy(glassesGeometryPivotPosTemplate);
         glassesPivot.rotation.order = "YXZ";
@@ -6659,7 +6672,9 @@ async function runArSession({
       }
       glassesPivot.add(glasses);
       glasses.name = "omafit-ar-glasses-model";
-      glasses.position.set(0, 0, 0);
+      if (!glassesManualMindarRig) {
+        glasses.position.set(0, 0, 0);
+      }
       if (!glassesStructuralMindarRig && !glassesManualMindarRig) {
         omafitStripGlassesMeshRollYxz(THREE, glasses);
       }
@@ -6685,10 +6700,16 @@ async function runArSession({
         axesH.name = "omafit-ar-glasses-structural-axes";
         glassesPivot.add(axesH);
       }
-      if (glassesManualMindarRig && glassesPivot) {
-        console.log("[omafit-ar] glasses manual MindAR — após montar pivot+modelo", OMAFIT_AR_WIDGET_BUILD);
-        console.log("FINAL SCALE:", glassesPivot.scale);
-        console.log("MODEL QUAT:", glasses.quaternion);
+      if (glassesManualMindarRig && glassesPivot && glassesManualPivotPosVec) {
+        omafitApplyGlassesManualPivotModelMatrixOverride(
+          THREE,
+          glassesPivot,
+          glasses,
+          glassesManualPivotPosVec,
+          glassesManualPivotScale,
+          glassesManualFixEulerPreset,
+        );
+        console.log("[omafit-ar] glasses manual MindAR — matrix.compose (init)", OMAFIT_AR_WIDGET_BUILD);
       }
     } else if (accessoryType === "necklace") {
       necklaceSwingGroup = new GroupCtor();
@@ -7333,16 +7354,19 @@ async function runArSession({
         }
         if (accessoryType === "glasses") {
           if (st.glassesManualMindarRig && glassesPivot) {
-            glassesPivot.scale.setScalar(st.glassesManualPivotScale);
-            glassesPivot.position.copy(st.glassesManualPivotPos);
-            glasses.scale.set(1, 1, 1);
+            omafitApplyGlassesManualPivotModelMatrixOverride(
+              THREE,
+              glassesPivot,
+              glasses,
+              st.glassesManualPivotPos,
+              st.glassesManualPivotScale,
+              st.glassesManualFixEulerPreset,
+            );
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
-              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate", {
+              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (matrix.compose)", {
                 fixEulerPreset: st.glassesManualFixEulerPreset,
               });
-              console.log("FINAL SCALE:", glassesPivot.scale);
-              console.log("MODEL QUAT:", glasses.quaternion);
             }
           } else {
           /**
