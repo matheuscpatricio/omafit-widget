@@ -101,9 +101,11 @@ import {
  *
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
  * `modelScaleMul`, `calRotDeg` no GLB, Tripo, bind, strip roll e lock de horizonte no pivot;
- * `calibRot` fica em identidade; `wearPosition` em (0,0,0). Rotação do modelo fixa em
- * `rotation.set(π/2, π, 0)` (XYZ); escala/pos do `glassesPivot` via attrs (defaults 120 e
- * 0,-0.04,-0.1). Incompatível com estrutural e geometria.
+ * `calibRot` fica em identidade; `wearPosition` em (0,0,0). Correcção de eixos do GLB **uma
+ * vez no load**: `quaternion.multiply(fixQuat)` com Euler preset `a`–`e` (`data-ar-glasses-manual-fix-euler-preset`):
+ * A (π/2,π,0), B (-π/2,π,0), C (π/2,0,π), D (0,π,π/2), E (0,π,-π/2). Sem `rotation.set` no mesh
+ * em runtime; pivot sem `rotation.set` no loop. Escala/pos no pivot via attrs. Incompatível
+ * com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -253,7 +255,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-no-calib-wear";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-fix-euler-abcde";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -500,19 +502,15 @@ function omafitStripGlassesMeshRollYxz(THREE, mesh) {
 }
 
 /**
- * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora bake/bind/auto,
- * `baseUnitScale`, `modelScaleMul`, `calRotDeg` no modelo. Reset → centro bbox → rotação
- * base só no mesh (Euler XYZ em graus via attrs).
+ * Modo manual MindAR: reset de pos/escala/quaternion, centro da bbox na origem — **sem**
+ * `rotation.set` no mesh (evita conflito com o tracking do pai `anchor.group`).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} mesh
- * @param {{ x: number, y: number, z: number }} rotDeg Graus Euler XYZ
- * @param {(d: number) => number} radFn
  */
-function omafitApplyGlassesManualMindarPrep(THREE, mesh, rotDeg, radFn) {
+function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh) {
   if (!THREE || !mesh) return;
   mesh.position.set(0, 0, 0);
-  mesh.rotation.set(0, 0, 0);
   mesh.scale.set(1, 1, 1);
   mesh.quaternion.identity();
   mesh.updateMatrix();
@@ -522,10 +520,27 @@ function omafitApplyGlassesManualMindarPrep(THREE, mesh, rotDeg, radFn) {
     const c = box.getCenter(new THREE.Vector3());
     mesh.position.sub(c);
   }
-  mesh.rotation.order = "XYZ";
-  mesh.rotation.set(radFn(rotDeg.x), radFn(rotDeg.y), radFn(rotDeg.z));
   mesh.updateMatrix();
   mesh.updateMatrixWorld(true);
+}
+
+/**
+ * Euler **XYZ** para testar alinhamento GLB ↔ MindAR (modo manual).
+ * `data-ar-glasses-manual-fix-euler-preset="a"` … `"e"` (default `a`).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {string} preset `a`–`e` (case-insensitive)
+ * @returns {import("three").Euler}
+ */
+function omafitGlassesManualFixEulerForPreset(THREE, preset) {
+  const p = String(preset || "a").trim().toLowerCase();
+  const PI = Math.PI;
+  if (p === "b") return new THREE.Euler(-PI / 2, PI, 0, "XYZ");
+  if (p === "c") return new THREE.Euler(PI / 2, 0, PI, "XYZ");
+  if (p === "d") return new THREE.Euler(0, PI, PI / 2, "XYZ");
+  if (p === "e") return new THREE.Euler(0, PI, -PI / 2, "XYZ");
+  /** A: π/2, π, 0 */
+  return new THREE.Euler(PI / 2, PI, 0, "XYZ");
 }
 
 /**
@@ -6128,9 +6143,9 @@ async function runArSession({
     const glassesManualPivotPosVec = glassesManualMindarRig
       ? parseXyzMeters(cfgAttr("arGlassesManualPivotPos", "0 -0.04 -0.1"), 0, -0.04, -0.1)
       : null;
-    const glassesManualModelRotDeg = glassesManualMindarRig
-      ? parseEulerDegComponents(cfgAttr("arGlassesManualModelRotDeg", "90, 180, 0"), 90, 180, 0)
-      : { x: 0, y: 0, z: 0 };
+    const glassesManualFixEulerPreset = glassesManualMindarRig
+      ? String(cfgAttr("arGlassesManualFixEulerPreset", "a")).trim().toLowerCase()
+      : "a";
 
     /**
      * Contentor de orientação: quando activo (default para óculos), o GLB
@@ -6345,16 +6360,35 @@ async function runArSession({
       });
     }
     if (glassesManualMindarRig) {
-      omafitApplyGlassesManualMindarPrep(THREE, glasses, glassesManualModelRotDeg, rad);
-      /** Rotação base fixa no modelo (equiv. a 90°, 180°, 0° em XYZ); sobrepõe o Euler do prep. */
-      glasses.rotation.order = "XYZ";
-      glasses.rotation.set(Math.PI / 2, Math.PI, 0);
+      omafitApplyGlassesManualMindarCenterMesh(THREE, glasses);
+      glasses.updateMatrixWorld(true);
+      const boxPre = new THREE.Box3().setFromObject(glasses);
+      const szPre = new THREE.Vector3();
+      boxPre.getSize(szPre);
+      console.log("BBOX SIZE:", boxPre.getSize(new THREE.Vector3()));
+      const maxPre = Math.max(szPre.x, szPre.y, szPre.z);
+      const domPre =
+        szPre.x >= szPre.y && szPre.x >= szPre.z ? "x" : szPre.y >= szPre.z ? "y" : "z";
+      console.log(
+        "[omafit-ar] manual rig: eixo dominante bbox (pré-fixQuat; pós-alinhamento ideal largura≈X):",
+        domPre,
+        { x: szPre.x, y: szPre.y, z: szPre.z, max: maxPre },
+      );
+      /** Um só `multiply` no load — trocar preset `a`…`e` para alinhar ao teu GLB. */
+      const fixEuler = omafitGlassesManualFixEulerForPreset(THREE, glassesManualFixEulerPreset);
+      const fixQuat = new THREE.Quaternion().setFromEuler(fixEuler);
+      glasses.quaternion.multiply(fixQuat);
       glasses.updateMatrix();
       glasses.updateMatrixWorld(true);
+      const boxPost = new THREE.Box3().setFromObject(glasses);
+      console.log("BBOX SIZE:", boxPost.getSize(new THREE.Vector3()));
       const szMan = new THREE.Vector3();
-      new THREE.Box3().setFromObject(glasses).getSize(szMan);
+      boxPost.getSize(szMan);
       glassesFaceWideAxisX = szMan.x >= szMan.z;
-      console.log("[omafit-ar] glasses manual MindAR rig (sem auto; prep único no mesh)", {
+      console.log("MODEL QUAT:", glasses.quaternion);
+      console.log("[omafit-ar] glasses manual MindAR rig (fixQuat uma vez)", {
+        fixEulerPreset: glassesManualFixEulerPreset,
+        fixEuler: { x: fixEuler.x, y: fixEuler.y, z: fixEuler.z, order: fixEuler.order },
         pivotScale: glassesManualPivotScale,
         pivotPos: glassesManualPivotPosVec
           ? {
@@ -6363,7 +6397,7 @@ async function runArSession({
               z: glassesManualPivotPosVec.z,
             }
           : null,
-        note: "calibRot identidade; wearPosition 0; calRotDeg não afecta o GLB neste modo",
+        note: "calibRot identidade; wear 0; sem rotation.set no mesh; pivot sem rotação em runtime",
       });
     }
 
@@ -6654,7 +6688,7 @@ async function runArSession({
       if (glassesManualMindarRig && glassesPivot) {
         console.log("[omafit-ar] glasses manual MindAR — após montar pivot+modelo", OMAFIT_AR_WIDGET_BUILD);
         console.log("FINAL SCALE:", glassesPivot.scale);
-        console.log("FINAL ROT:", glasses.rotation);
+        console.log("MODEL QUAT:", glasses.quaternion);
       }
     } else if (accessoryType === "necklace") {
       necklaceSwingGroup = new GroupCtor();
@@ -6886,6 +6920,7 @@ async function runArSession({
           ? glassesManualPivotPosVec.clone()
           : new THREE.Vector3(),
       glassesManualMindarFinalLogged: false,
+      glassesManualFixEulerPreset: glassesManualMindarRig ? glassesManualFixEulerPreset : "a",
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -7300,15 +7335,14 @@ async function runArSession({
           if (st.glassesManualMindarRig && glassesPivot) {
             glassesPivot.scale.setScalar(st.glassesManualPivotScale);
             glassesPivot.position.copy(st.glassesManualPivotPos);
-            glassesPivot.rotation.set(0, 0, 0);
             glasses.scale.set(1, 1, 1);
-            glasses.rotation.order = "XYZ";
-            glasses.rotation.set(Math.PI / 2, Math.PI, 0);
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
-              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate");
+              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate", {
+                fixEulerPreset: st.glassesManualFixEulerPreset,
+              });
               console.log("FINAL SCALE:", glassesPivot.scale);
-              console.log("FINAL ROT:", glasses.rotation);
+              console.log("MODEL QUAT:", glasses.quaternion);
             }
           } else {
           /**
