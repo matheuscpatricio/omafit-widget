@@ -258,7 +258,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-mesh-ry-cleanup";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-eye-basis-rh";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -1908,9 +1908,9 @@ let _omafitManualEyeRotMat = null;
 
 /**
  * Modo manual MindAR: base **right-handed** no pivot — X = interpupilar (direita→esquerda do
- * utilizador), Y = `eyeDir × forward`, Z = `up × eyeDir` (forward para fora do rosto; flip se
- * `forward.z > 0`). Rotação via `quaternion.setFromRotationMatrix` (equivalente a
- * `setRotationFromMatrix` no pivot). Mesh não é rodado aqui.
+ * utilizador), Z = `up × eyeDir` (forward para fora do rosto; flip se `forward.z > 0`),
+ * Y = `forward × eyeDir` para cumprir **X × Y = Z** (ortonormal; `makeBasis` do THREE exige RH).
+ * Rotação via `quaternion.setFromRotationMatrix` no pivot. Mesh não é rodado aqui.
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
@@ -1964,7 +1964,8 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
     forward.multiplyScalar(-1);
   }
 
-  const trueUp = _omafitManualEyeTrueUp.crossVectors(eyeDir, forward);
+  /** Y = Z × X = forward × eyeDir — não usar eyeDir × forward (isso dá X × Y = −Z, base inválida). */
+  const trueUp = _omafitManualEyeTrueUp.crossVectors(forward, eyeDir);
   if (trueUp.lengthSq() < 1e-14) return false;
   trueUp.normalize();
 
