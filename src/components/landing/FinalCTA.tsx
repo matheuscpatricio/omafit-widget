@@ -64,14 +64,15 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
 
             <motion.div
               variants={itemVariants}
-              className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3"
+              className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center"
             >
               <ButtonLink
                 variant="primary"
-                size="xl"
+                size="lg"
                 href="https://apps.shopify.com/omafit"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="min-h-0 w-full !h-auto flex-col items-center gap-1 whitespace-normal px-5 py-3.5 text-center leading-snug sm:w-auto sm:px-7 sm:py-4"
                 onClick={(e) => {
                   if (onInstallShopify) {
                     e.preventDefault();
@@ -79,13 +80,23 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
                   }
                 }}
               >
-                Instalar Omafit na Shopify
-                <span className="text-xs font-normal text-oma-cream/75">(instalação grátis)</span>
-                <ArrowRight className="w-4 h-4" />
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span>Instalar Omafit na Shopify</span>
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </span>
+                <span className="text-[11px] font-normal leading-tight text-oma-cream/80 sm:text-xs">
+                  (instalação grátis)
+                </span>
               </ButtonLink>
 
-              <Button variant="secondary" size="xl" onClick={onScheduleDemo} type="button">
-                <Calendar className="w-4 h-4" />
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={onScheduleDemo}
+                type="button"
+                className="min-h-0 w-full !h-auto flex-wrap justify-center gap-2 whitespace-normal px-5 py-3.5 text-center leading-snug sm:w-auto sm:px-6 sm:py-4"
+              >
+                <Calendar className="h-4 w-4 shrink-0" />
                 Agendar Demonstração Personalizada
               </Button>
             </motion.div>

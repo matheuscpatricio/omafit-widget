@@ -111,6 +111,8 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
     offset: ['start start', 'end start'],
   });
   const contentOpacity = useTransform(scrollYProgress, [0, 0.72], [1, 0.45]);
+  /** Degradê no rodapé do hero: intensifica ligeiramente ao aproximar da secção seguinte (Lenis + scroll suave). */
+  const footerBlendOpacity = useTransform(scrollYProgress, [0.45, 0.92], [0.55, 1]);
 
   const contentStyle = isMdUp ? { opacity: contentOpacity } : undefined;
 
@@ -271,6 +273,12 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           </motion.div>
         </motion.div>
       </motion.div>
+
+      <motion.div
+        aria-hidden
+        style={{ opacity: footerBlendOpacity }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-32 bg-gradient-to-b from-transparent via-oma-canvas/70 to-oma-elevated sm:h-36 md:h-44"
+      />
     </section>
   );
 }

@@ -84,7 +84,7 @@ export function LandingSEO() {
           '@id': `${base}/#organization`,
           name: 'Omafit',
           url: base,
-          logo: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/favicon%20(1).png',
+          logo: `${base}/favicon.svg`,
           sameAs: ['https://www.instagram.com/omafit.co/'],
           description: DEFAULT_DESC,
         },

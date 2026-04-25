@@ -209,11 +209,11 @@ function SolutionTripletCarousel() {
         </CarouselContent>
         <CarouselPrevious
           type="button"
-          className="left-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream sm:left-2"
+          className="left-1 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream md:left-2 md:flex"
         />
         <CarouselNext
           type="button"
-          className="right-1 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream sm:right-2"
+          className="right-1 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream md:right-2 md:flex"
         />
       </Carousel>
 

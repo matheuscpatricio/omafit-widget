@@ -58,11 +58,13 @@ export function Navbar({ onInstall }: NavbarProps) {
               href="#top"
               aria-label="Omafit — início"
               className={cn(
-                'group min-w-0 shrink-0 transition-opacity hover:opacity-95',
-                !solidBar && '[&_span]:[text-shadow:0_1px_18px_rgba(0,0,0,0.45)]',
+                'group min-w-0 shrink-0 rounded-md transition-opacity hover:opacity-95',
+                '[&_span]:[text-shadow:0_1px_14px_rgba(0,0,0,0.35)]',
+                solidBar &&
+                  'bg-oma-elevated/95 px-2 py-1 shadow-sm ring-1 ring-oma-line/40 backdrop-blur-sm',
               )}
             >
-              <OmafitLogo variant={solidBar ? 'onLight' : 'onDark'} />
+              <OmafitLogo variant="onDark" />
             </a>
 
             <nav className="hidden md:flex items-center gap-1">
