@@ -254,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-matrix-compose-every-frame";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-pipeline-log-default-manual-embed";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -6214,6 +6214,18 @@ async function runArSession({
       !/^(0|off|false|no)$/.test(
         String(cfgAttr("arGlassesTripoOffsetContainer", "1")).trim().toLowerCase(),
       );
+    if (accessoryType === "glasses") {
+      console.log("[omafit-ar] pipeline óculos (verificar build + modo)", {
+        build: OMAFIT_AR_WIDGET_BUILD,
+        glassesManualMindarRig,
+        useTripoOffsetContainer,
+        fixEulerPreset: glassesManualFixEulerPreset,
+        hint:
+          !glassesManualMindarRig && useTripoOffsetContainer
+            ? "Tripo/canonical activo — óculos pequenos/inclinados: activar data-ar-glasses-manual-mindar-rig=1 no #omafit-ar-root (tema Omafit embed) ou desmarcar pipeline antigo."
+            : null,
+      });
+    }
     const tripOffRaw = String(cfgAttr("arGlassesTripoOffsetWorldDeg", "auto")).trim().toLowerCase();
     const tripOffUseAuto = tripOffRaw === "" || tripOffRaw === "auto";
     const tripOffParts = tripOffRaw.split(",").map((s) => parseFloat(String(s).trim()));
