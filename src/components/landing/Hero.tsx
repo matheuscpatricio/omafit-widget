@@ -142,8 +142,8 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
           animate="visible"
           className="flex flex-col items-center text-center md:items-stretch md:text-left"
         >
-          <div className="hidden w-full items-start gap-10 md:grid md:grid-cols-2 md:gap-8 lg:gap-12 lg:items-center">
-            <div className="flex w-full max-w-2xl flex-col items-center justify-self-start md:max-w-none md:pr-2 lg:pr-6">
+          <div className="hidden w-full items-start gap-10 md:grid md:grid-cols-2 md:gap-12 lg:gap-16 xl:gap-20 lg:items-center">
+            <div className="flex w-full max-w-2xl flex-col items-center justify-self-start md:max-w-none md:pr-4 lg:pr-10">
               <motion.div variants={itemVariants} className="flex w-full justify-center md:justify-start">
                 <span className="landing-tagline inline-flex max-w-full items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-elevated px-3 py-1.5 text-[11px] font-semibold text-oma-cream shadow-sm sm:px-3.5 sm:text-[12px]">
                   <Sparkles className="h-3.5 w-3.5 shrink-0 text-oma-tech" />

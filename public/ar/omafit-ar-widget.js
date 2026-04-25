@@ -100,11 +100,11 @@ import {
  * no `glassesPivot` (clamp 80–150 por defeito); pivot travado a horizonte (só yaw Y).
  *
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
- * `modelScaleMul`, `calRotDeg` no GLB, Tripo, bind, strip roll e lock de horizonte no pivot;
- * `calibRot` identidade; `wearPosition` (0,0,0). **Cada frame**: `glassesPivot.matrix.compose`
- * (pos/attrs, `makeBasis` interpupilar×cima com Z virado para frente `(0,0,−1)` × preset Euler
- * `a`–`e`, escala uniforme attrs) + `glasses.matrix` identidade; `matrixAutoUpdate = false`.
- * Incompatível com estrutural e geometria.
+ * Tripo, bind automático, strip roll. `calibRot` identidade; `wearPosition` (0,0,0); pivot
+ * filho directo de `anchor.group` — **posição+rotação** da cabeça só no MindAR (`anchor.group`).
+ * No load: `glasses.rotation.set(π/2, π, 0)` (uma vez). Cada frame: `glassesPivot.position` fixa,
+ * `scale.setScalar((faceWidth/10)*targetFactor/modelWidth)`; sem `makeBasis` / quaternions a
+ * partir de landmarks no pivot. Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -254,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-eye-basis-z-forward";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-stable-anchor-pivot";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -523,151 +523,6 @@ function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh) {
   }
   mesh.updateMatrix();
   mesh.updateMatrixWorld(true);
-}
-
-/**
- * Euler **XYZ** para testar alinhamento GLB ↔ MindAR (modo manual).
- * `data-ar-glasses-manual-fix-euler-preset="a"` … `"e"` (default `a`).
- *
- * @param {typeof import("three")} THREE
- * @param {string} preset `a`–`e` (case-insensitive)
- * @returns {import("three").Euler}
- */
-function omafitGlassesManualFixEulerForPreset(THREE, preset) {
-  const p = String(preset || "a").trim().toLowerCase();
-  const PI = Math.PI;
-  if (p === "b") return new THREE.Euler(-PI / 2, PI, 0, "XYZ");
-  if (p === "c") return new THREE.Euler(PI / 2, 0, PI, "XYZ");
-  if (p === "d") return new THREE.Euler(0, PI, PI / 2, "XYZ");
-  if (p === "e") return new THREE.Euler(0, PI, -PI / 2, "XYZ");
-  /** A: π/2, π, 0 */
-  return new THREE.Euler(PI / 2, PI, 0, "XYZ");
-}
-
-/** Reutilização: `matrix.compose` por frame sem alocar `Vector3`/`Quaternion`. */
-let _omafitManualMatPos = null;
-let _omafitManualMatScale = null;
-let _omafitManualMatQuat = null;
-let _omafitManualBasisPtL = null;
-let _omafitManualBasisPtR = null;
-let _omafitManualBasisEx = null;
-let _omafitManualBasisEy = null;
-let _omafitManualBasisEz = null;
-let _omafitManualBasisUp = null;
-let _omafitManualBasisMat = null;
-let _omafitManualBasisQFix = null;
-/** Frente “clássica” Three.js (câmara olha −Z); inicializado em `omafitApplyGlassesManualPivotModelMatrixOverride`. */
-let _omafitManualCamFwdScratch = null;
-
-/**
- * Modo manual MindAR: **só** `matrix` no pivot + identidade no mesh — ignora pos/rot/scale
- * automáticos do widget. Sem `rotation.set` / `scale.set` no pivot ou modelo.
- *
- * Com `manualEyeBasisOpts` (landmarks + smoother): rotação = `makeBasis(eyeVector, y, z)` onde
- * `eyeVector` é interpupilar (263−33), `z = eye×up` com flip se `z·(0,0,−1)<0`, `y=z×eye`; depois
- * `q = q_basis * q_fixEuler` para manter o bind do GLB.
- *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} glassesPivot
- * @param {import("three").Object3D} glasses
- * @param {import("three").Vector3 | { x?: number, y?: number, z?: number }} pivotPos
- * @param {number} pivotUniformScale escala uniforme na diagonal do `matrix.compose` (interpupilar × factor / largura GLB em X, etc.)
- * @param {string} fixEulerPreset `a`–`e`
- * @param {{ lm: any, smoother: { get(i: number): { x: number, y: number, z: number } | null } | null } | null} manualEyeBasisOpts
- */
-function omafitApplyGlassesManualPivotModelMatrixOverride(
-  THREE,
-  glassesPivot,
-  glasses,
-  pivotPos,
-  pivotUniformScale,
-  fixEulerPreset,
-  manualEyeBasisOpts,
-) {
-  if (!THREE || !glassesPivot || !glasses || !pivotPos) return;
-  if (!_omafitManualMatPos) _omafitManualMatPos = new THREE.Vector3();
-  if (!_omafitManualMatScale) _omafitManualMatScale = new THREE.Vector3();
-  if (!_omafitManualMatQuat) _omafitManualMatQuat = new THREE.Quaternion();
-  if (!_omafitManualBasisQFix) _omafitManualBasisQFix = new THREE.Quaternion();
-  if (!_omafitManualBasisPtL) _omafitManualBasisPtL = new THREE.Vector3();
-  if (!_omafitManualBasisPtR) _omafitManualBasisPtR = new THREE.Vector3();
-  if (!_omafitManualBasisEx) _omafitManualBasisEx = new THREE.Vector3();
-  if (!_omafitManualBasisEy) _omafitManualBasisEy = new THREE.Vector3();
-  if (!_omafitManualBasisEz) _omafitManualBasisEz = new THREE.Vector3();
-  if (!_omafitManualBasisUp) _omafitManualBasisUp = new THREE.Vector3();
-  if (!_omafitManualBasisMat) _omafitManualBasisMat = new THREE.Matrix4();
-  if (!_omafitManualCamFwdScratch) _omafitManualCamFwdScratch = new THREE.Vector3(0, 0, -1);
-  glassesPivot.matrixAutoUpdate = false;
-  glasses.matrixAutoUpdate = false;
-  glassesPivot.matrix.identity();
-  glasses.matrix.identity();
-  if (pivotPos instanceof THREE.Vector3) {
-    _omafitManualMatPos.copy(pivotPos);
-  } else {
-    _omafitManualMatPos.set(
-      pivotPos.x || 0,
-      pivotPos.y || 0,
-      pivotPos.z || 0,
-    );
-  }
-  const s =
-    Number.isFinite(Number(pivotUniformScale)) && Number(pivotUniformScale) > 0
-      ? Number(pivotUniformScale)
-      : 1;
-  _omafitManualMatScale.set(s, s, s);
-  const fixEuler = omafitGlassesManualFixEulerForPreset(THREE, fixEulerPreset);
-  _omafitManualBasisQFix.setFromEuler(fixEuler);
-
-  const fillEye = (idx, out) => {
-    const smoother = manualEyeBasisOpts?.smoother;
-    const lm = manualEyeBasisOpts?.lm;
-    const p = smoother?.get(idx);
-    if (p) {
-      out.set(p.x, p.y, p.z);
-      return true;
-    }
-    const a = lm?.[idx];
-    if (!a) return false;
-    out.set(a[0], a[1], a[2]);
-    return true;
-  };
-
-  let usedEyeBasis = false;
-  if (manualEyeBasisOpts?.lm) {
-    const eyeVector = _omafitManualBasisEx;
-    const y = _omafitManualBasisEy;
-    const z = _omafitManualBasisEz;
-    const up = _omafitManualBasisUp.set(0, 1, 0);
-    if (
-      fillEye(OMAFIT_FACE_LM_EYE_L_OUT, _omafitManualBasisPtL) &&
-      fillEye(OMAFIT_FACE_LM_EYE_R_OUT, _omafitManualBasisPtR)
-    ) {
-      eyeVector.subVectors(_omafitManualBasisPtL, _omafitManualBasisPtR);
-      if (eyeVector.lengthSq() > 1e-10) {
-        eyeVector.normalize();
-        z.crossVectors(eyeVector, up);
-        if (z.lengthSq() > 1e-10) {
-          z.normalize();
-          if (z.dot(_omafitManualCamFwdScratch) < 0) {
-            z.negate();
-          }
-          y.crossVectors(z, eyeVector).normalize();
-          _omafitManualBasisMat.makeBasis(eyeVector, y, z);
-          _omafitManualMatQuat.setFromRotationMatrix(_omafitManualBasisMat);
-          _omafitManualMatQuat.multiply(_omafitManualBasisQFix);
-          usedEyeBasis = true;
-        }
-      }
-    }
-  }
-  if (!usedEyeBasis) {
-    _omafitManualMatQuat.copy(_omafitManualBasisQFix);
-  }
-
-  glassesPivot.matrix.compose(_omafitManualMatPos, _omafitManualMatQuat, _omafitManualMatScale);
-  glassesPivot.matrixWorldNeedsUpdate = true;
-  glasses.matrixWorldNeedsUpdate = true;
-  glassesPivot.updateMatrixWorld(true);
 }
 
 /**
@@ -6335,27 +6190,6 @@ async function runArSession({
           )
         : null;
 
-    const glassesManualPivotScale = glassesManualMindarRig
-      ? (() => {
-          const s = Number(String(cfgAttr("arGlassesManualPivotScale", "120")).trim());
-          return Number.isFinite(s) && s > 0 ? s : 120;
-        })()
-      : 120;
-    /** `parseXyzMeters` devolve `{x,y,z}` plano — o pipeline manual usa `.clone()` / `copy` como `Vector3`. */
-    const glassesManualPivotPosVec = glassesManualMindarRig
-      ? (() => {
-          const p = parseXyzMeters(
-            cfgAttr("arGlassesManualPivotPos", "0 -0.04 -0.1"),
-            0,
-            -0.04,
-            -0.1,
-          );
-          return new THREE.Vector3(p.x, p.y, p.z);
-        })()
-      : null;
-    const glassesManualFixEulerPreset = glassesManualMindarRig
-      ? String(cfgAttr("arGlassesManualFixEulerPreset", "a")).trim().toLowerCase()
-      : "a";
     const glassesManualTargetWidthFactor = glassesManualMindarRig
       ? (() => {
           const v = Number(String(cfgAttr("arGlassesManualTargetWidthFactor", "1.1")).trim());
@@ -6390,7 +6224,6 @@ async function runArSession({
         build: OMAFIT_AR_WIDGET_BUILD,
         glassesManualMindarRig,
         useTripoOffsetContainer,
-        fixEulerPreset: glassesManualFixEulerPreset,
         hint:
           !glassesManualMindarRig && useTripoOffsetContainer
             ? "Tripo/canonical activo — óculos pequenos/inclinados: activar data-ar-glasses-manual-mindar-rig=1 no #omafit-ar-root (tema Omafit embed) ou desmarcar pipeline antigo."
@@ -6600,11 +6433,10 @@ async function runArSession({
       glassesFaceWideAxisX = szMan.x >= szMan.z;
       console.log("MODEL WIDTH USED:", glassesManualModelWidth);
       console.log("BBOX:", { x: szMan.x, y: szMan.y, z: szMan.z });
-      console.log("[omafit-ar] glasses manual MindAR (centro GLB; transform só matrix.compose)", {
+      console.log("[omafit-ar] glasses manual MindAR (centro GLB; pivot estável + escala interpupilar)", {
         bboxSize: { x: szMan.x, y: szMan.y, z: szMan.z },
         modelHeight,
         modelWidth: glassesManualModelWidth,
-        fixEulerPreset: glassesManualFixEulerPreset,
       });
     }
 
@@ -6826,9 +6658,11 @@ async function runArSession({
         );
         glassesPivot.scale.setScalar(1);
       } else if (glassesManualMindarRig) {
-        /** Posição/rotação/escala finais só via `matrix.compose` (init + cada `onUpdate`). */
-        glassesPivot.matrixAutoUpdate = false;
-        glassesPivot.matrix.identity();
+        /** Posição/escala no pivot; rotação da cabeça só no `anchor.group` (MindAR). */
+        glassesPivot.matrixAutoUpdate = true;
+        glassesPivot.position.set(0, -0.03, -0.08);
+        glassesPivot.rotation.set(0, 0, 0);
+        glassesPivot.scale.setScalar(1);
       } else if (glassesGeometryAnchor && glassesGeometryPivotPosTemplate) {
         glassesPivot.position.copy(glassesGeometryPivotPosTemplate);
         glassesPivot.rotation.order = "YXZ";
@@ -6863,7 +6697,14 @@ async function runArSession({
       }
       glassesPivot.add(glasses);
       glasses.name = "omafit-ar-glasses-model";
-      if (!glassesManualMindarRig) {
+      if (glassesManualMindarRig) {
+        glasses.matrixAutoUpdate = true;
+        glasses.position.set(0, 0, 0);
+        glasses.scale.set(1, 1, 1);
+        glasses.rotation.order = "XYZ";
+        glasses.rotation.set(Math.PI / 2, Math.PI, 0);
+        glasses.updateMatrix();
+      } else {
         glasses.position.set(0, 0, 0);
       }
       if (!glassesStructuralMindarRig && !glassesManualMindarRig) {
@@ -6891,17 +6732,12 @@ async function runArSession({
         axesH.name = "omafit-ar-glasses-structural-axes";
         glassesPivot.add(axesH);
       }
-      if (glassesManualMindarRig && glassesPivot && glassesManualPivotPosVec) {
-        omafitApplyGlassesManualPivotModelMatrixOverride(
-          THREE,
-          glassesPivot,
-          glasses,
-          glassesManualPivotPosVec,
-          1,
-          glassesManualFixEulerPreset,
-          null,
-        );
-        console.log("[omafit-ar] glasses manual MindAR — matrix.compose (init)", OMAFIT_AR_WIDGET_BUILD);
+      if (glassesManualMindarRig && glassesPivot) {
+        console.log("[omafit-ar] glasses manual MindAR — init (rotação fixa no mesh; pivot no anchor)", {
+          build: OMAFIT_AR_WIDGET_BUILD,
+          meshRot: { x: Math.PI / 2, y: Math.PI, z: 0 },
+          pivotPos: { x: 0, y: -0.03, z: -0.08 },
+        });
       }
     } else if (accessoryType === "necklace") {
       necklaceSwingGroup = new GroupCtor();
@@ -7127,19 +6963,7 @@ async function runArSession({
       glassesModelUnitScale:
         accessoryType === "glasses" && !glassesManualMindarRig ? glassesModelUnitScale : 1,
       glassesManualMindarRig: !!glassesManualMindarRig,
-      glassesManualPivotScale: glassesManualMindarRig ? glassesManualPivotScale : 120,
-      glassesManualPivotPos: (() => {
-        if (!glassesManualMindarRig || !glassesManualPivotPosVec) {
-          return new THREE.Vector3();
-        }
-        let v = glassesManualPivotPosVec;
-        if (!(v instanceof THREE.Vector3)) {
-          v = new THREE.Vector3(v.x || 0, v.y || 0, v.z || 0);
-        }
-        return v.clone();
-      })(),
       glassesManualMindarFinalLogged: false,
-      glassesManualFixEulerPreset: glassesManualMindarRig ? glassesManualFixEulerPreset : "a",
       glassesManualModelWidth: glassesManualMindarRig ? glassesManualModelWidth : 1,
       glassesManualTargetWidthFactor: glassesManualMindarRig
         ? glassesManualTargetWidthFactor
@@ -7558,39 +7382,30 @@ async function runArSession({
           if (st.glassesManualMindarRig && glassesPivot) {
             const faceW = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
             const modelW = st.glassesManualModelWidth;
-            let pivotUniform = 1;
+            glassesPivot.position.set(0, -0.03, -0.08);
+            let scaleFactor = 1;
             if (
               Number.isFinite(faceW) &&
               faceW > 1e-8 &&
               Number.isFinite(modelW) &&
               modelW > 1e-8
             ) {
-              const glassesTargetWidth = faceW * st.glassesManualTargetWidthFactor;
-              const scaleFactor = glassesTargetWidth / modelW;
-              const pivotMul =
-                (Number.isFinite(Number(st.glassesManualPivotScale)) &&
-                Number(st.glassesManualPivotScale) > 0
-                  ? Number(st.glassesManualPivotScale)
-                  : OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE) / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE;
-              pivotUniform = scaleFactor * pivotMul;
+              const faceWidthNormalized = faceW / 10;
+              scaleFactor = (faceWidthNormalized * st.glassesManualTargetWidthFactor) / modelW;
             }
-            omafitApplyGlassesManualPivotModelMatrixOverride(
-              THREE,
-              glassesPivot,
-              glasses,
-              st.glassesManualPivotPos,
-              pivotUniform,
-              st.glassesManualFixEulerPreset,
-              { lm, smoother: st.lmSmoother },
-            );
+            if (Number.isFinite(scaleFactor) && scaleFactor > 0) {
+              glassesPivot.scale.setScalar(scaleFactor);
+            } else {
+              glassesPivot.scale.setScalar(1);
+            }
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
-              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (matrix.compose)", {
-                fixEulerPreset: st.glassesManualFixEulerPreset,
+              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (pivot pos/escala)", {
                 faceInterpupillary: faceW,
+                faceWidthNormalized: Number.isFinite(faceW) ? faceW / 10 : null,
                 modelWidth: modelW,
                 targetWidthFactor: st.glassesManualTargetWidthFactor,
-                pivotUniform,
+                scaleFactor,
               });
             }
           } else {

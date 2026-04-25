@@ -58,13 +58,14 @@ export function Navbar({ onInstall }: NavbarProps) {
               href="#top"
               aria-label="Omafit — início"
               className={cn(
-                'group min-w-0 shrink-0 rounded-md px-2 py-1 ring-1 transition-[background-color,box-shadow,backdrop-filter,opacity] duration-500 hover:opacity-95',
-                'outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none',
-                'focus-visible:ring-2 focus-visible:ring-oma-accent/55 focus-visible:ring-offset-2',
+                'group min-w-0 shrink-0 select-none rounded-md border px-2 py-1 transition-[background-color,box-shadow,backdrop-filter,opacity,border-color] duration-500 hover:opacity-95',
+                'outline-none ring-0 [-webkit-tap-highlight-color:transparent]',
+                'focus:outline-none focus:ring-0',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oma-accent/55 focus-visible:ring-offset-2',
                 '[&_span]:[text-shadow:0_1px_14px_rgba(0,0,0,0.35)]',
                 solidBar
-                  ? 'bg-oma-elevated/95 shadow-sm ring-oma-line/40 backdrop-blur-sm focus-visible:ring-offset-oma-parchment'
-                  : 'bg-transparent shadow-none ring-transparent backdrop-blur-none focus-visible:ring-offset-oma-canvas',
+                  ? 'border-oma-line/40 bg-oma-elevated/95 shadow-sm backdrop-blur-sm focus-visible:ring-offset-oma-parchment'
+                  : 'border-transparent bg-transparent shadow-none backdrop-blur-none focus-visible:ring-offset-oma-canvas',
               )}
             >
               <OmafitLogo variant="onDark" />
