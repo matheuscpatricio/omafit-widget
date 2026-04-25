@@ -104,8 +104,10 @@ import {
  * filho directo de `anchor.group`. **Mesh** `glasses`: só `quaternion.identity()` (sem Euler fixo).
  * **Pivot**: cada frame `makeBasis(eyeDir, trueUp, forward)` com `forward = up×eyeDir`,
  * `trueUp = eyeDir×forward`, flip de X se `eyeDir.x>0`, `forward.z>0` → flip; rotação via
- * `quaternion.setFromRotationMatrix`. Posição fixa e
- * escala `(faceWidth/10)*targetFactor/modelWidth`. Incompatível com estrutural e geometria.
+ * `quaternion.setFromRotationMatrix`. Posição fixa e escala
+ * `(interpupilar_métrica × targetFactor) / modelWidth` (mesmo espaço que `metricLandmarks`;
+ * **sem** `/10` — esse factor deslocava a ordem de grandeza e o GLB ficava invisível). Incompatível
+ * com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -255,7 +257,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-eye-basis-rh-fix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-scale-interpupillary-si";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -7468,8 +7470,9 @@ async function runArSession({
               Number.isFinite(modelW) &&
               modelW > 1e-8
             ) {
-              const faceWidthNormalized = faceW / 10;
-              scaleFactor = (faceWidthNormalized * st.glassesManualTargetWidthFactor) / modelW;
+              /** `faceW` e `modelW` na mesma ordem de grandeza (MindAR métrico vs bbox GLB centrado). */
+              scaleFactor = (faceW * st.glassesManualTargetWidthFactor) / modelW;
+              scaleFactor = THREE.MathUtils.clamp(scaleFactor, 0.02, 250);
             }
             if (Number.isFinite(scaleFactor) && scaleFactor > 0) {
               glassesPivot.scale.setScalar(scaleFactor);
@@ -7484,7 +7487,6 @@ async function runArSession({
               st.glassesManualMindarFinalLogged = true;
               console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (pivot pos/escala/base olhos)", {
                 faceInterpupillary: faceW,
-                faceWidthNormalized: Number.isFinite(faceW) ? faceW / 10 : null,
                 modelWidth: modelW,
                 targetWidthFactor: st.glassesManualTargetWidthFactor,
                 scaleFactor,
