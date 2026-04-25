@@ -254,7 +254,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-hydrate-url-root-first";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-model-width-max-xz";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -322,6 +322,8 @@ const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.052;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF = 1.02;
 /** Largura da armação = `factor` × distância métrica 234–454 (bochechas). Override: `data-ar-glasses-anatomic-width-factor`. */
 const OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR = 1.05;
+/** Modo manual MindAR: largura alvo dos óculos = interpupilar × factor. Override: `data-ar-glasses-manual-target-width-factor`. */
+const OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT = 1.1;
 /**
  * GLB em escala pequena (ex. maxDim ≤ 0.01): o mesh fica ~1 unidade de âncora com
  * `baseUnitScale / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE`; a largura no rosto vem do
@@ -555,7 +557,7 @@ let _omafitManualMatQuat = null;
  * @param {import("three").Object3D} glassesPivot
  * @param {import("three").Object3D} glasses
  * @param {import("three").Vector3 | { x?: number, y?: number, z?: number }} pivotPos
- * @param {number} pivotScaleScalar
+ * @param {number} pivotUniformScale escala uniforme na diagonal do `matrix.compose` (interpupilar × factor / largura GLB em X, etc.)
  * @param {string} fixEulerPreset `a`–`e`
  */
 function omafitApplyGlassesManualPivotModelMatrixOverride(
@@ -563,7 +565,7 @@ function omafitApplyGlassesManualPivotModelMatrixOverride(
   glassesPivot,
   glasses,
   pivotPos,
-  pivotScaleScalar,
+  pivotUniformScale,
   fixEulerPreset,
 ) {
   if (!THREE || !glassesPivot || !glasses || !pivotPos) return;
@@ -584,9 +586,9 @@ function omafitApplyGlassesManualPivotModelMatrixOverride(
     );
   }
   const s =
-    Number.isFinite(Number(pivotScaleScalar)) && Number(pivotScaleScalar) > 0
-      ? Number(pivotScaleScalar)
-      : 120;
+    Number.isFinite(Number(pivotUniformScale)) && Number(pivotUniformScale) > 0
+      ? Number(pivotUniformScale)
+      : 1;
   _omafitManualMatScale.set(s, s, s);
   const fixEuler = omafitGlassesManualFixEulerForPreset(THREE, fixEulerPreset);
   _omafitManualMatQuat.setFromEuler(fixEuler);
@@ -1930,6 +1932,23 @@ function omafitFaceLandmarkDist3(lm, i, j) {
   const dy = a[1] - b[1];
   const dz = a[2] - b[2];
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/**
+ * Distância 3D entre cantos externos dos olhos (landmarks 263 e 33) em `metricLandmarks`.
+ * @param {any} lm `metricLandmarks`
+ * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
+ */
+function omafitGlassesManualInterpupillaryDistance(lm, smoother) {
+  const eL = smoother?.get(OMAFIT_FACE_LM_EYE_L_OUT);
+  const eR = smoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
+  if (eL && eR) {
+    const dx = eL.x - eR.x;
+    const dy = eL.y - eR.y;
+    const dz = eL.z - eR.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+  return omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_EYE_L_OUT, OMAFIT_FACE_LM_EYE_R_OUT);
 }
 
 /**
@@ -6265,6 +6284,12 @@ async function runArSession({
     const glassesManualFixEulerPreset = glassesManualMindarRig
       ? String(cfgAttr("arGlassesManualFixEulerPreset", "a")).trim().toLowerCase()
       : "a";
+    const glassesManualTargetWidthFactor = glassesManualMindarRig
+      ? (() => {
+          const v = Number(String(cfgAttr("arGlassesManualTargetWidthFactor", "1.1")).trim());
+          return Number.isFinite(v) && v > 0 ? v : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
+        })()
+      : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
 
     /**
      * Contentor de orientação: quando activo (default para óculos), o GLB
@@ -6490,15 +6515,23 @@ async function runArSession({
         bbox: { x: szStr.x, y: szStr.y, z: szStr.z },
       });
     }
+    let glassesManualModelWidth = 1;
     if (glassesManualMindarRig) {
       omafitApplyGlassesManualMindarCenterMesh(THREE, glasses);
       glasses.updateMatrixWorld(true);
       const boxMan = new THREE.Box3().setFromObject(glasses);
       const szMan = new THREE.Vector3();
       boxMan.getSize(szMan);
+      /** Largura horizontal do GLB: max(X,Z) da bbox (metros, mesh centrado); Y = altura — evita GLB com largura no Z. */
+      const modelHeight = szMan.y;
+      glassesManualModelWidth = Math.max(szMan.x, szMan.z, 1e-6);
       glassesFaceWideAxisX = szMan.x >= szMan.z;
+      console.log("MODEL WIDTH USED:", glassesManualModelWidth);
+      console.log("BBOX:", { x: szMan.x, y: szMan.y, z: szMan.z });
       console.log("[omafit-ar] glasses manual MindAR (centro GLB; transform só matrix.compose)", {
         bboxSize: { x: szMan.x, y: szMan.y, z: szMan.z },
+        modelHeight,
+        modelWidth: glassesManualModelWidth,
         fixEulerPreset: glassesManualFixEulerPreset,
       });
     }
@@ -6792,7 +6825,7 @@ async function runArSession({
           glassesPivot,
           glasses,
           glassesManualPivotPosVec,
-          glassesManualPivotScale,
+          1,
           glassesManualFixEulerPreset,
         );
         console.log("[omafit-ar] glasses manual MindAR — matrix.compose (init)", OMAFIT_AR_WIDGET_BUILD);
@@ -7034,6 +7067,10 @@ async function runArSession({
       })(),
       glassesManualMindarFinalLogged: false,
       glassesManualFixEulerPreset: glassesManualMindarRig ? glassesManualFixEulerPreset : "a",
+      glassesManualModelWidth: glassesManualMindarRig ? glassesManualModelWidth : 1,
+      glassesManualTargetWidthFactor: glassesManualMindarRig
+        ? glassesManualTargetWidthFactor
+        : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT,
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -7446,18 +7483,40 @@ async function runArSession({
         }
         if (accessoryType === "glasses") {
           if (st.glassesManualMindarRig && glassesPivot) {
+            const faceW = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
+            const modelW = st.glassesManualModelWidth;
+            let pivotUniform = 1;
+            if (
+              Number.isFinite(faceW) &&
+              faceW > 1e-8 &&
+              Number.isFinite(modelW) &&
+              modelW > 1e-8
+            ) {
+              const glassesTargetWidth = faceW * st.glassesManualTargetWidthFactor;
+              const scaleFactor = glassesTargetWidth / modelW;
+              const pivotMul =
+                (Number.isFinite(Number(st.glassesManualPivotScale)) &&
+                Number(st.glassesManualPivotScale) > 0
+                  ? Number(st.glassesManualPivotScale)
+                  : OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE) / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE;
+              pivotUniform = scaleFactor * pivotMul;
+            }
             omafitApplyGlassesManualPivotModelMatrixOverride(
               THREE,
               glassesPivot,
               glasses,
               st.glassesManualPivotPos,
-              st.glassesManualPivotScale,
+              pivotUniform,
               st.glassesManualFixEulerPreset,
             );
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
               console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate (matrix.compose)", {
                 fixEulerPreset: st.glassesManualFixEulerPreset,
+                faceInterpupillary: faceW,
+                modelWidth: modelW,
+                targetWidthFactor: st.glassesManualTargetWidthFactor,
+                pivotUniform,
               });
             }
           } else {
