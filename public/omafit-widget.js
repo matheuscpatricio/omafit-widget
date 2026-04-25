@@ -1909,21 +1909,15 @@
       }
     }
 
+    /**
+     * Permissions Policy no iframe: tem de seguir a sintaxe real (v. MDN
+     * Permissions-Policy / iframe `allow`). `camera https://…` **não** é
+     * allowlist válida — o Chrome trata como negação e aparece
+     * "camera is not allowed in this document". `camera *` delega a funcionalidade
+     * ao contexto do documento carregado no `src` (origem do widget).
+     */
     (function setIframeCameraDelegation() {
-      var embedOrigin = 'https://omafit.netlify.app';
-      try {
-        var wu = new URL(widgetUrl);
-        embedOrigin = wu.origin;
-      } catch (eAllow) {
-        if (OMAFIT_DEBUG) console.warn('Omafit: URL do widget para allow=', eAllow);
-      }
-      var allowVal =
-        'camera ' +
-        embedOrigin +
-        '; microphone ' +
-        embedOrigin +
-        '; fullscreen ' +
-        embedOrigin;
+      var allowVal = 'camera *; microphone *; fullscreen *';
       iframe.setAttribute('allow', allowVal);
       iframe.allow = allowVal;
     })();

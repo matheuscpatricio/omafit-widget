@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Documento do widget (iframe): permitir câmara no próprio contexto; a delegação desde a loja usa `allow` no iframe do tema. -->
-    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), fullscreen=(self)" />
+    <!-- Documento do widget: `*` evita negar câmara no próprio contexto; a delegação desde a loja continua a depender do `allow` no iframe do tema. -->
+    <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*, fullscreen=*" />
     <meta http-equiv="Content-Security-Policy" content="frame-ancestors *">
 
     <title>Omafit — IA para moda na Shopify | Try-on, medidas e AR</title>

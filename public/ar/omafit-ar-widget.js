@@ -240,7 +240,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_policy-cart-postmsg";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_iframe-allow-camera-star";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -3189,7 +3189,7 @@ const COPY = {
     arLoading: "A iniciar câmera e modelo 3D…",
     errCamera: "Permita o uso da câmera para o provador AR.",
     errCameraEmbed:
-      "A câmara está bloqueada neste iframe (política do browser ou da loja). Atualize o tema Omafit, abra o provador noutro browser ou use o telemóvel.",
+      "A câmara está bloqueada neste iframe (política do browser, preview do tema Shopify ou extensão). Teste na loja publicada (não no editor), actualize o tema Omafit ou use o telemóvel.",
     errFace: "Não foi possível carregar a detecção facial.",
     errGlb: "Não foi possível carregar o modelo 3D (GLB). Verifique se o ficheiro está público e acessível.",
     errGeneric: "AR indisponível neste dispositivo.",
@@ -3245,7 +3245,7 @@ const COPY = {
     arLoading: "Starting camera and 3D model…",
     errCamera: "Allow camera access for AR try-on.",
     errCameraEmbed:
-      "Camera is blocked in this iframe (browser or store policy). Update the Omafit theme, try another browser, or use a phone.",
+      "Camera is blocked in this iframe (browser policy, Shopify theme preview, or an extension). Try the live storefront (not the editor), update the Omafit theme, or use a phone.",
     errFace: "Could not load face detection.",
     errGlb: "Could not load the 3D model (GLB). Check that the file is public and reachable.",
     errGeneric: "AR unavailable on this device.",
@@ -3301,7 +3301,7 @@ const COPY = {
     arLoading: "Iniciando cámara y modelo 3D…",
     errCamera: "Permite el acceso a la cámara para el probador AR.",
     errCameraEmbed:
-      "La cámara está bloqueada en este iframe (política del navegador o de la tienda). Actualiza el tema Omafit, prueba otro navegador o usa el móvil.",
+      "La cámara está bloqueada en este iframe (política del navegador, vista previa del tema Shopify o extensión). Prueba en la tienda publicada (no en el editor), actualiza el tema Omafit o usa el móvil.",
     errFace: "No se pudo cargar la detección facial.",
     errGlb: "No se pudo cargar el modelo 3D (GLB). Comprueba que el archivo sea público y accesible.",
     errGeneric: "AR no disponible en este dispositivo.",
@@ -7672,7 +7672,15 @@ async function runArSession({
         calSource: arCfg?.dataset?.arOmafitCalSource || "unknown",
       },
     });
-  } catch (e) {
+  } catch (rawErr) {
+    const e =
+      rawErr === undefined || rawErr === null
+        ? new Error("omafit-ar: falha sem valor (rejeição vazia)")
+        : rawErr instanceof Error
+          ? rawErr
+          : typeof rawErr === "object" && "message" in rawErr
+            ? new Error(String(rawErr.message))
+            : new Error(String(rawErr));
     console.error("[omafit-ar]", e);
     const errName = e && typeof e === "object" && "name" in e ? String(e.name || "") : "";
     const isCam =
