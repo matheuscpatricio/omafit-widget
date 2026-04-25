@@ -249,7 +249,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-stable-pivot-pipeline";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-scale-structural-fix";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -475,6 +475,24 @@ function omafitLockGlassesPivotHorizon(THREE, pivot) {
   e.setFromQuaternion(pivot.quaternion, "YXZ");
   pivot.rotation.order = "YXZ";
   pivot.rotation.set(0, e.y, 0);
+}
+
+/**
+ * Remove roll local (Z em YXZ) do mesh do GLB após bind — evita “uma haste acima
+ * da outra” quando o quaternion do bind introduz componente lateral. Mantém pitch (X) e yaw (Y).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} mesh
+ */
+function omafitStripGlassesMeshRollYxz(THREE, mesh) {
+  if (!THREE || !mesh) return;
+  if (!omafitStripGlassesMeshRollYxz._e) {
+    omafitStripGlassesMeshRollYxz._e = new THREE.Euler(0, 0, 0, "YXZ");
+  }
+  const e = omafitStripGlassesMeshRollYxz._e;
+  e.setFromQuaternion(mesh.quaternion, "YXZ");
+  mesh.rotation.order = "YXZ";
+  mesh.rotation.set(e.x, e.y, 0);
 }
 
 /**
@@ -6502,6 +6520,9 @@ async function runArSession({
       glasses.name = "omafit-ar-glasses-model";
       glasses.position.set(0, 0, 0);
       glasses.scale.set(1, 1, 1);
+      if (!glassesStructuralMindarRig) {
+        omafitStripGlassesMeshRollYxz(THREE, glasses);
+      }
       if (!glassesGeometryAnchor) {
         glassesPivot.position.z += glassesModelStickZ + glassesZFitExtra;
       }
@@ -7220,7 +7241,10 @@ async function runArSession({
                 );
               }
             }
-            const fsUse = Number(st.smoothedFaceScale);
+            let fsUse = Number(st.smoothedFaceScale);
+            if (!Number.isFinite(fsUse) || fsUse <= 1e-8) {
+              if (Number.isFinite(fsRaw) && fsRaw > 1e-8) fsUse = fsRaw;
+            }
             if (
               st.glassesStructuralMindarRig &&
               glassesPivot &&
@@ -7228,18 +7252,16 @@ async function runArSession({
             ) {
               if (Number.isFinite(fsUse) && fsUse > 1e-8) {
                 const cheekToFace = cwUse / fsUse;
-                const faceFit = mulScale * factor * cheekToFace;
-                const pivotBoost = st.glassesStructuralPivotBoost / 20;
-                const rawPv = OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE * faceFit * pivotBoost;
+                const meshS = baseUnitScale * mulScale * factor * cheekToFace;
                 const pv = THREE.MathUtils.clamp(
-                  rawPv,
+                  meshS * st.glassesStructuralPivotBoost,
                   st.glassesStructuralPivotClampMin,
                   st.glassesStructuralPivotClampMax,
                 );
                 st.glassesPivotFaceScale = omafitClampGlassesPivotFaceScale(
-                  OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE * faceFit,
+                  OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE * mulScale * factor * cheekToFace,
                 );
-                glassesPivot.scale.setScalar(pv * st.glassesModelUnitScale);
+                glassesPivot.scale.setScalar(baseUnitScale * pv);
                 glassesPivot.rotation.set(
                   0,
                   rad(st.glassesStructuralPivotRotYDeg),
