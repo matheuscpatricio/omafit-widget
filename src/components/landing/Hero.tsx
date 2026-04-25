@@ -250,7 +250,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
 
             <motion.div
               variants={itemVariants}
-              className="hidden w-full justify-self-end md:block md:max-w-lg lg:max-w-none"
+              className="hidden w-full justify-self-end md:block md:max-w-lg md:translate-x-3 lg:max-w-none lg:translate-x-6"
             >
               <HeroDesktopRotator />
             </motion.div>
