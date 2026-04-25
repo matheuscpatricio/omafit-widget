@@ -100,10 +100,10 @@ import {
  * no `glassesPivot` (clamp 80–150 por defeito); pivot travado a horizonte (só yaw Y).
  *
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale`,
- * `modelScaleMul`, `calRotDeg` no GLB, Tripo, bind, strip roll e lock de horizonte no pivot.
- * Prep único no mesh (`arGlassesManualModelRotDeg`, default 90,180,0); `glassesPivot` filho
- * directo de `anchor.group` com `arGlassesManualPivotScale` (default 120) e
- * `arGlassesManualPivotPos` (default 0 -0.04 -0.1). Incompatível com estrutural e geometria.
+ * `modelScaleMul`, `calRotDeg` no GLB, Tripo, bind, strip roll e lock de horizonte no pivot;
+ * `calibRot` fica em identidade; `wearPosition` em (0,0,0). Rotação do modelo fixa em
+ * `rotation.set(π/2, π, 0)` (XYZ); escala/pos do `glassesPivot` via attrs (defaults 120 e
+ * 0,-0.04,-0.1). Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
 const ESM_SH = "https://esm.sh";
@@ -253,7 +253,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-mindar-rig";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-manual-no-calib-wear";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -6346,6 +6346,10 @@ async function runArSession({
     }
     if (glassesManualMindarRig) {
       omafitApplyGlassesManualMindarPrep(THREE, glasses, glassesManualModelRotDeg, rad);
+      /** Rotação base fixa no modelo (equiv. a 90°, 180°, 0° em XYZ); sobrepõe o Euler do prep. */
+      glasses.rotation.order = "XYZ";
+      glasses.rotation.set(Math.PI / 2, Math.PI, 0);
+      glasses.updateMatrix();
       glasses.updateMatrixWorld(true);
       const szMan = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szMan);
@@ -6359,7 +6363,7 @@ async function runArSession({
               z: glassesManualPivotPosVec.z,
             }
           : null,
-        modelRotDeg: glassesManualModelRotDeg,
+        note: "calibRot identidade; wearPosition 0; calRotDeg não afecta o GLB neste modo",
       });
     }
 
@@ -6472,9 +6476,27 @@ async function runArSession({
      * tenham valores herdados de calibrações anteriores.
      *
      * Ordem de composição (premultiply): Y → X → Z, igual ao preview.
+     *
+     * --- Mapa rápido (óculos): onde entram calibração / escala / wear ---
+     * - `calRotDeg` + `calibRot`: este bloco (óculos **automáticos** vivem sob
+     *   `calibRot`). Modo `data-ar-glasses-manual-mindar-rig="1"`: **identidade**
+     *   aqui — o GLB não passa por esta rotação.
+     * - `wearPosM`: `wearPosition.position.set` (mais abaixo). Modo manual óculos:
+     *   forçado a `0,0,0` para não deslocar a cadeia face/occluders vs. óculos no `anchor`.
+     * - `baseUnitScale` / `modelScaleMul`: cálculo ~`baseUnitScale = (1/maxDim)*modelScaleMul`;
+     *   `glasses.scale` no load; no `onUpdate` ramo automático (cheeks / wideDim).
+     * - `glassesModelUnitScale`: `faceArEnhancementState` + ramo geometria no `onUpdate`.
      */
     const calibRot = new GroupCtor();
-    {
+    if (accessoryType === "glasses" && glassesManualMindarRig) {
+      calibRot.position.set(0, 0, 0);
+      calibRot.scale.set(1, 1, 1);
+      calibRot.rotation.order = "XYZ";
+      calibRot.rotation.set(0, 0, 0);
+      calibRot.quaternion.identity();
+      calibRot.updateMatrix();
+      calibRot.updateMatrixWorld(true);
+    } else {
       const ryRad = rad(calRotDeg.y);
       const rxRad = rad(calRotDeg.x);
       const rzRad = rad(calRotDeg.z);
@@ -6629,6 +6651,11 @@ async function runArSession({
         axesH.name = "omafit-ar-glasses-structural-axes";
         glassesPivot.add(axesH);
       }
+      if (glassesManualMindarRig && glassesPivot) {
+        console.log("[omafit-ar] glasses manual MindAR — após montar pivot+modelo", OMAFIT_AR_WIDGET_BUILD);
+        console.log("FINAL SCALE:", glassesPivot.scale);
+        console.log("FINAL ROT:", glasses.rotation);
+      }
     } else if (accessoryType === "necklace") {
       necklaceSwingGroup = new GroupCtor();
       necklaceSwingGroup.name = "omafit-ar-necklace-swing";
@@ -6677,7 +6704,11 @@ async function runArSession({
         : null;
 
     const wearPosition = new GroupCtor();
-    wearPosition.position.set(wearPosM.x, wearPosM.y, wearPosM.z);
+    if (accessoryType === "glasses" && glassesManualMindarRig) {
+      wearPosition.position.set(0, 0, 0);
+    } else {
+      wearPosition.position.set(wearPosM.x, wearPosM.y, wearPosM.z);
+    }
     /**
      * SEM espelho de cena por defeito. O MindAR já inverte o frame antes da
      * detecção quando `flipFace=true` (selfie default), e entrega a matriz
@@ -6721,7 +6752,7 @@ async function runArSession({
 
     anchor.group.add(wearPosition);
 
-    if (glassesPivotConfig) {
+    if (glassesPivotConfig && !(accessoryType === "glasses" && glassesManualMindarRig)) {
       try {
         window.__omafitGlassesPivotConfig = glassesPivotConfig;
         window.__omafitGlassesManualCalib = glassesPivotConfig;
@@ -6854,6 +6885,7 @@ async function runArSession({
         glassesManualMindarRig && glassesManualPivotPosVec
           ? glassesManualPivotPosVec.clone()
           : new THREE.Vector3(),
+      glassesManualMindarFinalLogged: false,
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -7270,6 +7302,14 @@ async function runArSession({
             glassesPivot.position.copy(st.glassesManualPivotPos);
             glassesPivot.rotation.set(0, 0, 0);
             glasses.scale.set(1, 1, 1);
+            glasses.rotation.order = "XYZ";
+            glasses.rotation.set(Math.PI / 2, Math.PI, 0);
+            if (!st.glassesManualMindarFinalLogged) {
+              st.glassesManualMindarFinalLogged = true;
+              console.log("[omafit-ar] glasses manual MindAR — 1º frame onUpdate");
+              console.log("FINAL SCALE:", glassesPivot.scale);
+              console.log("FINAL ROT:", glasses.rotation);
+            }
           } else {
           /**
            * Orientação: base ortogonal (bochechas + testa–queixo) no espaço
