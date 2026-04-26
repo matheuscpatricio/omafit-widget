@@ -259,7 +259,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-rig-pivot-matrix-quat";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-auto-fix-orientation";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -638,6 +638,43 @@ function omafitAutoAlignGlassesModel(glasses, THREE) {
     heightValue,
     rotationApplied: { x: rotX, y: rotY, z: rotZ },
   };
+}
+
+/**
+ * Após bake + centro na origem: corrige ambiguidade de eixo (bbox `z` vs `x` ≈ largura)
+ * e tenta alinhar a frente ao **−Z** (câmara). Uma vez no load.
+ *
+ * 1. `Ry(π)` inicial (óculos “para a frente” no convénio Omafit).
+ * 2. Se `size.z > size.x` → `rotation.y = π/2` (largura no eixo X local).
+ * 3. Se o eixo local **+Z** (`(0,0,1)` em quat) tiver `forward.z > 0` em mundo → `rotation.y += π`.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} glasses Root `gltf.scene`
+ */
+function omafitAutoFixModelOrientation(THREE, glasses) {
+  if (!THREE || !glasses) return;
+  glasses.rotation.order = "XYZ";
+  glasses.rotation.set(0, Math.PI, 0);
+  glasses.updateMatrix();
+  glasses.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(glasses);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  const isZDominant = size.z > size.x;
+  if (isZDominant) {
+    glasses.rotation.y = Math.PI / 2;
+  }
+
+  glasses.updateMatrix();
+  const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(glasses.quaternion);
+  if (forward.z > 0) {
+    glasses.rotation.y += Math.PI;
+  }
+
+  glasses.updateMatrix();
+  glasses.updateMatrixWorld(true);
 }
 
 /**
@@ -6322,6 +6359,14 @@ async function runArSession({
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
     glasses.position.sub(center);
+
+    if (accessoryType === "glasses") {
+      try {
+        omafitAutoFixModelOrientation(THREE, glasses);
+      } catch (e) {
+        console.warn("[omafit-ar] omafitAutoFixModelOrientation:", e?.message || e);
+      }
+    }
 
     /** Calibração do lojista (metafield / data-attrs). Lida antes do bind
      *  MindAR para saber se cal=0,0,0 e podemos aplicar correcção de eixo. */
