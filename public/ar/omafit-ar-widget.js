@@ -106,7 +106,8 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). Offset **X** do pivot = `-visualCenterX * escala` (midpoint X frontal em **espaço local do root glasses**, 1× no 1º frame);
+ * landmarks para local). Centro X: midpoint filtrado → **clamp** ±`OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M` → **bias** opcional
+ * `data-ar-glasses-x-bias`; offset pivot `vx = -visualCenterX * escala` (1× no 1º frame).
  * **Y/Z** via `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
  * Incompatível com estrutural e geometria.
  */
@@ -258,7 +259,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-midpoint-fix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-clamp-bias";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -333,6 +334,8 @@ const OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT = 1.1;
  * `baseUnitScale` nesta conversão. Objectivo típico ~0,06–0,08 m.
  */
 const OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS = 0.0065;
+/** Clamp do centro visual X (m) após midpoint — evita offsets extremos em GLBs assimétricos. */
+const OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M = 0.03;
 /**
  * GLB em escala pequena (ex. maxDim ≤ 0.01): o mesh fica ~1 unidade de âncora com
  * `baseUnitScale / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE`; a largura no rosto vem do
@@ -6684,6 +6687,13 @@ async function runArSession({
           -0.05,
         )
       : { x: 0, y: 0, z: 0 };
+    /** Bias fino em X (m) no centro visual após clamp — `data-ar-glasses-x-bias` (ex. `0.01`). */
+    const glassesManualXBiasM = glassesManualMindarRig
+      ? (() => {
+          const v = Number(String(cfgAttr("arGlassesXBias", "0")).trim());
+          return Number.isFinite(v) ? v : 0;
+        })()
+      : 0;
 
     /**
      * Contentor de orientação: quando activo (default para óculos), o GLB
@@ -7469,6 +7479,7 @@ async function runArSession({
         z: glassesManualFaceBasisOffsetM.z,
       },
       glassesManualVisualCenterX,
+      glassesManualXBiasM,
       /** `true` após 1º cálculo de centro visual com `forward` face basis (modo manual). */
       glassesManualVisualCenterResolved: !glassesManualMindarRig,
       /** `1/maxDim * modelScaleMul` — pipeline automático / mesh; modo manual interpupilar usa `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS`. */
@@ -7898,17 +7909,30 @@ async function runArSession({
               )
             ) {
               glasses.updateMatrixWorld(true);
-              const vcx = omafitComputeVisualCenterX(THREE, glasses, _omafitManualEyeFwd);
-              st.glassesManualVisualCenterX = vcx;
+              const original = omafitComputeVisualCenterX(THREE, glasses, _omafitManualEyeFwd);
+              const clamped = THREE.MathUtils.clamp(
+                original,
+                -OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M,
+                OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M,
+              );
+              const biasX = Number.isFinite(st.glassesManualXBiasM) ? st.glassesManualXBiasM : 0;
+              const vcxFinal = clamped + biasX;
+              st.glassesManualVisualCenterX = vcxFinal;
               st.glassesManualVisualCenterResolved = true;
               try {
+                console.log("[omafit-ar] center corrected", {
+                  original,
+                  clamped,
+                  biasX,
+                  visualCenterX: vcxFinal,
+                });
                 console.log("[omafit-ar] visual center using face forward", {
                   forward: {
                     x: _omafitManualEyeFwd.x,
                     y: _omafitManualEyeFwd.y,
                     z: _omafitManualEyeFwd.z,
                   },
-                  visualCenterX: vcx,
+                  visualCenterX: vcxFinal,
                 });
               } catch {
                 /* ignore */
