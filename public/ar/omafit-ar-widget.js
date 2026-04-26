@@ -106,7 +106,8 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). Defaults `data-ar-glasses-manual-face-basis-offset-m`: `0 -0.02 -0.05`. Escala IPD.
+ * landmarks para local). Defaults `data-ar-glasses-manual-face-basis-offset-m`: `-0.01 -0.02 -0.05` (X fino à
+ * esquerda; testar p.ex. `-0.005`, `-0.01`, `-0.015`). Escala IPD.
  * Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
@@ -257,7 +258,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_manual-face-basis-offset-pivot";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_manual-face-basis-offset-x-default";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -2096,7 +2097,8 @@ function omafitGlassesManualPivotApplyEyeBasis(
   matrix.makeBasis(eyeDir, trueUp, forward);
   glassesPivot.quaternion.setFromRotationMatrix(matrix);
 
-  const ox = faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.x) ? faceBasisOffsetM.x : 0;
+  const ox =
+    faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.x) ? faceBasisOffsetM.x : -0.01;
   const oy =
     faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.y) ? faceBasisOffsetM.y : -0.02;
   const oz =
@@ -6509,8 +6511,8 @@ async function runArSession({
     /** Offset do pivot na base facial (olhos / cima / frente), metros — `data-ar-glasses-manual-face-basis-offset-m`. */
     const glassesManualFaceBasisOffsetM = glassesManualMindarRig
       ? parseXyzMeters(
-          cfgAttr("arGlassesManualFaceBasisOffsetM", "0 -0.02 -0.05"),
-          0,
+          cfgAttr("arGlassesManualFaceBasisOffsetM", "-0.01 -0.02 -0.05"),
+          -0.01,
           -0.02,
           -0.05,
         )
