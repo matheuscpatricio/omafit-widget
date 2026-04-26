@@ -104,9 +104,9 @@ import {
  * `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS` (não `baseUnitScale`): `faceWidthMeters = faceInterpupillary * k`;
  * `scaleFactor = (faceWidthMeters * targetWidthFactor) / modelWidth`, clamp `[0.7, 1.4]`. Tripo, bind
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
- * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: base RHS estável
- * `makeBasis(eyeDir, trueUp, forward)` com `forward` fechado a partir de `(0,0,−1)` + `eyeDir`; `setFromRotationMatrix`;
- * `scale.setScalar` positivo; sem quat correctivo extra, sem rotação fixa no GLB.
+ * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: posição local =
+ * média métrica dos olhos (33, 263) → espaço do `anchor.group` (a âncora MindAR pode continuar no 168 só para
+ * o frame do PnP). **Pivot**: base RHS estável `makeBasis(eyeDir, trueUp, forward)` …; `scale.setScalar` (IPD).
  * Incompatível com estrutural e geometria.
  */
 const ESM_THREE_VER = "0.150.1";
@@ -257,7 +257,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_manual-bbox-center-mesh-only";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_manual-mid-eye-pivot-position";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -2007,6 +2007,53 @@ let __omafitManualFinalOrientationLogged = false;
 let __omafitManualOrthoCheckLogged = false;
 /** Uma vez: centro da bbox do mesh (modo manual). */
 let __omafitManualModelCenterFixLogged = false;
+/** Scratch: média 33/263 em métricas MindAR + inversa do anchor para posição local do pivot. */
+let _omafitMidEyeMetric = null;
+let _omafitMidEyeAnchorInv = null;
+/** Uma vez: média interpupilar em coordenadas métricas (validação). */
+let __omafitMidEyeLogged = false;
+
+/**
+ * Média dos landmarks 33 e 263 (`metricLandmarks`, mesmo espaço que o PnP MindAR),
+ * transformada para o espaço **local** de `anchorGroup` (filho directo = pivot).
+ * Assim a **posição** do óculos segue o centro interpupilar; a origem da âncora
+ * MindAR (p.ex. 168) deixa de definir o centro lateral do modelo.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} anchorGroup
+ * @param {any} lm `metricLandmarks`
+ * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
+ * @param {import("three").Vector3} outLocal
+ * @returns {boolean}
+ */
+function omafitGlassesMidEyeMetricToAnchorLocal(THREE, anchorGroup, lm, smoother, outLocal) {
+  if (!THREE || !anchorGroup || !lm || !outLocal) return false;
+  if (!_omafitMidEyeMetric) _omafitMidEyeMetric = new THREE.Vector3();
+  if (!_omafitMidEyeAnchorInv) _omafitMidEyeAnchorInv = new THREE.Matrix4();
+  const mid = _omafitMidEyeMetric;
+  const eR = smoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
+  const eL = smoother?.get(OMAFIT_FACE_LM_EYE_L_OUT);
+  if (eR && eL) {
+    mid.set((eR.x + eL.x) * 0.5, (eR.y + eL.y) * 0.5, (eR.z + eL.z) * 0.5);
+  } else {
+    const a = lm[OMAFIT_FACE_LM_EYE_R_OUT];
+    const b = lm[OMAFIT_FACE_LM_EYE_L_OUT];
+    if (!a || !b) return false;
+    mid.set((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5);
+  }
+  anchorGroup.updateMatrixWorld(true);
+  _omafitMidEyeAnchorInv.copy(anchorGroup.matrixWorld).invert();
+  outLocal.copy(mid).applyMatrix4(_omafitMidEyeAnchorInv);
+  if (!__omafitMidEyeLogged) {
+    __omafitMidEyeLogged = true;
+    try {
+      console.log("MID EYE POSITION", { x: mid.x, y: mid.y, z: mid.z });
+    } catch {
+      /* ignore */
+    }
+  }
+  return Number.isFinite(outLocal.x) && Number.isFinite(outLocal.y) && Number.isFinite(outLocal.z);
+}
 
 /**
  * Modo manual MindAR — orientação **só** no `glassesPivot`: base ortonormal RHS estável,
@@ -5638,20 +5685,6 @@ async function runArSession({
       return { x: parts[0], y: parts[1], z: parts[2] };
     }
 
-    const defaultMindarAnchor = accessoryType === "necklace" ? "152" : "168";
-    const anchorRaw = cfgAttr("arMindarAnchor", defaultMindarAnchor);
-    let anchorIndex = Math.max(
-      0,
-      Math.min(477, Math.floor(Number(anchorRaw)) || (accessoryType === "necklace" ? 152 : 168)),
-    );
-    if (accessoryType === "glasses" && anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE) {
-      console.warn(
-        "[omafit-ar] óculos: a âncora MindAR deve ser o landmark 168 (ponte). arMindarAnchor=",
-        anchorIndex,
-        "→ a forçar 168.",
-      );
-      anchorIndex = OMAFIT_FACE_LM_NOSE_BRIDGE;
-    }
     /**
      * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): sem auto no GLB;
      * pivot directo em `anchor.group`. Incompatível com estrutural, geometria e Tripo.
@@ -5661,6 +5694,24 @@ async function runArSession({
       /^(1|true|yes|on)$/.test(
         String(cfgAttr("arGlassesManualMindarRig", "0")).trim().toLowerCase(),
       );
+    const defaultMindarAnchor = accessoryType === "necklace" ? "152" : "168";
+    const anchorRaw = cfgAttr("arMindarAnchor", defaultMindarAnchor);
+    let anchorIndex = Math.max(
+      0,
+      Math.min(477, Math.floor(Number(anchorRaw)) || (accessoryType === "necklace" ? 152 : 168)),
+    );
+    if (
+      accessoryType === "glasses" &&
+      anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE &&
+      !glassesManualMindarRig
+    ) {
+      console.warn(
+        "[omafit-ar] óculos: a âncora MindAR deve ser o landmark 168 (ponte). arMindarAnchor=",
+        anchorIndex,
+        "→ a forçar 168.",
+      );
+      anchorIndex = OMAFIT_FACE_LM_NOSE_BRIDGE;
+    }
     /** Uma vez no load: `omafitAutoAlignGlassesModel` — `data-ar-glasses-auto-align-model="1"`. */
     const glassesAutoAlignModel =
       accessoryType === "glasses" &&
@@ -5748,6 +5799,7 @@ async function runArSession({
       principalShiftNdcLp: { x: 0, y: 0 },
       principalAlign168:
         accessoryType === "glasses" &&
+        !glassesManualMindarRig &&
         !/^(0|false|off|no)$/i.test(String(cfgAttr("arFacePrincipalAlign168", "0")).trim()),
     };
     const glassesAnchorSmoothMode = String(
@@ -7021,10 +7073,12 @@ async function runArSession({
         glassesPivot.add(axesH);
       }
       if (glassesManualMindarRig && glassesPivot) {
-        console.log("[omafit-ar] glasses manual MindAR — init (mesh centrado bbox+stickZ; pivot 0,0,0 + basis)", {
-          build: OMAFIT_AR_WIDGET_BUILD,
-          pivotPos: { x: 0, y: 0, z: 0 },
-        });
+        console.log(
+          "[omafit-ar] glasses manual MindAR — init (mesh bbox+stickZ; pivot pos = média 33/263 por frame; basis+IPD)",
+          {
+            build: OMAFIT_AR_WIDGET_BUILD,
+          },
+        );
       }
     } else if (accessoryType === "necklace") {
       necklaceSwingGroup = new GroupCtor();
@@ -7672,7 +7726,18 @@ async function runArSession({
             /** Bruto MindAR (landmarks) → metros só via `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS`. */
             const faceInterpupillary = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
             const modelWidth = st.glassesManualModelWidth;
-            glassesPivot.position.set(0, 0, 0);
+            /** Centro interpupilar (33+263)/2 em métricas → local do `anchor.group` (não usar 168 para lateral). */
+            if (
+              !omafitGlassesMidEyeMetricToAnchorLocal(
+                THREE,
+                anchor.group,
+                lm,
+                st.lmSmoother,
+                glassesPivot.position,
+              )
+            ) {
+              glassesPivot.position.set(0, 0, 0);
+            }
             let finalScale = 1;
             if (
               Number.isFinite(faceInterpupillary) &&
@@ -7949,6 +8014,7 @@ async function runArSession({
           }
           if (
             st.glassesForceBboxAlign168 &&
+            !st.glassesManualMindarRig &&
             lm168DebugMesh &&
             st.glassesPivotBaseLocalPos &&
             glassesPivot &&
