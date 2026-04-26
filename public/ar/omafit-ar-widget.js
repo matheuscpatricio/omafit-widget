@@ -106,8 +106,9 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). **X** do pivot: `midEye.x − lm[168].x` com `midEye = (lm[33]+lm[263])/2` (sem escala/clamp no X).
- * **Y/Z**: `quat * (0,oy,oz)` — `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
+ * landmarks para local). **Centro geométrico**: após bake, `Box3` + `glasses.position.sub(center)` no root (igual pipeline
+ * automático); modo manual só aplica `stickZ` no mesh. **Pivot** MindAR 168: posição `quat*(0,oy,oz)` — **sem** offset X por landmark.
+ * **Y/Z**: `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD no pivot.
  * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada.
  * Incompatível com estrutural e geometria.
  */
@@ -259,7 +260,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_manual-vx-landmark-x";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_glasses-bbox-center-anchor168";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -513,39 +514,30 @@ function omafitStripGlassesMeshRollYxz(THREE, mesh) {
 }
 
 /**
- * Modo manual MindAR: **uma vez** no load — centro geométrico do GLB na origem **só no mesh**
- * (`mesh.position.sub(center)`); profundidade opcional `stickZ` em **Z local** do mesh.
- * Não altera o pivot; lateral não vem de offsets fixos.
+ * Modo manual MindAR: **uma vez** no load — o centro da bbox já foi aplicado no root (`glasses.position.sub(center)` pós-bake).
+ * Aqui só garantimos **mesh** identidade (escala/rotação) e `stickZ` em **Z local** (ex. colagem à face).
  *
  * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} mesh
- * @param {number} [stickZ=0] somado a `mesh.position.z` após centrar (ex. `glassesModelStickZ`).
+ * @param {import("three").Object3D} mesh root do GLB (`gltf.scene`)
+ * @param {number} [stickZ=0] somado a `mesh.position.z` (ex. `glassesModelStickZ`).
  */
 function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh, stickZ = 0) {
   if (!THREE || !mesh) return;
-  mesh.position.set(0, 0, 0);
   mesh.scale.set(1, 1, 1);
   mesh.rotation.order = "XYZ";
   mesh.rotation.set(0, 0, 0);
   mesh.quaternion.identity();
-  mesh.updateMatrix();
-  mesh.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(mesh);
-  if (typeof box.isEmpty === "function" && box.isEmpty()) return;
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  mesh.position.sub(center);
   if (Number.isFinite(stickZ) && stickZ !== 0) {
     mesh.position.z += stickZ;
   }
-  mesh.rotation.set(0, 0, 0);
-  mesh.quaternion.identity();
   mesh.updateMatrix();
   mesh.updateMatrixWorld(true);
   if (!__omafitManualModelCenterFixLogged) {
     __omafitManualModelCenterFixLogged = true;
     try {
-      console.log("MODEL CENTER FIX", center);
+      console.log("[omafit-ar] glasses manual mesh prep (bbox já no root; stickZ)", {
+        stickZ: Number.isFinite(stickZ) ? stickZ : 0,
+      });
     } catch {
       /* ignore */
     }
@@ -2007,15 +1999,10 @@ let _omafitManualBasisM4 = null;
 let __omafitManualFinalOrientationLogged = false;
 /** Uma vez: produtos escalares da base (devem ≈ 0). */
 let __omafitManualOrthoCheckLogged = false;
-/** Uma vez: centro da bbox do mesh (modo manual). */
+/** Uma vez: log prep mesh modo manual (stickZ após bbox no root). */
 let __omafitManualModelCenterFixLogged = false;
 /** Offset `(ox,oy,oz)` na base facial → vector no espaço do pai (`applyQuaternion` após `makeBasis`). */
 let _omafitManualFaceBasisOffParent = null;
-/** Midpoint interpupilar (33+263)/2, ponte 168 — pivot manual (mesmo espaço que `lm`). */
-let _omafitManualMidEye = null;
-let _omafitManualBridge168 = null;
-/** Log único: `vx` = midEye.x − 168.x */
-let __omafitManualVxFinalCorrectLogged = false;
 
 /**
  * Base facial manual a partir de `metricLandmarks` — **mesmos** `eyeDir`, `trueUp`, `forward`
@@ -2084,8 +2071,8 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
  * - **X** = `eyeDir` = canto direito − esquerdo (33−263), `eyeDir.x ≥ 0`.
  * - **Z** = frente da câmara em **−Z** mundo: começa por `(0,0,−1)`, depois `eyeDir × trueUp` para fechar RHS.
  * - **Y** = `trueUp` = `forward × eyeDir`, depois re-`forward = eyeDir × trueUp`.
- * - `Matrix4.makeBasis(eyeDir, trueUp, forward)` → `pivot.quaternion.setFromRotationMatrix`; `setScalar(finalScale)` (só escala uniforme, **não** afecta `position.x`).
- * - **Posição**: `position = quat*(0,oy,oz)`; depois `position.x = midEye.x − lm[168].x` (coordenadas métricas dos landmarks).
+ * - `Matrix4.makeBasis(eyeDir, trueUp, forward)` → `pivot.quaternion.setFromRotationMatrix`; `setScalar(finalScale)`.
+ * - **Posição**: `position = quat*(0,oy,oz)` — alinhamento lateral do modelo vem do **centro da bbox** no GLB + âncora 168.
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
@@ -2140,23 +2127,6 @@ function omafitGlassesManualPivotApplyEyeBasis(
       ? pivotUniformScale
       : Math.max(Math.abs(sx0), Math.abs(sy0), Math.abs(sz0), 1e-8);
 
-  if (!_omafitManualMidEye) _omafitManualMidEye = new THREE.Vector3();
-  if (!_omafitManualBridge168) _omafitManualBridge168 = new THREE.Vector3();
-  const fillLmVec = (idx, out) => {
-    const p = smoother?.get(idx);
-    if (p) {
-      out.set(p.x, p.y, p.z);
-      return true;
-    }
-    const a = lm[idx];
-    if (!a) return false;
-    out.set(a[0], a[1], a[2]);
-    return true;
-  };
-  if (!fillLmVec(OMAFIT_FACE_LM_NOSE_BRIDGE, _omafitManualBridge168)) return false;
-  _omafitManualMidEye.copy(_omafitManualEyeR).add(_omafitManualEyeL).multiplyScalar(0.5);
-  const vx = _omafitManualMidEye.x - _omafitManualBridge168.x;
-  if (!Number.isFinite(vx)) return false;
   const oy =
     faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.y) ? faceBasisOffsetM.y : -0.02;
   const oz =
@@ -2164,7 +2134,6 @@ function omafitGlassesManualPivotApplyEyeBasis(
   if (!_omafitManualFaceBasisOffParent) _omafitManualFaceBasisOffParent = new THREE.Vector3();
   _omafitManualFaceBasisOffParent.set(0, oy, oz).applyQuaternion(glassesPivot.quaternion);
   glassesPivot.position.copy(_omafitManualFaceBasisOffParent);
-  glassesPivot.position.x = vx;
   glassesPivot.scale.setScalar(finalScale);
   glassesPivot.updateMatrix();
 
@@ -2204,14 +2173,6 @@ function omafitGlassesManualPivotApplyEyeBasis(
         quat: { x: q.x, y: q.y, z: q.z, w: q.w },
         scale: glassesPivot.scale.x,
       });
-    } catch {
-      /* ignore */
-    }
-  }
-  if (!__omafitManualVxFinalCorrectLogged) {
-    __omafitManualVxFinalCorrectLogged = true;
-    try {
-      console.log("[omafit-ar] VX FINAL CORRETO", { vx });
     } catch {
       /* ignore */
     }
@@ -6363,10 +6324,10 @@ async function runArSession({
     glasses.updateMatrix();
     glasses.updateMatrixWorld(true);
 
-    /** 2) Bbox + centro depois de normalizar. Centramos a bbox na origem
-     *    para que `calibRot` rode o GLB em torno do seu centro geométrico.
-     *    Modo manual MindAR: não subtrair aqui no root — só
-     *    `omafitApplyGlassesManualMindarCenterMesh` (uma vez, mesh + stickZ). */
+    /** 2) Bbox + centro depois de normalizar. Centramos a bbox na origem do root
+     *    (`glasses.position.sub(center)`) para o GLB rodar/transladar em torno do centro
+     *    geométrico — **todos** os modos óculos (incl. manual MindAR). Modo manual: depois
+     *    `omafitApplyGlassesManualMindarCenterMesh` só aplica identidade + `stickZ`. */
     const box = new THREE.Box3().setFromObject(glasses);
     if (typeof box.isEmpty === "function" && box.isEmpty()) {
       throw new Error(
@@ -6379,9 +6340,7 @@ async function runArSession({
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
-    if (!glassesManualMindarRig) {
-      glasses.position.sub(center);
-    }
+    glasses.position.sub(center);
 
     /** Calibração do lojista (metafield / data-attrs). Lida antes do bind
      *  MindAR para saber se cal=0,0,0 e podemos aplicar correcção de eixo. */
@@ -6573,7 +6532,7 @@ async function runArSession({
           return Number.isFinite(v) && v > 0 ? v : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
         })()
       : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
-    /** Offset pivot **Y/Z** na base facial (metros); **X** = `midEye.x − lm[168].x`. Attr: `data-ar-glasses-manual-face-basis-offset-m`. */
+    /** Offset pivot **Y/Z** na base facial (metros); **X** lateral = centro bbox no GLB + âncora 168. Attr: `data-ar-glasses-manual-face-basis-offset-m`. */
     const glassesManualFaceBasisOffsetM = glassesManualMindarRig
       ? parseXyzMeters(
           cfgAttr("arGlassesManualFaceBasisOffsetM", "0 -0.02 -0.05"),
@@ -7126,7 +7085,7 @@ async function runArSession({
       }
       if (glassesManualMindarRig && glassesPivot) {
         console.log(
-          "[omafit-ar] glasses manual MindAR — init (mesh bbox+stickZ; pivot X = midEye.x−168.x; Y/Z = quat*(0,oy,oz); escala IPD)",
+          "[omafit-ar] glasses manual MindAR — init (bbox-centro no root; mesh prep+stickZ; pivot quat*(0,oy,oz), X sem landmark; escala IPD)",
           {
             build: OMAFIT_AR_WIDGET_BUILD,
             faceBasisOffsetYZ: {
