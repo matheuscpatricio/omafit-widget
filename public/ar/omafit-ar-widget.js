@@ -106,8 +106,9 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). Centro X: midpoint filtrado → **clamp** ±`OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M` → **bias** opcional
- * `data-ar-glasses-x-bias`; offset pivot `vx = -visualCenterX * escala` (1× no 1º frame).
+ * landmarks para local). Centro X: midpoint filtrado → se `|x| ≤ OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_MAX_VALID_M`
+ * usa-se o valor; caso contrário **ignora-se** (0). **Bias** opcional `data-ar-glasses-x-bias` soma-se depois;
+ * offset pivot `vx = -visualCenterX * escala` (1× no 1º frame).
  * **Y/Z** via `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
  * Incompatível com estrutural e geometria.
  */
@@ -259,7 +260,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-clamp-bias";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-validation";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -334,8 +335,8 @@ const OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT = 1.1;
  * `baseUnitScale` nesta conversão. Objectivo típico ~0,06–0,08 m.
  */
 const OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS = 0.0065;
-/** Clamp do centro visual X (m) após midpoint — evita offsets extremos em GLBs assimétricos. */
-const OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M = 0.03;
+/** Centro visual X (m) só é aceite se `|original| ≤` este limite; senão trata-se como 0 (GLB enviesado). */
+const OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_MAX_VALID_M = 0.025;
 /**
  * GLB em escala pequena (ex. maxDim ≤ 0.01): o mesh fica ~1 unidade de âncora com
  * `baseUnitScale / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE`; a largura no rosto vem do
@@ -7909,22 +7910,25 @@ async function runArSession({
               )
             ) {
               glasses.updateMatrixWorld(true);
-              const original = omafitComputeVisualCenterX(THREE, glasses, _omafitManualEyeFwd);
-              const clamped = THREE.MathUtils.clamp(
-                original,
-                -OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M,
-                OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_CLAMP_M,
+              const originalVisualCenterX = omafitComputeVisualCenterX(
+                THREE,
+                glasses,
+                _omafitManualEyeFwd,
               );
+              const isValidCenter =
+                Number.isFinite(originalVisualCenterX) &&
+                Math.abs(originalVisualCenterX) <= OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_MAX_VALID_M;
+              let finalCenterX = 0;
+              if (isValidCenter) finalCenterX = originalVisualCenterX;
               const biasX = Number.isFinite(st.glassesManualXBiasM) ? st.glassesManualXBiasM : 0;
-              const vcxFinal = clamped + biasX;
+              const vcxFinal = finalCenterX + biasX;
               st.glassesManualVisualCenterX = vcxFinal;
               st.glassesManualVisualCenterResolved = true;
               try {
-                console.log("[omafit-ar] center corrected", {
-                  original,
-                  clamped,
-                  biasX,
-                  visualCenterX: vcxFinal,
+                console.log("[omafit-ar] center validation", {
+                  original: originalVisualCenterX,
+                  isValid: isValidCenter,
+                  finalCenterX,
                 });
                 console.log("[omafit-ar] visual center using face forward", {
                   forward: {
