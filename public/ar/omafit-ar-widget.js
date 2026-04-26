@@ -106,7 +106,7 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). Offset **X** do pivot = `-visualCenterX * escala` (centro visual X em **espaço local do root glasses**, 1× no 1º frame);
+ * landmarks para local). Offset **X** do pivot = `-visualCenterX * escala` (midpoint X frontal em **espaço local do root glasses**, 1× no 1º frame);
  * **Y/Z** via `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
  * Incompatível com estrutural e geometria.
  */
@@ -258,7 +258,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-full-mesh";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-midpoint-fix";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -2077,15 +2077,16 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
 }
 
 /**
- * Média de **X** no espaço **local do root `glasses`** (neutro face ao pivot/âncora): vértices em mundo
- * → `inverse(glasses.matrixWorld)`; `forward` (mundo, face basis) → direcção local com `transformDirection`.
- * Profundidade `pLocal · forwardLocal`; `depthThreshold = min + span*0.4`; filtro `depth < threshold`;
- * média dos `pLocal.x`. **Todas** as `Mesh` sob `glasses` (`glasses.traverse`), sem assumir `children[0]`.
+ * **Midpoint X** no espaço **local do root `glasses`** (neutro ao pivot): vértices em mundo
+ * → `inverse(glasses.matrixWorld)`; `forward` (mundo, face basis) → `transformDirection`.
+ * Bbox local → `lateralLimit`, `yCap`, `depthThreshold` (0.25); nos filtrados com `depth < threshold`:
+ * `visualCenterX = (minX + maxX) * 0.5` (não média — robusto à densidade de vértices).
+ * **Todas** as `Mesh` sob `glasses` (`glasses.traverse`).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glasses root do GLB (ex. `gltf.scene`)
  * @param {import("three").Vector3} forward mundo, **normalizado** (face basis = pivot)
- * @returns {number} média X **local glasses** ou `0` se vazio
+ * @returns {number} midpoint X **local glasses** ou `0` se vazio
  */
 function omafitComputeVisualCenterX(THREE, glasses, forward) {
   if (!THREE || !glasses || !forward) return 0;
@@ -2108,6 +2109,34 @@ function omafitComputeVisualCenterX(THREE, glasses, forward) {
   const vWorld = _omafitVisCtrScratchV;
   const pLocal = _omafitVisCtrPLocal;
 
+  let bboxMinX = Infinity;
+  let bboxMaxX = -Infinity;
+  let bboxMaxY = -Infinity;
+  glasses.traverse((obj) => {
+    if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
+    const pos = obj.geometry.attributes.position;
+    if (!pos || pos.count < 1) return;
+    const mw = obj.matrixWorld;
+    for (let i = 0; i < pos.count; i++) {
+      vWorld.fromBufferAttribute(pos, i).applyMatrix4(mw);
+      pLocal.copy(vWorld).applyMatrix4(invGlasses);
+      if (pLocal.x < bboxMinX) bboxMinX = pLocal.x;
+      if (pLocal.x > bboxMaxX) bboxMaxX = pLocal.x;
+      if (pLocal.y > bboxMaxY) bboxMaxY = pLocal.y;
+    }
+  });
+  if (
+    !Number.isFinite(bboxMinX) ||
+    !Number.isFinite(bboxMaxX) ||
+    !Number.isFinite(bboxMaxY) ||
+    bboxMaxX - bboxMinX < 1e-12
+  ) {
+    return 0;
+  }
+  const halfWidth = (bboxMaxX - bboxMinX) * 0.5;
+  const lateralLimit = halfWidth * 0.4;
+  const yCap = bboxMaxY * 0.6;
+
   let minDepth = Infinity;
   let maxDepth = -Infinity;
   glasses.traverse((obj) => {
@@ -2118,6 +2147,8 @@ function omafitComputeVisualCenterX(THREE, glasses, forward) {
     for (let i = 0; i < pos.count; i++) {
       vWorld.fromBufferAttribute(pos, i).applyMatrix4(mw);
       pLocal.copy(vWorld).applyMatrix4(invGlasses);
+      if (Math.abs(pLocal.x) > lateralLimit) continue;
+      if (pLocal.y > yCap) continue;
       const depth = pLocal.dot(fwdLocal);
       if (depth < minDepth) minDepth = depth;
       if (depth > maxDepth) maxDepth = depth;
@@ -2126,9 +2157,10 @@ function omafitComputeVisualCenterX(THREE, glasses, forward) {
   if (!Number.isFinite(minDepth) || !Number.isFinite(maxDepth)) return 0;
   const depthSpan = maxDepth - minDepth;
   if (depthSpan < 1e-12) return 0;
-  const depthThreshold = minDepth + depthSpan * 0.4;
+  const depthThreshold = minDepth + depthSpan * 0.25;
 
-  let sumX = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
   let count = 0;
   glasses.traverse((obj) => {
     if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
@@ -2138,27 +2170,34 @@ function omafitComputeVisualCenterX(THREE, glasses, forward) {
     for (let i = 0; i < pos.count; i++) {
       vWorld.fromBufferAttribute(pos, i).applyMatrix4(mw);
       pLocal.copy(vWorld).applyMatrix4(invGlasses);
+      if (Math.abs(pLocal.x) > lateralLimit) continue;
+      if (pLocal.y > yCap) continue;
       const depth = pLocal.dot(fwdLocal);
       if (depth < depthThreshold) {
-        sumX += pLocal.x;
         count++;
+        if (pLocal.x < minX) minX = pLocal.x;
+        if (pLocal.x > maxX) maxX = pLocal.x;
       }
     }
   });
 
   try {
-    console.log("[omafit-ar] depth range (glasses local)", {
+    console.log("[omafit-ar] depth range (glasses local, central band)", {
       minDepth,
       maxDepth,
       depthThreshold,
+      lateralLimit,
+      yCap,
     });
   } catch {
     /* ignore */
   }
 
-  const out = count > 0 ? sumX / count : 0;
+  const out =
+    count > 0 && Number.isFinite(minX) && Number.isFinite(maxX) ? (minX + maxX) * 0.5 : 0;
   try {
-    console.log("[omafit-ar] visual center full mesh", { visualCenterX: out });
+    console.log("[omafit-ar] center midpoint", { minX, maxX, visualCenterX: out });
+    console.log("[omafit-ar] filtered center stats", { count, visualCenterX: out });
   } catch {
     /* ignore */
   }
@@ -2184,7 +2223,7 @@ function omafitComputeVisualCenterX(THREE, glasses, forward) {
  * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
  * @param {number | null} [pivotUniformScale=null] escala uniforme do pivot; se omitido, `max(|sx|,|sy|,|sz|, 1e-8)`.
  * @param {{ x: number, y: number, z: number } | null} [faceBasisOffsetM=null] só **Y/Z** (metros); **X** vem de `meshVisualCenterX`.
- * @param {number} [meshVisualCenterX=0] média X **local do root glasses** (lentes, espaço neutro), 1× após 1º `lm`; offset X = `-meshVisualCenterX * escala`.
+ * @param {number} [meshVisualCenterX=0] midpoint X **local do root glasses** (região frontal filtrada), 1× após 1º `lm`; offset X = `-meshVisualCenterX * escala`.
  * @returns {boolean} `true` se a rotação do pivot foi actualizada
  */
 function omafitGlassesManualPivotApplyEyeBasis(
@@ -6870,7 +6909,7 @@ async function runArSession({
       });
     }
     let glassesManualModelWidth = 1;
-    /** Média X **local glasses** da região frontal — 1× no 1º frame (`lm` + forward face basis); offset pivot X = `-this * escala`. */
+    /** Midpoint X **local glasses** da região frontal — 1× no 1º frame (`lm` + forward face basis); offset pivot X = `-this * escala`. */
     let glassesManualVisualCenterX = 0;
     if (glassesManualMindarRig) {
       omafitApplyGlassesManualMindarCenterMesh(THREE, glasses, glassesModelStickZ);
