@@ -27,6 +27,22 @@ import {
  * calibração do lojista e defaults de filtro/resolução afinados para aproximar
  * a estabilidade “tipo Instagram” dentro do que o browser permite.
  *
+ * Desempenho (30–60 FPS): GLB com Draco (`import` lazy do decoder WASM),
+ * `data-ar-renderer-max-dpr` (cap opcional; sem valor usa tecto por perfil de dispositivo),
+ * `data-ar-performance-profile` (auto | quality | balanced | performance),
+ * anisotropia limitada (`arTextureMaxAnisotropy` + perfil), FOV/câmara ajustados ao
+ * aspecto do contentor e ao tipo de ecrã, aviso se triângulos >50k, opcional
+ * `data-ar-defer-module-preload="1"` para adiar o bundle Three/MindAR até ao 1.º AR.
+ * Micro-UX (`data-ar-micro-ux`, default `1`): entrada fade+scale, anel de tracking,
+ * snap ao detectar rosto/mão, transição ao trocar variante (mão) / calibração (face).
+ * GLB canónico Blender (`data-ar-glasses-canonical-blender-export="1"`): origem na ponte
+ * (nariz), frente −Z, rotação zero no root; desliga centro bbox, Tripo/bind automáticos
+ * e re-centro pós-bind — ver comentário em `normalizeGlassesModel` e guia em `omafit-glasses-orient.js`.
+ *
+ * Iluminação adaptativa (face): amostragem do vídeo → ambiente + hemisfério + luz chave
+ * + exposição ACES; sombras de contacto ajustam opacidade; PBR (`toneMapped`, IBL).
+ * Opt-out: `data-ar-face-ambient-adaptive="0"`. Mão: cor do hemisfério segue média do feed.
+ *
  * @see https://github.com/hiukim/mind-ar-js
  * @see https://hiukim.github.io/mind-ar-js-doc/face-tracking-examples/tryon
  */
@@ -80,20 +96,22 @@ import {
  *    `anchor.group.matrix` multiplica os filhos por `faceScale` (ver `controller.js:
  *    getLandmarkMatrix: fm * s`). O `estimateResult.faceScale` do MindAR
  *    (`estimator.js`: `rightMost.x − leftMost.x` em `metricLandmarks`) está no **mesmo
- *    espaço 3D** que a distância bochecha–bochecha (234–454). Não misturar essas
- *    grandezas com `wideDim` em **metros** do GLB — o quociente `cw / wideDim` explodia
- *    a escala. A escala por frame: `glasses.scale ≈ baseUnitScale × cw/faceScale × factor`;
- *    `glassesPivot.scale` ≈ multiplicador da loja. Modo geometria: pivot extra (~120).
+ *    espaço 3D** que landmarks faciais. A escala anatómica do **mesh** (automático) usa
+ *    **interpupilar** (263–33) suavizada: `numer ≈ ipd × arGlassesIpdCheekEquiv` (equiv
+ *    ≈ largura bochecha / IPD mediano) para manter magnitude compatível com o antigo
+ *    `cw/faceScale`; `glasses.scale ≈ baseUnitScale × factor × numer/faceScale × depthMul`.
+ *    `depthMul` (opcional, default on) corrige suavemente pela distância rosto–câmara.
+ *    Limites relativos a `baseUnitScale×modelScaleMul` evitam micro/macro extremos entre
+ *    dispositivos. Modo geometria: pivot extra (~120). Rig manual: metros via IPD no pivot.
  *
  * 5) GLB tem qualquer orientação — o lojista calibra na ferramenta visual do admin.
  *
- * Oclusão WebAR (Three.js): máscara facial só depth — `MeshBasicMaterial` com
- * `colorWrite: false`, `depthWrite: true`, renderOrder abaixo do GLB; o depth buffer
- * grava a silhueta da face (malha 468 MindAR) para o GLB não “pintar” por cima do nariz
- * ou pestanas. Limitações: sem stencil por cabelo fino, sem SSAO facial; oclusores são
- * aproximações da superfície. Ver
+ * Oclusão WebAR (Three.js): **óculos** — por defeito malha facial 468 só depth + extensões
+ * temporais (`data-ar-glasses-face-depth-occluder`, default `1`); `renderOrder`/`polygonOffset`
+ * por mesh (hastes vs lentes) para z-test estável atrás do rosto. `arFaceOccluderNoseAhead`
+ * empurra a máscara µm para a câmara quando oclusão activa (default ~0,0012 m). Opt-out:
+ * `data-ar-glasses-face-depth-occluder="0"`. Limitações: sem stencil cabelo fino; ver
  * https://threejs.org/docs/#api/en/materials/Material.depthWrite e MindAR `addFaceMesh`.
- * `frustumCulled = false` nos oclusores dinâmicos evita culling com bbox desactualizada.
  *
  * Rig estrutural opcional (`data-ar-glasses-structural-mindar-rig="1"`): desliga Tripo/bind
  * no mesh; `Ry(π)` (+ `arGlassesStructuralBaseRxDeg` opcional) só no modelo; escala anatómica
@@ -102,13 +120,16 @@ import {
  * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): ignora `baseUnitScale` no **mesh**
  * (escala 1,1,1); interpupilar MindAR é **bruta** — converter com factor fixo
  * `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS` (não `baseUnitScale`): `faceWidthMeters = faceInterpupillary * k`;
- * `scaleFactor = (faceWidthMeters * targetWidthFactor) / modelWidth`, clamp `[0.7, 1.4]`. Tripo, bind
+ * `scaleFactor = (faceWidthMeters * targetWidthFactor) / modelWidth`, clamp
+ * `[OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MIN, OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MAX]`; suavização
+ * do alvo + `arGlassesFaceDistanceScale` (distância câmara). Tripo, bind
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
  * landmarks para local). **Centro geométrico**: após bake, `Box3` + `glasses.position.sub(center)` no root (igual pipeline
  * automático); modo manual só aplica `stickZ` no mesh. **Pivot** MindAR 168: posição `quat*(0,oy,oz)` — **sem** offset X por landmark.
  * **Y/Z**: `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD no pivot.
+ * Suavização pivot: `data-ar-glasses-manual-pivot-smooth` (lerp pos + slerp quat, default 0,72; intervalo típico 0,6–0,85).
  * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada.
  * Incompatível com estrutural e geometria.
  */
@@ -117,8 +138,126 @@ const ESM_SH = "https://esm.sh";
 /** Mesmo ficheiro que o GLTFLoader do esm.sh importa — evita dois módulos `three`. */
 const ESM_THREE_MJS = `${ESM_SH}/three@${ESM_THREE_VER}/es2022/three.mjs`;
 const ESM_GLTF_MIND = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/GLTFLoader.js`;
+/** Carregado só ao abrir sessão AR / carregar GLB — não entra no bundle inicial MindAR+Three. */
+const ESM_DRACO_LOADER_MJS = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/DRACOLoader.js`;
+/** WASM Draco alinhado às builds `three` recentes (CDN Google, cacheável). */
+const OMAFIT_DRACO_DECODER_BASE =
+  "https://www.gstatic.com/draco/versioned/decoders/1.5.7/";
+/** Aviso único em consola se o GLB exceder triângulos alvo (performance mobile). */
+const OMAFIT_AR_GLB_TRIANGLE_WARN = 50_000;
 /** Sem `bundle`: `three` deduplica com `ESM_THREE_MJS`. */
 const ESM_MINDAR_FACE_THREE = `${ESM_SH}/mind-ar@1.2.5/dist/mindar-face-three.prod.js?deps=three@${ESM_THREE_VER}`;
+
+let __omafitSharedDracoLoader = null;
+let __omafitSharedDracoLoaderPromise = null;
+/** URL já avisada por excesso de triângulos (evita spam na consola). */
+let __omafitGlbTriWarnUrl = null;
+
+/**
+ * DracoLoader partilhado (lazy `import()` da primeira vez) — descodifica GLB Draco sem duplicar WASM.
+ * @returns {Promise<any>}
+ */
+function omafitGetSharedDracoLoader() {
+  if (__omafitSharedDracoLoader) return Promise.resolve(__omafitSharedDracoLoader);
+  if (!__omafitSharedDracoLoaderPromise) {
+    __omafitSharedDracoLoaderPromise = import(ESM_DRACO_LOADER_MJS)
+      .then((mod) => {
+        const DRACOLoader = mod.DRACOLoader || mod.default;
+        const draco = new DRACOLoader();
+        draco.setDecoderPath(OMAFIT_DRACO_DECODER_BASE);
+        try {
+          if (typeof draco.preload === "function") draco.preload();
+        } catch {
+          /* ignore */
+        }
+        __omafitSharedDracoLoader = draco;
+        return draco;
+      })
+      .catch((e) => {
+        __omafitSharedDracoLoaderPromise = null;
+        throw e;
+      });
+  }
+  return __omafitSharedDracoLoaderPromise;
+}
+
+/**
+ * @param {import("three").Object3D} root
+ * @returns {number}
+ */
+function omafitCountGltfTriangles(root) {
+  let total = 0;
+  if (!root || typeof root.traverse !== "function") return 0;
+  root.traverse((o) => {
+    const g = o.geometry;
+    if (!g || !g.attributes || !g.attributes.position) return;
+    const idx = g.index;
+    const start = g.drawRange?.start ?? 0;
+    const count =
+      g.drawRange?.count != null
+        ? g.drawRange.count
+        : idx
+          ? idx.count
+          : g.attributes.position.count;
+    if (count <= 0) return;
+    if (idx) total += Math.floor(count / 3);
+    else total += Math.floor(count / 3);
+  });
+  return total;
+}
+
+/**
+ * Limita anisotropia das texturas do GLB (VRAM + filtragem em GPUs médias).
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {number} maxAniso pedido (1–16); clampado ao máximo do renderer.
+ */
+/**
+ * @param {string} urlHint
+ * @param {number} triCount
+ */
+function omafitMaybeWarnGltfTriangleBudget(urlHint, triCount) {
+  if (!Number.isFinite(triCount) || triCount < OMAFIT_AR_GLB_TRIANGLE_WARN) return;
+  const key = String(urlHint || "").slice(0, 512);
+  if (__omafitGlbTriWarnUrl === key) return;
+  __omafitGlbTriWarnUrl = key;
+  console.warn(
+    "[omafit-ar] GLB com muitos triângulos (objectivo <50k para 30–60 FPS em dispositivos médios)",
+    {
+      url: urlHint,
+      triangles: triCount,
+      hint: "Reduza polígonos no DCC e exporte com compressão Draco/meshopt.",
+    },
+  );
+}
+
+function omafitApplyGltfTextureAnisotropy(THREE, root, renderer, maxAniso) {
+  if (!THREE || !root?.traverse || !renderer?.capabilities) return;
+  const cap = Math.min(
+    Math.max(1, Number(maxAniso) || 4),
+    renderer.capabilities.getMaxAnisotropy?.() || 4,
+  );
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (let mi = 0; mi < mats.length; mi++) {
+      const m = mats[mi];
+      if (!m || typeof m !== "object") continue;
+      for (const key of [
+        "map",
+        "normalMap",
+        "roughnessMap",
+        "metalnessMap",
+        "aoMap",
+        "emissiveMap",
+        "clearcoatNormalMap",
+      ]) {
+        const tex = m[key];
+        if (tex && tex.isTexture) tex.anisotropy = cap;
+      }
+    }
+  });
+}
 
 /**
  * MediaPipe Tasks Vision para hand tracking (relógios, pulseiras).
@@ -260,7 +399,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_glasses-bbox-center-anchor168";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-canonical-blender-export";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -283,6 +422,244 @@ const OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES = {
 const OMAFIT_FACE_CAMERA_FOV_DEFAULT = 63;
 
 /**
+ * Form factor do browser (mobile / tablet / desktop) — heurística UA + touch + viewport.
+ * @returns {"mobile"|"tablet"|"desktop"}
+ */
+function omafitDetectArFormFactor() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return "desktop";
+  const ua = String(navigator.userAgent || "");
+  const maxTp = Number(navigator.maxTouchPoints) || 0;
+  const isIpad =
+    /iPad/i.test(ua) ||
+    (maxTp > 1 && /Macintosh/i.test(ua) && typeof document !== "undefined" && "ontouchend" in document);
+  const isMobileUa =
+    /Mobi|Android.*Mobile|iPhone|webOS|BlackBerry|IEMobile|Opera Mini|Mobile\/\w+/i.test(ua);
+  const ww = Math.max(0, Number(window.innerWidth) || 0);
+  const wh = Math.max(0, Number(window.innerHeight) || 0);
+  const shortSide = ww > 0 && wh > 0 ? Math.min(ww, wh) : 0;
+  const longSide = ww > 0 && wh > 0 ? Math.max(ww, wh) : 0;
+  if (isIpad) return "tablet";
+  if (isMobileUa || (shortSide > 0 && shortSide <= 560 && longSide <= 1100)) return "mobile";
+  if (maxTp > 1 && shortSide >= 600 && shortSide <= 1100 && longSide <= 1400) return "tablet";
+  return "desktop";
+}
+
+/**
+ * Escalão de performance heurístico (CPU/RAM/DPR/rede). Sobrescrito por `data-ar-performance-profile`.
+ * @param {"mobile"|"tablet"|"desktop"} formFactor
+ * @returns {"low"|"medium"|"high"}
+ */
+function omafitDetectArPerfTier(formFactor) {
+  let score = 0;
+  try {
+    const hc = Number(navigator.hardwareConcurrency);
+    if (hc >= 8) score += 2;
+    else if (hc >= 4) score += 1;
+    else score -= 1;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const dm = Number(navigator.deviceMemory);
+    if (dm >= 8) score += 2;
+    else if (dm >= 4) score += 1;
+    else score -= 1;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const dpr = Number(window.devicePixelRatio) || 1;
+    if (dpr >= 3) score -= 1;
+    if (dpr <= 1.25 && formFactor !== "desktop") score += 1;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const c = navigator.connection;
+    if (c && c.saveData) score -= 2;
+    const et = c && c.effectiveType;
+    if (et === "slow-2g" || et === "2g") score -= 1;
+  } catch {
+    /* ignore */
+  }
+  if (formFactor === "desktop") score += 1;
+  if (formFactor === "mobile") score -= 1;
+
+  if (score <= 0) return "low";
+  if (score <= 2) return "medium";
+  return "high";
+}
+
+/**
+ * Perfil unificado para paths face (MindAR) e mão (MediaPipe + Three).
+ * @param {{ perfMode?: string }} opts `auto` | `quality` | `high` | `balanced` | `medium` | `performance` | `low`
+ * @returns {{
+ *   formFactor: "mobile"|"tablet"|"desktop",
+ *   perfTier: "low"|"medium"|"high",
+ *   maxDprCap: number,
+ *   maxTextureAnisotropy: number,
+ *   webglAntialias: boolean,
+ *   faceVideoIdealMax: { w: number, h: number },
+ * }}
+ */
+function omafitResolveArDeviceRuntimeProfile(opts) {
+  const formFactor = omafitDetectArFormFactor();
+  const mode = String(opts?.perfMode || "auto").trim().toLowerCase();
+  let perfTier;
+  if (mode === "quality" || mode === "high") perfTier = "high";
+  else if (mode === "balanced" || mode === "medium") perfTier = "medium";
+  else if (mode === "performance" || mode === "low") perfTier = "low";
+  else perfTier = omafitDetectArPerfTier(formFactor);
+
+  let maxDprCap = 1.5;
+  let maxAniso = 4;
+  let webglAntialias = true;
+  /** Tecto pedido ao `getUserMedia` no path face (MindAR patch). */
+  let faceVideoIdealMax = { w: 1280, h: 720 };
+
+  if (formFactor === "mobile") {
+    if (perfTier === "low") {
+      maxDprCap = 1;
+      maxAniso = 2;
+      webglAntialias = false;
+      faceVideoIdealMax = { w: 960, h: 540 };
+    } else if (perfTier === "medium") {
+      maxDprCap = 1.25;
+      maxAniso = 4;
+      webglAntialias = true;
+      faceVideoIdealMax = { w: 1280, h: 720 };
+    } else {
+      maxDprCap = 1.5;
+      maxAniso = 6;
+      webglAntialias = true;
+      faceVideoIdealMax = { w: 1280, h: 720 };
+    }
+  } else if (formFactor === "tablet") {
+    if (perfTier === "low") {
+      maxDprCap = 1.15;
+      maxAniso = 2;
+      webglAntialias = true;
+      faceVideoIdealMax = { w: 1280, h: 720 };
+    } else if (perfTier === "medium") {
+      maxDprCap = 1.35;
+      maxAniso = 5;
+      webglAntialias = true;
+      faceVideoIdealMax = { w: 1280, h: 720 };
+    } else {
+      maxDprCap = 2;
+      maxAniso = 8;
+      webglAntialias = true;
+      faceVideoIdealMax = { w: 1280, h: 720 };
+    }
+  } else {
+    if (perfTier === "low") {
+      maxDprCap = 1.25;
+      maxAniso = 4;
+      webglAntialias = true;
+    } else if (perfTier === "medium") {
+      maxDprCap = 1.75;
+      maxAniso = 8;
+      webglAntialias = true;
+    } else {
+      maxDprCap = 2;
+      maxAniso = 12;
+      webglAntialias = true;
+    }
+  }
+
+  return {
+    formFactor,
+    perfTier,
+    maxDprCap,
+    maxTextureAnisotropy: maxAniso,
+    webglAntialias,
+    faceVideoIdealMax,
+  };
+}
+
+/**
+ * @param {typeof import("three")} THREE
+ * @param {string} cfgValStr valor de `data-ar-renderer-max-dpr` ou `""` para só perfil
+ * @param {ReturnType<typeof omafitResolveArDeviceRuntimeProfile>} profile
+ */
+function omafitEffectiveArRendererMaxDpr(THREE, cfgValStr, profile) {
+  if (!THREE) return 1.5;
+  const raw = String(cfgValStr ?? "").trim();
+  const userRaw = raw.length ? Number(raw) : NaN;
+  const user = Number.isFinite(userRaw) ? THREE.MathUtils.clamp(userRaw, 1, 3) : NaN;
+  const capRaw = Number(profile?.maxDprCap);
+  const cap = Number.isFinite(capRaw) && capRaw >= 1 ? capRaw : 1.5;
+  if (!Number.isFinite(user)) return THREE.MathUtils.clamp(cap, 1, 3);
+  return THREE.MathUtils.clamp(Math.min(user, cap), 1, 3);
+}
+
+/**
+ * @param {string} cfgValStr `data-ar-texture-max-anisotropy`
+ * @param {ReturnType<typeof omafitResolveArDeviceRuntimeProfile>} profile
+ * @param {number} capHard tecto absoluto (p.ex. 16)
+ */
+function omafitEffectiveArTextureMaxAnisotropy(cfgValStr, profile, capHard = 16) {
+  const raw = Number(String(cfgValStr ?? "").trim());
+  const user = Number.isFinite(raw) ? raw : 4;
+  const pMax = Number(profile?.maxTextureAnisotropy);
+  const tierCap = Number.isFinite(pMax) && pMax >= 1 ? pMax : 8;
+  return Math.min(Math.max(1, user), tierCap, Math.max(1, capHard));
+}
+
+/** Constraints de vídeo para o patch `getUserMedia` do path face. */
+function omafitBuildFaceUserMediaVideoIdeal(profile) {
+  const m = profile?.faceVideoIdealMax || { w: 1280, h: 720 };
+  const w = Math.max(480, Math.min(1920, Math.floor(Number(m.w) || 1280)));
+  const h = Math.max(360, Math.min(1080, Math.floor(Number(m.h) || 720)));
+  const low = profile?.perfTier === "low";
+  return {
+    width: { ideal: w, max: w, min: 480 },
+    height: { ideal: h, max: h, min: 360 },
+    frameRate: { ideal: low ? 24 : 30, max: 30, min: 12 },
+  };
+}
+
+/**
+ * Ajuste fino de FOV vertical (graus) a partir do aspecto CSS do host AR — rotação / modais estreitos.
+ * Escrito em `opts.responsiveLayoutFovAdjustDeg`; lido em `omafitSyncMindARFaceProjection`.
+ * @param {Record<string, unknown>} opts `faceProjectionOpts`
+ * @param {HTMLElement | null} host
+ * @param {ReturnType<typeof omafitResolveArDeviceRuntimeProfile> | null} profile
+ */
+function omafitRefreshFaceProjectionLayoutFovNudge(opts, host, profile) {
+  if (!opts || !host) return;
+  let adj = 0;
+  try {
+    const r = host.getBoundingClientRect();
+    const aw = Math.max(1, r.width || 1);
+    const ah = Math.max(1, r.height || 1);
+    const layoutAspect = aw / ah;
+    if (layoutAspect < 0.42) adj += 2;
+    else if (layoutAspect < 0.52) adj += 1;
+    else if (layoutAspect > 1.85) adj -= 1.5;
+    else if (layoutAspect > 1.25) adj -= 0.5;
+    if (profile?.formFactor === "mobile" && profile?.perfTier === "low") adj -= 0.75;
+  } catch {
+    /* ignore */
+  }
+  opts.responsiveLayoutFovAdjustDeg = adj;
+}
+
+/**
+ * FOV vertical (graus) no path mão — buffer de vídeo + perfil.
+ * @param {typeof import("three")} THREE
+ */
+function omafitHandPathCameraFovDeg(THREE, bufferAspect, profile) {
+  let f = 55;
+  if (!THREE || !Number.isFinite(bufferAspect) || bufferAspect <= 0) return f;
+  if (bufferAspect > 1.35) f -= 4;
+  else if (bufferAspect < 0.72) f += 3;
+  if (profile?.formFactor === "tablet") f += 1;
+  if (profile?.perfTier === "low") f -= 2;
+  return THREE.MathUtils.clamp(f, 48, 62);
+}
+
+/**
  * MindAR face `Controller` (hiukim/mind-ar-js) usa One Euro em cada landmark.
  * Defaults da lib: filterMinCF=0.001, filterBeta=1. Valores ligeiramente mais
  * baixos em minCutOff reduzem micro-tremor (mais “filtro Instagram”), com
@@ -301,10 +678,12 @@ const OMAFIT_MINDAR_GLASSES_FILTER_BETA = 0.94;
 /** Suavização extra (pós One Euro do MindAR) — interpolação de matriz âncora/malha facial. */
 const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH = 0.2;
 /**
- * Óculos: seguir de perto a matriz já filtrada pelo MindAR (sensação “colada” ao rosto).
- * Equilibrado com `GLASSES_FILTER_MIN_CF` baixo para não duplicar lag excessivo.
+ * Óculos: λ na `omafitDampMatrix4` (malha facial + âncora quando sem One Euro no 168).
+ * Valor mais baixo = mais suavização (menos jitter na base do rosto).
  */
-const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH_GLASSES = 0.26;
+const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH_GLASSES = 0.22;
+/** Lerp/slerp pivot manual óculos: fração do **alvo** por frame (0.6–0.85 típico). */
+const OMAFIT_GLASSES_MANUAL_PIVOT_LERP_DEFAULT = 0.72;
 /** Colar: λ mais conservador que óculos (menos “colado” à malha; evita puxar o colar com o mesmo agressivo). */
 const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH_NECKLACE = 0.18;
 /** EMA nos marcos 168/33/263/234/454 (ms) — legado; óculos usam One Euro (abaixo). */
@@ -357,6 +736,21 @@ function omafitClampGlassesPivotFaceScale(s) {
 const OMAFIT_FACE_CHEEK_WIDTH_SMOOTH = 0.18;
 /** Lerp do `faceScale` MindAR (mesmo espaço que `metricLandmarks`) — reduz jitter na escala. */
 const OMAFIT_FACE_FS_SCALE_SMOOTH = 0.2;
+/** EMA na distância interpupilar (landmarks 263–33) para escala anatómica estável. */
+const OMAFIT_FACE_IPD_SMOOTH = 0.2;
+/**
+ * Em `metricLandmarks`, largura bochecha–bochecha mediana ≈ `OMAFIT_GLASSES_IPD_CHEEK_EQUIV` × IPD.
+ * Usado para que `ipd×equiv / faceScale` substitua `cw/faceScale` sem saltar de tamanho.
+ */
+const OMAFIT_GLASSES_IPD_CHEEK_EQUIV = 2.1;
+/** Limites relativos a `baseUnitScale × modelScaleMul` na escala do mesh (óculos automático). */
+const OMAFIT_GLASSES_MESH_SCALE_MIN_REL = 0.48;
+const OMAFIT_GLASSES_MESH_SCALE_MAX_REL = 2.45;
+/** Rig manual: limites na escala uniforme do pivot (interpupilar em metros). */
+const OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MIN = 0.55;
+const OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MAX = 1.45;
+/** Suavização do alvo de escala no rig manual (antes do lerp do pivot). */
+const OMAFIT_GLASSES_MANUAL_SCALE_TARGET_SMOOTH = 0.22;
 /** Modelo Image Segmenter (multiclasse: cabelo, pele, roupa, …) — mesmo runtime WASM que HandLandmarker. */
 const OMAFIT_IMAGE_SEG_SELFIE_MULTICLASS_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite";
@@ -636,15 +1030,24 @@ function omafitAutoAlignGlassesModel(glasses, THREE) {
 }
 
 /**
- * Normaliza o root do GLB de óculos **antes** de ancorar no MindAR: reset total
- * de transform, centro da bbox na origem, orientação padrão em Euler **XYZ**
- * com **`Ry(π)`** (frente típica glTF/Omafit −Z → +Z da âncora; X largura, Y vertical).
- * Opcionalmente **`Rx`** em graus (`baseRxDeg`) para GLBs que precisem de ±90°.
- * Volta a centrar a bbox **depois** da rotação para o conjunto ficar consistente.
+ * Normaliza o root do GLB de óculos **antes** de ancorar no MindAR.
+ *
+ * **Modo legado (default):** reset, centro da bbox na origem, **`Ry(π)`** + `Rx` opcional
+ * (`baseRxDeg`) — alinha frente típica glTF/Tripo (−Z) ao referencial da âncora MindAR.
+ *
+ * **Modo export canónico Blender** (`skipAxisRemap: true` via `data-ar-glasses-canonical-blender-export`):
+ * não aplica `Ry(π)`; mantém **rotação identidade** (só `baseRxDeg` se necessário); com
+ * `skipBboxCenter: true` não desloca o root para o centróide da bbox (a **origem do GLB**
+ * deve estar na **ponte do nariz**; eixo **−Z** = frente das lentes, **+Y** = cima, **+X** = direita).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} model Raiz `gltf.scene`
- * @param {{ baseRxDeg?: number, recenterAfterRotation?: boolean }} [opts]
+ * @param {{
+ *   baseRxDeg?: number,
+ *   recenterAfterRotation?: boolean,
+ *   skipBboxCenter?: boolean,
+ *   skipAxisRemap?: boolean,
+ * }} [opts]
  * @returns {import("three").Object3D} O mesmo `model` (mutado)
  */
 function normalizeGlassesModel(THREE, model, opts = {}) {
@@ -657,15 +1060,33 @@ function normalizeGlassesModel(THREE, model, opts = {}) {
   if (typeof model.updateMatrix === "function") model.updateMatrix();
   model.updateMatrixWorld(true);
 
-  const box = new THREE.Box3().setFromObject(model);
-  if (!(typeof box.isEmpty === "function" && box.isEmpty())) {
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    model.position.sub(center);
+  if (!opts.skipBboxCenter) {
+    const box = new THREE.Box3().setFromObject(model);
+    if (!(typeof box.isEmpty === "function" && box.isEmpty())) {
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+    }
   }
 
   const rxDeg = Number(opts.baseRxDeg);
   const rxRad = Number.isFinite(rxDeg) ? (rxDeg * Math.PI) / 180 : 0;
+
+  if (opts.skipAxisRemap) {
+    model.rotation.set(rxRad, 0, 0);
+    if (typeof model.updateMatrix === "function") model.updateMatrix();
+    model.updateMatrixWorld(true);
+    if (opts.recenterAfterRotation !== false) {
+      const box2 = new THREE.Box3().setFromObject(model);
+      if (!(typeof box2.isEmpty === "function" && box2.isEmpty())) {
+        const c2 = new THREE.Vector3();
+        box2.getCenter(c2);
+        model.position.sub(c2);
+      }
+    }
+    return model;
+  }
+
   model.rotation.set(rxRad, Math.PI, 0);
   if (typeof model.updateMatrix === "function") model.updateMatrix();
   model.updateMatrixWorld(true);
@@ -1988,6 +2409,27 @@ function omafitGlassesManualInterpupillaryDistance(lm, smoother) {
   return omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_EYE_L_OUT, OMAFIT_FACE_LM_EYE_R_OUT);
 }
 
+/**
+ * Limita a escala do mesh de óculos relativamente a `baseUnitScale × modelScaleMul`
+ * (evita armação minúscula ou gigante em tracking ruidoso / FOV muito diferente).
+ * @param {typeof import("three")} THREE
+ */
+function omafitClampGlassesMeshAnatomicScale(
+  THREE,
+  s,
+  baseUnitScale,
+  mulScale,
+  minRel,
+  maxRel,
+) {
+  if (!THREE || !Number.isFinite(s) || s <= 0) return s;
+  const m = Number(mulScale);
+  const anchor = Math.max(baseUnitScale * (Number.isFinite(m) && m > 0 ? m : 1), 1e-9);
+  const lo = anchor * minRel;
+  const hi = anchor * maxRel;
+  return THREE.MathUtils.clamp(s, lo, hi);
+}
+
 /** Scratch: base olhos → rotação do pivot manual (evita alocações por frame). */
 let _omafitManualEyeL = null;
 let _omafitManualEyeR = null;
@@ -2003,6 +2445,8 @@ let __omafitManualOrthoCheckLogged = false;
 let __omafitManualModelCenterFixLogged = false;
 /** Offset `(ox,oy,oz)` na base facial → vector no espaço do pai (`applyQuaternion` após `makeBasis`). */
 let _omafitManualFaceBasisOffParent = null;
+/** Alvo de quaternion do pivot manual (evita slerp a partir de `glassesPivot` antes de actualizar). */
+let _omafitManualPivotTargetQuat = null;
 
 /**
  * Base facial manual a partir de `metricLandmarks` — **mesmos** `eyeDir`, `trueUp`, `forward`
@@ -2064,6 +2508,15 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
 }
 
 /**
+ * Garante caminho mais curto no `slerp` entre quaternions (evita salto 180°).
+ * @param {import("three").Quaternion} qFrom
+ * @param {import("three").Quaternion} qTo mutável; pode ser negado in-place
+ */
+function omafitQuatShortestPathToward(qFrom, qTo) {
+  if (qFrom.dot(qTo) < 0) qTo.set(-qTo.x, -qTo.y, -qTo.z, -qTo.w);
+}
+
+/**
  * Modo manual MindAR — orientação **só** no `glassesPivot`: base ortonormal RHS estável,
  * **independente** da orientação do GLB Tripo. Sem rotação correctiva no mesh, sem `y180`/quat extra,
  * sem escala negativa.
@@ -2080,6 +2533,7 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
  * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
  * @param {number | null} [pivotUniformScale=null] escala uniforme do pivot; se omitido, `max(|sx|,|sy|,|sz|, 1e-8)`.
  * @param {{ x: number, y: number, z: number } | null} [faceBasisOffsetM=null] só **Y/Z** (metros).
+ * @param {{ initialized: boolean, alpha: number } | null} [pivotSmooth=null] lerp posição + slerp quat + escala por frame.
  * @returns {boolean} `true` se a rotação do pivot foi actualizada
  */
 function omafitGlassesManualPivotApplyEyeBasis(
@@ -2089,6 +2543,7 @@ function omafitGlassesManualPivotApplyEyeBasis(
   smoother,
   pivotUniformScale = null,
   faceBasisOffsetM = null,
+  pivotSmooth = null,
 ) {
   if (!THREE || !glassesPivot || !lm) return false;
   if (!_omafitManualEyeDir) _omafitManualEyeDir = new THREE.Vector3();
@@ -2118,7 +2573,8 @@ function omafitGlassesManualPivotApplyEyeBasis(
 
   const matrix = _omafitManualBasisM4;
   matrix.makeBasis(eyeDir, trueUp, forward);
-  glassesPivot.quaternion.setFromRotationMatrix(matrix);
+  if (!_omafitManualPivotTargetQuat) _omafitManualPivotTargetQuat = new THREE.Quaternion();
+  _omafitManualPivotTargetQuat.setFromRotationMatrix(matrix);
 
   const finalScale =
     pivotUniformScale != null &&
@@ -2132,9 +2588,31 @@ function omafitGlassesManualPivotApplyEyeBasis(
   const oz =
     faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.z) ? faceBasisOffsetM.z : -0.05;
   if (!_omafitManualFaceBasisOffParent) _omafitManualFaceBasisOffParent = new THREE.Vector3();
-  _omafitManualFaceBasisOffParent.set(0, oy, oz).applyQuaternion(glassesPivot.quaternion);
-  glassesPivot.position.copy(_omafitManualFaceBasisOffParent);
-  glassesPivot.scale.setScalar(finalScale);
+  _omafitManualFaceBasisOffParent.set(0, oy, oz).applyQuaternion(_omafitManualPivotTargetQuat);
+
+  const alpha =
+    pivotSmooth &&
+    Number.isFinite(pivotSmooth.alpha) &&
+    pivotSmooth.alpha > 0 &&
+    pivotSmooth.alpha <= 1
+      ? pivotSmooth.alpha
+      : 1;
+
+  if (!pivotSmooth || !pivotSmooth.initialized || alpha >= 1 - 1e-6) {
+    glassesPivot.quaternion.copy(_omafitManualPivotTargetQuat);
+    glassesPivot.position.copy(_omafitManualFaceBasisOffParent);
+    glassesPivot.scale.setScalar(finalScale);
+    if (pivotSmooth && !pivotSmooth.initialized) pivotSmooth.initialized = true;
+  } else {
+    omafitQuatShortestPathToward(glassesPivot.quaternion, _omafitManualPivotTargetQuat);
+    glassesPivot.quaternion.slerp(_omafitManualPivotTargetQuat, alpha);
+    glassesPivot.quaternion.normalize();
+    glassesPivot.position.lerp(_omafitManualFaceBasisOffParent, alpha);
+    const sPrev = glassesPivot.scale.x;
+    glassesPivot.scale.setScalar(
+      Number.isFinite(sPrev) ? THREE.MathUtils.lerp(sPrev, finalScale, alpha) : finalScale,
+    );
+  }
   glassesPivot.updateMatrix();
 
   const qw = glassesPivot.quaternion.w;
@@ -2394,6 +2872,43 @@ function createOmafitFaceDepthOccluderMaterial(THREE) {
   m.polygonOffsetFactor = 1;
   m.polygonOffsetUnits = 1;
   return m;
+}
+
+/**
+ * Oclusão por profundidade: hastes laterais antes do resto; lentes por cima.
+ * Complementa a máscara 468 (só depth) para geometria atrás do rosto (z-test).
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ */
+function omafitApplyGlassesMeshDepthPriorities(THREE, root) {
+  if (!THREE || !root?.traverse) return;
+  const templeRe = /\b(temple|haste|shaft|stem|temporal|earpiece|hook|bra[cç]o)\b/i;
+  const protectRe = /\b(lens|lentes|rim_front|frame_front|bridge|brow|topbar|shield|visor|nose)\b/i;
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    const n = String(child.name || "").toLowerCase();
+    const isTempleSide = templeRe.test(n) && !protectRe.test(n);
+    const isLens = /\b(lens|lentes|mica|shield|visor)\b/i.test(n);
+    child.renderOrder = isLens ? 4 : isTempleSide ? 1 : 2;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (!mat || typeof mat !== "object") continue;
+      mat.depthTest = true;
+      if ("polygonOffset" in mat) {
+        mat.polygonOffset = true;
+        if (isLens) {
+          mat.polygonOffsetFactor = -4;
+          mat.polygonOffsetUnits = -2;
+        } else if (isTempleSide) {
+          mat.polygonOffsetFactor = -1;
+          mat.polygonOffsetUnits = -1;
+        } else {
+          mat.polygonOffsetFactor = -2;
+          mat.polygonOffsetUnits = -2;
+        }
+      }
+    }
+  });
 }
 
 /**
@@ -2830,6 +3345,7 @@ function omafitCreateGlassesContactShadowRig(THREE, glassesAnatomy) {
   tR.rotation.x = -Math.PI / 2;
   tR.position.set(0.086, -0.006, 0.01);
   g.add(bridge, tL, tR);
+  g.userData.omafitContactShadowMat = sharedMat;
   glassesAnatomy.add(g);
   return g;
 }
@@ -2853,6 +3369,107 @@ function omafitDisposeGlassesContactRig(rig) {
     rig.parent?.remove(rig);
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Micro-UX: grava opacidade / transparent base por material (idempotente).
+ * @param {import("three").Object3D} root
+ */
+function omafitStoreMaterialOpacityBaseline(root) {
+  if (!root?.traverse) return;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (let mi = 0; mi < mats.length; mi++) {
+      const m = mats[mi];
+      if (!m || typeof m !== "object" || m.userData?.omafitOpacityBaseStored) continue;
+      m.userData.omafitOpacityBaseStored = true;
+      m.userData.omafitOpacityBase = typeof m.opacity === "number" ? m.opacity : 1;
+      m.userData.omafitTransparentBase = m.transparent === true;
+    }
+  });
+}
+
+/**
+ * @param {import("three").Object3D} root
+ * @param {number} factor 0–1 multiplica a opacidade base
+ */
+function omafitApplyModelOpacityFactor(root, factor) {
+  if (!root?.traverse) return;
+  const f = Math.max(0, Math.min(1, Number(factor) || 0));
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (let mi = 0; mi < mats.length; mi++) {
+      const m = mats[mi];
+      if (!m || !m.userData?.omafitOpacityBaseStored) continue;
+      const base = Number(m.userData.omafitOpacityBase);
+      const b = Number.isFinite(base) ? base : 1;
+      const op = b * f;
+      if (op < 0.998) {
+        m.transparent = true;
+        m.opacity = op;
+      } else {
+        m.opacity = b;
+        m.transparent = !!m.userData.omafitTransparentBase;
+      }
+    }
+  });
+}
+
+/** Repõe materiais ao estado gravado em `omafitStoreMaterialOpacityBaseline`. */
+function omafitRestoreModelOpacityBaseline(root) {
+  if (!root?.traverse) return;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (let mi = 0; mi < mats.length; mi++) {
+      const m = mats[mi];
+      if (!m || !m.userData?.omafitOpacityBaseStored) continue;
+      const base = Number(m.userData.omafitOpacityBase);
+      m.opacity = Number.isFinite(base) ? base : 1;
+      m.transparent = !!m.userData.omafitTransparentBase;
+    }
+  });
+}
+
+/**
+ * Entrada suave (escala + opacidade) + decaimento de `snapBoost` no grupo wrap.
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D | null} wrap
+ * @param {import("three").Object3D | null} opacityRoot
+ * @param {{ introStartMs?: number, snapBoost?: number, introComplete?: boolean }} state
+ * @param {number} nowMs
+ * @param {{ introMs?: number, scaleFrom?: number }} [opts]
+ */
+function omafitStepMicroUxIntro(THREE, wrap, opacityRoot, state, nowMs, opts) {
+  if (!THREE || !wrap || !state) return;
+  const introMs = Math.max(120, Number(opts?.introMs) || 520);
+  const scaleFrom = Number.isFinite(Number(opts?.scaleFrom)) ? Number(opts.scaleFrom) : 0.88;
+  if (!(typeof state.introStartMs === "number") || !Number.isFinite(state.introStartMs)) {
+    state.introStartMs = nowMs;
+  }
+  const u = THREE.MathUtils.clamp((nowMs - state.introStartMs) / introMs, 0, 1);
+  const ease = 1 - (1 - u) ** 3;
+  let snap = typeof state.snapBoost === "number" ? state.snapBoost : 1;
+  if (snap > 1.0004) {
+    snap = THREE.MathUtils.lerp(snap, 1, 0.17);
+    state.snapBoost = snap;
+  } else {
+    state.snapBoost = 1;
+  }
+  const scaleCore = THREE.MathUtils.lerp(scaleFrom, 1, ease);
+  wrap.scale.setScalar(scaleCore * snap);
+  if (opacityRoot && state.preparedOpacity) {
+    const op = THREE.MathUtils.clamp(u * 1.12, 0, 1);
+    omafitApplyModelOpacityFactor(opacityRoot, op);
+    if (u >= 1 && !state.introComplete) {
+      state.introComplete = true;
+      omafitRestoreModelOpacityBaseline(opacityRoot);
+    }
+  } else if (u >= 1 && !state.introComplete) {
+    state.introComplete = true;
   }
 }
 
@@ -2885,6 +3502,128 @@ diffuseColor.rgb*=mix(1.0,${1 - intensity},0.55*omafitCav+0.35*omafitTmp);`;
         }
       };
       mat.needsUpdate = true;
+    }
+  });
+}
+
+/**
+ * Canvas minúsculo para amostrar o feed de vídeo (luminância + cor) sem custo alto.
+ * @param {number} w
+ * @param {number} h
+ */
+function omafitCreateFaceAmbientProbe(w, h) {
+  const canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
+  if (!canvas) return { canvas: null, ctx: null, w: 0, h: 0 };
+  const ww = Math.max(8, Math.min(96, Math.floor(w)));
+  const hh = Math.max(8, Math.min(96, Math.floor(h)));
+  canvas.width = ww;
+  canvas.height = hh;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  return { canvas, ctx, w: ww, h: hh };
+}
+
+/**
+ * Ajusta luzes da cena face + exposição do renderer a partir do vídeo (AR “colado” ao mundo).
+ * @param {typeof import("three")} THREE
+ * @param {object} al estado `faceAdaptiveLight`
+ * @param {HTMLElement | null} mindarHost
+ * @param {import("three").WebGLRenderer | null} renderer
+ */
+function omafitStepFaceAdaptiveLighting(THREE, al, mindarHost, renderer) {
+  if (!THREE || !al || !mindarHost) return;
+  const nowMs = performance.now();
+  if (al.lastMs > 0 && nowMs - al.lastMs < al.intervalMs) return;
+  al.lastMs = nowMs;
+  const vid = mindarHost.querySelector?.("video");
+  if (!vid || vid.readyState < 2) return;
+  const { ctx, w, h } = al.probe;
+  if (!ctx || w < 4 || h < 4) return;
+  let sr = 0;
+  let sg = 0;
+  let sb = 0;
+  try {
+    ctx.drawImage(vid, 0, 0, w, h);
+    const im = ctx.getImageData(0, 0, w, h);
+    const d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      sr += d[i];
+      sg += d[i + 1];
+      sb += d[i + 2];
+    }
+    const np = d.length / 4;
+    sr /= np;
+    sg /= np;
+    sb /= np;
+  } catch {
+    return;
+  }
+  const y = THREE.MathUtils.clamp((0.299 * sr + 0.587 * sg + 0.114 * sb) / 255, 0, 1);
+  const denom = Math.max(1e-3, sr + sg + sb);
+  const warmth = THREE.MathUtils.clamp((sr - sb) / denom, -0.55, 0.55);
+  const wb = al.warmBias;
+  const k = 0.24;
+  const ambTarget = THREE.MathUtils.lerp(0.24, 0.98, THREE.MathUtils.smoothstep(y, 0.07, 0.84));
+  al.ambient.intensity += (ambTarget - al.ambient.intensity) * k;
+  if (!al._skyA) al._skyA = new THREE.Color(0xb8daf8);
+  if (!al._skyB) al._skyB = new THREE.Color(0xffead8);
+  if (!al._gndA) al._gndA = new THREE.Color(0xa09078);
+  if (!al._scratchSky) al._scratchSky = new THREE.Color();
+  if (!al._scratchGnd) al._scratchGnd = new THREE.Color();
+  const warmT = THREE.MathUtils.clamp(0.5 + warmth * wb, 0, 1);
+  al._scratchSky.lerpColors(al._skyA, al._skyB, warmT);
+  const dark = THREE.MathUtils.lerp(1, 0.52, THREE.MathUtils.smoothstep(y, 0.12, 0.92));
+  al._scratchGnd.copy(al._skyB).lerp(al._gndA, 0.42).multiplyScalar(dark);
+  al.hemi.color.lerp(al._scratchSky, k);
+  al.hemi.groundColor.lerp(al._scratchGnd, k);
+  const hemiI = al.accessoryNecklace
+    ? THREE.MathUtils.lerp(0.34, 0.64, y)
+    : THREE.MathUtils.lerp(0.3, 0.58, y);
+  al.hemi.intensity += (hemiI - al.hemi.intensity) * k;
+  if (al.key) {
+    const keyI = THREE.MathUtils.lerp(0.1, 0.64, Math.pow(y, 0.84));
+    al.key.intensity += (keyI - al.key.intensity) * k;
+    if (!al._keyTint) al._keyTint = new THREE.Color();
+    al._keyTint.setRGB(
+      THREE.MathUtils.clamp(sr / 255, 0.75, 1),
+      THREE.MathUtils.clamp(sg / 255, 0.78, 1),
+      THREE.MathUtils.clamp(sb / 255, 0.72, 1),
+    );
+    al.key.color.lerp(al._keyTint, k * 0.55);
+  }
+  if (renderer && typeof renderer.toneMappingExposure === "number") {
+    const expT = THREE.MathUtils.lerp(0.86, 1.24, y);
+    renderer.toneMappingExposure += (expT - renderer.toneMappingExposure) * (k * 0.38);
+  }
+  const cm = al.contactRig?.userData?.omafitContactShadowMat;
+  if (cm && typeof cm.opacity === "number") {
+    const opT = THREE.MathUtils.lerp(0.3, 0.6, y);
+    cm.opacity += (opT - cm.opacity) * k;
+  }
+}
+
+/**
+ * Garante resposta PBR coerente (tone map + materiais) após PMREM ou em cena só com luzes.
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ */
+function omafitEnhanceFaceGlbPbrResponse(THREE, root) {
+  if (!THREE || !root?.traverse) return;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m || m.userData?.omafitPbrRespTuned) continue;
+      if (m.isMeshStandardMaterial !== true && m.isMeshPhysicalMaterial !== true) continue;
+      m.userData = m.userData || {};
+      m.userData.omafitPbrRespTuned = true;
+      m.toneMapped = true;
+      if ("envMapIntensity" in m && m.envMap && !(Number(m.envMapIntensity) > 0)) {
+        m.envMapIntensity = 0.85;
+      }
+      if ("aoMapIntensity" in m && m.aoMap && Number(m.aoMapIntensity) === 0) {
+        m.aoMapIntensity = 1;
+      }
+      m.needsUpdate = true;
     }
   });
 }
@@ -4068,6 +4807,24 @@ function injectGlobalStyles(root, primaryOverride) {
       background: transparent !important;
       background-color: transparent !important;
     }
+    @keyframes omafit-ar-ring-pulse {
+      0% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.12), 0 0 0 0 rgba(120,220,160,0.35); }
+      55% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.22), 0 0 22px 3px rgba(120,220,160,0.28); }
+      100% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.14), 0 0 0 0 rgba(120,220,160,0); }
+    }
+    .omafit-ar-track-detect-ring {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      border-radius: 14px;
+      opacity: 0;
+      transition: opacity 0.45s ease, box-shadow 0.45s ease;
+    }
+    .omafit-ar-track-detect-ring--on {
+      opacity: 1;
+      animation: omafit-ar-ring-pulse 1.85s ease-in-out infinite;
+    }
     /* Miniaturas + carrinho: filho de arWrap (fora do overflow do vídeo), acima do WebGL. */
     .omafit-ar-shell .omafit-ar-variant-cart-strip {
       z-index: 120 !important;
@@ -4685,7 +5442,11 @@ function omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, opts) {
   const fovLocked63 = opts?.lockWebcamFov63 === true;
   let fov = fovLocked63 ? 63 : Number(opts?.fovDeg);
   if (!Number.isFinite(fov)) fov = OMAFIT_FACE_CAMERA_FOV_DEFAULT;
-  if (!fovLocked63) fov = THREE.MathUtils.clamp(fov, 35, 95);
+  const fovAdj = Number(opts?.responsiveLayoutFovAdjustDeg);
+  const adj = Number.isFinite(fovAdj) ? fovAdj : 0;
+  fov += adj;
+  if (fovLocked63) fov = THREE.MathUtils.clamp(fov, 56, 72);
+  else fov = THREE.MathUtils.clamp(fov, 35, 95);
   camera.fov = fov;
   const useGl =
     opts?.useOpenGlStyleProjection !== false &&
@@ -4780,7 +5541,7 @@ function omafitArAppendNewWindowFallbackButton(loadingEl, t, onCloseModal) {
   loadingEl.appendChild(btn);
 }
 
-async function startMindARFaceWithReliableCamera(mindarThree) {
+async function startMindARFaceWithReliableCamera(mindarThree, videoIdealBlock) {
   const md = navigator.mediaDevices;
   if (!md || typeof md.getUserMedia !== "function") {
     try {
@@ -4804,11 +5565,14 @@ async function startMindARFaceWithReliableCamera(mindarThree) {
    * (com fallback em cascata se o dispositivo não suportar).
    */
   /** Pedidos altos (1080p) saturam GPU + `setSize` — 720p chega para landmarks. */
-  const faceVideoIdeal = {
-    width: { ideal: 1280, max: 1280, min: 480 },
-    height: { ideal: 720, max: 720, min: 360 },
-    frameRate: { ideal: 30, min: 12 },
-  };
+  const faceVideoIdeal =
+    videoIdealBlock && typeof videoIdealBlock === "object"
+      ? videoIdealBlock
+      : {
+          width: { ideal: 1280, max: 1280, min: 480 },
+          height: { ideal: 720, max: 720, min: 360 },
+          frameRate: { ideal: 30, min: 12 },
+        };
   md.getUserMedia = function (constraints) {
     if (!patchActive) return orig(constraints);
     try {
@@ -5496,6 +6260,9 @@ async function runArSession({
       trackingStack = "face";
     }
 
+    const arPerfModeEarly = String(cfgAttrDispatch("arPerformanceProfile", "auto")).trim().toLowerCase();
+    const arDeviceProfileSnapshot = omafitResolveArDeviceRuntimeProfile({ perfMode: arPerfModeEarly });
+
     console.log("[omafit-ar] dispatcher snapshot", {
       build: OMAFIT_AR_WIDGET_BUILD,
       accessoryType,
@@ -5511,6 +6278,7 @@ async function runArSession({
       arProductTags: dispatchProductTags ? dispatchProductTags.slice(0, 180) : "(empty)",
       productTitle: dispatchProductTitle.slice(0, 80),
       arPreferredCamera: cfgAttrDispatch("arPreferredCamera", ""),
+      arDeviceProfile: arDeviceProfileSnapshot,
     });
 
     if (trackingStack === "hand") {
@@ -5716,9 +6484,21 @@ async function runArSession({
       /^(1|true|yes|on)$/.test(
         String(cfgAttr("arGlassesAutoAlignModel", "0")).trim().toLowerCase(),
       );
+    /**
+     * GLB preparado no Blender (ou DCC equivalente): **Object Origin** na ponte do nariz,
+     * rotação aplicada no mesh (Apply Rotation), **frente das lentes = −Z** no espaço do root,
+     * **+Y** para cima. Desliga heurísticas Tripo / bind Ry(180) / centro por bbox no root.
+     * Attr: `data-ar-glasses-canonical-blender-export="1"`.
+     */
+    const glassesCanonicalBlenderExport =
+      accessoryType === "glasses" &&
+      /^(1|true|yes|on)$/.test(
+        String(cfgAttr("arGlassesCanonicalBlenderExport", "0")).trim().toLowerCase(),
+      );
     const glassesBboxRecenterPostBind =
       accessoryType === "glasses" &&
       !glassesManualMindarRig &&
+      !glassesCanonicalBlenderExport &&
       !/^(0|off|false|no)$/i.test(String(cfgAttr("arGlassesBboxRecenterPostBind", "1")).trim());
     /** Z **local do mesh** (negativo = empurra contra o rosto / âncora). Range típico −0.01…−0.05. */
     const glassesModelStickZ =
@@ -5728,17 +6508,77 @@ async function runArSession({
             return Number.isFinite(v) ? v : -0.032;
           })()
         : 0;
-    /** Largura visível da armação ≈ factor × distância 234–454. Override: `data-ar-glasses-anatomic-width-factor`. */
+    /** Multiplicador de estilo na largura anatómica (automático: IPD×equiv×factor/faceScale; antes era bochechas). */
     const glassesAnatomicWidthFactor = (() => {
       if (accessoryType !== "glasses") return 1;
       const v = Number(String(cfgAttr("arGlassesAnatomicWidthFactor", "1.05")).trim());
       return Number.isFinite(v) && v > 0.2 ? v : OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR;
     })();
+    /** IPD (landmarks) × equiv ≈ largura bochecha em mesma unidade. `data-ar-glasses-ipd-cheek-equiv`. */
+    const glassesIpdCheekEquiv =
+      accessoryType === "glasses"
+        ? (() => {
+            const raw = String(cfgAttr("arGlassesIpdCheekEquiv", "")).trim();
+            if (!raw) return OMAFIT_GLASSES_IPD_CHEEK_EQUIV;
+            const v = Number(raw);
+            return Number.isFinite(v) && v > 0.4 && v < 6 ? v : OMAFIT_GLASSES_IPD_CHEEK_EQUIV;
+          })()
+        : OMAFIT_GLASSES_IPD_CHEEK_EQUIV;
+    const glassesFaceDistanceScale =
+      accessoryType === "glasses" &&
+      !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlassesFaceDistanceScale", "1")).trim());
+    const glassesFaceDistanceRefM =
+      accessoryType === "glasses" && glassesFaceDistanceScale
+        ? (() => {
+            const v = Number(String(cfgAttr("arGlassesFaceDistanceRefM", "0.45")).trim());
+            return Number.isFinite(v) && v > 0.08 ? v : 0.45;
+          })()
+        : 0.45;
+    const glassesFaceDistanceMulMin =
+      accessoryType === "glasses" && glassesFaceDistanceScale
+        ? (() => {
+            const v = Number(String(cfgAttr("arGlassesFaceDistanceMulMin", "0.88")).trim());
+            return Number.isFinite(v) && v > 0.45 ? v : 0.88;
+          })()
+        : 0.88;
+    const glassesFaceDistanceMulMax =
+      accessoryType === "glasses" && glassesFaceDistanceScale
+        ? (() => {
+            const v = Number(String(cfgAttr("arGlassesFaceDistanceMulMax", "1.14")).trim());
+            return Number.isFinite(v) && v < 2.5 && v > glassesFaceDistanceMulMin ? v : 1.14;
+          })()
+        : 1.14;
+    const glassesMeshScaleMinRel =
+      accessoryType === "glasses"
+        ? (() => {
+            const v = Number(
+              String(cfgAttr("arGlassesMeshScaleMinRel", String(OMAFIT_GLASSES_MESH_SCALE_MIN_REL))).trim(),
+            );
+            return Number.isFinite(v)
+              ? THREE.MathUtils.clamp(v, 0.22, 0.92)
+              : OMAFIT_GLASSES_MESH_SCALE_MIN_REL;
+          })()
+        : OMAFIT_GLASSES_MESH_SCALE_MIN_REL;
+    const glassesMeshScaleMaxRel =
+      accessoryType === "glasses"
+        ? (() => {
+            const v = Number(
+              String(cfgAttr("arGlassesMeshScaleMaxRel", String(OMAFIT_GLASSES_MESH_SCALE_MAX_REL))).trim(),
+            );
+            return Number.isFinite(v)
+              ? THREE.MathUtils.clamp(v, 1.05, 3.5)
+              : OMAFIT_GLASSES_MESH_SCALE_MAX_REL;
+          })()
+        : OMAFIT_GLASSES_MESH_SCALE_MAX_REL;
+    /** Malha 468 só-depth + extensões temporais (óculos); default `1` — `data-ar-glasses-face-depth-occluder="0"` desliga. */
+    const glassesFaceDepthOccluderEnabled =
+      accessoryType === "glasses" &&
+      !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlassesFaceDepthOccluder", "1")).trim());
     const faceOccAheadLocalZ =
       accessoryType === "glasses"
         ? (() => {
-            /** `0` por defeito: empurrar a máscara só-depth para a câmara pode fazer o z-test engolir o GLB inteiro. */
-            const v = Number(String(cfgAttr("arFaceOccluderNoseAhead", "0")).trim());
+            const defAhead = glassesFaceDepthOccluderEnabled ? "0.0012" : "0";
+            const v = Number(String(cfgAttr("arFaceOccluderNoseAhead", defAhead)).trim());
             return Number.isFinite(v) && v > 0 ? v : 0;
           })()
         : 0;
@@ -5768,6 +6608,11 @@ async function runArSession({
     } else if (legacyMs === "0" || legacyMs === "false" || legacyMs === "off") {
       disableFaceMirror = true;
     }
+
+    const perfModeResolved = String(cfgAttr("arPerformanceProfile", "auto")).trim().toLowerCase();
+    const arDeviceProfile = omafitResolveArDeviceRuntimeProfile({ perfMode: perfModeResolved });
+    /** Micro-interacções (entrada, anel de tracking, snap). `data-ar-micro-ux="0"` desliga. */
+    const microUxDisabled = /^(0|false|off|no)$/i.test(String(cfgAttr("arMicroUx", "1")).trim());
 
     const faceCameraFovDeg = (() => {
       const v = Number(String(cfgAttr("arFaceCameraFovDeg", "63")).trim());
@@ -5800,6 +6645,11 @@ async function runArSession({
         !glassesManualMindarRig &&
         !/^(0|false|off|no)$/i.test(String(cfgAttr("arFacePrincipalAlign168", "0")).trim()),
     };
+    try {
+      omafitRefreshFaceProjectionLayoutFovNudge(faceProjectionOpts, mindarHost, arDeviceProfile);
+    } catch {
+      /* ignore */
+    }
     const glassesAnchorSmoothMode = String(
       cfgAttr("arGlassesAnchorSmooth", accessoryType === "glasses" ? "one-euro" : "damp"),
     )
@@ -5872,6 +6722,21 @@ async function runArSession({
     };
 
     mindarThree = new MindARThree(mindarOpts);
+    /** Saída linear → sRGB + ACES por defeito (PBR / IBL coerente com o vídeo). */
+    try {
+      const r0 = mindarThree.renderer;
+      if (r0 && THREE.SRGBColorSpace) r0.outputColorSpace = THREE.SRGBColorSpace;
+      if (
+        r0 &&
+        THREE.ACESFilmicToneMapping !== undefined &&
+        (!r0.toneMapping || r0.toneMapping === THREE.NoToneMapping)
+      ) {
+        r0.toneMapping = THREE.ACESFilmicToneMapping;
+        r0.toneMappingExposure = 1.02;
+      }
+    } catch {
+      /* ignore */
+    }
     /** Óculos/colar: câmara frontal; só `environment` se o tema pedir explicitamente. */
     {
       const arPreferredCam = String(cfgAttr("arPreferredCamera", "user"))
@@ -5879,16 +6744,18 @@ async function runArSession({
         .toLowerCase();
       mindarThree.shouldFaceUser = arPreferredCam !== "environment";
     }
-    mindarThree.scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    {
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.45);
-      if (accessoryType === "glasses" || accessoryType === "necklace") {
-        hemi.color.set(0xb8daf8);
-        hemi.groundColor.set(0xa09078);
-        hemi.intensity = accessoryType === "necklace" ? 0.52 : 0.48;
-      }
-      mindarThree.scene.add(hemi);
+    /** Luz ambiente + hemisfério + chave suave; intensidades/cores base (refinadas por vídeo se `arFaceAmbientAdaptive`). */
+    const faceAmbientLight = new THREE.AmbientLight(0xffffff, 0.62);
+    const faceHemisphereLight = new THREE.HemisphereLight(0xb8daf8, 0xa09078, 0.46);
+    if (accessoryType === "necklace") {
+      faceHemisphereLight.intensity = 0.52;
     }
+    mindarThree.scene.add(faceAmbientLight);
+    mindarThree.scene.add(faceHemisphereLight);
+    const faceKeyLight = new THREE.DirectionalLight(0xfff5ee, 0.36);
+    faceKeyLight.name = "omafit-ar-face-key";
+    faceKeyLight.position.set(0.32, 0.82, 0.38);
+    mindarThree.scene.add(faceKeyLight);
 
     const anchor = mindarThree.addAnchor(anchorIndex);
     /** Grupos sob `anchor.group` devem ser da mesma classe `Group` que o MindAR usa (mesmo `three`). */
@@ -5921,6 +6788,21 @@ async function runArSession({
      * possível, chamamos o próprio `_resize` do MindAR directamente.
      */
     const triggerMindarResize = () => {
+      try {
+        omafitRefreshFaceProjectionLayoutFovNudge(faceProjectionOpts, mindarHost, arDeviceProfile);
+      } catch {
+        /* ignore */
+      }
+      try {
+        const r = mindarThree?.renderer;
+        if (r?.setPixelRatio) {
+          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+          const maxDpr = omafitEffectiveArRendererMaxDpr(THREE, cfgAttr("arRendererMaxDpr", ""), arDeviceProfile);
+          r.setPixelRatio(Math.min(dpr, maxDpr));
+        }
+      } catch {
+        /* ignore */
+      }
       try {
         window.dispatchEvent(new Event("resize"));
       } catch {
@@ -5977,7 +6859,10 @@ async function runArSession({
       /* ignore */
     }
 
-    await startMindARFaceWithReliableCamera(mindarThree);
+    await startMindARFaceWithReliableCamera(
+      mindarThree,
+      omafitBuildFaceUserMediaVideoIdeal(arDeviceProfile),
+    );
     {
       const vMeta = mindarHost?.querySelector?.("video");
       if (vMeta) {
@@ -6002,24 +6887,22 @@ async function runArSession({
      * Mantemos vídeo DOM atrás do canvas com limpeza transparente (ver loop).
      */
     fixMindARFaceVideoBehindCanvas(THREE, mindarThree, mindarHost, faceProjectionOpts);
-    /** Máx. nitidez do canvas WebGL dentro do que o GPU aguenta (MindAR já criou o renderer). */
-    if (accessoryType === "glasses") {
-      try {
-        const r = mindarThree.renderer;
-        if (r?.setPixelRatio) {
-          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-          r.setPixelRatio(Math.min(dpr, 1.5));
-        }
-      } catch {
-        /* ignore */
+    /** DPR do canvas WebGL: tecto por `data-ar-renderer-max-dpr` e/ou perfil de dispositivo. */
+    try {
+      const r = mindarThree.renderer;
+      if (r?.setPixelRatio) {
+        const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+        const maxDpr = omafitEffectiveArRendererMaxDpr(THREE, cfgAttr("arRendererMaxDpr", ""), arDeviceProfile);
+        r.setPixelRatio(Math.min(dpr, maxDpr));
       }
+    } catch {
+      /* ignore */
     }
 
     /**
-     * Malha facial 468 só depth: oclusão de hastes / nuca. No **relógio** (mão)
-     * este caminho nem existe — em óculos, a máscara + z-test pode esconder o
-     * GLB inteiro em vários GPUs. Por defeito **óculos não** criam esta malha;
-     * colar continua a usar. Opt-in óculos: `data-ar-glasses-face-depth-occluder="1"`.
+     * Malha facial 468 só depth + extensões temporais (óculos): oclusão de hastes / nuca.
+     * No path mão não existe. Óculos: **default activo** (`data-ar-glasses-face-depth-occluder="1"`);
+     * `data-ar-glasses-face-depth-occluder="0"` desliga se algum GPU clipar o GLB inteiro.
      */
     let faceOccluderMesh = null;
     let templeDepthGeom = null;
@@ -6028,11 +6911,8 @@ async function runArSession({
     /** Cilindro só depth: base ~ombros / topo ~mandíbula (métrico face). */
     let neckOccluderMesh = null;
     let neckOccGeomState = null;
-    const glassesFace468DepthOccluder =
-      accessoryType === "glasses" &&
-      !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlassesFaceDepthOccluder", "0")).trim());
     const useFace468DepthOccluder =
-      accessoryType === "necklace" || glassesFace468DepthOccluder;
+      accessoryType === "necklace" || glassesFaceDepthOccluderEnabled;
     if (useFace468DepthOccluder) {
       if (typeof mindarThree.addFaceMesh === "function") {
         try {
@@ -6065,6 +6945,14 @@ async function runArSession({
           templeOccR.renderOrder = -79;
           templeOccL.frustumCulled = false;
           templeOccR.frustumCulled = false;
+          {
+            const occTempleScaleRaw = Number(String(cfgAttr("arGlassesTempleOccluderScale", "1")).trim());
+            const occTempleScale = Number.isFinite(occTempleScaleRaw)
+              ? THREE.MathUtils.clamp(occTempleScaleRaw, 0.78, 1.45)
+              : 1;
+            templeOccL.scale.setScalar(occTempleScale);
+            templeOccR.scale.setScalar(occTempleScale);
+          }
           faceOccluderMesh.add(templeOccL);
           faceOccluderMesh.add(templeOccR);
         } catch (e) {
@@ -6123,8 +7011,18 @@ async function runArSession({
       String(arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "").trim();
     const glbLoadUrl = buildGlbLoaderUrl(sessionGlbUrl, glbVersion) || sessionGlbUrl;
 
+    const arGlbDraco = !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlbDraco", "1")).trim());
+    let dracoLoaderFace = null;
+    if (arGlbDraco) {
+      try {
+        dracoLoaderFace = await omafitGetSharedDracoLoader();
+      } catch (e) {
+        console.warn("[omafit-ar] Draco indisponível (GLB sem Draco continua OK):", e?.message || e);
+      }
+    }
     const loader = new GLTFLoader();
     loader.setCrossOrigin("anonymous");
+    if (dracoLoaderFace) loader.setDRACOLoader(dracoLoaderFace);
     try {
       if (THREE.Cache && typeof THREE.Cache.remove === "function") {
         THREE.Cache.remove(glbLoadUrl);
@@ -6161,7 +7059,22 @@ async function runArSession({
       glasses.traverse((o) => {
         if (o && o.isMesh) meshN += 1;
       });
-      console.log("[omafit-ar] GLB carregado", OMAFIT_AR_WIDGET_BUILD, { url: glbLoadUrl, meshes: meshN });
+      const triN = omafitCountGltfTriangles(glasses);
+      omafitMaybeWarnGltfTriangleBudget(glbLoadUrl, triN);
+      const texAniso = omafitEffectiveArTextureMaxAnisotropy(
+        cfgAttr("arTextureMaxAnisotropy", "4"),
+        arDeviceProfile,
+        16,
+      );
+      if (mindarThree?.renderer) {
+        omafitApplyGltfTextureAnisotropy(THREE, glasses, mindarThree.renderer, texAniso);
+      }
+      console.log("[omafit-ar] GLB carregado", OMAFIT_AR_WIDGET_BUILD, {
+        url: glbLoadUrl,
+        meshes: meshN,
+        triangles: triN,
+        draco: Boolean(dracoLoaderFace),
+      });
     } catch {
       /* ignore */
     }
@@ -6226,6 +7139,11 @@ async function runArSession({
       } catch (e) {
         console.warn("[omafit-ar] ensure meshes renderable:", e?.message || e);
       }
+      try {
+        omafitApplyGlassesMeshDepthPriorities(THREE, glasses);
+      } catch (e) {
+        console.warn("[omafit-ar] mesh depth priorities:", e?.message || e);
+      }
     }
     if (accessoryType === "glasses" && glassesCavityAoIntensity > 0) {
       try {
@@ -6234,13 +7152,20 @@ async function runArSession({
         console.warn("[omafit-ar] cavity AO patch:", e?.message || e);
       }
     }
+    if (accessoryType === "glasses" || accessoryType === "necklace") {
+      try {
+        omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
+      } catch (e) {
+        console.warn("[omafit-ar] PBR response tune:", e?.message || e);
+      }
+    }
 
     /**
      * Centralização absoluta do pivot **logo após o load** (antes de bake):
      * `position.sub(center)` — NÃO usar `pos += pos - center` (equivale a
      * `2*pos - center` e **não** zera o desvio).
      */
-    if (accessoryType === "glasses" && !glassesManualMindarRig) {
+    if (accessoryType === "glasses" && !glassesManualMindarRig && !glassesCanonicalBlenderExport) {
       glasses.updateMatrixWorld(true);
       const boxLoad = new THREE.Box3().setFromObject(glasses);
       if (!(typeof boxLoad.isEmpty === "function" && boxLoad.isEmpty())) {
@@ -6272,7 +7197,8 @@ async function runArSession({
     if (
       accessoryType === "glasses" &&
       glassesAutoAlignModel &&
-      !glassesManualMindarRig
+      !glassesManualMindarRig &&
+      !glassesCanonicalBlenderExport
     ) {
       try {
         omafitAutoAlignGlassesModel(glasses, THREE);
@@ -6340,7 +7266,18 @@ async function runArSession({
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
-    glasses.position.sub(center);
+    if (!glassesCanonicalBlenderExport) {
+      glasses.position.sub(center);
+    } else {
+      try {
+        console.log(
+          "[omafit-ar] GLB canónico Blender: origem na ponte (sem `position.sub` do centróide da bbox).",
+          OMAFIT_AR_WIDGET_BUILD,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
 
     /** Calibração do lojista (metafield / data-attrs). Lida antes do bind
      *  MindAR para saber se cal=0,0,0 e podemos aplicar correcção de eixo. */
@@ -6541,6 +7478,16 @@ async function runArSession({
           -0.05,
         )
       : { x: 0, y: 0, z: 0 };
+    /** Lerp posição / slerp quat do pivot manual por frame (`data-ar-glasses-manual-pivot-smooth`, clamp 0.6–0.85). */
+    const glassesManualPivotSmoothAlpha = glassesManualMindarRig
+      ? (() => {
+          const v = Number(
+            String(cfgAttr("arGlassesManualPivotSmooth", String(OMAFIT_GLASSES_MANUAL_PIVOT_LERP_DEFAULT))).trim(),
+          );
+          if (!Number.isFinite(v)) return OMAFIT_GLASSES_MANUAL_PIVOT_LERP_DEFAULT;
+          return THREE.MathUtils.clamp(v, 0.6, 0.85);
+        })()
+      : 1;
     const glassesOffsetFinalM = parseOffsetFinal(cfgAttr("arGlassesOffsetFinalM", "0 0 0"));
     try {
       console.log("[omafit-ar] FINAL OFFSET (authoritative)", glassesOffsetFinalM);
@@ -6567,6 +7514,7 @@ async function runArSession({
       !glassesManualMindarRig &&
       !glassesStructuralMindarRig &&
       !glassesGeometryAnchor &&
+      !glassesCanonicalBlenderExport &&
       !/^(0|off|false|no)$/.test(
         String(cfgAttr("arGlassesTripoOffsetContainer", "1")).trim().toLowerCase(),
       );
@@ -6574,6 +7522,7 @@ async function runArSession({
       console.log("[omafit-ar] pipeline óculos (verificar build + modo)", {
         build: OMAFIT_AR_WIDGET_BUILD,
         glassesManualMindarRig,
+        glassesCanonicalBlenderExport,
         useTripoOffsetContainer,
         hint:
           !glassesManualMindarRig && useTripoOffsetContainer
@@ -6660,92 +7609,106 @@ async function runArSession({
         });
       }
     } else if (accessoryType === "glasses" && !glassesStructuralMindarRig && !glassesManualMindarRig) {
-      const rawBind = String(cfgAttr("arGlassesMindarBindFix", "") || "").trim();
-      const rb = rawBind.toLowerCase();
-      const autoAttr = String(
-        cfgAttr("arGlassesAutoDepthAxis", "1"),
-      ).trim().toLowerCase();
-      const useAutoDepthAxis = !/^(0|off|false|no|legacy|ry180|manual)$/.test(
-        autoAttr,
-      );
-      let bx = 0;
-      let by = 0;
-      let bz = 0;
-      let applyBind = false;
-      if (!rb || rb === "auto") {
-        const sumCal =
-          Math.abs(calRotDeg.x) +
-          Math.abs(calRotDeg.y) +
-          Math.abs(calRotDeg.z);
-        if (sumCal < 1e-6) {
-          let auto = null;
-          if (useAutoDepthAxis) {
-            try {
-              auto = applyGlassesAutoBind(THREE, glasses);
-            } catch (e) {
-              console.warn("[omafit-ar] glasses auto depth-axis falhou", e?.message || e);
+      if (glassesCanonicalBlenderExport) {
+        glasses.updateMatrixWorld(true);
+        const szCan = new THREE.Vector3();
+        new THREE.Box3().setFromObject(glasses).getSize(szCan);
+        glassesFaceWideAxisX = szCan.x >= szCan.z;
+        try {
+          console.log("[omafit-ar] glasses canonical Blender export — sem bind automático / Tripo.", {
+            bbox: { x: szCan.x, y: szCan.y, z: szCan.z },
+          });
+        } catch {
+          /* ignore */
+        }
+      } else {
+        const rawBind = String(cfgAttr("arGlassesMindarBindFix", "") || "").trim();
+        const rb = rawBind.toLowerCase();
+        const autoAttr = String(
+          cfgAttr("arGlassesAutoDepthAxis", "1"),
+        ).trim().toLowerCase();
+        const useAutoDepthAxis = !/^(0|off|false|no|legacy|ry180|manual)$/.test(
+          autoAttr,
+        );
+        let bx = 0;
+        let by = 0;
+        let bz = 0;
+        let applyBind = false;
+        if (!rb || rb === "auto") {
+          const sumCal =
+            Math.abs(calRotDeg.x) +
+            Math.abs(calRotDeg.y) +
+            Math.abs(calRotDeg.z);
+          if (sumCal < 1e-6) {
+            let auto = null;
+            if (useAutoDepthAxis) {
+              try {
+                auto = applyGlassesAutoBind(THREE, glasses);
+              } catch (e) {
+                console.warn("[omafit-ar] glasses auto depth-axis falhou", e?.message || e);
+              }
+            }
+            if (auto) {
+              const { signs } = auto;
+              const szPost = new THREE.Vector3();
+              new THREE.Box3().setFromObject(glasses).getSize(szPost);
+              glassesFaceWideAxisX = szPost.x >= szPost.z;
+              console.log("[omafit-ar] glasses auto depth-axis bind", {
+                widthAxis: auto.detected?.widthAxisIdx,
+                heightAxis: auto.detected?.heightAxisIdx,
+                depthAxis: auto.detected?.depthAxisIdx,
+                depthFrontSign: auto.detected?.depthFrontSign,
+                rimHeightSign: auto.rimHeightSign,
+                widthSign: signs?.widthSign,
+                flippedWidthForRotation: signs?.flippedWidthForRotation,
+                confidence: auto.detected?.confidence,
+                sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
+                sizeBboxPost: { x: szPost.x, y: szPost.y, z: szPost.z },
+              });
+            } else {
+              /**
+               * GLB Omafit canonical: frente lentes -Z, hastes +Z. Fallback
+               * quando a auto heurística rejeita (malha demasiado simétrica) ou
+               * está desligada: `Ry(180)`.
+               */
+              applyBind = true;
+              bx = 0;
+              by = 180;
+              bz = 0;
+              omafitApplyGlassesMindarBindFix(THREE, glasses, bx, by, bz);
+              const szPost = new THREE.Vector3();
+              new THREE.Box3().setFromObject(glasses).getSize(szPost);
+              glassesFaceWideAxisX = szPost.x >= szPost.z;
+              console.log("[omafit-ar] glasses MindAR bind fix fallback Ry(180) (°)", {
+                rx: bx,
+                ry: by,
+                rz: bz,
+                autoDepth: useAutoDepthAxis,
+                sizeBbox: { x: szPost.x, y: szPost.y, z: szPost.z },
+              });
             }
           }
-          if (auto) {
-            const { signs } = auto;
-            const szPost = new THREE.Vector3();
-            new THREE.Box3().setFromObject(glasses).getSize(szPost);
-            glassesFaceWideAxisX = szPost.x >= szPost.z;
-            console.log("[omafit-ar] glasses auto depth-axis bind", {
-              widthAxis: auto.detected?.widthAxisIdx,
-              heightAxis: auto.detected?.heightAxisIdx,
-              depthAxis: auto.detected?.depthAxisIdx,
-              depthFrontSign: auto.detected?.depthFrontSign,
-              rimHeightSign: auto.rimHeightSign,
-              widthSign: signs?.widthSign,
-              flippedWidthForRotation: signs?.flippedWidthForRotation,
-              confidence: auto.detected?.confidence,
-              sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
-              sizeBboxPost: { x: szPost.x, y: szPost.y, z: szPost.z },
-            });
-          } else {
-            /**
-             * GLB Omafit canonical: frente lentes -Z, hastes +Z. Fallback
-             * quando a auto heurística rejeita (malha demasiado simétrica) ou
-             * está desligada: `Ry(180)`.
-             */
-            applyBind = true;
-            bx = 0;
-            by = 180;
-            bz = 0;
+        } else if (!/^(0|none|off|false|identity)$/.test(rb)) {
+          const p = parseEulerDegComponents(rawBind, 0, 0, 0);
+          bx = p.x;
+          by = p.y;
+          bz = p.z;
+          applyBind =
+            Math.abs(bx) > 1e-6 ||
+            Math.abs(by) > 1e-6 ||
+            Math.abs(bz) > 1e-6;
+          if (applyBind) {
             omafitApplyGlassesMindarBindFix(THREE, glasses, bx, by, bz);
-            const szPost = new THREE.Vector3();
-            new THREE.Box3().setFromObject(glasses).getSize(szPost);
-            glassesFaceWideAxisX = szPost.x >= szPost.z;
-            console.log("[omafit-ar] glasses MindAR bind fix fallback Ry(180) (°)", {
+            const szP = new THREE.Vector3();
+            new THREE.Box3().setFromObject(glasses).getSize(szP);
+            glassesFaceWideAxisX = szP.x >= szP.z;
+            console.log("[omafit-ar] glasses MindAR bind fix (°)", {
               rx: bx,
               ry: by,
               rz: bz,
-              autoDepth: useAutoDepthAxis,
-              sizeBbox: { x: szPost.x, y: szPost.y, z: szPost.z },
+              mode: rawBind,
             });
           }
-        }
-      } else if (!/^(0|none|off|false|identity)$/.test(rb)) {
-        const p = parseEulerDegComponents(rawBind, 0, 0, 0);
-        bx = p.x;
-        by = p.y;
-        bz = p.z;
-        applyBind =
-          Math.abs(bx) > 1e-6 ||
-          Math.abs(by) > 1e-6 ||
-          Math.abs(bz) > 1e-6;
-        if (applyBind) {
-          omafitApplyGlassesMindarBindFix(THREE, glasses, bx, by, bz);
-          const szP = new THREE.Vector3();
-          new THREE.Box3().setFromObject(glasses).getSize(szP);
-          glassesFaceWideAxisX = szP.x >= szP.z;
-          console.log("[omafit-ar] glasses MindAR bind fix (°)", {
-            rx: bx,
-            ry: by,
-            rz: bz,
-            mode: rawBind,
-          });
         }
       }
     } else if (accessoryType === "glasses" && glassesStructuralMindarRig) {
@@ -6760,7 +7723,12 @@ async function runArSession({
             ? -90
             : Number(rxStr);
       const rxDegParsed = Number.isFinite(rxDegS) ? rxDegS : 0;
-      normalizeGlassesModel(THREE, glasses, { baseRxDeg: rxDegParsed });
+      normalizeGlassesModel(THREE, glasses, {
+        baseRxDeg: rxDegParsed,
+        skipBboxCenter: glassesCanonicalBlenderExport,
+        skipAxisRemap: glassesCanonicalBlenderExport,
+        recenterAfterRotation: !glassesCanonicalBlenderExport,
+      });
       glasses.updateMatrixWorld(true);
       const bStr = new THREE.Box3().setFromObject(glasses);
       const szStr = new THREE.Vector3();
@@ -6832,9 +7800,9 @@ async function runArSession({
       }
     }
 
-    /** 4) Escala base — óculos: **mesh** = `baseUnitScale × (cw/faceScale) × factor`
-     *    (proporção ao rosto); **pivot** = multiplicador da loja (`cfg.scale`, 0.25–4).
-     *    Ver MindAR 1.2.5 `getLandmarkMatrix` (`fm[i]*s`). */
+    /** 4) Escala base — óculos: **mesh** = `baseUnitScale × (ipd×equiv/faceScale) × factor × depthMul`
+     *    (interpupilar + equiv mediano vs bochechas; fallback bochechas); clamp rel. a `baseUnitScale`.
+     *    **Pivot** = multiplicador da loja (`cfg.scale`, 0.25–4). Ver MindAR `getLandmarkMatrix` (`fm[i]*s`). */
     let maxDimForBase = maxDim;
     if (accessoryType === "glasses" && !glassesManualMindarRig) {
       glasses.updateMatrixWorld(true);
@@ -6989,6 +7957,8 @@ async function runArSession({
     /** @type {THREE.Group | null} */
     let necklaceSwingGroup = null;
     let necklaceShadowParts = null;
+    /** Grupo intermédio: escala + fade de entrada sem afectar escalas anatómicas no mesh. */
+    let microUxModelWrap = null;
     let glassesPivot = null;
     /** Cópia da posição inicial do pivot (Z inclui stick) — repor antes do alinhamento debug 168. */
     let glassesPivotBaseLocalPos = null;
@@ -7046,7 +8016,14 @@ async function runArSession({
       } else {
         calibRot.add(glassesPivot);
       }
-      glassesPivot.add(glasses);
+      if (!microUxDisabled) {
+        microUxModelWrap = new GroupCtor();
+        microUxModelWrap.name = "omafit-ar-micro-ux-wrap";
+        microUxModelWrap.add(glasses);
+        glassesPivot.add(microUxModelWrap);
+      } else {
+        glassesPivot.add(glasses);
+      }
       glasses.name = "omafit-ar-glasses-model";
       if (glassesManualMindarRig) {
         glasses.matrixAutoUpdate = true;
@@ -7058,7 +8035,7 @@ async function runArSession({
       } else {
         glasses.position.set(0, 0, 0);
       }
-      if (!glassesStructuralMindarRig && !glassesManualMindarRig) {
+      if (!glassesStructuralMindarRig && !glassesManualMindarRig && !glassesCanonicalBlenderExport) {
         omafitStripGlassesMeshRollYxz(THREE, glasses);
       }
       if (!glassesGeometryAnchor && !glassesManualMindarRig) {
@@ -7102,7 +8079,14 @@ async function runArSession({
       necklaceSwingGroup.add(glassesAnatomy);
       necklaceShadowParts = omafitCreateNecklaceChestDropShadow(THREE);
       necklaceSwingGroup.add(necklaceShadowParts.mesh);
-      glassesAnatomy.add(glasses);
+      if (!microUxDisabled) {
+        microUxModelWrap = new GroupCtor();
+        microUxModelWrap.name = "omafit-ar-micro-ux-wrap";
+        microUxModelWrap.add(glasses);
+        glassesAnatomy.add(microUxModelWrap);
+      } else {
+        glassesAnatomy.add(glasses);
+      }
     }
 
     /** Lerp/slerp leve no `glassesPivot` (opcional): `data-ar-glasses-pivot-smooth-ms="55"`. */
@@ -7309,6 +8293,17 @@ async function runArSession({
         glassesFaceBasisAttr === "no");
 
     faceArEnhancementState = {
+      microUxDisabled,
+      microUxModelWrap,
+      microUxGlassesRoot: glasses,
+      microUxRingEl: null,
+      microUx: {
+        introStartMs: performance.now(),
+        snapBoost: 1,
+        hasFacePrev: false,
+        preparedOpacity: false,
+        introComplete: false,
+      },
       faceProjectionOpts,
       projectionSyncLogged: false,
       glassesNdcScreenLock,
@@ -7329,6 +8324,9 @@ async function runArSession({
         y: glassesManualFaceBasisOffsetM.y,
         z: glassesManualFaceBasisOffsetM.z,
       },
+      glassesManualPivotSmooth: glassesManualMindarRig
+        ? { initialized: false, alpha: glassesManualPivotSmoothAlpha }
+        : null,
       glassesOffsetFinalM: {
         x: glassesOffsetFinalM.x,
         y: glassesOffsetFinalM.y,
@@ -7387,7 +8385,19 @@ async function runArSession({
       smoothInitialized: false,
       cheekRefWidth: null,
       smoothedCheekW: null,
+      smoothedIpd: null,
       smoothedFaceScale: null,
+      glassesIpdCheekEquiv,
+      glassesFaceDistanceScale,
+      glassesFaceDistanceRefM,
+      glassesFaceDistanceMulMin,
+      glassesFaceDistanceMulMax,
+      glassesMeshScaleMinRel,
+      glassesMeshScaleMaxRel,
+      manualIpdScaleSmoothed: null,
+      faceCamDistScratch: glassesFaceDistanceScale ? new THREE.Vector3() : null,
+      faceCamDistCamPos: glassesFaceDistanceScale ? new THREE.Vector3() : null,
+      smoothedFaceCamDist: null,
       glassesPivotFaceScale: OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE,
       glassesStructuralMindarRig: !!glassesStructuralMindarRig,
       glassesStructuralPivotBoost,
@@ -7503,13 +8513,72 @@ async function runArSession({
             }
           : null,
       necklaceShadowRes: accessoryType === "necklace" ? necklaceShadowParts : null,
+      faceAdaptiveLight: (() => {
+        if (
+          /^(0|false|off|no)$/i.test(String(cfgAttr("arFaceAmbientAdaptive", "1")).trim())
+        ) {
+          return null;
+        }
+        const probe = omafitCreateFaceAmbientProbe(40, 40);
+        if (!probe.ctx) return null;
+        return {
+          ambient: faceAmbientLight,
+          hemi: faceHemisphereLight,
+          key: faceKeyLight,
+          probe,
+          lastMs: 0,
+          intervalMs: Math.max(
+            48,
+            Number(String(cfgAttr("arFaceAmbientProbeMs", "120")).trim()) || 120,
+          ),
+          warmBias: THREE.MathUtils.clamp(
+            Number(String(cfgAttr("arFaceAmbientWarmBias", "0.35")).trim()) || 0.35,
+            0,
+            1,
+          ),
+          accessoryNecklace: accessoryType === "necklace",
+          contactRig: glassesContactRig,
+        };
+      })(),
     };
+
+    if (!microUxDisabled && microUxModelWrap && glasses) {
+      try {
+        omafitStoreMaterialOpacityBaseline(glasses);
+        omafitApplyModelOpacityFactor(glasses, 0);
+        faceArEnhancementState.microUx.introStartMs = performance.now();
+        faceArEnhancementState.microUx.preparedOpacity = true;
+        microUxModelWrap.scale.setScalar(0.88);
+      } catch (e) {
+        console.warn("[omafit-ar] micro-ux init:", e?.message || e);
+      }
+    }
+    if (!microUxDisabled && mindarHost) {
+      try {
+        const ring = document.createElement("div");
+        ring.className = "omafit-ar-track-detect-ring";
+        ring.setAttribute("aria-hidden", "true");
+        mindarHost.appendChild(ring);
+        faceArEnhancementState.microUxRingEl = ring;
+      } catch (e) {
+        console.warn("[omafit-ar] micro-ux ring:", e?.message || e);
+      }
+    }
 
     if (mindarThree.controller && typeof mindarThree.controller.onUpdate === "function") {
       const st = faceArEnhancementState;
       st.faceControllerPrev = mindarThree.controller.onUpdate;
       mindarThree.controller.onUpdate = (payload) => {
         st.faceControllerPrev(payload);
+        try {
+          const mx = st.microUx;
+          if (!st.microUxDisabled && mx && st.microUxRingEl) {
+            if (payload.hasFace) st.microUxRingEl.classList.add("omafit-ar-track-detect-ring--on");
+            else st.microUxRingEl.classList.remove("omafit-ar-track-detect-ring--on");
+          }
+        } catch {
+          /* ignore */
+        }
         const runProjectionSync = () => {
           if (!st.faceProjectionOpts) return;
           try {
@@ -7532,6 +8601,11 @@ async function runArSession({
           }
         };
         if (!payload.hasFace) {
+          try {
+            if (st.microUx) st.microUx.hasFacePrev = false;
+          } catch {
+            /* ignore */
+          }
           if (st.faceProjectionOpts?.principalShiftNdcLp) {
             st.faceProjectionOpts.principalShiftNdcLp.x *= 0.88;
             st.faceProjectionOpts.principalShiftNdcLp.y *= 0.88;
@@ -7585,6 +8659,15 @@ async function runArSession({
         }
         const nowMs = performance.now();
         st.lmSmoother?.sample(lm, nowMs);
+        try {
+          const mx = st.microUx;
+          if (!st.microUxDisabled && mx && !mx.hasFacePrev) {
+            mx.snapBoost = Math.max(typeof mx.snapBoost === "number" ? mx.snapBoost : 1, 1.048);
+          }
+          if (st.microUx) st.microUx.hasFacePrev = true;
+        } catch {
+          /* ignore */
+        }
         if (
           accessoryType === "glasses" &&
           st.faceProjectionOpts?.principalAlign168 &&
@@ -7750,10 +8833,10 @@ async function runArSession({
         }
         if (accessoryType === "glasses") {
           if (st.glassesManualMindarRig && glassesPivot) {
-            /** Bruto MindAR (landmarks) → metros só via `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS`. */
+            /** MindAR (landmarks) → metros só via `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS` (IPD). */
             const faceInterpupillary = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
             const modelWidth = st.glassesManualModelWidth;
-            let finalScale = 1;
+            let targetScale = 1;
             if (
               Number.isFinite(faceInterpupillary) &&
               faceInterpupillary > 1e-8 &&
@@ -7761,10 +8844,47 @@ async function runArSession({
               modelWidth > 1e-8
             ) {
               const faceWidthMeters = faceInterpupillary * OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS;
-              finalScale =
+              targetScale =
                 (faceWidthMeters * st.glassesManualTargetWidthFactor) / modelWidth;
-              finalScale = Math.min(Math.max(finalScale, 0.7), 1.4);
             }
+            let depthMul = 1;
+            if (
+              st.glassesFaceDistanceScale &&
+              mindarThree?.camera &&
+              st.faceCamDistScratch &&
+              st.faceCamDistCamPos
+            ) {
+              anchor.group.updateMatrixWorld(true);
+              anchor.group.getWorldPosition(st.faceCamDistScratch);
+              mindarThree.camera.getWorldPosition(st.faceCamDistCamPos);
+              const dRaw = Math.max(0.06, st.faceCamDistScratch.distanceTo(st.faceCamDistCamPos));
+              if (!(typeof st.smoothedFaceCamDist === "number") || !Number.isFinite(st.smoothedFaceCamDist)) {
+                st.smoothedFaceCamDist = dRaw;
+              } else {
+                st.smoothedFaceCamDist = THREE.MathUtils.lerp(st.smoothedFaceCamDist, dRaw, 0.14);
+              }
+              depthMul = THREE.MathUtils.clamp(
+                st.glassesFaceDistanceRefM / st.smoothedFaceCamDist,
+                st.glassesFaceDistanceMulMin,
+                st.glassesFaceDistanceMulMax,
+              );
+            }
+            targetScale *= depthMul;
+            targetScale = THREE.MathUtils.clamp(
+              targetScale,
+              OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MIN,
+              OMAFIT_GLASSES_MANUAL_UNIFORM_SCALE_MAX,
+            );
+            if (!(typeof st.manualIpdScaleSmoothed === "number") || !Number.isFinite(st.manualIpdScaleSmoothed)) {
+              st.manualIpdScaleSmoothed = targetScale;
+            } else {
+              st.manualIpdScaleSmoothed = THREE.MathUtils.lerp(
+                st.manualIpdScaleSmoothed,
+                targetScale,
+                OMAFIT_GLASSES_MANUAL_SCALE_TARGET_SMOOTH,
+              );
+            }
+            let finalScale = st.manualIpdScaleSmoothed;
             if (!Number.isFinite(finalScale) || finalScale <= 0) {
               finalScale = 1;
             }
@@ -7775,6 +8895,7 @@ async function runArSession({
               st.lmSmoother,
               finalScale,
               st.glassesManualFaceBasisOffsetM,
+              st.glassesManualPivotSmooth,
             );
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
@@ -7820,6 +8941,18 @@ async function runArSession({
             faceParentGroup.scale.set(1, 1, 1);
             faceParentGroup.rotation.set(0, 0, 0);
           }
+          const ipdRawAuto = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
+          if (Number.isFinite(ipdRawAuto) && ipdRawAuto > 1e-7) {
+            if (!(typeof st.smoothedIpd === "number") || !Number.isFinite(st.smoothedIpd)) {
+              st.smoothedIpd = ipdRawAuto;
+            } else {
+              st.smoothedIpd = THREE.MathUtils.lerp(
+                st.smoothedIpd,
+                ipdRawAuto,
+                OMAFIT_FACE_IPD_SMOOTH,
+              );
+            }
+          }
           const pR = st.lmSmoother?.get(OMAFIT_FACE_LM_RIGHT_CHEEK);
           const pL = st.lmSmoother?.get(OMAFIT_FACE_LM_LEFT_CHEEK);
           const cw =
@@ -7836,7 +8969,20 @@ async function runArSession({
                 OMAFIT_FACE_CHEEK_WIDTH_SMOOTH,
               );
             }
-            const cwUse = st.smoothedCheekW;
+          }
+          const cwUse =
+            typeof st.smoothedCheekW === "number" &&
+            Number.isFinite(st.smoothedCheekW) &&
+            st.smoothedCheekW > 1e-7
+              ? st.smoothedCheekW
+              : Number.NaN;
+          const ipdOk =
+            typeof st.smoothedIpd === "number" &&
+            Number.isFinite(st.smoothedIpd) &&
+            st.smoothedIpd > 1e-7;
+          /** Largura facial efectiva em unidades MindAR: IPD×equiv (primário), senão bochechas (fallback). */
+          const geomNumer = ipdOk ? st.smoothedIpd * st.glassesIpdCheekEquiv : cwUse;
+          if (Number.isFinite(geomNumer) && geomNumer > 1e-7) {
             const wideDim = st.glassesWideDimPreScale;
             const factor = st.glassesAnatomicWidthFactor || OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR;
             const mulScale = st.modelScaleMul || 1;
@@ -7859,14 +9005,36 @@ async function runArSession({
             if (!Number.isFinite(fsUse) || fsUse <= 1e-8) {
               if (Number.isFinite(fsRaw) && fsRaw > 1e-8) fsUse = fsRaw;
             }
+            let depthMul = 1;
+            if (
+              st.glassesFaceDistanceScale &&
+              mindarThree?.camera &&
+              st.faceCamDistScratch &&
+              st.faceCamDistCamPos
+            ) {
+              anchor.group.updateMatrixWorld(true);
+              anchor.group.getWorldPosition(st.faceCamDistScratch);
+              mindarThree.camera.getWorldPosition(st.faceCamDistCamPos);
+              const dRaw = Math.max(0.06, st.faceCamDistScratch.distanceTo(st.faceCamDistCamPos));
+              if (!(typeof st.smoothedFaceCamDist === "number") || !Number.isFinite(st.smoothedFaceCamDist)) {
+                st.smoothedFaceCamDist = dRaw;
+              } else {
+                st.smoothedFaceCamDist = THREE.MathUtils.lerp(st.smoothedFaceCamDist, dRaw, 0.14);
+              }
+              depthMul = THREE.MathUtils.clamp(
+                st.glassesFaceDistanceRefM / st.smoothedFaceCamDist,
+                st.glassesFaceDistanceMulMin,
+                st.glassesFaceDistanceMulMax,
+              );
+            }
             if (
               st.glassesStructuralMindarRig &&
               glassesPivot &&
               st.glassesStructuralPivotPos
             ) {
               if (Number.isFinite(fsUse) && fsUse > 1e-8) {
-                const cheekToFace = cwUse / fsUse;
-                const meshS = baseUnitScale * mulScale * factor * cheekToFace;
+                const ipdToFace = (geomNumer / fsUse) * depthMul;
+                const meshS = baseUnitScale * mulScale * factor * ipdToFace;
                 const pv = THREE.MathUtils.clamp(
                   meshS * st.glassesStructuralPivotBoost,
                   st.glassesStructuralPivotClampMin,
@@ -7885,8 +9053,16 @@ async function runArSession({
               Number.isFinite(fsUse) &&
               fsUse > 1e-8
             ) {
-              const cheekToFace = cwUse / fsUse;
-              const s = baseUnitScale * mulScale * factor * cheekToFace;
+              const ipdToFace = (geomNumer / fsUse) * depthMul;
+              let s = baseUnitScale * mulScale * factor * ipdToFace;
+              s = omafitClampGlassesMeshAnatomicScale(
+                THREE,
+                s,
+                baseUnitScale,
+                mulScale,
+                st.glassesMeshScaleMinRel,
+                st.glassesMeshScaleMaxRel,
+              );
               if (Number.isFinite(s) && s > 1e-8) {
                 glasses.scale.setScalar(s);
               }
@@ -7895,7 +9071,15 @@ async function runArSession({
               typeof wideDim === "number" &&
               wideDim > 1e-6
             ) {
-              const s = ((factor * cwUse) / wideDim) * mulScale;
+              let s = ((factor * geomNumer * depthMul) / wideDim) * mulScale;
+              s = omafitClampGlassesMeshAnatomicScale(
+                THREE,
+                s,
+                baseUnitScale,
+                mulScale,
+                st.glassesMeshScaleMinRel,
+                st.glassesMeshScaleMaxRel,
+              );
               if (Number.isFinite(s) && s > 1e-8) {
                 glasses.scale.setScalar(s);
               }
@@ -8194,6 +9378,12 @@ async function runArSession({
     mindarFaceEnhancementsCleanup = () => {
       const st = faceArEnhancementState;
       try {
+        const el = st?.microUxRingEl;
+        if (el?.parentNode) el.parentNode.removeChild(el);
+      } catch {
+        /* ignore */
+      }
+      try {
         if (mindarThree?.controller && st?.faceControllerPrev) {
           mindarThree.controller.onUpdate = st.faceControllerPrev;
         }
@@ -8316,6 +9506,11 @@ async function runArSession({
         upgradeFaceArEyewearRendering(THREE, glasses, pmremRT.texture);
         if (accessoryType === "necklace") {
           upgradeFaceArNecklaceJewelryMaterials(THREE, glasses, pmremRT.texture);
+        }
+        try {
+          omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
+        } catch {
+          /* ignore */
         }
         if (faceArEnhancementState?.hairUniforms && accessoryType === "glasses") {
           const n = installGlassesTempleHairMaskOnGlb(THREE, glasses, faceArEnhancementState.hairUniforms);
@@ -8671,32 +9866,73 @@ async function runArSession({
      *     o frame esperado (identidade + translação, para rosto frontal). */
     const { renderer, scene, camera } = mindarThree;
     let firstAnchorMatrixLogged = false;
-      renderer.setAnimationLoop(() => {
+    /** `setClearColor` só na 1.ª frame — evita trabalho WebGL redundante. */
+    let mindarRendererClearPrimed = false;
+    /** Últimos valores aplicados a `tripOffsetGroup` — evita `set` por frame quando estáveis. */
+    const tripOffsetApplied = {
+      rx: NaN,
+      ry: NaN,
+      rz: NaN,
+      px: NaN,
+      py: NaN,
+      pz: NaN,
+    };
+    renderer.setAnimationLoop(() => {
       try {
         if (scene && scene.background != null) scene.background = null;
-        if (renderer && typeof renderer.setClearColor === "function") {
+        if (!mindarRendererClearPrimed && renderer && typeof renderer.setClearColor === "function") {
           renderer.setClearColor(0x000000, 0);
+          mindarRendererClearPrimed = true;
         }
       } catch {
         /* ignore */
       }
       /**
-       * Aplicar `glassesOffset` ao `tripOffsetGroup` a cada frame — garante que
-       * qualquer mudança de slider (UI) ou mutação externa (ex.:
-       * `window.__omafitGlassesOffset`) é reflectida, e sobrevive a outros
-       * escritores eventuais sobre o grupo.
+       * Aplicar `glassesOffset` ao `tripOffsetGroup` quando mudou — sliders / `__omafitGlassesOffset`.
        */
       if (tripOffsetGroup && glassesOffset) {
-        tripOffsetGroup.rotation.set(
-          glassesOffset.rotX,
-          glassesOffset.rotY,
-          glassesOffset.rotZ,
-        );
-        tripOffsetGroup.position.set(
-          glassesOffset.posX,
-          glassesOffset.posY,
-          glassesOffset.posZ,
-        );
+        const ox = glassesOffset.rotX;
+        const oy = glassesOffset.rotY;
+        const oz = glassesOffset.rotZ;
+        const px = glassesOffset.posX;
+        const py = glassesOffset.posY;
+        const pz = glassesOffset.posZ;
+        const ta = tripOffsetApplied;
+        const eps = 1e-6;
+        if (
+          !Number.isFinite(ta.rx) ||
+          Math.abs(ta.rx - ox) > eps ||
+          Math.abs(ta.ry - oy) > eps ||
+          Math.abs(ta.rz - oz) > eps ||
+          Math.abs(ta.px - px) > eps ||
+          Math.abs(ta.py - py) > eps ||
+          Math.abs(ta.pz - pz) > eps
+        ) {
+          ta.rx = ox;
+          ta.ry = oy;
+          ta.rz = oz;
+          ta.px = px;
+          ta.py = py;
+          ta.pz = pz;
+          tripOffsetGroup.rotation.set(ox, oy, oz);
+          tripOffsetGroup.position.set(px, py, pz);
+        }
+      }
+      try {
+        const stMu = faceArEnhancementState;
+        const nowRaf = performance.now();
+        if (stMu && !stMu.microUxDisabled && stMu.microUxModelWrap && stMu.microUx) {
+          omafitStepMicroUxIntro(
+            THREE,
+            stMu.microUxModelWrap,
+            stMu.microUxGlassesRoot,
+            stMu.microUx,
+            nowRaf,
+            { introMs: 520, scaleFrom: 0.88 },
+          );
+        }
+      } catch {
+        /* ignore */
       }
       try {
         const vid = mindarHost?.querySelector?.("video");
@@ -8709,6 +9945,14 @@ async function runArSession({
       try {
         if (faceProjectionOpts) {
           omafitSyncMindARFaceProjection(THREE, mindarThree, mindarHost, faceProjectionOpts);
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        const fad = faceArEnhancementState?.faceAdaptiveLight;
+        if (fad) {
+          omafitStepFaceAdaptiveLighting(THREE, fad, mindarHost, renderer);
         }
       } catch {
         /* ignore */
@@ -8752,6 +9996,20 @@ async function runArSession({
     window.__omafitArSwitchGlb = async (nextUrl, cal) => {
       try {
         if (cal && typeof cal === "object") applyOmafitCalibration(cal, arCfg);
+        try {
+          const stSw = faceArEnhancementState;
+          if (stSw?.microUx && !stSw.microUxDisabled) {
+            stSw.microUx.snapBoost = Math.max(typeof stSw.microUx.snapBoost === "number" ? stSw.microUx.snapBoost : 1, 1.032);
+            stSw.microUx.introComplete = false;
+            stSw.microUx.introStartMs = performance.now();
+            if (stSw.microUxModelWrap) stSw.microUxModelWrap.scale.setScalar(0.985);
+            if (stSw.microUxGlassesRoot && stSw.microUx.preparedOpacity) {
+              omafitApplyModelOpacityFactor(stSw.microUxGlassesRoot, 0.88);
+            }
+          }
+        } catch {
+          /* ignore */
+        }
         const gpc = glassesPivotConfig;
         if (gpc && arCfg?.dataset && !OMAFIT_GLASSES_PIVOT_DIRECT_TEST) {
           const fine = parseXyzMeters(arCfg.dataset.arGlassesLocalFineXyz || "0 0 0", 0, 0, 0);
@@ -8975,6 +10233,10 @@ async function runHandArSession({
     return String(fallback ?? "").trim();
   }
 
+  const perfModeHand = String(cfgAttr("arPerformanceProfile", "auto")).trim().toLowerCase();
+  const handArProfile = omafitResolveArDeviceRuntimeProfile({ perfMode: perfModeHand });
+  const handMicroUxDisabled = /^(0|false|off|no)$/i.test(String(cfgAttr("arMicroUx", "1")).trim());
+
   function parseEulerDegComponents(raw, defX, defY, defZ) {
     const str = String(raw || "").trim();
     if (!str) return { x: defX, y: defY, z: defZ };
@@ -9025,9 +10287,11 @@ async function runHandArSession({
   /** Espelho horizontal do vídeo: selfie frontal costuma espelhar; câmara traseira não. */
   let mirrorVideoX = true;
 
+  const handVidIdeal = omafitBuildFaceUserMediaVideoIdeal(handArProfile);
   const baseVideoConstraint = {
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
+    width: { ideal: handVidIdeal.width.ideal, max: handVidIdeal.width.max },
+    height: { ideal: handVidIdeal.height.ideal, max: handVidIdeal.height.max },
+    frameRate: handVidIdeal.frameRate,
   };
 
   try {
@@ -9098,6 +10362,7 @@ async function runHandArSession({
     videoHeight: video.videoHeight,
     videoAspect: video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : null,
     mirrorVideoX,
+    arDeviceProfile: handArProfile,
   });
 
   loading.textContent = t.loadingTracking || t.loading || "A carregar tracking...";
@@ -9156,13 +10421,30 @@ async function runHandArSession({
   proximityHint.textContent = "Aproxime seu pulso para um ajuste perfeito";
   mindarHost.appendChild(proximityHint);
 
+  let handDetectRingEl = null;
+  if (!handMicroUxDisabled) {
+    try {
+      handDetectRingEl = document.createElement("div");
+      handDetectRingEl.className = "omafit-ar-track-detect-ring";
+      handDetectRingEl.setAttribute("aria-hidden", "true");
+      mindarHost.appendChild(handDetectRingEl);
+    } catch {
+      /* ignore */
+    }
+  }
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
-    antialias: true,
+    antialias: handArProfile.webglAntialias !== false,
     preserveDrawingBuffer: false,
+    powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  {
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const maxDpr = omafitEffectiveArRendererMaxDpr(THREE, cfgAttr("arRendererMaxDpr", ""), handArProfile);
+    renderer.setPixelRatio(Math.min(dpr, maxDpr));
+  }
   const hostRect = () => mindarHost.getBoundingClientRect();
   /**
    * Canvas backing store = vídeo intrínseco; CSS via `object-fit: cover` no
@@ -9179,8 +10461,17 @@ async function runHandArSession({
     const vW = video.videoWidth || cssW;
     const vH = video.videoHeight || cssH;
     renderer.setSize(vW, vH, false);
+    try {
+      const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      const maxDpr = omafitEffectiveArRendererMaxDpr(THREE, cfgAttr("arRendererMaxDpr", ""), handArProfile);
+      renderer.setPixelRatio(Math.min(dpr, maxDpr));
+    } catch {
+      /* ignore */
+    }
     if (camera) {
-      camera.aspect = vW / vH;
+      const asp = vW / Math.max(1, vH);
+      camera.aspect = asp;
+      camera.fov = omafitHandPathCameraFovDeg(THREE, asp, handArProfile);
       camera.updateProjectionMatrix();
     }
     void cssW;
@@ -9199,7 +10490,14 @@ async function runHandArSession({
   scene.add(handAmbientLight);
   scene.add(handHemiLight);
 
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.02, 100);
+  const handInitAsp =
+    video.videoWidth > 2 && video.videoHeight > 2 ? video.videoWidth / video.videoHeight : 1;
+  const camera = new THREE.PerspectiveCamera(
+    omafitHandPathCameraFovDeg(THREE, handInitAsp, handArProfile),
+    handInitAsp,
+    0.02,
+    100,
+  );
   camera.position.set(0, 0, 0);
   camera.lookAt(0, 0, -1);
 
@@ -9254,6 +10552,8 @@ async function runHandArSession({
     typeof document !== "undefined" ? document.createElement("canvas") : null;
   let lumaCtx = null;
   let lastLumaMs = 0;
+  /** Reuso cor média do vídeo → hemisfério (iluminação adaptativa mão). */
+  let handLumaTintCol = null;
   if (lumaCanvas) {
     lumaCanvas.width = 48;
     lumaCanvas.height = 32;
@@ -9279,13 +10579,25 @@ async function runHandArSession({
   let braceletWristAlignGroup = null;
   const glbRoot = new THREE.Group();
   glbRoot.visible = false;
+  const handMicroUxWrap = new THREE.Group();
+  handMicroUxWrap.name = "omafit-ar-hand-micro-ux-wrap";
+  const handMicroUx = {
+    introStartMs: 0,
+    introComplete: false,
+    preparedOpacity: false,
+    snapBoost: 1,
+    hadLandmarks: false,
+  };
+  let handMicroOpacityRoot = null;
   if (accessoryType === "bracelet") {
     braceletWristAlignGroup = new THREE.Group();
     braceletWristAlignGroup.name = "omafit-ar-bracelet-wrist-align";
     calibRot.add(braceletWristAlignGroup);
-    braceletWristAlignGroup.add(glbRoot);
+    braceletWristAlignGroup.add(handMicroUxWrap);
+    handMicroUxWrap.add(glbRoot);
   } else {
-    calibRot.add(glbRoot);
+    calibRot.add(handMicroUxWrap);
+    handMicroUxWrap.add(glbRoot);
   }
 
   /**
@@ -9797,8 +11109,19 @@ async function runHandArSession({
     };
   }
 
-  // Load the GLB.
+  // Load the GLB (Draco lazy: partilha WASM com o caminho face).
+  const arGlbDracoHand = !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlbDraco", "1")).trim());
+  let dracoLoaderHand = null;
+  if (arGlbDracoHand) {
+    try {
+      dracoLoaderHand = await omafitGetSharedDracoLoader();
+    } catch (e) {
+      console.warn("[omafit-ar] hand GLB Draco:", e?.message || e);
+    }
+  }
   const glbLoader = new GLTFLoader();
+  glbLoader.setCrossOrigin("anonymous");
+  if (dracoLoaderHand) glbLoader.setDRACOLoader(dracoLoaderHand);
   const versionHint =
     arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "";
   const finalGlbUrl = buildGlbLoaderUrl(omafitAbsolutizeGlbUrlMaybe(glbUrl), versionHint);
@@ -9853,8 +11176,33 @@ async function runHandArSession({
             `[omafit-ar] hand GLB baked meshes=${baked} skipped=${skipped}`,
           );
         });
+        try {
+          const triH = omafitCountGltfTriangles(glbScene);
+          omafitMaybeWarnGltfTriangleBudget(finalGlbUrl, triH);
+          const texAnisoH = omafitEffectiveArTextureMaxAnisotropy(
+            cfgAttr("arTextureMaxAnisotropy", "4"),
+            handArProfile,
+            16,
+          );
+          omafitApplyGltfTextureAnisotropy(THREE, glbScene, renderer, texAnisoH);
+        } catch {
+          /* ignore */
+        }
         glbRoot.add(glbScene);
         upgradeHandArGlassMaterials(THREE, glbScene);
+        handMicroOpacityRoot = glbScene;
+        if (!handMicroUxDisabled) {
+          try {
+            omafitStoreMaterialOpacityBaseline(glbScene);
+            omafitApplyModelOpacityFactor(glbScene, 0);
+            handMicroUx.introStartMs = performance.now();
+            handMicroUx.introComplete = false;
+            handMicroUx.preparedOpacity = true;
+            handMicroUxWrap.scale.setScalar(0.9);
+          } catch {
+            /* ignore */
+          }
+        }
 
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
@@ -10815,7 +12163,7 @@ async function runHandArSession({
 
   function tick() {
     if (!running) return;
-    rafId = requestAnimationFrame(tick);
+    try {
     if (video.readyState < 2) {
       renderer.render(scene, camera);
       return;
@@ -10877,6 +12225,20 @@ async function runHandArSession({
       missedFrames = 0;
       updateAnchorFromHand(landmarks, dtMs, handLabel);
       anchor.visible = true;
+      if (!handMicroUxDisabled) {
+        try {
+          if (handDetectRingEl) handDetectRingEl.classList.add("omafit-ar-track-detect-ring--on");
+          if (!handMicroUx.hadLandmarks) {
+            handMicroUx.snapBoost = Math.max(
+              typeof handMicroUx.snapBoost === "number" ? handMicroUx.snapBoost : 1,
+              1.042,
+            );
+          }
+          handMicroUx.hadLandmarks = true;
+        } catch {
+          /* ignore */
+        }
+      }
       /** Occluder só é útil quando há mão detectada. Evita deixar cilindro
        *  invisível a escrever depth no meio do ecrã quando a mão desaparece. */
       armOccluder.visible = true;
@@ -10885,6 +12247,14 @@ async function runHandArSession({
       missedFrames += 1;
       if (missedFrames > MISSED_HIDE_THRESHOLD) {
         anchor.visible = false;
+        if (!handMicroUxDisabled) {
+          try {
+            handMicroUx.hadLandmarks = false;
+            if (handDetectRingEl) handDetectRingEl.classList.remove("omafit-ar-track-detect-ring--on");
+          } catch {
+            /* ignore */
+          }
+        }
         armOccluder.visible = false;
         contactShadow.visible = false;
         smoothInitialized = false;
@@ -10947,13 +12317,20 @@ async function runHandArSession({
           const d = im.data;
           const n = d.length;
           let sum = 0;
+          let sR = 0;
+          let sG = 0;
+          let sB = 0;
           for (let i = 0; i < n; i += 4) {
-            sum +=
-              0.299 * d[i] +
-              0.587 * d[i + 1] +
-              0.114 * d[i + 2];
+            const r = d[i];
+            const g = d[i + 1];
+            const b = d[i + 2];
+            sR += r;
+            sG += g;
+            sB += b;
+            sum += 0.299 * r + 0.587 * g + 0.114 * b;
           }
-          const avg = sum / (n / 4) / 255;
+          const np = n / 4;
+          const avg = sum / np / 255;
           const tgt = THREE.MathUtils.lerp(
             0.2,
             1.82,
@@ -10964,13 +12341,36 @@ async function runHandArSession({
             tgt,
             0.24,
           );
+          handAmbientLight.intensity = THREE.MathUtils.lerp(
+            handAmbientLight.intensity,
+            THREE.MathUtils.lerp(0.18, 0.58, avg),
+            0.12,
+          );
+          if (!handLumaTintCol) handLumaTintCol = new THREE.Color();
+          handLumaTintCol.setRGB(sR / np / 255, sG / np / 255, sB / np / 255);
+          handHemiLight.color.lerp(handLumaTintCol, 0.09);
+          handHemiLight.groundColor.lerp(handLumaTintCol, 0.05);
         } catch {
           /* vídeo pode estar tainted em contextos raros */
         }
       }
     }
 
+    if (!handMicroUxDisabled && handMicroUxWrap) {
+      try {
+        omafitStepMicroUxIntro(THREE, handMicroUxWrap, handMicroOpacityRoot, handMicroUx, nowTs, {
+          introMs: 480,
+          scaleFrom: 0.9,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
     renderer.render(scene, camera);
+    } finally {
+      if (running) rafId = requestAnimationFrame(tick);
+    }
   }
 
   loading.style.display = "none";
@@ -11010,6 +12410,16 @@ async function runHandArSession({
             (gltf) => {
               const next = gltf.scene || gltf.scenes?.[0];
               if (!next) return resolve();
+              if (!handMicroUxDisabled) {
+                try {
+                  handMicroUxWrap.scale.setScalar(0.94);
+                  handMicroUx.introComplete = false;
+                  handMicroUx.introStartMs = performance.now();
+                  if (handMicroOpacityRoot) omafitApplyModelOpacityFactor(handMicroOpacityRoot, 0.2);
+                } catch {
+                  /* ignore */
+                }
+              }
               bakeGLBTransforms(THREE, next, () => {});
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
@@ -11065,6 +12475,19 @@ async function runHandArSession({
               smoothedStrapK = 1;
               upgradeHandArMetalMaterials(THREE, next);
               setHandArMeshRenderOrder(glbRoot, 1);
+              handMicroOpacityRoot = next;
+              if (!handMicroUxDisabled) {
+                try {
+                  omafitStoreMaterialOpacityBaseline(next);
+                  omafitApplyModelOpacityFactor(next, 0);
+                  handMicroUx.introStartMs = performance.now();
+                  handMicroUx.introComplete = false;
+                  handMicroUx.preparedOpacity = true;
+                  handMicroUxWrap.scale.setScalar(0.9);
+                } catch {
+                  /* ignore */
+                }
+              }
               resolve();
             },
             undefined,
@@ -11125,6 +12548,11 @@ async function runHandArSession({
     }
     try {
       if (proximityHint?.parentNode) proximityHint.parentNode.removeChild(proximityHint);
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (handDetectRingEl?.parentNode) handDetectRingEl.parentNode.removeChild(handDetectRingEl);
     } catch {
       /* ignore */
     }
@@ -11326,7 +12754,15 @@ async function main() {
 
   try {
   injectGlobalStyles(root, primaryColor);
-  getOmafitArModuleBundle().catch(() => {});
+  {
+    const deferPreload =
+      String(root?.dataset?.arDeferModulePreload ?? root?.getAttribute?.("data-ar-defer-module-preload") ?? "")
+        .trim()
+        .toLowerCase() === "1";
+    if (!deferPreload) {
+      getOmafitArModuleBundle().catch(() => {});
+    }
+  }
 
   let modal = null;
 
