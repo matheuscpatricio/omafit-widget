@@ -257,7 +257,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-pivot-ortho-basis-only";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_manual-bbox-center-mesh-only";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -511,12 +511,15 @@ function omafitStripGlassesMeshRollYxz(THREE, mesh) {
 }
 
 /**
- * Modo manual MindAR: centro da bbox na origem; **sem** rotação no mesh — orientação só no `glassesPivot` (`makeBasis`).
+ * Modo manual MindAR: **uma vez** no load — centro geométrico do GLB na origem **só no mesh**
+ * (`mesh.position.sub(center)`); profundidade opcional `stickZ` em **Z local** do mesh.
+ * Não altera o pivot; lateral não vem de offsets fixos.
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} mesh
+ * @param {number} [stickZ=0] somado a `mesh.position.z` após centrar (ex. `glassesModelStickZ`).
  */
-function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh) {
+function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh, stickZ = 0) {
   if (!THREE || !mesh) return;
   mesh.position.set(0, 0, 0);
   mesh.scale.set(1, 1, 1);
@@ -526,14 +529,25 @@ function omafitApplyGlassesManualMindarCenterMesh(THREE, mesh) {
   mesh.updateMatrix();
   mesh.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(mesh);
-  if (!(typeof box.isEmpty === "function" && box.isEmpty())) {
-    const c = box.getCenter(new THREE.Vector3());
-    mesh.position.sub(c);
+  if (typeof box.isEmpty === "function" && box.isEmpty()) return;
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  mesh.position.sub(center);
+  if (Number.isFinite(stickZ) && stickZ !== 0) {
+    mesh.position.z += stickZ;
   }
   mesh.rotation.set(0, 0, 0);
   mesh.quaternion.identity();
   mesh.updateMatrix();
   mesh.updateMatrixWorld(true);
+  if (!__omafitManualModelCenterFixLogged) {
+    __omafitManualModelCenterFixLogged = true;
+    try {
+      console.log("MODEL CENTER FIX", center);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
@@ -1991,6 +2005,8 @@ let _omafitManualBasisM4 = null;
 let __omafitManualFinalOrientationLogged = false;
 /** Uma vez: produtos escalares da base (devem ≈ 0). */
 let __omafitManualOrthoCheckLogged = false;
+/** Uma vez: centro da bbox do mesh (modo manual). */
+let __omafitManualModelCenterFixLogged = false;
 
 /**
  * Modo manual MindAR — orientação **só** no `glassesPivot`: base ortonormal RHS estável,
@@ -6259,7 +6275,9 @@ async function runArSession({
     glasses.updateMatrixWorld(true);
 
     /** 2) Bbox + centro depois de normalizar. Centramos a bbox na origem
-     *    para que `calibRot` rode o GLB em torno do seu centro geométrico. */
+     *    para que `calibRot` rode o GLB em torno do seu centro geométrico.
+     *    Modo manual MindAR: não subtrair aqui no root — só
+     *    `omafitApplyGlassesManualMindarCenterMesh` (uma vez, mesh + stickZ). */
     const box = new THREE.Box3().setFromObject(glasses);
     if (typeof box.isEmpty === "function" && box.isEmpty()) {
       throw new Error(
@@ -6272,7 +6290,9 @@ async function runArSession({
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
-    glasses.position.sub(center);
+    if (!glassesManualMindarRig) {
+      glasses.position.sub(center);
+    }
 
     /** Calibração do lojista (metafield / data-attrs). Lida antes do bind
      *  MindAR para saber se cal=0,0,0 e podemos aplicar correcção de eixo. */
@@ -6284,12 +6304,17 @@ async function runArSession({
      * Wear em unidades de âncora. Colagem em profundidade: `arGlassesModelStickZ`
      * no eixo Z **local do GLB** (negativo). Override: `data-ar-mindar-wear-position`.
      */
-    const wearPosM = parseXyzMeters(
+    const wearPosMRaw = parseXyzMeters(
       cfgAttr("arMindarWearPosition", accessoryType === "glasses" ? "0 0 0" : ""),
       0,
       0,
       0,
     );
+    /** Manual: sem offset lateral/vertical em `wearPosition` — só mesh centrado + `stickZ` no mesh. */
+    const wearPosM =
+      accessoryType === "glasses" && glassesManualMindarRig
+        ? { x: 0, y: 0, z: 0 }
+        : wearPosMRaw;
     /**
      * Ajuste fino de centragem no espaço **local** do GLB (filho de
      * `glassesPivot`, antes do `scale` do mesh): move com a cabeça porque
@@ -6685,7 +6710,7 @@ async function runArSession({
     }
     let glassesManualModelWidth = 1;
     if (glassesManualMindarRig) {
-      omafitApplyGlassesManualMindarCenterMesh(THREE, glasses);
+      omafitApplyGlassesManualMindarCenterMesh(THREE, glasses, glassesModelStickZ);
       glasses.updateMatrixWorld(true);
       const boxMan = new THREE.Box3().setFromObject(glasses);
       const szMan = new THREE.Vector3();
@@ -6923,7 +6948,7 @@ async function runArSession({
       } else if (glassesManualMindarRig) {
         /** Posição/escala no pivot; rotação da cabeça só no `anchor.group` (MindAR). */
         glassesPivot.matrixAutoUpdate = true;
-        glassesPivot.position.set(0, -0.03, -0.08);
+        glassesPivot.position.set(0, 0, 0);
         glassesPivot.rotation.set(0, 0, 0);
         glassesPivot.scale.setScalar(1);
       } else if (glassesGeometryAnchor && glassesGeometryPivotPosTemplate) {
@@ -6962,7 +6987,6 @@ async function runArSession({
       glasses.name = "omafit-ar-glasses-model";
       if (glassesManualMindarRig) {
         glasses.matrixAutoUpdate = true;
-        glasses.position.set(0, 0, 0);
         glasses.scale.set(1, 1, 1);
         glasses.rotation.order = "XYZ";
         glasses.rotation.set(0, 0, 0);
@@ -6997,9 +7021,9 @@ async function runArSession({
         glassesPivot.add(axesH);
       }
       if (glassesManualMindarRig && glassesPivot) {
-        console.log("[omafit-ar] glasses manual MindAR — init (mesh identidade; pivot = basis olhos no onUpdate)", {
+        console.log("[omafit-ar] glasses manual MindAR — init (mesh centrado bbox+stickZ; pivot 0,0,0 + basis)", {
           build: OMAFIT_AR_WIDGET_BUILD,
-          pivotPos: { x: 0, y: -0.03, z: -0.08 },
+          pivotPos: { x: 0, y: 0, z: 0 },
         });
       }
     } else if (accessoryType === "necklace") {
@@ -7648,7 +7672,7 @@ async function runArSession({
             /** Bruto MindAR (landmarks) → metros só via `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS`. */
             const faceInterpupillary = omafitGlassesManualInterpupillaryDistance(lm, st.lmSmoother);
             const modelWidth = st.glassesManualModelWidth;
-            glassesPivot.position.set(0, -0.03, -0.08);
+            glassesPivot.position.set(0, 0, 0);
             let finalScale = 1;
             if (
               Number.isFinite(faceInterpupillary) &&
