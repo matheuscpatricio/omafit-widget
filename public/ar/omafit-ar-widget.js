@@ -106,9 +106,8 @@ import {
  * automático, strip roll desligados. `calibRot` identidade; `wearPosition` (0,0,0); pivot filho directo de `anchor.group`.
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
- * landmarks para local). **X** na base facial = projeção `(midpoint 33+263 − ponte 168)·eyeDir` (metros, mesmo
- * espaço que `metricLandmarks` / âncora); **bias** opcional `data-ar-glasses-x-bias` (m) ao longo de `eyeDir`.
- * **Y/Z** via `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
+ * landmarks para local). **X** do pivot: `midEye.x − lm[168].x` com `midEye = (lm[33]+lm[263])/2` (sem escala/clamp no X).
+ * **Y/Z**: `quat * (0,oy,oz)` — `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
  * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada.
  * Incompatível com estrutural e geometria.
  */
@@ -260,7 +259,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_manual-vx-scale-clamp";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_manual-vx-landmark-x";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -335,8 +334,6 @@ const OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT = 1.1;
  * `baseUnitScale` nesta conversão. Objectivo típico ~0,06–0,08 m.
  */
 const OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS = 0.0065;
-/** Clamp do deslocamento horizontal IPD (m) após `vxIp * baseUnitScale * modelScaleMul`. */
-const OMAFIT_GLASSES_MANUAL_VX_IPD_CLAMP_M = 0.03;
 /**
  * GLB em escala pequena (ex. maxDim ≤ 0.01): o mesh fica ~1 unidade de âncora com
  * `baseUnitScale / OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE`; a largura no rosto vem do
@@ -2014,14 +2011,11 @@ let __omafitManualOrthoCheckLogged = false;
 let __omafitManualModelCenterFixLogged = false;
 /** Offset `(ox,oy,oz)` na base facial → vector no espaço do pai (`applyQuaternion` após `makeBasis`). */
 let _omafitManualFaceBasisOffParent = null;
-/** Midpoint interpupilar (33+263)/2, ponte 168, vector delta — pivot manual (mesmo espaço que `lm`). */
+/** Midpoint interpupilar (33+263)/2, ponte 168 — pivot manual (mesmo espaço que `lm`). */
 let _omafitManualMidEye = null;
 let _omafitManualBridge168 = null;
-let _omafitManualMidDelta = null;
-/** Log único: `vxIp` → normalizado → clamp ao longo de `eyeDir`. */
-let __omafitManualVxCorrectionLogged = false;
-/** `eyeDir * vxClamped` sem alocar por frame. */
-let _omafitManualVxAlongEye = null;
+/** Log único: `vx` = midEye.x − 168.x */
+let __omafitManualVxFinalCorrectLogged = false;
 
 /**
  * Base facial manual a partir de `metricLandmarks` — **mesmos** `eyeDir`, `trueUp`, `forward`
@@ -2090,10 +2084,8 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
  * - **X** = `eyeDir` = canto direito − esquerdo (33−263), `eyeDir.x ≥ 0`.
  * - **Z** = frente da câmara em **−Z** mundo: começa por `(0,0,−1)`, depois `eyeDir × trueUp` para fechar RHS.
  * - **Y** = `trueUp` = `forward × eyeDir`, depois re-`forward = eyeDir × trueUp`.
- * - `Matrix4.makeBasis(eyeDir, trueUp, forward)` → `pivot.quaternion.setFromRotationMatrix`; `setScalar(finalScale)`.
- * - **Posição** (espaço do pai): `quat * (0,oy,oz)` + `eyeDir * vxClamped`, com
- *   `vxClamped = clamp(vxIp * baseUnitScale * modelScaleMul, ±OMAFIT_GLASSES_MANUAL_VX_IPD_CLAMP_M)`;
- *   **vxIp** = `((lm[33]+lm[263])/2 − lm[168])·eyeDir` + `ipdHorizontalBiasM` (tracking).
+ * - `Matrix4.makeBasis(eyeDir, trueUp, forward)` → `pivot.quaternion.setFromRotationMatrix`; `setScalar(finalScale)` (só escala uniforme, **não** afecta `position.x`).
+ * - **Posição**: `position = quat*(0,oy,oz)`; depois `position.x = midEye.x − lm[168].x` (coordenadas métricas dos landmarks).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
@@ -2101,9 +2093,6 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
  * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
  * @param {number | null} [pivotUniformScale=null] escala uniforme do pivot; se omitido, `max(|sx|,|sy|,|sz|, 1e-8)`.
  * @param {{ x: number, y: number, z: number } | null} [faceBasisOffsetM=null] só **Y/Z** (metros).
- * @param {number} [ipdHorizontalBiasM=0] metros ao longo de `eyeDir` (`data-ar-glasses-x-bias`).
- * @param {number} [manualBaseUnitScale=1] `st.baseUnitScale` (modo manual).
- * @param {number} [modelScaleMul=1] `st.modelScaleMul`.
  * @returns {boolean} `true` se a rotação do pivot foi actualizada
  */
 function omafitGlassesManualPivotApplyEyeBasis(
@@ -2113,9 +2102,6 @@ function omafitGlassesManualPivotApplyEyeBasis(
   smoother,
   pivotUniformScale = null,
   faceBasisOffsetM = null,
-  ipdHorizontalBiasM = 0,
-  manualBaseUnitScale = 1,
-  modelScaleMul = 1,
 ) {
   if (!THREE || !glassesPivot || !lm) return false;
   if (!_omafitManualEyeDir) _omafitManualEyeDir = new THREE.Vector3();
@@ -2156,7 +2142,6 @@ function omafitGlassesManualPivotApplyEyeBasis(
 
   if (!_omafitManualMidEye) _omafitManualMidEye = new THREE.Vector3();
   if (!_omafitManualBridge168) _omafitManualBridge168 = new THREE.Vector3();
-  if (!_omafitManualMidDelta) _omafitManualMidDelta = new THREE.Vector3();
   const fillLmVec = (idx, out) => {
     const p = smoother?.get(idx);
     if (p) {
@@ -2170,19 +2155,8 @@ function omafitGlassesManualPivotApplyEyeBasis(
   };
   if (!fillLmVec(OMAFIT_FACE_LM_NOSE_BRIDGE, _omafitManualBridge168)) return false;
   _omafitManualMidEye.copy(_omafitManualEyeR).add(_omafitManualEyeL).multiplyScalar(0.5);
-  _omafitManualMidDelta.subVectors(_omafitManualMidEye, _omafitManualBridge168);
-  const vxIp =
-    _omafitManualMidDelta.dot(eyeDir) +
-    (Number.isFinite(ipdHorizontalBiasM) ? ipdHorizontalBiasM : 0);
-  const bu =
-    Number.isFinite(manualBaseUnitScale) && manualBaseUnitScale > 0 ? manualBaseUnitScale : 1;
-  const msm = Number.isFinite(modelScaleMul) && modelScaleMul > 0 ? modelScaleMul : 1;
-  const vxNormalized = vxIp * bu * msm;
-  const vxClamped = THREE.MathUtils.clamp(
-    vxNormalized,
-    -OMAFIT_GLASSES_MANUAL_VX_IPD_CLAMP_M,
-    OMAFIT_GLASSES_MANUAL_VX_IPD_CLAMP_M,
-  );
+  const vx = _omafitManualMidEye.x - _omafitManualBridge168.x;
+  if (!Number.isFinite(vx)) return false;
   const oy =
     faceBasisOffsetM && Number.isFinite(faceBasisOffsetM.y) ? faceBasisOffsetM.y : -0.02;
   const oz =
@@ -2190,9 +2164,7 @@ function omafitGlassesManualPivotApplyEyeBasis(
   if (!_omafitManualFaceBasisOffParent) _omafitManualFaceBasisOffParent = new THREE.Vector3();
   _omafitManualFaceBasisOffParent.set(0, oy, oz).applyQuaternion(glassesPivot.quaternion);
   glassesPivot.position.copy(_omafitManualFaceBasisOffParent);
-  if (!_omafitManualVxAlongEye) _omafitManualVxAlongEye = new THREE.Vector3();
-  _omafitManualVxAlongEye.copy(eyeDir).multiplyScalar(vxClamped);
-  glassesPivot.position.add(_omafitManualVxAlongEye);
+  glassesPivot.position.x = vx;
   glassesPivot.scale.setScalar(finalScale);
   glassesPivot.updateMatrix();
 
@@ -2236,14 +2208,10 @@ function omafitGlassesManualPivotApplyEyeBasis(
       /* ignore */
     }
   }
-  if (!__omafitManualVxCorrectionLogged) {
-    __omafitManualVxCorrectionLogged = true;
+  if (!__omafitManualVxFinalCorrectLogged) {
+    __omafitManualVxFinalCorrectLogged = true;
     try {
-      console.log("[omafit-ar] VX CORRECTION", {
-        vxIp,
-        vxNormalized,
-        vxClamped,
-      });
+      console.log("[omafit-ar] VX FINAL CORRETO", { vx });
     } catch {
       /* ignore */
     }
@@ -6605,7 +6573,7 @@ async function runArSession({
           return Number.isFinite(v) && v > 0 ? v : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
         })()
       : OMAFIT_GLASSES_MANUAL_FACE_WIDTH_TO_FRAME_FACTOR_DEFAULT;
-    /** Offset pivot **Y/Z** na base facial (metros); **X** = midpoint 33/263 vs 168 ao longo de `eyeDir`. Attr: `data-ar-glasses-manual-face-basis-offset-m`. */
+    /** Offset pivot **Y/Z** na base facial (metros); **X** = `midEye.x − lm[168].x`. Attr: `data-ar-glasses-manual-face-basis-offset-m`. */
     const glassesManualFaceBasisOffsetM = glassesManualMindarRig
       ? parseXyzMeters(
           cfgAttr("arGlassesManualFaceBasisOffsetM", "0 -0.02 -0.05"),
@@ -6614,13 +6582,6 @@ async function runArSession({
           -0.05,
         )
       : { x: 0, y: 0, z: 0 };
-    /** Bias fino (m) ao longo de `eyeDir` somado ao X por IPD+168 — `data-ar-glasses-x-bias` (ex. `0.01`). */
-    const glassesManualXBiasM = glassesManualMindarRig
-      ? (() => {
-          const v = Number(String(cfgAttr("arGlassesXBias", "0")).trim());
-          return Number.isFinite(v) ? v : 0;
-        })()
-      : 0;
     const glassesOffsetFinalM = parseOffsetFinal(cfgAttr("arGlassesOffsetFinalM", "0 0 0"));
     try {
       console.log("[omafit-ar] FINAL OFFSET (authoritative)", glassesOffsetFinalM);
@@ -7165,7 +7126,7 @@ async function runArSession({
       }
       if (glassesManualMindarRig && glassesPivot) {
         console.log(
-          "[omafit-ar] glasses manual MindAR — init (mesh bbox+stickZ; pivot X = midpoint 33/263 vs 168 + face basis; Y/Z + IPD)",
+          "[omafit-ar] glasses manual MindAR — init (mesh bbox+stickZ; pivot X = midEye.x−168.x; Y/Z = quat*(0,oy,oz); escala IPD)",
           {
             build: OMAFIT_AR_WIDGET_BUILD,
             faceBasisOffsetYZ: {
@@ -7409,7 +7370,6 @@ async function runArSession({
         y: glassesManualFaceBasisOffsetM.y,
         z: glassesManualFaceBasisOffsetM.z,
       },
-      glassesManualXBiasM,
       glassesOffsetFinalM: {
         x: glassesOffsetFinalM.x,
         y: glassesOffsetFinalM.y,
@@ -7856,9 +7816,6 @@ async function runArSession({
               st.lmSmoother,
               finalScale,
               st.glassesManualFaceBasisOffsetM,
-              st.glassesManualXBiasM,
-              st.baseUnitScale,
-              st.modelScaleMul,
             );
             if (!st.glassesManualMindarFinalLogged) {
               st.glassesManualMindarFinalLogged = true;
