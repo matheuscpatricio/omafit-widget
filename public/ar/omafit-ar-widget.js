@@ -259,7 +259,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_glasses-auto-fix-orientation";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-25_manual-pivot-quat-no-neg-scale";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -2040,15 +2040,17 @@ let _omafitManualEyeTrueUp = null;
 let _omafitManualEyePar = null;
 let _omafitManualCorQuat = null;
 let _omafitManualCorEul = null;
+let _omafitManualBasisM4 = null;
 /** Log único orientação manual (forward + escala pivot). */
 let __omafitManualFinalOrientationLogged = false;
 
 /**
- * Modo manual MindAR: base **right-handed** no pivot — `eyeDir`, `forward`, `trueUp` normalizados;
- * fecho **Z = X × Y** antes de `makeBasis`. **`pivot.matrix.makeBasis`** → **`pivot.quaternion.setFromRotationMatrix(pivot.matrix)`**
- * (reset explícito do quat a partir da rotação); **`multiply(fixQuat)`** com `Euler(0,π,0)` (sem `rotation.set`);
- * opcional `x180`/`z180` em cima via `data-ar-glasses-manual-mindar-basis-correction`. Heurística hastes:
- * se eixo local +Z (coluna matriz) aponta “para a frente” (`z` mundo > limiar), **`scale.set(u,u,-u)`** (sem `*= -1` por frame).
+ * Modo manual MindAR: base **RHS** no pivot (`X=eyeDir`, `Y=trueUp`, `Z=forward`).
+ * Ordem: `eyeDir` (+ correção **hastes** se `eyeDir.x > 0`), `trueUp=(0,1,0)`,
+ * `forward = eyeDir × trueUp`, `trueUp = forward × eyeDir`, fecho `forward = eyeDir × trueUp`;
+ * se `forward.z > 0` → `forward` negado e base re-ortogonalizada (câmara em **−Z**).
+ * **`Matrix4.makeBasis`** → **`quaternion.setFromRotationMatrix`** (sem espelhar com escala negativa no pivot:
+ * **`scale.setScalar(u)`** só com `u > 0`). Opcional `y180` / `x180` / `z180` via attr.
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} glassesPivot
@@ -2066,6 +2068,7 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   if (!_omafitManualEyeFwd) _omafitManualEyeFwd = new THREE.Vector3();
   if (!_omafitManualEyeTrueUp) _omafitManualEyeTrueUp = new THREE.Vector3();
   if (!_omafitManualEyePar) _omafitManualEyePar = new THREE.Vector3();
+  if (!_omafitManualBasisM4) _omafitManualBasisM4 = new THREE.Matrix4();
 
   const fillEye = (idx, out) => {
     const p = smoother?.get(idx);
@@ -2084,47 +2087,36 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   const eyeDir = _omafitManualEyeDir.subVectors(_omafitManualEyeL, _omafitManualEyeR);
   if (eyeDir.lengthSq() < 1e-14) return false;
   eyeDir.normalize();
-  /** +X da armação: da direita do rosto → esquerda (evita espelho / GLB invertido). */
+  /** +X armação: esquerda do rosto → direita (hastes não cruzam o rosto). */
   if (eyeDir.x > 0) {
     eyeDir.multiplyScalar(-1);
   }
   eyeDir.normalize();
 
-  const up = _omafitManualEyeUp.set(0, 1, 0);
-  _omafitManualEyePar.copy(eyeDir).multiplyScalar(up.dot(eyeDir));
-  up.sub(_omafitManualEyePar);
-  if (up.lengthSq() < 1e-14) return false;
-  up.normalize();
-
-  /** `forward = up × eyeDir` (equiv. `new THREE.Vector3().crossVectors(up, eyeDir).normalize()`). */
-  const forward = _omafitManualEyeFwd.crossVectors(up, eyeDir);
-  if (forward.lengthSq() < 1e-14) return false;
-  forward.normalize();
-  /**
-   * MindAR / câmara típica: olhar ao longo de **−Z** mundo; queremos hastes para trás do crânio
-   * com **forward.z < 0** neste espaço métrico da âncora (senão o eixo Z do pivot aponta ao contrário).
-   */
-  if (forward.z > 0) {
-    forward.multiplyScalar(-1);
+  const trueUp = _omafitManualEyeTrueUp.set(0, 1, 0);
+  const forward = _omafitManualEyeFwd.crossVectors(eyeDir, trueUp);
+  if (forward.lengthSq() < 1e-14) {
+    trueUp.set(1, 0, 0);
+    forward.crossVectors(eyeDir, trueUp);
+    if (forward.lengthSq() < 1e-14) return false;
   }
   forward.normalize();
-
-  /** Y = Z × X = forward × eyeDir — não usar eyeDir × forward (isso dá X × Y = −Z, base inválida). */
-  const trueUp = _omafitManualEyeTrueUp.crossVectors(forward, eyeDir);
+  trueUp.crossVectors(forward, eyeDir);
   if (trueUp.lengthSq() < 1e-14) return false;
   trueUp.normalize();
-
-  /**
-   * Fecho ortonormal (erro de ponto flutuante no cross): Z = X × Y com X=eyeDir, Y=trueUp;
-   * voltar a impor `forward.z < 0` após o fecho.
-   */
   forward.crossVectors(eyeDir, trueUp);
   if (forward.lengthSq() < 1e-14) return false;
   forward.normalize();
+
   if (forward.z > 0) {
     forward.multiplyScalar(-1);
+    trueUp.crossVectors(forward, eyeDir);
+    if (trueUp.lengthSq() < 1e-14) return false;
+    trueUp.normalize();
+    forward.crossVectors(eyeDir, trueUp);
+    if (forward.lengthSq() < 1e-14) return false;
+    forward.normalize();
   }
-  forward.normalize();
   eyeDir.normalize();
   trueUp.normalize();
 
@@ -2135,8 +2127,8 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   const sy0 = glassesPivot.scale.y;
   const sz0 = glassesPivot.scale.z;
 
-  glassesPivot.matrix.makeBasis(eyeDir, trueUp, forward);
-  glassesPivot.quaternion.setFromRotationMatrix(glassesPivot.matrix);
+  _omafitManualBasisM4.makeBasis(eyeDir, trueUp, forward);
+  glassesPivot.quaternion.setFromRotationMatrix(_omafitManualBasisM4);
 
   if (!_omafitManualCorQuat) _omafitManualCorQuat = new THREE.Quaternion();
   if (!_omafitManualCorEul) _omafitManualCorEul = new THREE.Euler(0, 0, 0, "XYZ");
@@ -2157,17 +2149,17 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
     }
   }
 
-  glassesPivot.position.set(px, py, pz);
-  glassesPivot.updateMatrix();
-  const te = glassesPivot.matrix.elements;
-  _omafitManualEyePar.set(te[8], te[9], te[10]);
-  if (_omafitManualEyePar.lengthSq() > 1e-14) _omafitManualEyePar.normalize();
-  const uSym = Math.max(Math.abs(sx0), Math.abs(sy0), Math.abs(sz0), 1e-8);
-  let szOut = uSym;
-  if (_omafitManualEyePar.z > 0.12) {
-    szOut = -uSym;
+  /** Local +Z em mundo: se aponta para +Z, `Ry(π)` (sem escala negativa). */
+  _omafitManualEyePar.set(0, 0, 1).applyQuaternion(glassesPivot.quaternion);
+  if (_omafitManualEyePar.z > 0) {
+    _omafitManualCorEul.set(0, Math.PI, 0, "XYZ");
+    _omafitManualCorQuat.setFromEuler(_omafitManualCorEul);
+    glassesPivot.quaternion.multiply(_omafitManualCorQuat);
   }
-  glassesPivot.scale.set(uSym, uSym, szOut);
+
+  glassesPivot.position.set(px, py, pz);
+  const uSym = Math.max(Math.abs(sx0), Math.abs(sy0), Math.abs(sz0), 1e-8);
+  glassesPivot.scale.setScalar(uSym);
   glassesPivot.updateMatrix();
 
   const qw = glassesPivot.quaternion.w;
@@ -2184,8 +2176,10 @@ function omafitGlassesManualPivotApplyEyeBasis(THREE, glassesPivot, lm, smoother
   if (!__omafitManualFinalOrientationLogged) {
     __omafitManualFinalOrientationLogged = true;
     try {
-      console.log("FORWARD FINAL:", forward);
-      console.log("PIVOT SCALE:", glassesPivot.scale);
+      const q = glassesPivot.quaternion;
+      console.log("FORWARD FINAL:", forward.x, forward.y, forward.z);
+      console.log("PIVOT QUAT:", { x: q.x, y: q.y, z: q.z, w: q.w });
+      console.log("PIVOT SCALE:", glassesPivot.scale.x);
     } catch {
       /* ignore */
     }
@@ -7060,8 +7054,8 @@ async function runArSession({
         glasses.position.set(0, 0, 0);
         glasses.scale.set(1, 1, 1);
         glasses.rotation.order = "XYZ";
-        /** `Ry(π)` já aplicado antes da medição de `modelWidth`; evita culling / lentes em −Z. */
-        glasses.rotation.set(0, Math.PI, 0);
+        /** Emergencial: Rx(π/2)+Ry(π) alinha GLB “de lado” ao eixo da âncora; afinar com attrs se preciso. */
+        glasses.rotation.set(Math.PI / 2, Math.PI, 0);
         glasses.updateMatrix();
         if (glassesManualMindarPivotYawFlip && glassesPivot) {
           glassesPivot.rotateY(Math.PI);
