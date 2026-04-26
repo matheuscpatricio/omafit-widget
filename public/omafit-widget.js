@@ -1915,6 +1915,8 @@
           passAttr('arGlassesManualCalibScale', 'data-ar-glasses-manual-calib-scale');
           passAttr('arGlassesManualCalibUi', 'data-ar-glasses-manual-calib-ui');
           passAttr('arGlassesPivotRotDeg', 'data-ar-glasses-pivot-rot-deg');
+          passAttr('arGlassesNoseAlignOffsetXM', 'data-ar-glasses-nose-align-offset-x-m');
+          passAttr('arGlassesModelCenterOffsetM', 'data-ar-glasses-model-center-offset-m');
           passAttr('arGlassesManualMindarRig', 'data-ar-glasses-manual-mindar-rig');
           passAttr('arOmafitCalibration', 'data-ar-omafit-calibration');
         }

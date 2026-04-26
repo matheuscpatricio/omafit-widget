@@ -38,6 +38,14 @@ import {
  * GLB canónico Blender (`data-ar-glasses-canonical-blender-export="1"`): origem na ponte
  * (nariz), frente −Z, rotação zero no root; desliga centro bbox, Tripo/bind automáticos
  * e re-centro pós-bind — ver comentário em `normalizeGlassesModel` e guia em `omafit-glasses-orient.js`.
+ * Alinhamento lateral ao nariz: `data-ar-glasses-nose-align-offset-x-m` (metros no **mesh**
+ * dentro de `omafit-ar-glasses-model-wrap`, **sem** rotação); default **−0.03**; típico **−0.06…−0.02**.
+ * Centro geométrico opcional no grupo: `data-ar-glasses-model-center-offset-m` (`x y z` m no mesh).
+ * **Âncora MindAR (óculos):** sempre **168** (ponte nasal / eixo médio na malha 468). O atributo
+ * `data-ar-mindar-anchor` **não** substitui 168 para óculos — evita origens laterais (ex. 33, 263).
+ * **Rotação do mesh `glasses`:** só no load (`normalizeGlassesModel` / canónico / identidade);
+ * sem `rotation.y +=` por frame. `data-ar-glasses-anatomy-yaw-deg` funde-se em **Y** de
+ * `data-ar-glasses-pivot-rot-deg` no init — o pivot usa um **Euler fixo** por frame (smoother ou `setFromEuler`).
  *
  * Iluminação adaptativa (face): amostragem do vídeo → ambiente + hemisfério + luz chave
  * + exposição ACES; sombras de contacto ajustam opacidade; PBR (`toneMapped`, IBL).
@@ -127,7 +135,7 @@ import {
  * **Mesh** `glasses`: identidade após centrar (orientação **só** no `glassesPivot`). **Pivot**: origem na âncora
  * (`position` = offset na **base facial** após `quat` de `makeBasis(eyeDir,trueUp,forward)` — sem converter
  * landmarks para local). **Centro geométrico**: após bake, `Box3` + `glasses.position.sub(center)` no root (igual pipeline
- * automático); modo manual só aplica `stickZ` no mesh. **Pivot** MindAR 168: posição `quat*(0,oy,oz)` — **sem** offset X por landmark.
+ * automático); modo manual só aplica `stickZ` no mesh. **Pivot** MindAR **sempre** âncora **168** (nariz; `data-ar-mindar-anchor` lateral ignorado em óculos): posição `quat*(0,oy,oz)` — **sem** offset X por landmark.
  * **Y/Z**: `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD no pivot.
  * Suavização pivot: `data-ar-glasses-manual-pivot-smooth` (lerp pos + slerp quat, default 0,72; intervalo típico 0,6–0,85).
  * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada.
@@ -399,7 +407,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-canonical-blender-export";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-glasses-model-wrap-group";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -760,6 +768,7 @@ const OMAFIT_FACE_LM_RIGHT_CHEEK = 234;
 /** Cantos dos olhos + ponte (referência de tilt). */
 const OMAFIT_FACE_LM_EYE_L_OUT = 263;
 const OMAFIT_FACE_LM_EYE_R_OUT = 33;
+/** Ponte nasal (Face Mesh 468) — origem MindAR **central** para óculos; não usar 33/263 (olhos) como âncora. */
 const OMAFIT_FACE_LM_NOSE_BRIDGE = 168;
 /** Topo da testa (glabela) + queixo: eixo vertical do rosto. */
 const OMAFIT_FACE_LM_FOREHEAD_TOP = 10;
@@ -6460,21 +6469,23 @@ async function runArSession({
       /^(1|true|yes|on)$/.test(
         String(cfgAttr("arGlassesManualMindarRig", "0")).trim().toLowerCase(),
       );
+    /**
+     * MindAR `addAnchor(i)`: i na malha facial 468. **Óculos** — sempre **168** (ponte nasal,
+     * eixo médio estável). `data-ar-mindar-anchor` lateral (ex. 33, 263 olhos) é ignorado para
+     * não deslocar estruturalmente o modelo. **Colar** — default **152** (zona mandíbula); aí
+     * `arMindarAnchor` continua configurável dentro do clamp 0…477.
+     */
     const defaultMindarAnchor = accessoryType === "necklace" ? "152" : "168";
     const anchorRaw = cfgAttr("arMindarAnchor", defaultMindarAnchor);
     let anchorIndex = Math.max(
       0,
       Math.min(477, Math.floor(Number(anchorRaw)) || (accessoryType === "necklace" ? 152 : 168)),
     );
-    if (
-      accessoryType === "glasses" &&
-      anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE &&
-      !glassesManualMindarRig
-    ) {
+    if (accessoryType === "glasses" && anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE) {
       console.warn(
-        "[omafit-ar] óculos: a âncora MindAR deve ser o landmark 168 (ponte). arMindarAnchor=",
+        "[omafit-ar] óculos: âncora MindAR fixa no landmark 168 (ponte nasal / centro facial). arMindarAnchor=",
         anchorIndex,
-        "→ a forçar 168.",
+        "→ a forçar 168 (evitar âncoras laterais dos olhos).",
       );
       anchorIndex = OMAFIT_FACE_LM_NOSE_BRIDGE;
     }
@@ -6508,6 +6519,24 @@ async function runArSession({
             return Number.isFinite(v) ? v : -0.032;
           })()
         : 0;
+    /**
+     * Deslocamento lateral do **mesh** `glasses` no eixo **+X local** (metros), só translação
+     * — centra visualmente a armação no nariz (âncora 168) quando o GLB vem ligeiramente
+     * deslocado em X. Não usar rotação para corrigir lateral. Attr: `data-ar-glasses-nose-align-offset-x-m`.
+     */
+    const glassesNoseAlignOffsetXM =
+      accessoryType === "glasses"
+        ? (() => {
+            const v = Number(String(cfgAttr("arGlassesNoseAlignOffsetXM", "-0.03")).trim());
+            if (!Number.isFinite(v)) return -0.03;
+            return THREE.MathUtils.clamp(v, -0.08, 0.04);
+          })()
+        : 0;
+    /** Offset manual do GLB no espaço local do `omafit-ar-glasses-model-wrap` (m); somado ao nariz em X. */
+    const glassesModelCenterOffsetM =
+      accessoryType === "glasses"
+        ? parseXyzMeters(cfgAttr("arGlassesModelCenterOffsetM", "0 0 0"), 0, 0, 0)
+        : { x: 0, y: 0, z: 0 };
     /** Multiplicador de estilo na largura anatómica (automático: IPD×equiv×factor/faceScale; antes era bochechas). */
     const glassesAnatomicWidthFactor = (() => {
       if (accessoryType !== "glasses") return 1;
@@ -6757,6 +6786,7 @@ async function runArSession({
     faceKeyLight.position.set(0.32, 0.82, 0.38);
     mindarThree.scene.add(faceKeyLight);
 
+    /** Óculos: `anchorIndex` já foi forçado a **168** (nariz / eixo médio); colar: 152 ou attr. */
     const anchor = mindarThree.addAnchor(anchorIndex);
     /** Grupos sob `anchor.group` devem ser da mesma classe `Group` que o MindAR usa (mesmo `three`). */
     const GroupCtor = anchor.group.constructor;
@@ -7324,6 +7354,9 @@ async function runArSession({
       Number.isFinite(glassesManualScaleRaw) && glassesManualScaleRaw > 0
         ? THREE.MathUtils.clamp(glassesManualScaleRaw, 0.25, 4)
         : 1;
+    /** Yaw anatómico extra (graus): fundido em `rotY` do pivot no load — sem quaternion extra por frame. */
+    const glassesAnatomyYawDegRaw = Number(String(cfgAttr("arGlassesAnatomyYawDeg", "0")).trim());
+    const glassesAnatomyYawDeltaDeg = Number.isFinite(glassesAnatomyYawDegRaw) ? glassesAnatomyYawDegRaw : 0;
     const glassesPivotRotDeg = parseEulerDegComponents(
       cfgAttr("arGlassesPivotRotDeg", "0, 0, 0"),
       0,
@@ -7343,7 +7376,7 @@ async function runArSession({
             offsetY: glassesLocalFineM.y + glassesManualCalibParsed.y,
             offsetZ: glassesLocalFineM.z + glassesManualCalibParsed.z,
             rotX: glassesPivotRotDeg.x,
-            rotY: glassesPivotRotDeg.y,
+            rotY: glassesPivotRotDeg.y + glassesAnatomyYawDeltaDeg,
             rotZ: glassesPivotRotDeg.z,
             scale: glassesManualScaleMulInit,
           }
@@ -7363,10 +7396,6 @@ async function runArSession({
     if (OMAFIT_GLASSES_PIVOT_DIRECT_TEST && glassesPivotConfig) {
       Object.assign(glassesPivotConfig, OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES);
     }
-    const anatomyYawDeg = Number(String(cfgAttr("arGlassesAnatomyYawDeg", "0")).trim());
-    const anatomyYawRad = Number.isFinite(anatomyYawDeg)
-      ? (anatomyYawDeg * Math.PI) / 180
-      : 0;
 
     /**
      * Rig **estrutural** MindAR (opcional): `data-ar-glasses-structural-mindar-rig="1"`
@@ -7959,6 +7988,8 @@ async function runArSession({
     let necklaceShadowParts = null;
     /** Grupo intermédio: escala + fade de entrada sem afectar escalas anatómicas no mesh. */
     let microUxModelWrap = null;
+    /** Grupo filho do pivot: origem = ponto lógico de try-on; o mesh `glasses` desloca-se dentro sem editar o GLB. */
+    let glassesModelWrap = null;
     let glassesPivot = null;
     /** Cópia da posição inicial do pivot (Z inclui stick) — repor antes do alinhamento debug 168. */
     let glassesPivotBaseLocalPos = null;
@@ -8016,14 +8047,17 @@ async function runArSession({
       } else {
         calibRot.add(glassesPivot);
       }
+      glassesModelWrap = new GroupCtor();
+      glassesModelWrap.name = "omafit-ar-glasses-model-wrap";
       if (!microUxDisabled) {
         microUxModelWrap = new GroupCtor();
         microUxModelWrap.name = "omafit-ar-micro-ux-wrap";
-        microUxModelWrap.add(glasses);
+        microUxModelWrap.add(glassesModelWrap);
         glassesPivot.add(microUxModelWrap);
       } else {
-        glassesPivot.add(glasses);
+        glassesPivot.add(glassesModelWrap);
       }
+      glassesModelWrap.add(glasses);
       glasses.name = "omafit-ar-glasses-model";
       if (glassesManualMindarRig) {
         glasses.matrixAutoUpdate = true;
@@ -8034,6 +8068,20 @@ async function runArSession({
         glasses.updateMatrix();
       } else {
         glasses.position.set(0, 0, 0);
+      }
+      /** Centro lógico no wrap: translação só no mesh `glasses` (GLB inalterado). */
+      if (accessoryType === "glasses") {
+        const nx = Number.isFinite(glassesNoseAlignOffsetXM) ? glassesNoseAlignOffsetXM : 0;
+        const cx = glassesModelCenterOffsetM.x + nx;
+        const cy = glassesModelCenterOffsetM.y;
+        const cz = glassesModelCenterOffsetM.z;
+        if (glassesManualMindarRig) {
+          glasses.position.x += cx;
+          glasses.position.y += cy;
+          glasses.position.z += cz;
+        } else {
+          glasses.position.set(cx, cy, cz);
+        }
       }
       if (!glassesStructuralMindarRig && !glassesManualMindarRig && !glassesCanonicalBlenderExport) {
         omafitStripGlassesMeshRollYxz(THREE, glasses);
@@ -8111,7 +8159,7 @@ async function runArSession({
       });
     }
 
-    /** Compõe só yaw anatómico (YXZ, Z=0) com a rotação do pivot; o horizonte trava-se no `onUpdate`. */
+    /** Euler XYZ do pivot (graus→rad no `onUpdate`); sem composição Y extra por frame. */
     const glassesPivotPoseScratch =
       accessoryType === "glasses" &&
       glassesPivot &&
@@ -8119,10 +8167,7 @@ async function runArSession({
       !glassesStructuralMindarRig &&
       !glassesGeometryAnchor
         ? {
-            qAnat: new THREE.Quaternion(),
-            qMerc: new THREE.Quaternion(),
             eMerc: new THREE.Euler(0, 0, 0, "XYZ"),
-            eAnat: new THREE.Euler(0, 0, 0, "YXZ"),
           }
         : null;
 
@@ -8295,6 +8340,7 @@ async function runArSession({
     faceArEnhancementState = {
       microUxDisabled,
       microUxModelWrap,
+      glassesModelWrap,
       microUxGlassesRoot: glasses,
       microUxRingEl: null,
       microUx: {
@@ -8454,11 +8500,6 @@ async function runArSession({
               mat: new THREE.Matrix4(),
             }
           : null,
-      eyeNeutralAtan: 0,
-      eyeNeutralWarmupSum: 0,
-      eyeNeutralWarmupN: 0,
-      eyeNeutralReady: false,
-      eyeTiltSmoothed: 0,
       facePmremRT: null,
       templeDepthGeom,
       faceOccluderMesh,
@@ -8619,11 +8660,6 @@ async function runArSession({
             faceParentGroup.matrix.identity();
             faceParentGroup.matrixWorldNeedsUpdate = true;
           }
-          st.eyeNeutralWarmupSum = 0;
-          st.eyeNeutralWarmupN = 0;
-          st.eyeNeutralReady = false;
-          st.eyeNeutralAtan = 0;
-          st.eyeTiltSmoothed = 0;
           st.glassesPivotFaceScale = OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE;
           if (st.necklaceSwing?.swingGroup) {
             st.necklaceSwing.vel.set(0, 0, 0);
@@ -9088,35 +9124,6 @@ async function runArSession({
           if (
             !st.glassesStructuralMindarRig &&
             !st.glassesGeometryAnchor &&
-            !st.glassesCheekOrthogonalBasis
-          ) {
-            const eL = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_L_OUT);
-            const eR = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
-            let atan;
-            if (eL && eR) {
-              atan = Math.atan2(eL.y - eR.y, eL.x - eR.x);
-            } else {
-              const dx = lm[OMAFIT_FACE_LM_EYE_L_OUT][0] - lm[OMAFIT_FACE_LM_EYE_R_OUT][0];
-              const dy = lm[OMAFIT_FACE_LM_EYE_L_OUT][1] - lm[OMAFIT_FACE_LM_EYE_R_OUT][1];
-              atan = Math.atan2(dy, dx);
-            }
-            if (!st.eyeNeutralReady) {
-              st.eyeNeutralWarmupSum += atan;
-              st.eyeNeutralWarmupN += 1;
-              if (st.eyeNeutralWarmupN >= 28) {
-                st.eyeNeutralAtan = st.eyeNeutralWarmupSum / st.eyeNeutralWarmupN;
-                st.eyeNeutralReady = true;
-              }
-            }
-            const neutral = st.eyeNeutralReady ? st.eyeNeutralAtan : atan;
-            const rawTilt = THREE.MathUtils.clamp((atan - neutral) * 0.34, -0.065, 0.065);
-            st.eyeTiltSmoothed = THREE.MathUtils.lerp(st.eyeTiltSmoothed, rawTilt, 0.16);
-          } else if (!st.glassesStructuralMindarRig && !st.glassesGeometryAnchor) {
-            st.eyeTiltSmoothed = THREE.MathUtils.lerp(st.eyeTiltSmoothed, 0, 0.22);
-          }
-          if (
-            !st.glassesStructuralMindarRig &&
-            !st.glassesGeometryAnchor &&
             glassesPivot &&
             glassesPivotConfig &&
             glassesPivotPoseScratch
@@ -9125,8 +9132,6 @@ async function runArSession({
             const sm = Number(cfg.scale);
             const sc = Number.isFinite(sm) && sm > 0 ? THREE.MathUtils.clamp(sm, 0.25, 4) : 1;
             const scratch = glassesPivotPoseScratch;
-            scratch.eAnat.set(0, anatomyYawRad, 0, "YXZ");
-            scratch.qAnat.setFromEuler(scratch.eAnat);
             if (glassesPivotSmoother) {
               const dtPv =
                 glassesPivotSmoothPrevMs >= 0
@@ -9142,27 +9147,12 @@ async function runArSession({
                 dtPv,
                 rad,
               );
-              scratch.qMerc.copy(glassesPivot.quaternion);
-              glassesPivot.quaternion.copy(scratch.qAnat).multiply(scratch.qMerc);
             } else {
               scratch.eMerc.set(rad(cfg.rotX), rad(cfg.rotY), rad(cfg.rotZ), "XYZ");
-              scratch.qMerc.setFromEuler(scratch.eMerc);
-              glassesPivot.quaternion.copy(scratch.qAnat).multiply(scratch.qMerc);
+              glassesPivot.quaternion.setFromEuler(scratch.eMerc);
               glassesPivot.position.set(cfg.offsetX, cfg.offsetY, cfg.offsetZ);
               glassesPivot.scale.setScalar(sc);
             }
-          } else if (
-            !st.glassesStructuralMindarRig &&
-            !st.glassesGeometryAnchor &&
-            glassesPivot &&
-            glassesPivotPoseScratch
-          ) {
-            const scratch = glassesPivotPoseScratch;
-            scratch.eAnat.set(0, anatomyYawRad, 0, "YXZ");
-            scratch.qAnat.setFromEuler(scratch.eAnat);
-            scratch.qMerc.copy(glassesPivot.quaternion);
-            glassesPivot.quaternion.copy(scratch.qAnat).multiply(scratch.qMerc);
-            glassesPivot.scale.setScalar(1);
           }
           /**
            * Sincronização definitiva câmara↔vídeo + bloqueio NDC: centro da bbox
