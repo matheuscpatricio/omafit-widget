@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Lock, Eye, FileText } from 'lucide-react';
+import { ArrowLeft, Lock, Eye, FileText } from 'lucide-react';
+import { OmafitLogo } from './landing/OmafitLogo';
 
 type PublicLocale = 'pt' | 'en' | 'es';
 
@@ -240,54 +241,51 @@ export function PrivacyPolicyPage() {
   const t = privacyTranslations[locale];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="landing-page min-h-screen bg-oma-canvas text-oma-cream antialiased">
+      <header className="border-b border-oma-line/40 bg-oma-elevated/95 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           <button
+            type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+            className="mb-6 flex items-center gap-2 text-sm font-medium text-oma-muted transition-colors hover:text-oma-cream"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5 shrink-0" />
             <span>{t.back}</span>
           </button>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-[#810707] to-red-700 rounded-xl flex items-center justify-center">
-              <Shield className="w-8 h-8 text-white" />
+          <div className="flex flex-wrap items-center gap-4 sm:gap-5">
+            <div className="rounded-2xl border border-oma-line/40 bg-oma-canvas/60 p-3 shadow-inner">
+              <OmafitLogo variant="onDark" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
-              <p className="text-gray-600">{t.updatedAt}</p>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl">{t.title}</h1>
+              <p className="mt-1 text-sm text-oma-muted">{t.updatedAt}</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded-xl shadow-sm p-8 space-y-8">
+      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="space-y-10 rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-6 shadow-elegant backdrop-blur-sm sm:p-8 sm:space-y-12">
 
           {/* Introduction */}
           <section>
-            <div className="flex items-center gap-3 mb-4">
-              <FileText className="w-6 h-6 text-[#810707]" />
-              <h2 className="text-2xl font-bold text-gray-900">{t.introTitle}</h2>
+            <div className="mb-4 flex items-center gap-3">
+              <FileText className="h-6 w-6 shrink-0 text-oma-accent" />
+              <h2 className="text-2xl font-semibold tracking-tight text-oma-cream">{t.introTitle}</h2>
             </div>
-            <p className="text-gray-700 leading-relaxed">
-              {t.introText}
-            </p>
+            <p className="leading-relaxed text-oma-muted">{t.introText}</p>
           </section>
 
           {/* Information Collection */}
           <section>
-            <div className="flex items-center gap-3 mb-4">
-              <Eye className="w-6 h-6 text-[#810707]" />
-              <h2 className="text-2xl font-bold text-gray-900">{t.collectTitle}</h2>
+            <div className="mb-4 flex items-center gap-3">
+              <Eye className="h-6 w-6 shrink-0 text-oma-accent" />
+              <h2 className="text-2xl font-semibold tracking-tight text-oma-cream">{t.collectTitle}</h2>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.accountInfo}</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                <h3 className="mb-2 text-lg font-semibold text-oma-cream">{t.accountInfo}</h3>
+                <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
                   <li>{t.accountItem1}</li>
                   <li>{t.accountItem2}</li>
                   <li>{t.accountItem3}</li>
@@ -295,8 +293,8 @@ export function PrivacyPolicyPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.usageData}</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                <h3 className="mb-2 text-lg font-semibold text-oma-cream">{t.usageData}</h3>
+                <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
                   <li>{t.usageItem1}</li>
                   <li>{t.usageItem2}</li>
                   <li>{t.usageItem3}</li>
@@ -305,8 +303,8 @@ export function PrivacyPolicyPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t.technicalInfo}</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                <h3 className="mb-2 text-lg font-semibold text-oma-cream">{t.technicalInfo}</h3>
+                <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
                   <li>{t.technicalItem1}</li>
                   <li>{t.technicalItem2}</li>
                   <li>{t.technicalItem3}</li>
@@ -317,11 +315,11 @@ export function PrivacyPolicyPage() {
 
           {/* How We Use Information */}
           <section>
-            <div className="flex items-center gap-3 mb-4">
-              <Lock className="w-6 h-6 text-[#810707]" />
-              <h2 className="text-2xl font-bold text-gray-900">{t.useTitle}</h2>
+            <div className="mb-4 flex items-center gap-3">
+              <Lock className="h-6 w-6 shrink-0 text-oma-accent" />
+              <h2 className="text-2xl font-semibold tracking-tight text-oma-cream">{t.useTitle}</h2>
             </div>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+            <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
               <li>{t.useItem1}</li>
               <li>{t.useItem2}</li>
               <li>{t.useItem3}</li>
@@ -334,12 +332,10 @@ export function PrivacyPolicyPage() {
 
           {/* Image Processing */}
           <section>
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-3">{t.imageTitle}</h3>
-              <p className="text-gray-700 mb-3">
-                {t.imageText}
-              </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+            <div className="rounded-2xl border border-oma-tech/35 bg-oma-tech/[0.08] p-6 shadow-inner">
+              <h3 className="mb-3 text-lg font-semibold text-oma-cream">{t.imageTitle}</h3>
+              <p className="mb-3 leading-relaxed text-oma-muted">{t.imageText}</p>
+              <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
                 <li>{t.imageItem1}</li>
                 <li>{t.imageItem2}</li>
                 <li>{t.imageItem3}</li>
@@ -350,23 +346,29 @@ export function PrivacyPolicyPage() {
 
           {/* Data Sharing */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.sharingTitle}</h2>
-            <p className="text-gray-700 mb-3">{t.sharingText}</p>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
-              <li><strong>{t.sharingItem1}</strong> {t.sharingItem1Desc}</li>
-              <li><strong>{t.sharingItem2}</strong> {t.sharingItem2Desc}</li>
-              <li><strong>{t.sharingItem3}</strong> {t.sharingItem3Desc}</li>
-              <li><strong>{t.sharingItem4}</strong> {t.sharingItem4Desc}</li>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.sharingTitle}</h2>
+            <p className="mb-3 leading-relaxed text-oma-muted">{t.sharingText}</p>
+            <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
+              <li>
+                <strong className="font-semibold text-oma-cream">{t.sharingItem1}</strong> {t.sharingItem1Desc}
+              </li>
+              <li>
+                <strong className="font-semibold text-oma-cream">{t.sharingItem2}</strong> {t.sharingItem2Desc}
+              </li>
+              <li>
+                <strong className="font-semibold text-oma-cream">{t.sharingItem3}</strong> {t.sharingItem3Desc}
+              </li>
+              <li>
+                <strong className="font-semibold text-oma-cream">{t.sharingItem4}</strong> {t.sharingItem4Desc}
+              </li>
             </ul>
           </section>
 
           {/* Data Security */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.securityTitle}</h2>
-            <p className="text-gray-700 mb-3">
-              {t.securityText}
-            </p>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.securityTitle}</h2>
+            <p className="mb-3 leading-relaxed text-oma-muted">{t.securityText}</p>
+            <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
               <li>{t.securityItem1}</li>
               <li>{t.securityItem2}</li>
               <li>{t.securityItem3}</li>
@@ -377,11 +379,9 @@ export function PrivacyPolicyPage() {
 
           {/* Your Rights */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.rightsTitle}</h2>
-            <p className="text-gray-700 mb-3">
-              {t.rightsText}
-            </p>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.rightsTitle}</h2>
+            <p className="mb-3 leading-relaxed text-oma-muted">{t.rightsText}</p>
+            <ul className="ml-4 list-inside list-disc space-y-2 text-oma-muted">
               <li>{t.rightsItem1}</li>
               <li>{t.rightsItem2}</li>
               <li>{t.rightsItem3}</li>
@@ -390,51 +390,49 @@ export function PrivacyPolicyPage() {
               <li>{t.rightsItem6}</li>
               <li>{t.rightsItem7}</li>
             </ul>
-            <p className="text-gray-700 mt-4">
-              {t.rightsContact} <a href="mailto:contato@omafit.co" className="text-[#810707] font-semibold hover:underline">contato@omafit.co</a>
+            <p className="mt-4 leading-relaxed text-oma-muted">
+              {t.rightsContact}{' '}
+              <a href="mailto:contato@omafit.co" className="font-medium text-oma-accent hover:underline">
+                contato@omafit.co
+              </a>
             </p>
           </section>
 
           {/* Data Retention */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.retentionTitle}</h2>
-            <p className="text-gray-700">
-              {t.retentionText}
-            </p>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.retentionTitle}</h2>
+            <p className="leading-relaxed text-oma-muted">{t.retentionText}</p>
           </section>
 
           {/* Cookies */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.cookiesTitle}</h2>
-            <p className="text-gray-700">
-              {t.cookiesText}
-            </p>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.cookiesTitle}</h2>
+            <p className="leading-relaxed text-oma-muted">{t.cookiesText}</p>
           </section>
 
           {/* Children's Privacy */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.minorsTitle}</h2>
-            <p className="text-gray-700">
-              {t.minorsText}
-            </p>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.minorsTitle}</h2>
+            <p className="leading-relaxed text-oma-muted">{t.minorsText}</p>
           </section>
 
           {/* Changes to Policy */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.changesTitle}</h2>
-            <p className="text-gray-700">
-              {t.changesText}
-            </p>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.changesTitle}</h2>
+            <p className="leading-relaxed text-oma-muted">{t.changesText}</p>
           </section>
 
           {/* Contact */}
-          <section className="bg-gray-50 rounded-xl p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.contactTitle}</h2>
-            <p className="text-gray-700 mb-4">
-              {t.contactText}
-            </p>
-            <div className="space-y-2 text-gray-700">              
-              <p><strong>{t.emailLabel}</strong> <a href="mailto:contato@omafit.co" className="text-[#810707] hover:underline">contato@omafit.co</a></p>
+          <section className="rounded-2xl border border-oma-accent/25 bg-oma-canvas/50 p-6">
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight text-oma-cream">{t.contactTitle}</h2>
+            <p className="mb-4 leading-relaxed text-oma-muted">{t.contactText}</p>
+            <div className="space-y-2 text-oma-muted">
+              <p>
+                <strong className="font-semibold text-oma-cream">{t.emailLabel}</strong>{' '}
+                <a href="mailto:contato@omafit.co" className="font-medium text-oma-accent hover:underline">
+                  contato@omafit.co
+                </a>
+              </p>
             </div>
           </section>
 

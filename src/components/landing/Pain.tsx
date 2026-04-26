@@ -115,7 +115,7 @@ export function Pain() {
                 variants={itemVariants}
                 whileHover={{ y: -8, scale: 1.01 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                className="group relative overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-parchment/95 p-6 text-oma-ink shadow-elegant backdrop-blur-sm transition-shadow duration-300 hover:border-oma-accent/35 hover:shadow-[0_20px_50px_-12px_rgba(217,104,69,0.2)] sm:p-7"
+                className="group relative overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-parchment/95 p-6 shadow-elegant backdrop-blur-sm transition-shadow duration-300 hover:border-oma-accent/35 hover:shadow-[0_20px_50px_-12px_rgba(217,104,69,0.2)] sm:p-7"
               >
                 <div
                   aria-hidden
@@ -126,7 +126,7 @@ export function Pain() {
                     <div className="grid h-11 w-11 place-items-center rounded-xl bg-oma-light">
                       <Icon className="h-5 w-5 text-oma-accentDark" />
                     </div>
-                    <span className="font-dm-mono text-[11px] font-medium uppercase tracking-wider text-oma-ink opacity-[0.62]">
+                    <span className="font-dm-mono text-[11px] font-medium uppercase tracking-wider text-oma-muted">
                       Dor #{i + 1}
                     </span>
                   </div>
@@ -134,15 +134,15 @@ export function Pain() {
                     <div className="font-dm-mono text-2xl font-semibold tracking-tight text-[#5BAF8A]">
                       {p.stat}
                     </div>
-                    <div className="mt-0.5 max-w-[130px] text-[11px] leading-tight text-oma-ink opacity-[0.72]">
+                    <div className="mt-0.5 max-w-[130px] text-[11px] leading-tight text-oma-muted">
                       {p.statLabel}
                     </div>
                   </div>
                 </div>
-                <h3 className="relative mt-5 text-xl font-semibold tracking-tight text-oma-canvas">
+                <h3 className="relative mt-5 text-xl font-semibold tracking-tight text-oma-cream">
                   {p.title}
                 </h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-oma-ink opacity-[0.82]">
+                <p className="mt-2 text-[15px] leading-relaxed text-oma-muted">
                   {p.description}
                 </p>
               </motion.div>

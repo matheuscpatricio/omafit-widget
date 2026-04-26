@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, MessageSquare, Send, CheckCircle, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Mail, MessageSquare, Send, CheckCircle, Phone } from 'lucide-react';
+import { OmafitLogo } from './landing/OmafitLogo';
+import { Button } from './ui/button';
 
 type PublicLocale = 'pt' | 'en' | 'es';
 
@@ -176,125 +178,121 @@ export function ContactPage() {
     }));
   };
 
+  const inputClass =
+    'w-full rounded-xl border border-oma-line/50 bg-oma-canvas/80 px-4 py-3 text-oma-cream shadow-inner placeholder:text-oma-muted/55 transition-[border-color,box-shadow] focus:border-oma-accent/50 focus:outline-none focus:ring-2 focus:ring-oma-accent/35';
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="landing-page min-h-screen bg-oma-canvas text-oma-cream antialiased">
+      <header className="border-b border-oma-line/40 bg-oma-elevated/95 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <button
+            type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+            className="mb-6 flex items-center gap-2 text-sm font-medium text-oma-muted transition-colors hover:text-oma-cream"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5 shrink-0" />
             <span>{t.back}</span>
           </button>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-[#810707] to-red-700 rounded-xl flex items-center justify-center">
-              <Mail className="w-8 h-8 text-white" />
+          <div className="flex flex-wrap items-center gap-4 sm:gap-5">
+            <div className="rounded-2xl border border-oma-line/40 bg-oma-canvas/60 p-3 shadow-inner">
+              <OmafitLogo variant="onDark" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
-              <p className="text-gray-600">{t.subtitle}</p>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl">{t.title}</h1>
+              <p className="mt-1 text-oma-muted">{t.subtitle}</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
 
           {/* Contact Information */}
           <div className="lg:col-span-1 space-y-6">
 
             {/* Contact Cards */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-6 h-6 text-[#810707]" />
+            <div className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-6 shadow-elegant backdrop-blur-sm">
+              <div className="mb-6 flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-oma-line/40 bg-oma-canvas/50">
+                  <Mail className="h-6 w-6 text-oma-accent" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{t.email}</h3>
-                  <a href="mailto:contato@omafit.co" className="text-gray-600 hover:text-[#810707] transition-colors">
+                <div className="min-w-0">
+                  <h3 className="mb-1 font-semibold text-oma-cream">{t.email}</h3>
+                  <a
+                    href="mailto:contato@omafit.co"
+                    className="text-sm text-oma-muted transition-colors hover:text-oma-accent"
+                  >
                     contato@omafit.co
                   </a>
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="w-6 h-6 text-blue-600" />
+              <div className="mb-6 flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-oma-line/40 bg-oma-canvas/50">
+                  <MessageSquare className="h-6 w-6 text-oma-tech" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{t.support}</h3>
-                  <p className="text-gray-600">
-                    {t.supportDesc}
-                  </p>
+                  <h3 className="mb-1 font-semibold text-oma-cream">{t.support}</h3>
+                  <p className="text-sm leading-relaxed text-oma-muted">{t.supportDesc}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-6 h-6 text-green-600" />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-oma-line/40 bg-oma-canvas/50">
+                  <Phone className="h-6 w-6 text-oma-accent" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{t.enterprise}</h3>
-                  <p className="text-gray-600 text-sm">
-                    {t.enterpriseDesc}
-                  </p>
+                  <h3 className="mb-1 font-semibold text-oma-cream">{t.enterprise}</h3>
+                  <p className="text-sm leading-relaxed text-oma-muted">{t.enterpriseDesc}</p>
                 </div>
               </div>
             </div>
 
-            {/* Quick Info */}
-            <div className="bg-gradient-to-br from-[#810707] to-red-700 rounded-xl shadow-sm p-6 text-white">
-              <h3 className="text-xl font-bold mb-4">{t.faqTitle}</h3>
-              <ul className="space-y-3 text-sm">
+            <div className="rounded-2xl border border-oma-line/40 bg-gradient-to-br from-oma-elevated to-oma-canvas p-6 shadow-elegant">
+              <h3 className="mb-4 text-xl font-semibold tracking-tight text-oma-cream">{t.faqTitle}</h3>
+              <ul className="space-y-3 text-sm text-oma-muted">
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-1">•</span>
+                  <span className="mt-0.5 shrink-0 text-oma-accent">•</span>
                   <span>{t.faq1}</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-1">•</span>
+                  <span className="mt-0.5 shrink-0 text-oma-accent">•</span>
                   <span>{t.faq2}</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-1">•</span>
+                  <span className="mt-0.5 shrink-0 text-oma-accent">•</span>
                   <span>{t.faq3}</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-1">•</span>
+                  <span className="mt-0.5 shrink-0 text-oma-accent">•</span>
                   <span>{t.faq4}</span>
                 </li>
               </ul>
-              <p className="text-sm mt-4 text-red-100">
-                {t.faqFooter}
-              </p>
+              <p className="mt-4 text-sm leading-relaxed text-oma-muted">{t.faqFooter}</p>
             </div>
 
           </div>
 
           {/* Contact Form */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm p-8">
+            <div className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-6 shadow-elegant backdrop-blur-sm sm:p-8">
               {isSubmitted ? (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle className="w-12 h-12 text-green-600" />
+                <div className="py-12 text-center">
+                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-oma-tech/40 bg-oma-tech/15">
+                    <CheckCircle className="h-12 w-12 text-oma-tech" />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.sentTitle}</h3>
-                  <p className="text-gray-600">
-                    {t.sentDesc}
-                  </p>
+                  <h3 className="mb-2 text-2xl font-semibold tracking-tight text-oma-cream">{t.sentTitle}</h3>
+                  <p className="text-oma-muted">{t.sentDesc}</p>
                 </div>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">{t.formTitle}</h2>
+                  <h2 className="mb-6 text-2xl font-semibold tracking-tight text-oma-cream">{t.formTitle}</h2>
 
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="storeName" className="mb-2 block text-sm font-medium text-oma-muted">
                           {t.storeName}
                         </label>
                         <input
@@ -304,13 +302,13 @@ export function ContactPage() {
                           required
                           value={formData.storeName}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
+                          className={inputClass}
                           placeholder={t.storeNamePlaceholder}
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="email" className="mb-2 block text-sm font-medium text-oma-muted">
                           {t.emailLabel}
                         </label>
                         <input
@@ -320,14 +318,14 @@ export function ContactPage() {
                           required
                           value={formData.email}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
+                          className={inputClass}
                           placeholder={t.emailPlaceholder}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="subject" className="mb-2 block text-sm font-medium text-oma-muted">
                         {t.subject}
                       </label>
                       <select
@@ -336,7 +334,7 @@ export function ContactPage() {
                         required
                         value={formData.subject}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all"
+                        className={inputClass}
                       >
                         <option value="">{t.subjectPlaceholder}</option>
                         <option value={t.subjectTechnical}>{t.subjectTechnical}</option>
@@ -349,7 +347,7 @@ export function ContactPage() {
                     </div>
 
                     <div>
-                      <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="message" className="mb-2 block text-sm font-medium text-oma-muted">
                         {t.message}
                       </label>
                       <textarea
@@ -359,32 +357,34 @@ export function ContactPage() {
                         value={formData.message}
                         onChange={handleChange}
                         rows={6}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#810707] focus:border-transparent transition-all resize-none"
+                        className={`${inputClass} resize-none`}
                         placeholder={t.messagePlaceholder}
                       />
                     </div>
 
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      size="lg"
                       disabled={isSubmitting}
-                      className="w-full bg-gradient-to-r from-[#810707] to-red-700 text-white py-3 px-6 rounded-lg hover:from-red-800 hover:to-red-900 transition-all font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full shadow-[0_8px_28px_-4px_rgba(217,104,69,0.45)]"
                     >
                       {isSubmitting ? (
                         <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#F6F0E2] border-t-transparent" />
                           {t.sending}
                         </>
                       ) : (
                         <>
-                          <Send className="w-5 h-5" />
+                          <Send className="h-5 w-5 shrink-0" />
                           {t.send}
                         </>
                       )}
-                    </button>
+                    </Button>
 
-                    <p className="text-sm text-gray-500 text-center">
+                    <p className="text-center text-sm text-oma-muted">
                       {t.privacyPrefix}{' '}
-                      <a href="/privacidade" className="text-[#810707] hover:underline">
+                      <a href="/privacidade" className="font-medium text-oma-accent hover:underline">
                         {t.privacyLink}
                       </a>
                     </p>
