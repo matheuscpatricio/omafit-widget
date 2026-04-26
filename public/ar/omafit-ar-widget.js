@@ -109,6 +109,7 @@ import {
  * landmarks para local). Centro X: midpoint filtrado → se `|x| ≤ OMAFIT_GLASSES_MANUAL_VISUAL_CENTER_MAX_VALID_M`
  * usa-se o valor; caso contrário **ignora-se** (0). **Bias** opcional `data-ar-glasses-x-bias` soma-se depois;
  * offset pivot `vx = -visualCenterX * escala` (1× no 1º frame).
+ * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada; não usa centro visual.
  * **Y/Z** via `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`). Escala IPD.
  * Incompatível com estrutural e geometria.
  */
@@ -260,7 +261,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_visual-center-validation";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-26_final-authoritative-offset";
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -5827,6 +5828,10 @@ async function runArSession({
       if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return { x: defX, y: defY, z: defZ };
       return { x: parts[0], y: parts[1], z: parts[2] };
     }
+    /** Offset final do pivot (m), eixos locais do pai — `data-ar-glasses-offset-final-m`. */
+    function parseOffsetFinal(raw) {
+      return parseXyzMeters(raw, 0, 0, 0);
+    }
 
     /**
      * Rig **100% manual** (`data-ar-glasses-manual-mindar-rig="1"`): sem auto no GLB;
@@ -6695,6 +6700,12 @@ async function runArSession({
           return Number.isFinite(v) ? v : 0;
         })()
       : 0;
+    const glassesOffsetFinalM = parseOffsetFinal(cfgAttr("arGlassesOffsetFinalM", "0 0 0"));
+    try {
+      console.log("[omafit-ar] FINAL OFFSET (authoritative)", glassesOffsetFinalM);
+    } catch {
+      /* ignore */
+    }
 
     /**
      * Contentor de orientação: quando activo (default para óculos), o GLB
@@ -7481,6 +7492,13 @@ async function runArSession({
       },
       glassesManualVisualCenterX,
       glassesManualXBiasM,
+      glassesOffsetFinalM: {
+        x: glassesOffsetFinalM.x,
+        y: glassesOffsetFinalM.y,
+        z: glassesOffsetFinalM.z,
+      },
+      /** Reuso: `position.add` do offset final sem alocar por frame. */
+      glassesOffsetFinalVec: new THREE.Vector3(),
       /** `true` após 1º cálculo de centro visual com `forward` face basis (modo manual). */
       glassesManualVisualCenterResolved: !glassesManualMindarRig,
       /** `1/maxDim * modelScaleMul` — pipeline automático / mesh; modo manual interpupilar usa `OMAFIT_GLASSES_MANUAL_MINDAR_TO_METERS`. */
@@ -8242,6 +8260,11 @@ async function runArSession({
           }
           if (glassesPivot && !st.glassesManualMindarRig) {
             omafitLockGlassesPivotHorizon(THREE, glassesPivot);
+          }
+          if (glassesPivot && st.glassesOffsetFinalM && st.glassesOffsetFinalVec) {
+            const fo = st.glassesOffsetFinalM;
+            st.glassesOffsetFinalVec.set(fo.x, fo.y, fo.z);
+            glassesPivot.position.add(st.glassesOffsetFinalVec);
           }
           }
         }
