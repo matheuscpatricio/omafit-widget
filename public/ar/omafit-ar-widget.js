@@ -10655,7 +10655,10 @@ async function runHandArSession({
     arDeviceProfile: handArProfile,
   });
 
-  loading.textContent = t.loadingTracking || t.loading || "A carregar tracking...";
+  loading.textContent =
+    accessoryType === "bracelet"
+      ? "A preparar tracking da pulseira…"
+      : "A preparar tracking do pulso…";
 
   const visionExports = (() => {
     const v = vision;
@@ -10735,7 +10738,11 @@ async function runHandArSession({
    * `data-ar-hand-pmrem-import-timeout-ms` (dynamic `import()` do IBL via esm.sh).
    */
   let handLandmarker;
-  const delegatePref = String(cfgAttr("arHandMpDelegate", "") || "").trim().toLowerCase();
+  const delegatePrefRaw = String(cfgAttr("arHandMpDelegate", "") || "").trim().toLowerCase();
+  const delegatePref =
+    accessoryType === "bracelet" && delegatePrefRaw === "gpu"
+      ? "cpu"
+      : delegatePrefRaw;
   const timeoutRaw = cfgAttr("arHandLandmarkerTimeoutMs", "");
   let mpTimeoutMs = Number(timeoutRaw);
   if (!Number.isFinite(mpTimeoutMs) || mpTimeoutMs <= 0) mpTimeoutMs = 24000;
@@ -10749,6 +10756,10 @@ async function runHandArSession({
   }
 
   if (cpuFirst) {
+    loading.textContent =
+      accessoryType === "bracelet"
+        ? "A carregar tracking da pulseira (CPU)…"
+        : "A carregar tracking do pulso (CPU)…";
     console.log(
       "[omafit-ar] HandLandmarker CPU (default; use data-ar-hand-mp-delegate=gpu for GPU first)",
     );
@@ -10759,6 +10770,7 @@ async function runHandArSession({
     console.log("[omafit-ar] HandLandmarker OK (CPU)");
   } else {
     try {
+      loading.textContent = "A carregar tracking do pulso (GPU)…";
       handLandmarker = await Promise.race([
         createHandLandmarker("GPU"),
         new Promise((_, rej) => {
@@ -10770,7 +10782,10 @@ async function runHandArSession({
       console.log("[omafit-ar] HandLandmarker OK (GPU)");
     } catch (eGpu) {
       console.warn("[omafit-ar] HandLandmarker GPU falhou ou expirou:", eGpu?.message || eGpu);
-      loading.textContent = t.loadingTracking || t.loading || "A carregar tracking…";
+      loading.textContent =
+        accessoryType === "bracelet"
+          ? "A trocar para tracking da pulseira (CPU)…"
+          : "A trocar para tracking do pulso (CPU)…";
       handLandmarker = await createHandLandmarkerWithTimeout(
         "CPU",
         "HandLandmarker CPU fallback",
