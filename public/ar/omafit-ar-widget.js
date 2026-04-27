@@ -3717,7 +3717,13 @@ function omafitApplyModelOpacityFactor(root, factor) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (let mi = 0; mi < mats.length; mi++) {
       const m = mats[mi];
-      if (!m || !m.userData?.omafitOpacityBaseStored) continue;
+      if (!m || typeof m !== "object") continue;
+      if (!m.userData) m.userData = {};
+      if (!m.userData.omafitOpacityBaseStored) {
+        m.userData.omafitOpacityBaseStored = true;
+        m.userData.omafitOpacityBase = typeof m.opacity === "number" ? m.opacity : 1;
+        m.userData.omafitTransparentBase = m.transparent === true;
+      }
       const base = Number(m.userData.omafitOpacityBase);
       const b = Number.isFinite(base) ? base : 1;
       const op = b * f;
@@ -11593,19 +11599,6 @@ async function runHandArSession({
         }
         glbRoot.add(glbScene);
         upgradeHandArGlassMaterials(THREE, glbScene);
-        handMicroOpacityRoot = glbScene;
-        if (!handMicroUxDisabled) {
-          try {
-            omafitStoreMaterialOpacityBaseline(glbScene);
-            omafitApplyModelOpacityFactor(glbScene, 0);
-            handMicroUx.introStartMs = performance.now();
-            handMicroUx.introComplete = false;
-            handMicroUx.preparedOpacity = true;
-            handMicroUxWrap.scale.setScalar(0.9);
-          } catch {
-            /* ignore */
-          }
-        }
 
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
@@ -11669,7 +11662,21 @@ async function runHandArSession({
         }
         smoothedStrapK = 1;
         upgradeHandArMetalMaterials(THREE, glbScene);
+        omafitEnsureGlassesMeshesRenderable(THREE, glbScene);
         setHandArMeshRenderOrder(glbRoot, 1);
+        handMicroOpacityRoot = glbScene;
+        if (!handMicroUxDisabled) {
+          try {
+            omafitStoreMaterialOpacityBaseline(glbScene);
+            omafitApplyModelOpacityFactor(glbScene, 0);
+            handMicroUx.introStartMs = performance.now();
+            handMicroUx.introComplete = false;
+            handMicroUx.preparedOpacity = true;
+            handMicroUxWrap.scale.setScalar(0.9);
+          } catch {
+            /* ignore */
+          }
+        }
 
         console.log("[omafit-ar] hand GLB fit", {
           accessoryType,
@@ -12874,6 +12881,7 @@ async function runHandArSession({
               }
               smoothedStrapK = 1;
               upgradeHandArMetalMaterials(THREE, next);
+              omafitEnsureGlassesMeshesRenderable(THREE, next);
               setHandArMeshRenderOrder(glbRoot, 1);
               handMicroOpacityRoot = next;
               if (!handMicroUxDisabled) {
