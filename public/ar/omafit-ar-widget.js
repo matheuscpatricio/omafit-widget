@@ -1928,6 +1928,17 @@ function omafitHydrateArTelemetryDatasetFromSearchParams(arRootEl, widgetRootEl)
         const incoming = pickQuery(queryKeys);
         if (!incoming) continue;
         const cur = el.dataset[camel];
+        /**
+         * Iframe: query `arTrackingStack=hand` deve ganhar sobre tema desactualizado (`face`).
+         */
+        if (camel === "arTrackingStack") {
+          const inc = incoming.trim().toLowerCase();
+          const cu = cur !== undefined ? String(cur).trim().toLowerCase() : "";
+          if (inc === "hand" && cu === "face") {
+            el.dataset[camel] = incoming.trim();
+            continue;
+          }
+        }
         if (cur !== undefined && String(cur).trim() !== "") continue;
         el.dataset[camel] = incoming;
       }
@@ -6558,6 +6569,14 @@ async function runArSession({
         ? trackingStackRaw
         : inferredStack;
 
+    /**
+     * Metafields/tema antigos podem emitir `arTrackingStack=face` com `arAccessoryType=bracelet|watch`.
+     * Nesse caso MindAR+cara corria em vez de `runHandArSession` — tracking “preso” e GLB incoerente.
+     */
+    if (accessoryType === "watch" || accessoryType === "bracelet") {
+      trackingStack = "hand";
+    }
+
     if (isOmafitEyewearArForcedFromQuery()) {
       accessoryType = "glasses";
       accessoryTypeSource = "query-eyewear_ar-forced";
@@ -6586,7 +6605,24 @@ async function runArSession({
     });
 
     if (trackingStack === "hand") {
-      const [threeModHand, gltfModuleHand, visionMod] = await getOmafitArHandModuleBundle();
+      let bundleImportMs = Number(cfgAttrDispatch("arHandBundleImportTimeoutMs", ""));
+      if (!Number.isFinite(bundleImportMs) || bundleImportMs < 15000) bundleImportMs = 120000;
+      bundleImportMs = Math.min(300000, bundleImportMs);
+
+      let threeModHand;
+      let gltfModuleHand;
+      let visionMod;
+      try {
+        [threeModHand, gltfModuleHand, visionMod] = await omafitPromiseTimeoutRace(
+          getOmafitArHandModuleBundle(),
+          bundleImportMs,
+          "import hand AR (Three + GLTFLoader + @mediapipe/tasks-vision)",
+        );
+      } catch (eB) {
+        console.error("[omafit-ar] falha ao carregar bundle mão:", eB?.message || eB);
+        loading.textContent = t.errGeneric || t.errFace || "";
+        throw eB instanceof Error ? eB : new Error(String(eB));
+      }
       const THREEHand =
         threeModHand.default && typeof threeModHand.default.Group === "function"
           ? threeModHand.default
@@ -10415,6 +10451,27 @@ async function runArSession({
 }
 
 /**
+ * `import()` remoto (tasks-vision), WASM MediaPipe ou GPU que nunca faz resolve —
+ * sem timeout o utilizador fica eternamente em «A carregar tracking».
+ *
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+function omafitPromiseTimeoutRace(promise, ms, label) {
+  const n = Math.max(1, Math.min(600000, Number(ms) || 90000));
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => {
+      setTimeout(() => {
+        rej(new Error(`omafit-ar: ${label} (${n}ms)`));
+      }, n);
+    }),
+  ]);
+}
+
+/**
  * Sessão AR para acessórios de pulso (relógios, pulseiras) usando
  * MediaPipe Hand Landmarker + Three.js directamente (sem MindAR).
  *
@@ -10594,7 +10651,31 @@ async function runHandArSession({
 
   loading.textContent = t.loadingTracking || t.loading || "A carregar tracking...";
 
-  const { FilesetResolver, HandLandmarker } = vision;
+  const visionExports = (() => {
+    const v = vision;
+    if (!v || typeof v !== "object") return null;
+    if (typeof v.FilesetResolver === "function" && typeof v.HandLandmarker === "function") {
+      return v;
+    }
+    const d = v.default;
+    if (
+      d &&
+      typeof d === "object" &&
+      typeof d.FilesetResolver === "function" &&
+      typeof d.HandLandmarker === "function"
+    ) {
+      return d;
+    }
+    return null;
+  })();
+  if (!visionExports) {
+    console.error("[omafit-ar] vision module inválido (tasks-vision):", vision);
+    loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
+    throw new Error(
+      "omafit-ar: MediaPipe tasks-vision sem FilesetResolver/HandLandmarker — verifique import/CDN.",
+    );
+  }
+  const { FilesetResolver, HandLandmarker } = visionExports;
 
   /** WASM/jsDelivr/CSP: `forVisionTasks` pode pendurar indefinidamente sem isto. */
   function omaMpRace(promise, ms, label) {
@@ -10627,12 +10708,6 @@ async function runHandArSession({
     throw eFs instanceof Error ? eFs : new Error(String(eFs));
   }
 
-  /**
-   * HandLandmarker `GPU` bloqueia em muitos iframes / iOS. Fallback CPU + timeouts.
-   * `data-ar-hand-mp-delegate`: `cpu` | `gpu` | vazio.
-   * Em **iframe**, por defeito **CPU primeiro** (widget Netlify). `gpu` força GPU primeiro.
-   * `data-ar-hand-landmarker-timeout-ms`, `data-ar-hand-fileset-timeout-ms`.
-   */
   async function createHandLandmarker(delegate) {
     return HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
@@ -10647,6 +10722,12 @@ async function runHandArSession({
     });
   }
 
+  /**
+   * Por defeito **CPU** — `GPU` bloqueia ou falha silenciosamente em WebView, Shopify app,
+   * Safari e muitos Android. Opt-in: `data-ar-hand-mp-delegate="gpu"`.
+   * `data-ar-hand-landmarker-timeout-ms`, `data-ar-hand-fileset-timeout-ms`,
+   * `data-ar-hand-pmrem-import-timeout-ms` (dynamic `import()` do IBL via esm.sh).
+   */
   let handLandmarker;
   const delegatePref = String(cfgAttr("arHandMpDelegate", "") || "").trim().toLowerCase();
   const timeoutRaw = cfgAttr("arHandLandmarkerTimeoutMs", "");
@@ -10654,14 +10735,7 @@ async function runHandArSession({
   if (!Number.isFinite(mpTimeoutMs) || mpTimeoutMs <= 0) mpTimeoutMs = 24000;
   mpTimeoutMs = Math.min(60000, Math.max(5000, mpTimeoutMs));
 
-  let inIframe = false;
-  try {
-    inIframe = window.self !== window.top;
-  } catch {
-    inIframe = true;
-  }
-  const cpuFirst =
-    delegatePref === "cpu" || (delegatePref !== "gpu" && inIframe);
+  const cpuFirst = delegatePref !== "gpu";
 
   async function createHandLandmarkerWithTimeout(delegate, label) {
     const lmTo = Math.min(90000, Math.max(mpTimeoutMs, 15000));
@@ -10670,8 +10744,7 @@ async function runHandArSession({
 
   if (cpuFirst) {
     console.log(
-      "[omafit-ar] HandLandmarker CPU primeiro",
-      delegatePref === "cpu" ? "(data-ar-hand-mp-delegate)" : "(iframe)",
+      "[omafit-ar] HandLandmarker CPU (default; use data-ar-hand-mp-delegate=gpu for GPU first)",
     );
     handLandmarker = await createHandLandmarkerWithTimeout(
       "CPU",
@@ -10832,10 +10905,22 @@ async function runHandArSession({
     const roomUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/environments/RoomEnvironment.js?${dep}`;
     const rgbeUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/RGBELoader.js?${dep}`;
     const hdrUrl = cfgAttr("arHandHdrEnvUrl", "").trim();
-    const [{ PMREMGenerator }] = await import(pmremUrl);
+    let pmremImpMs = Number(cfgAttr("arHandPmremImportTimeoutMs", ""));
+    if (!Number.isFinite(pmremImpMs) || pmremImpMs <= 0) pmremImpMs = 20000;
+    pmremImpMs = Math.min(45000, Math.max(6000, pmremImpMs));
+
+    const [{ PMREMGenerator }] = await omaMpRace(
+      import(pmremUrl),
+      pmremImpMs,
+      "PMREMGenerator import (esm)",
+    );
     const pmrem = new PMREMGenerator(renderer);
     if (hdrUrl) {
-      const { RGBELoader } = await import(rgbeUrl);
+      const { RGBELoader } = await omaMpRace(
+        import(rgbeUrl),
+        pmremImpMs,
+        "RGBELoader import (esm)",
+      );
       const hdrtx = await new Promise((resolve, reject) => {
         const loader = new RGBELoader();
         loader.load(hdrUrl, resolve, undefined, reject);
@@ -10846,7 +10931,11 @@ async function runHandArSession({
       handEnvPmremRT = pmrem.fromEquirectangular(hdrtx);
       scene.environment = handEnvPmremRT.texture;
     } else {
-      const { RoomEnvironment } = await import(roomUrl);
+      const { RoomEnvironment } = await omaMpRace(
+        import(roomUrl),
+        pmremImpMs,
+        "RoomEnvironment import (esm)",
+      );
       const envScene = new RoomEnvironment();
       handEnvPmremRT = pmrem.fromScene(envScene, 0.04);
       scene.environment = handEnvPmremRT.texture;
