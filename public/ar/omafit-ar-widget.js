@@ -10595,15 +10595,43 @@ async function runHandArSession({
   loading.textContent = t.loadingTracking || t.loading || "A carregar tracking...";
 
   const { FilesetResolver, HandLandmarker } = vision;
-  const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_BASE);
+
+  /** WASM/jsDelivr/CSP: `forVisionTasks` pode pendurar indefinidamente sem isto. */
+  function omaMpRace(promise, ms, label) {
+    const n = Math.max(1, Number(ms) || 1);
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => {
+        setTimeout(() => {
+          rej(new Error(`omafit-ar: ${label} (${n}ms)`));
+        }, n);
+      }),
+    ]);
+  }
+
+  let fsTimeoutMs = Number(cfgAttr("arHandFilesetTimeoutMs", ""));
+  if (!Number.isFinite(fsTimeoutMs) || fsTimeoutMs <= 0) fsTimeoutMs = 45000;
+  fsTimeoutMs = Math.min(120000, Math.max(8000, fsTimeoutMs));
+
+  let filesetResolver;
+  try {
+    filesetResolver = await omaMpRace(
+      FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_BASE),
+      fsTimeoutMs,
+      "MediaPipe WASM (FilesetResolver)",
+    );
+    console.log("[omafit-ar] FilesetResolver OK");
+  } catch (eFs) {
+    console.error("[omafit-ar] FilesetResolver falhou:", eFs?.message || eFs);
+    loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
+    throw eFs instanceof Error ? eFs : new Error(String(eFs));
+  }
 
   /**
-   * MediaPipe HandLandmarker com `delegate: "GPU"` falha ou **bloqueia indefinidamente**
-   * em muitos iframes WebView / iOS / políticas GPU — o utilizador fica preso em
-   * «A carregar tracking». Fallback CPU + timeout cobre estes casos com custo só de FPS.
-   *
-   * Override: `data-ar-hand-mp-delegate="cpu"` força CPU desde o início.
-   * Opcional: `data-ar-hand-landmarker-timeout-ms` (5000–60000, default 24000).
+   * HandLandmarker `GPU` bloqueia em muitos iframes / iOS. Fallback CPU + timeouts.
+   * `data-ar-hand-mp-delegate`: `cpu` | `gpu` | vazio.
+   * Em **iframe**, por defeito **CPU primeiro** (widget Netlify). `gpu` força GPU primeiro.
+   * `data-ar-hand-landmarker-timeout-ms`, `data-ar-hand-fileset-timeout-ms`.
    */
   async function createHandLandmarker(delegate) {
     return HandLandmarker.createFromOptions(filesetResolver, {
@@ -10626,9 +10654,30 @@ async function runHandArSession({
   if (!Number.isFinite(mpTimeoutMs) || mpTimeoutMs <= 0) mpTimeoutMs = 24000;
   mpTimeoutMs = Math.min(60000, Math.max(5000, mpTimeoutMs));
 
-  if (delegatePref === "cpu") {
-    console.log("[omafit-ar] HandLandmarker delegate=CPU (data-ar-hand-mp-delegate)");
-    handLandmarker = await createHandLandmarker("CPU");
+  let inIframe = false;
+  try {
+    inIframe = window.self !== window.top;
+  } catch {
+    inIframe = true;
+  }
+  const cpuFirst =
+    delegatePref === "cpu" || (delegatePref !== "gpu" && inIframe);
+
+  async function createHandLandmarkerWithTimeout(delegate, label) {
+    const lmTo = Math.min(90000, Math.max(mpTimeoutMs, 15000));
+    return omaMpRace(createHandLandmarker(delegate), lmTo, label);
+  }
+
+  if (cpuFirst) {
+    console.log(
+      "[omafit-ar] HandLandmarker CPU primeiro",
+      delegatePref === "cpu" ? "(data-ar-hand-mp-delegate)" : "(iframe)",
+    );
+    handLandmarker = await createHandLandmarkerWithTimeout(
+      "CPU",
+      "HandLandmarker CPU",
+    );
+    console.log("[omafit-ar] HandLandmarker OK (CPU)");
   } else {
     try {
       handLandmarker = await Promise.race([
@@ -10643,10 +10692,15 @@ async function runHandArSession({
     } catch (eGpu) {
       console.warn("[omafit-ar] HandLandmarker GPU falhou ou expirou:", eGpu?.message || eGpu);
       loading.textContent = t.loadingTracking || t.loading || "A carregar tracking…";
-      handLandmarker = await createHandLandmarker("CPU");
+      handLandmarker = await createHandLandmarkerWithTimeout(
+        "CPU",
+        "HandLandmarker CPU fallback",
+      );
       console.log("[omafit-ar] HandLandmarker OK (CPU fallback)");
     }
   }
+
+  loading.textContent = t.arLoading || t.loading || "A carregar modelo 3D…";
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, {
