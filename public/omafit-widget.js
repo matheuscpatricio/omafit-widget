@@ -1918,6 +1918,7 @@
           passAttr('arGlassesNoseAlignOffsetXM', 'data-ar-glasses-nose-align-offset-x-m');
           passAttr('arGlassesModelCenterOffsetM', 'data-ar-glasses-model-center-offset-m');
           passAttr('arGlassesEyeMidpointAlign', 'data-ar-glasses-eye-midpoint-align');
+          passAttr('arGlassesEyeMidDebugVisual', 'data-ar-glasses-eye-mid-debug-visual');
           passAttr('arGlassesManualMindarRig', 'data-ar-glasses-manual-mindar-rig');
           passAttr('arOmafitCalibration', 'data-ar-omafit-calibration');
         }
