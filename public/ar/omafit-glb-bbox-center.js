@@ -71,3 +71,98 @@ export function omafitCenterObject3OnBboxOrigin(THREE, root, options = {}) {
 export function omafitRecenterObject3Bbox(THREE, root) {
   omafitCenterObject3OnBboxOrigin(THREE, root);
 }
+
+/** Fração de vértices com **menor Z** (face frontal / lentes em +Z típico pós-orientação). */
+const OMAFIT_GLASSES_LENS_FRONT_SLICE_FRAC = 0.18;
+/** Mínimo de vértices na fatia frontal (fallback bbox se amostras insuficientes). */
+const OMAFIT_GLASSES_LENS_FRONT_MIN_VERTS = 48;
+
+/**
+ * Centróide dos vértices na face mais frontal do modelo (menores Z no espaço local do root),
+ * ignorando o centro da bbox AABB — referência visual das lentes.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root Raiz do GLB (ex. `gltf.scene`)
+ * @param {{ sliceFrac?: number, minSliceVerts?: number }} [opts]
+ * @returns {import("three").Vector3 | null}
+ */
+export function omafitComputeGlassesLensFrontCentroid(THREE, root, opts = {}) {
+  if (!THREE || !root) return null;
+  const sliceFrac =
+    Number.isFinite(opts.sliceFrac) && opts.sliceFrac > 0 && opts.sliceFrac <= 0.45
+      ? opts.sliceFrac
+      : OMAFIT_GLASSES_LENS_FRONT_SLICE_FRAC;
+  const minSliceVerts =
+    Number.isFinite(opts.minSliceVerts) && opts.minSliceVerts >= 8
+      ? opts.minSliceVerts
+      : OMAFIT_GLASSES_LENS_FRONT_MIN_VERTS;
+
+  root.updateMatrixWorld(true);
+  const invRoot = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const tmp = new THREE.Vector3();
+  const mat = new THREE.Matrix4();
+  const xs = [];
+  const ys = [];
+  const zs = [];
+
+  root.traverse((child) => {
+    if (!child.isMesh || child.isInstancedMesh || !child.geometry) return;
+    const geo = child.geometry;
+    const pos = geo.attributes.position;
+    if (!pos || pos.count < 1) return;
+    child.updateMatrixWorld(true);
+    mat.multiplyMatrices(invRoot, child.matrixWorld);
+    const stride = pos.count > 200000 ? 3 : pos.count > 100000 ? 2 : 1;
+    for (let i = 0; i < pos.count; i += stride) {
+      tmp.fromBufferAttribute(pos, i).applyMatrix4(mat);
+      xs.push(tmp.x);
+      ys.push(tmp.y);
+      zs.push(tmp.z);
+    }
+  });
+
+  const n = zs.length;
+  if (n < minSliceVerts) return null;
+
+  const order = new Array(n);
+  for (let i = 0; i < n; i++) order[i] = i;
+  order.sort((a, b) => zs[a] - zs[b]);
+
+  const take = Math.max(minSliceVerts, Math.ceil(n * sliceFrac));
+  let sx = 0;
+  let sy = 0;
+  let sz = 0;
+  for (let k = 0; k < take && k < n; k++) {
+    const i = order[k];
+    sx += xs[i];
+    sy += ys[i];
+    sz += zs[i];
+  }
+  const t = Math.min(take, n);
+  return new THREE.Vector3(sx / t, sy / t, sz / t);
+}
+
+/**
+ * Como `omafitCenterObject3OnBboxOrigin`, mas translada para o centróide frontal (lentes);
+ * se não for possível, usa bbox.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {{ skipUpdateWorld?: boolean, sliceFrac?: number, minSliceVerts?: number }} [opts]
+ */
+export function omafitRecenterObject3OnGlassesLensFront(THREE, root, opts = {}) {
+  if (!THREE || !root) {
+    return { ok: false, reason: "missing-three-or-root", mode: "none" };
+  }
+  const skipUpdateWorld = Boolean(opts?.skipUpdateWorld);
+  if (!skipUpdateWorld) root.updateMatrixWorld(true);
+
+  const fc = omafitComputeGlassesLensFrontCentroid(THREE, root, opts);
+  if (!fc) {
+    const fallback = omafitCenterObject3OnBboxOrigin(THREE, root, { ...opts, skipUpdateWorld: true });
+    return { ...fallback, mode: "bbox-fallback" };
+  }
+  root.position.sub(fc);
+  if (typeof root.updateMatrix === "function") root.updateMatrix();
+  return { ok: true, center: fc, mode: "lens-front" };
+}

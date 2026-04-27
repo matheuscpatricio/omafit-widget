@@ -3,7 +3,10 @@ import {
   computeGlassesCanonicalOffsetQuat,
   omafitApplyGlassesTripoOffsetContainer,
 } from "./omafit-glasses-orient.js";
-import { omafitRecenterObject3Bbox } from "./omafit-glb-bbox-center.js";
+import {
+  omafitComputeGlassesLensFrontCentroid,
+  omafitRecenterObject3OnGlassesLensFront,
+} from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
   omafitBraceletWristAlignStep,
@@ -49,8 +52,8 @@ import {
  * malha facial MindAR (`faceMeshes`, mesmo `faceMatrix` do PnP), convertida para o espaço local do pai do GLB;
  * escala uniforme **IPD 3D em mundo** × **2** (landmarks 33/263 → `applyMatrix4(face.matrixWorld)` → `distanceTo`).
  * `wearPosition` mantém apenas `wearPosM` base.
- * **Debug visual:** `data-ar-glasses-eye-mid-debug-visual="1"` ou `?omafit_ar_eye_mid_debug=1` — esfera verde no
- * mid olhos vs ciano no centro da bbox do GLB (espaço local da âncora); se não coincidirem, há desvio (souvent X).
+ * **Debug visual:** `data-ar-glasses-eye-mid-debug-visual="1"` — esfera verde no
+ * mid olhos vs ciano no **pivô** do mesh (origem pós-centro lentes, local âncora).
  * **Âncora MindAR (óculos):** sempre **168** (ponte nasal / eixo médio na malha 468). O atributo
  * `data-ar-mindar-anchor` **não** substitui 168 para óculos — evita origens laterais (ex. 33, 263).
  * **Rotação do mesh `glasses`:** só no load (`normalizeGlassesModel` / canónico / identidade);
@@ -147,7 +150,8 @@ import {
  * **Posição** = `((lm[263]+lm[33])/2) − lm[168]` + trim `data-ar-glasses-manual-face-basis-offset-m` + `arGlassesDepthForwardM` no Z
  * (coords. métricas da âncora; **sem** `quat*(ox,oy,oz)`). **Rotação** do pivot: `makeBasis(eyeDir,trueUp,forward)`.
  * Bloqueio NDC `wear`: vector mundo → local da âncora com `transformDirection(inverse(matrixWorld))`, não `quat*offset`.
- * **Centro geométrico**: após bake, `Box3` + `glasses.position.sub(center)` no root; offsets de mesh (nariz / centro GLB) só em `glasses.position`.
+ * **Centro geométrico**: após bake, centróide da **face frontal** (vértices com menor Z local,
+ * não centro da bbox) em `glasses.position.sub(frontCenter)`; offsets finos só em `glasses.position`.
  * Trim: `data-ar-glasses-manual-face-basis-offset-m` (default `0 -0.02 -0.05`) em xyz landmark; escala IPD no pivot. **Âncora** MindAR **168**.
  * Suavização pivot: `data-ar-glasses-manual-pivot-smooth` (lerp pos + slerp quat, default 0,72; intervalo típico 0,6–0,85).
  * **Offset final** (m, eixos do pai do pivot): `data-ar-glasses-offset-final-m` — última camada.
@@ -1058,7 +1062,7 @@ function omafitAutoAlignGlassesModel(glasses, THREE) {
  * Normaliza o root do GLB de óculos **antes** de ancorar no MindAR.
  * Uma única rotação base **`rotation.set(0, π, 0)`** (sem stacks Rx/Ry/Rz configuráveis).
  * **Ordem espacial (não inverter):** `scale` → `rotation` (base) → `quaternion` (sincronizado
- * com o Euler; sem face no load) → `position` (centróide(s) da bbox **só** após a rotação base).
+ * com o Euler; sem face no load) → `position` (centróide da **face frontal** / lentes, não bbox).
  * Em runtime, o contentor standardize combina face em `omafitGlassesStandardizeComposeContainerQuat`.
  *
  * @param {typeof import("three")} THREE
@@ -1079,21 +1083,25 @@ function normalizeGlassesModel(THREE, model, opts = {}) {
   model.updateMatrixWorld(true);
 
   if (!opts.skipBboxCenter) {
-    const box = new THREE.Box3().setFromObject(model);
-    if (!(typeof box.isEmpty === "function" && box.isEmpty())) {
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      model.position.set(-center.x, -center.y, -center.z);
+    let fc = omafitComputeGlassesLensFrontCentroid(THREE, model);
+    if (!fc) {
+      const box = new THREE.Box3().setFromObject(model);
+      if (!(typeof box.isEmpty === "function" && box.isEmpty())) {
+        fc = box.getCenter(new THREE.Vector3());
+      }
     }
+    if (fc) model.position.sub(fc);
     model.updateMatrixWorld(true);
 
     if (opts.recenterAfterRotation !== false) {
-      const box2 = new THREE.Box3().setFromObject(model);
-      if (!(typeof box2.isEmpty === "function" && box2.isEmpty())) {
-        const c2 = new THREE.Vector3();
-        box2.getCenter(c2);
-        model.position.sub(c2);
+      let fc2 = omafitComputeGlassesLensFrontCentroid(THREE, model);
+      if (!fc2) {
+        const box2 = new THREE.Box3().setFromObject(model);
+        if (!(typeof box2.isEmpty === "function" && box2.isEmpty())) {
+          fc2 = box2.getCenter(new THREE.Vector3());
+        }
       }
+      if (fc2) model.position.sub(fc2);
     }
   }
   return model;
@@ -6982,7 +6990,7 @@ async function runArSession({
     } catch {
       glassesEyeMidDebugQuery = false;
     }
-    /** Esfera verde = mid(33,263); ciano = centro bbox do mesh `glasses` — ambos em espaço local da âncora 168. */
+    /** Esfera verde = mid(33,263); ciano = pivô óculos após centro lentes — espaço local da âncora 168. */
     const glassesEyeMidDebugVisualEnabled =
       accessoryType === "glasses" &&
       (glassesEyeMidDebugQuery ||
@@ -7463,10 +7471,13 @@ async function runArSession({
       !glassesGlbStandardize
     ) {
       glasses.updateMatrixWorld(true);
-      const boxLoad = new THREE.Box3().setFromObject(glasses);
-      if (!(typeof boxLoad.isEmpty === "function" && boxLoad.isEmpty())) {
-        const cLoad = boxLoad.getCenter(new THREE.Vector3());
-        glasses.position.sub(cLoad);
+      const fcLoad = omafitComputeGlassesLensFrontCentroid(THREE, glasses);
+      if (fcLoad) glasses.position.sub(fcLoad);
+      else {
+        const boxLoad = new THREE.Box3().setFromObject(glasses);
+        if (!(typeof boxLoad.isEmpty === "function" && boxLoad.isEmpty())) {
+          glasses.position.sub(boxLoad.getCenter(new THREE.Vector3()));
+        }
       }
     }
 
@@ -7566,9 +7577,9 @@ async function runArSession({
       }
     }
 
-    /** 2) Bbox + centro depois de normalizar. Centramos a bbox na origem do root
-     *    (`glasses.position.sub(center)`) para o GLB rodar/transladar em torno do centro
-     *    geométrico — **todos** os modos óculos (incl. manual MindAR). Modo manual: depois
+    /** 2) Bbox (tamanho) + **centro nas lentes** (face frontal, vértices com menor Z), não
+     *    no centróide da AABB. `position.sub(frontCenter)` para o GLB assentar com a
+     *    frente óptica perto da origem — **todos** os modos óculos (incl. manual MindAR). Modo manual:
      *    `omafitApplyGlassesManualMindarCenterMesh` só aplica identidade no mesh. */
     const box = new THREE.Box3().setFromObject(glasses);
     if (typeof box.isEmpty === "function" && box.isEmpty()) {
@@ -7576,14 +7587,15 @@ async function runArSession({
         "omafit-ar: GLB sem geometria visível (cena vazia ou só nós sem vértices).",
       );
     }
-    const center = box.getCenter(new THREE.Vector3());
     const sz = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(sz.x, sz.y, sz.z, 1e-6);
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
     if (!glassesCanonicalBlenderExport) {
-      glasses.position.sub(center);
+      const frontCenter = omafitComputeGlassesLensFrontCentroid(THREE, glasses);
+      if (frontCenter) glasses.position.sub(frontCenter);
+      else glasses.position.sub(box.getCenter(new THREE.Vector3()));
     } else {
       try {
         console.log(
@@ -8077,7 +8089,7 @@ async function runArSession({
      * o mesh fica deslocado lateralmente. Re-centrar antes da escala base.
      */
     if (accessoryType === "glasses" && glassesBboxRecenterPostBind && !glassesStructuralMindarRig) {
-      omafitRecenterObject3Bbox(THREE, glasses);
+      omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
       glasses.updateMatrixWorld(true);
       const szPivot = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szPivot);
@@ -8550,7 +8562,7 @@ async function runArSession({
       anchor.group.add(glassesBboxCenterDebugMesh);
       try {
         console.log(
-          "[omafit-ar] debug visual: verde = mid olhos (metric); ciano = centro bbox GLB (local âncora). data-ar-glasses-eye-mid-debug-visual=1 ou ?omafit_ar_eye_mid_debug=1 — se não sobrepuserem, há erro de alinhamento (muitas vezes X).",
+          "[omafit-ar] debug visual: verde = mid olhos (metric); ciano = pivô óculos após centro lentes (origem mesh, local âncora). data-ar-glasses-eye-mid-debug-visual=1 ou ?omafit_ar_eye_mid_debug=1",
         );
       } catch {
         /* ignore */
@@ -8787,7 +8799,6 @@ async function runArSession({
         ? {
             mid: new THREE.Vector3(),
             nb: new THREE.Vector3(),
-            box: new THREE.Box3(),
             centerW: new THREE.Vector3(),
             centerLocal: new THREE.Vector3(),
           }
@@ -9310,14 +9321,11 @@ async function runArSession({
                 sc.mid.z - sc.nb.z,
               );
               glasses.updateMatrixWorld(true);
-              sc.box.setFromObject(glasses);
-              if (typeof sc.box.isEmpty === "function" && !sc.box.isEmpty()) {
-                sc.box.getCenter(sc.centerW);
-                anchor.group.updateMatrixWorld(true);
-                sc.centerLocal.copy(sc.centerW);
-                anchor.group.worldToLocal(sc.centerLocal);
-                st.glassesBboxCenterDebugMesh.position.copy(sc.centerLocal);
-              }
+              anchor.group.updateMatrixWorld(true);
+              sc.centerW.set(0, 0, 0).applyMatrix4(glasses.matrixWorld);
+              sc.centerLocal.copy(sc.centerW);
+              anchor.group.worldToLocal(sc.centerLocal);
+              st.glassesBboxCenterDebugMesh.position.copy(sc.centerLocal);
             }
           }
         }
