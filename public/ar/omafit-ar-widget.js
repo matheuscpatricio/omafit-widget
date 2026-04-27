@@ -421,7 +421,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-bracelet-align-watch-cpu";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-bracelet-mp-thresholds-dbg";
 
 /**
  * Quando `true`, **não** cria malha facial 468 só-depth nem extensões temporais (óculos).
@@ -10575,6 +10575,30 @@ async function runHandArSession({
     return String(fallback ?? "").trim();
   }
 
+  // #region agent log
+  function dbgBraceletAr(hypothesisId, location, message, data) {
+    if (accessoryType !== "bracelet") return;
+    const payload = {
+      sessionId: "49efff",
+      hypothesisId,
+      location,
+      message,
+      data: data && typeof data === "object" ? data : {},
+      timestamp: Date.now(),
+    };
+    try {
+      console.info("[omafitDbgBracelet]", payload.hypothesisId, payload.message, payload.data);
+    } catch {
+      /* ignore */
+    }
+    fetch("http://127.0.0.1:7744/ingest/736271b4-0216-42af-91db-7273b476c84e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "49efff" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  }
+  // #endregion
+
   const qsHand =
     typeof location !== "undefined" ? String(location.search || "") : "";
   const braceletHandDiag =
@@ -10634,6 +10658,11 @@ async function runHandArSession({
     microUxDisabled: handMicroUxDisabled,
     perfMode: perfModeHand,
     preferredCamera: String(cfgAttr("arPreferredCamera", "") || "").trim(),
+  });
+  dbgBraceletAr("H5", "runHandArSession:entry", "hand_session_start", {
+    build: typeof OMAFIT_AR_WIDGET_BUILD !== "undefined" ? OMAFIT_AR_WIDGET_BUILD : "?",
+    microUxDisabled: handMicroUxDisabled,
+    glbUrlPreview: String(glbUrl || "").slice(0, 160),
   });
 
   const debug = /[?&]omafit_ar_debug=1\b/.test(String(location?.search || ""));
@@ -10834,6 +10863,29 @@ async function runHandArSession({
     /* ignore */
   }
 
+  function parseHandMpConf(key, fallback) {
+    const raw = String(cfgAttr(key, "") || "").trim();
+    if (raw === "") return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0.05 && n <= 1 ? n : fallback;
+  }
+  /**
+   * Pulseira: limiares por defeito ligeiramente mais baixos que o relógio
+   * (0,35/0,4) para reduzir frames sem mão detetada — o âncora só mostra o GLB
+   * com landmarks estáveis. Override: `data-ar-hand-min-detection-confidence`, etc.
+   */
+  const mpConfFallbackDet = accessoryType === "bracelet" ? 0.35 : 0.5;
+  const mpConfFallbackPres = accessoryType === "bracelet" ? 0.35 : 0.5;
+  const mpConfFallbackTrack = accessoryType === "bracelet" ? 0.4 : 0.5;
+  const mpMinDet = parseHandMpConf("arHandMinDetectionConfidence", mpConfFallbackDet);
+  const mpMinPres = parseHandMpConf("arHandMinPresenceConfidence", mpConfFallbackPres);
+  const mpMinTrack = parseHandMpConf("arHandMinTrackingConfidence", mpConfFallbackTrack);
+  dbgBraceletAr("H4", "mediapipe:mp_conf", "HandLandmarker_thresholds", {
+    mpMinDet,
+    mpMinPres,
+    mpMinTrack,
+  });
+
   async function createHandLandmarker(delegate) {
     return HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
@@ -10842,9 +10894,9 @@ async function runHandArSession({
       },
       runningMode: "VIDEO",
       numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minHandDetectionConfidence: mpMinDet,
+      minHandPresenceConfidence: mpMinPres,
+      minTrackingConfidence: mpMinTrack,
     });
   }
 
@@ -10978,6 +11030,9 @@ async function runHandArSession({
 
   braceletHandLog("handSession:after_landmarker", {
     nextUi: "arLoading / modelo 3D",
+  });
+  dbgBraceletAr("H4", "runHandArSession:after_landmarker", "landmarker_ready", {
+    hasLandmarker: Boolean(handLandmarker),
   });
 
   loading.textContent = t.arLoading || t.loading || "A carregar modelo 3D…";
@@ -11783,15 +11838,23 @@ async function runHandArSession({
       : null;
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
+  dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
+    url: String(finalGlbUrl || "").slice(0, 200),
+    draco: Boolean(dracoLoaderHand),
+  });
   await new Promise((resolve, reject) => {
     glbLoader.load(
       finalGlbUrl,
       (gltf) => {
         const glbScene = gltf.scene || gltf.scenes?.[0];
         if (!glbScene) {
+          dbgBraceletAr("H1", "glb:onLoad", "gltf_no_scene", {});
           reject(new Error("GLB sem cena"));
           return;
         }
+        dbgBraceletAr("H1", "glb:onLoad", "gltf_scene_ok", {
+          childCount: glbScene.children?.length ?? -1,
+        });
         bakeGLBTransforms(THREE, glbScene, ({ baked, skipped }) => {
           console.log(
             `[omafit-ar] hand GLB baked meshes=${baked} skipped=${skipped}`,
@@ -11924,10 +11987,22 @@ async function runHandArSession({
         });
 
         glbRoot.visible = true;
+        dbgBraceletAr("H3", "glb:before_resolve", "fit_complete", {
+          baseScale: fitRes.baseScale,
+          glbRootVisible: glbRoot.visible,
+          braceletIsBangle,
+          microUxPrepared: Boolean(handMicroUx?.preparedOpacity),
+          glbWorldScale: glbRoot.scale
+            ? { x: glbRoot.scale.x, y: glbRoot.scale.y, z: glbRoot.scale.z }
+            : null,
+        });
         resolve();
       },
       undefined,
       (err) => {
+        dbgBraceletAr("H1", "glb:onError", "load_failed", {
+          message: String(err?.message || err).slice(0, 200),
+        });
         braceletHandLog("glb:load_error", {
           message: err?.message || String(err),
           url: String(finalGlbUrl || "").slice(0, 260),
@@ -12010,6 +12085,8 @@ async function runHandArSession({
   let missedFrames = 0;
   const MISSED_HIDE_THRESHOLD = 6;
   let braceletFirstLandmarkLogged = false;
+  /** Log debug H2 (sessão agent) uma vez quando há landmarks. */
+  let braceletH2DebugLogged = false;
 
   /**
    * === ESTABILIDADE DE HANDEDNESS (v11.2) ===
@@ -12868,6 +12945,13 @@ async function runHandArSession({
       missedFrames = 0;
       updateAnchorFromHand(landmarks, dtMs, handLabel);
       anchor.visible = true;
+      if (accessoryType === "bracelet" && !braceletH2DebugLogged) {
+        braceletH2DebugLogged = true;
+        dbgBraceletAr("H2", "tick:first_landmarks", "anchor_on", {
+          n: landmarks.length,
+          glbRootVisible: glbRoot.visible,
+        });
+      }
       if (!handMicroUxDisabled) {
         try {
           if (handDetectRingEl) handDetectRingEl.classList.add("omafit-ar-track-detect-ring--on");
@@ -13017,6 +13101,10 @@ async function runHandArSession({
   }
 
   loading.style.display = "none";
+  dbgBraceletAr("H5", "runHandArSession:loading_hidden", "overlay_hidden_starting_raf", {
+    glbRootVisible: glbRoot.visible,
+    anchorVisible: anchor.visible,
+  });
   rafId = requestAnimationFrame(tick);
 
   // Live variant override hook: compatível com o face path.
