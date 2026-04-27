@@ -1891,6 +1891,55 @@ function omafitHydrateArRootManualRigFromUrl(root) {
 }
 
 /**
+ * Iframe Netlify / HTML mínimo: `omafit-widget.js` envia `arAccessoryType`, `arTrackingStack`,
+ * tags, etc. na query. Se o DOM não espelhou os `data-ar-*`, o runtime assumia `glasses` +
+ * MindAR — pulseiras/relógios não entravam em `runHandArSession` e o GLB parecia “invisível”.
+ *
+ * Só preenche campos ainda vazios no dataset (Liquid da loja continua prioritário quando presente).
+ *
+ * @param {HTMLElement | null} arRootEl `#omafit-ar-root`
+ * @param {HTMLElement | null} widgetRootEl `#omafit-widget-root`
+ */
+function omafitHydrateArTelemetryDatasetFromSearchParams(arRootEl, widgetRootEl) {
+  if (typeof window === "undefined") return;
+  try {
+    const q = new URLSearchParams(window.location.search || "");
+    const defs = [
+      ["arAccessoryType", ["arAccessoryType", "ar_accessory_type"]],
+      ["arTrackingStack", ["arTrackingStack", "ar_tracking_stack"]],
+      ["arCategoryPath", ["arCategoryPath", "ar_category_path"]],
+      ["arProductType", ["arProductType", "ar_product_type"]],
+      ["arProductTags", ["arProductTags", "ar_product_tags"]],
+      ["arPreferredCamera", ["arPreferredCamera", "ar_preferred_camera"]],
+      ["productTitle", ["productTitle", "product_title"]],
+    ];
+    function pickQuery(keys) {
+      for (let i = 0; i < keys.length; i++) {
+        const raw = q.get(keys[i]);
+        if (raw != null && String(raw).trim() !== "") return String(raw).trim();
+      }
+      return "";
+    }
+    function patchEl(el) {
+      if (!el?.dataset) return;
+      for (let di = 0; di < defs.length; di++) {
+        const camel = defs[di][0];
+        const queryKeys = defs[di][1];
+        const incoming = pickQuery(queryKeys);
+        if (!incoming) continue;
+        const cur = el.dataset[camel];
+        if (cur !== undefined && String(cur).trim() !== "") continue;
+        el.dataset[camel] = incoming;
+      }
+    }
+    patchEl(arRootEl);
+    patchEl(widgetRootEl);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * `#omafit-ar-root` pode falhar intermitentemente no iframe React; a query `arGlbUrl`
  * (enviada pelo tema) serve de fallback antes de desistir do arranque.
  */
@@ -6421,6 +6470,7 @@ async function runArSession({
     const arCfg = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
     const embedCfg = typeof document !== "undefined" ? document.getElementById("omafit-widget-root") : null;
     if (arCfg) {
+      omafitHydrateArTelemetryDatasetFromSearchParams(arCfg, embedCfg);
       omafitHydrateArRootManualRigFromUrl(arCfg);
       try {
         console.log("Manual rig attr:", arCfg.dataset.arGlassesManualMindarRig);
@@ -12768,6 +12818,11 @@ async function main() {
   __omafitArMainStarted = true;
   __omafitArLastRootSig = rootSig;
 
+  omafitHydrateArTelemetryDatasetFromSearchParams(
+    root,
+    typeof document !== "undefined" ? document.getElementById("omafit-widget-root") : null,
+  );
+
   const adminBrand = await waitForOmafitWidgetAdminBranding();
   /** `#omafit-ar-root` (Liquid / iframe) e `#omafit-widget-root` (`data-omafit-admin-primary`) antes do fallback. */
   const widgetRootEl =
@@ -13140,6 +13195,10 @@ function bootOmafitArWidget() {
     const root = document.getElementById("omafit-ar-root");
     const glb = omafitReadGlbUrlFromRootOrQuery();
     if (root && glb) {
+      omafitHydrateArTelemetryDatasetFromSearchParams(
+        root,
+        document.getElementById("omafit-widget-root"),
+      );
       omafitHydrateArRootManualRigFromUrl(root);
       try {
         console.log("Manual rig attr:", root.dataset.arGlassesManualMindarRig);
