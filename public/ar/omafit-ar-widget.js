@@ -10596,17 +10596,57 @@ async function runHandArSession({
 
   const { FilesetResolver, HandLandmarker } = vision;
   const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_BASE);
-  const handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
-    baseOptions: {
-      modelAssetPath: MEDIAPIPE_HAND_MODEL_URL,
-      delegate: "GPU",
-    },
-    runningMode: "VIDEO",
-    numHands: 1,
-    minHandDetectionConfidence: 0.5,
-    minHandPresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
-  });
+
+  /**
+   * MediaPipe HandLandmarker com `delegate: "GPU"` falha ou **bloqueia indefinidamente**
+   * em muitos iframes WebView / iOS / políticas GPU — o utilizador fica preso em
+   * «A carregar tracking». Fallback CPU + timeout cobre estes casos com custo só de FPS.
+   *
+   * Override: `data-ar-hand-mp-delegate="cpu"` força CPU desde o início.
+   * Opcional: `data-ar-hand-landmarker-timeout-ms` (5000–60000, default 24000).
+   */
+  async function createHandLandmarker(delegate) {
+    return HandLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: MEDIAPIPE_HAND_MODEL_URL,
+        delegate,
+      },
+      runningMode: "VIDEO",
+      numHands: 1,
+      minHandDetectionConfidence: 0.5,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+  }
+
+  let handLandmarker;
+  const delegatePref = String(cfgAttr("arHandMpDelegate", "") || "").trim().toLowerCase();
+  const timeoutRaw = cfgAttr("arHandLandmarkerTimeoutMs", "");
+  let mpTimeoutMs = Number(timeoutRaw);
+  if (!Number.isFinite(mpTimeoutMs) || mpTimeoutMs <= 0) mpTimeoutMs = 24000;
+  mpTimeoutMs = Math.min(60000, Math.max(5000, mpTimeoutMs));
+
+  if (delegatePref === "cpu") {
+    console.log("[omafit-ar] HandLandmarker delegate=CPU (data-ar-hand-mp-delegate)");
+    handLandmarker = await createHandLandmarker("CPU");
+  } else {
+    try {
+      handLandmarker = await Promise.race([
+        createHandLandmarker("GPU"),
+        new Promise((_, rej) => {
+          setTimeout(() => {
+            rej(new Error("omafit-ar: HandLandmarker GPU timeout"));
+          }, mpTimeoutMs);
+        }),
+      ]);
+      console.log("[omafit-ar] HandLandmarker OK (GPU)");
+    } catch (eGpu) {
+      console.warn("[omafit-ar] HandLandmarker GPU falhou ou expirou:", eGpu?.message || eGpu);
+      loading.textContent = t.loadingTracking || t.loading || "A carregar tracking…";
+      handLandmarker = await createHandLandmarker("CPU");
+      console.log("[omafit-ar] HandLandmarker OK (CPU fallback)");
+    }
+  }
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, {

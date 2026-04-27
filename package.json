@@ -4,11 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync:theme-ar": "node scripts/sync-ar-assets-from-theme.mjs",
+    "predev": "npm run sync:theme-ar",
     "dev": "vite",
+    "prebuild": "npm run sync:theme-ar",
     "build": "vite build",
+    "prelint": "npm run sync:theme-ar",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "sync:theme-ar": "node scripts/sync-ar-assets-from-theme.mjs"
+    "prepreview": "npm run sync:theme-ar",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
