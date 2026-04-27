@@ -421,7 +421,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-22_ar-glasses-minimal-eye-ipd-pipeline";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-bracelet-align-watch-cpu";
 
 /**
  * Quando `true`, **não** cria malha facial 468 só-depth nem extensões temporais (óculos).
@@ -4215,8 +4215,8 @@ function upgradeHandArLuxuryJewelryMaterials(THREE, root) {
 /**
  * Heurística bangle (anel rígido): nome ou bbox quase isotrópico no plano do anel.
  */
-function detectBraceletBangle(glbScene) {
-  if (!glbScene) return false;
+function detectBraceletBangle(THREE, glbScene) {
+  if (!glbScene || !THREE) return false;
   let named = false;
   glbScene.traverse((o) => {
     const n = String(o.name || "").toLowerCase();
@@ -6610,6 +6610,29 @@ async function runArSession({
       arDeviceProfile: arDeviceProfileSnapshot,
     });
 
+    try {
+      const qsDbg = typeof location !== "undefined" ? String(location.search || "") : "";
+      if (
+        accessoryType === "bracelet" &&
+        (/[?&]omafit_ar_bracelet_log=1\b/.test(qsDbg) ||
+          /[?&]omafit_ar_debug=1\b/.test(qsDbg))
+      ) {
+        let bundleImportMsLog = Number(cfgAttrDispatch("arHandBundleImportTimeoutMs", ""));
+        if (!Number.isFinite(bundleImportMsLog) || bundleImportMsLog < 15000) bundleImportMsLog = 120000;
+        bundleImportMsLog = Math.min(300000, bundleImportMsLog);
+        console.info("[omafit-ar][bracelet]", "dispatcher:resolved", {
+          trackingStack,
+          source: accessoryTypeSource,
+          liquidAccessoryType,
+          clientDetected,
+          glbUrlPreview: String(glbUrl || "").slice(0, 220),
+          bundleImportMs: bundleImportMsLog,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+
     if (trackingStack === "hand") {
       let bundleImportMs = Number(cfgAttrDispatch("arHandBundleImportTimeoutMs", ""));
       if (!Number.isFinite(bundleImportMs) || bundleImportMs < 15000) bundleImportMs = 120000;
@@ -6624,7 +6647,36 @@ async function runArSession({
           bundleImportMs,
           "import hand AR (Three + GLTFLoader + @mediapipe/tasks-vision)",
         );
+        try {
+          const qsDbg = typeof location !== "undefined" ? String(location.search || "") : "";
+          if (
+            accessoryType === "bracelet" &&
+            (/[?&]omafit_ar_bracelet_log=1\b/.test(qsDbg) ||
+              /[?&]omafit_ar_debug=1\b/.test(qsDbg))
+          ) {
+            console.info("[omafit-ar][bracelet]", "dispatcher:hand_bundle_import_ok", {
+              bundleImportMs,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
       } catch (eB) {
+        try {
+          const qsDbg = typeof location !== "undefined" ? String(location.search || "") : "";
+          if (
+            accessoryType === "bracelet" &&
+            (/[?&]omafit_ar_bracelet_log=1\b/.test(qsDbg) ||
+              /[?&]omafit_ar_debug=1\b/.test(qsDbg))
+          ) {
+            console.info("[omafit-ar][bracelet]", "dispatcher:hand_bundle_import_fail", {
+              bundleImportMs,
+              message: eB?.message || String(eB),
+            });
+          }
+        } catch {
+          /* ignore */
+        }
         console.error("[omafit-ar] falha ao carregar bundle mão:", eB?.message || eB);
         loading.textContent = t.errGeneric || t.errFace || "";
         throw eB instanceof Error ? eB : new Error(String(eB));
@@ -9747,11 +9799,11 @@ async function runArSession({
           return;
         }
         const dep = `deps=three@${ESM_THREE_VER}`;
-        const pmremUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/utils/PMREMGenerator.js?${dep}`;
         const roomUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/environments/RoomEnvironment.js?${dep}`;
         const rgbeUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/RGBELoader.js?${dep}`;
         const hdrUrl = cfgAttr("arHandHdrEnvUrl", "").trim();
-        const [{ PMREMGenerator }] = await import(pmremUrl);
+        const PMREMGenerator = THREE.PMREMGenerator;
+        if (typeof PMREMGenerator !== "function") return;
         const renderer = mindarThree.renderer;
         const scene = mindarThree.scene;
         if (!renderer || !scene) return;
@@ -10523,6 +10575,29 @@ async function runHandArSession({
     return String(fallback ?? "").trim();
   }
 
+  const qsHand =
+    typeof location !== "undefined" ? String(location.search || "") : "";
+  const braceletHandDiag =
+    accessoryType === "bracelet" &&
+    (/[?&]omafit_ar_bracelet_log=1\b/.test(qsHand) ||
+      /[?&]omafit_ar_debug=1\b/.test(qsHand));
+  function braceletHandLog(stage, payload) {
+    if (!braceletHandDiag) return;
+    try {
+      const lt =
+        loading && loading.textContent != null
+          ? String(loading.textContent).slice(0, 140)
+          : "";
+      console.info("[omafit-ar][bracelet]", stage, {
+        tMs: typeof performance !== "undefined" ? Math.round(performance.now()) : 0,
+        loadingText: lt,
+        ...(payload && typeof payload === "object" ? payload : {}),
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   const perfModeHand = String(cfgAttr("arPerformanceProfile", "auto")).trim().toLowerCase();
   const handArProfile = omafitResolveArDeviceRuntimeProfile({ perfMode: perfModeHand });
   const handMicroUxDisabled = /^(0|false|off|no)$/i.test(String(cfgAttr("arMicroUx", "1")).trim());
@@ -10552,6 +10627,14 @@ async function runHandArSession({
     loading.textContent = t.errMediaDevices || t.errGeneric;
     throw new Error("omafit-ar: getUserMedia indisponível.");
   }
+
+  braceletHandLog("handSession:start", {
+    build: typeof OMAFIT_AR_WIDGET_BUILD !== "undefined" ? OMAFIT_AR_WIDGET_BUILD : "?",
+    glbUrlPreview: String(glbUrl || "").slice(0, 200),
+    microUxDisabled: handMicroUxDisabled,
+    perfMode: perfModeHand,
+    preferredCamera: String(cfgAttr("arPreferredCamera", "") || "").trim(),
+  });
 
   const debug = /[?&]omafit_ar_debug=1\b/.test(String(location?.search || ""));
 
@@ -10609,6 +10692,7 @@ async function runHandArSession({
     }
   } catch (e) {
     loading.textContent = t.errCamera || t.errGeneric;
+    braceletHandLog("getUserMedia:failed", { message: e?.message || String(e) });
     throw e;
   }
 
@@ -10617,6 +10701,11 @@ async function runHandArSession({
     const fm = track?.getSettings?.()?.facingMode;
     if (fm === "environment") mirrorVideoX = false;
     if (fm === "user") mirrorVideoX = true;
+    braceletHandLog("camera:track", {
+      facingMode: fm || "(unknown)",
+      mirrorVideoX,
+      wantRearCamera,
+    });
   } catch {
     /* ignore */
   }
@@ -10660,6 +10749,14 @@ async function runHandArSession({
       ? "A preparar tracking da pulseira…"
       : "A preparar tracking do pulso…";
 
+  braceletHandLog("mediapipe:before_vision_exports", {
+    visionKeys:
+      vision && typeof vision === "object"
+        ? Object.keys(vision).slice(0, 24)
+        : typeof vision,
+    hasDefault: Boolean(vision?.default),
+  });
+
   const visionExports = (() => {
     const v = vision;
     if (!v || typeof v !== "object") return null;
@@ -10679,6 +10776,9 @@ async function runHandArSession({
   })();
   if (!visionExports) {
     console.error("[omafit-ar] vision module inválido (tasks-vision):", vision);
+    braceletHandLog("mediapipe:vision_exports_invalid", {
+      visionType: typeof vision,
+    });
     loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
     throw new Error(
       "omafit-ar: MediaPipe tasks-vision sem FilesetResolver/HandLandmarker — verifique import/CDN.",
@@ -10703,6 +10803,11 @@ async function runHandArSession({
   if (!Number.isFinite(fsTimeoutMs) || fsTimeoutMs <= 0) fsTimeoutMs = 45000;
   fsTimeoutMs = Math.min(120000, Math.max(8000, fsTimeoutMs));
 
+  braceletHandLog("mediapipe:fileset_resolver_start", {
+    wasmBase: MEDIAPIPE_WASM_BASE,
+    fsTimeoutMs,
+  });
+
   let filesetResolver;
   try {
     filesetResolver = await omaMpRace(
@@ -10711,16 +10816,28 @@ async function runHandArSession({
       "MediaPipe WASM (FilesetResolver)",
     );
     console.log("[omafit-ar] FilesetResolver OK");
+    braceletHandLog("mediapipe:fileset_resolver_ok", {});
   } catch (eFs) {
     console.error("[omafit-ar] FilesetResolver falhou:", eFs?.message || eFs);
+    braceletHandLog("mediapipe:fileset_resolver_fail", {
+      message: eFs?.message || String(eFs),
+    });
     loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
     throw eFs instanceof Error ? eFs : new Error(String(eFs));
+  }
+
+  const handModelAssetUrl =
+    String(cfgAttr("arHandModelUrl", "") || "").trim() || MEDIAPIPE_HAND_MODEL_URL;
+  try {
+    void fetch(handModelAssetUrl, { mode: "cors", cache: "force-cache" }).catch(() => {});
+  } catch {
+    /* ignore */
   }
 
   async function createHandLandmarker(delegate) {
     return HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: MEDIAPIPE_HAND_MODEL_URL,
+        modelAssetPath: handModelAssetUrl,
         delegate,
       },
       runningMode: "VIDEO",
@@ -10732,12 +10849,12 @@ async function runHandArSession({
   }
 
   /**
-   * Por defeito **CPU** — `GPU` bloqueia ou falha silenciosamente em WebView, Shopify app,
-   * Safari e muitos Android. Opt-in: `data-ar-hand-mp-delegate="gpu"`.
-   * `data-ar-hand-landmarker-timeout-ms`, `data-ar-hand-fileset-timeout-ms`,
-   * `data-ar-hand-pmrem-import-timeout-ms` (dynamic `import()` do IBL via esm.sh).
+   * Igual ao relógio por defeito: **CPU primeiro** (`data-ar-hand-mp-delegate` vazio).
+   * Opt-in pulseira só se precisares do arranque GPU rápido em redes lentas:
+   * `data-ar-hand-bracelet-gpu-first="1"` em `#omafit-widget-root` ou `#omafit-ar-root`.
+   * Modelo espelhado (rede/CSP): `data-ar-hand-model-url="https://…/hand_landmarker.task"`.
    */
-  let handLandmarker;
+  let handLandmarker = null;
   const delegatePrefRaw = String(cfgAttr("arHandMpDelegate", "") || "").trim().toLowerCase();
   const delegatePref =
     accessoryType === "bracelet" && delegatePrefRaw === "gpu"
@@ -10750,49 +10867,118 @@ async function runHandArSession({
 
   const cpuFirst = delegatePref !== "gpu";
 
+  const bfGpuFirstRaw = String(cfgAttr("arHandBraceletGpuFirst", "0")).trim().toLowerCase();
+  const braceletGpuFirstEnabled =
+    accessoryType === "bracelet" &&
+    delegatePref === "" &&
+    (bfGpuFirstRaw === "1" ||
+      bfGpuFirstRaw === "true" ||
+      bfGpuFirstRaw === "yes" ||
+      bfGpuFirstRaw === "on");
+
+  braceletHandLog("mediapipe:hand_landmarker_plan", {
+    delegatePrefRaw,
+    delegatePrefEffective: delegatePref,
+    mpTimeoutMs,
+    cpuFirst,
+    modelUrl: handModelAssetUrl.slice(0, 220),
+    braceletGpuFirstEnabled,
+  });
+
   async function createHandLandmarkerWithTimeout(delegate, label) {
-    const lmTo = Math.min(90000, Math.max(mpTimeoutMs, 15000));
+    let lmTo = Math.min(90000, Math.max(mpTimeoutMs, 15000));
+    if (!Number.isFinite(lmTo) || lmTo <= 0) lmTo = 24000;
+    lmTo = Math.min(45000, Math.max(8000, lmTo));
     return omaMpRace(createHandLandmarker(delegate), lmTo, label);
   }
 
-  if (cpuFirst) {
-    loading.textContent =
-      accessoryType === "bracelet"
-        ? "A carregar tracking da pulseira (CPU)…"
-        : "A carregar tracking do pulso (CPU)…";
-    console.log(
-      "[omafit-ar] HandLandmarker CPU (default; use data-ar-hand-mp-delegate=gpu for GPU first)",
+  if (braceletGpuFirstEnabled) {
+    loading.textContent = "A carregar tracking da pulseira (GPU)…";
+    await new Promise((res) =>
+      requestAnimationFrame(() => requestAnimationFrame(res)),
     );
-    handLandmarker = await createHandLandmarkerWithTimeout(
-      "CPU",
-      "HandLandmarker CPU",
-    );
-    console.log("[omafit-ar] HandLandmarker OK (CPU)");
-  } else {
     try {
-      loading.textContent = "A carregar tracking do pulso (GPU)…";
-      handLandmarker = await Promise.race([
-        createHandLandmarker("GPU"),
-        new Promise((_, rej) => {
-          setTimeout(() => {
-            rej(new Error("omafit-ar: HandLandmarker GPU timeout"));
-          }, mpTimeoutMs);
-        }),
-      ]);
-      console.log("[omafit-ar] HandLandmarker OK (GPU)");
-    } catch (eGpu) {
-      console.warn("[omafit-ar] HandLandmarker GPU falhou ou expirou:", eGpu?.message || eGpu);
-      loading.textContent =
-        accessoryType === "bracelet"
-          ? "A trocar para tracking da pulseira (CPU)…"
-          : "A trocar para tracking do pulso (CPU)…";
-      handLandmarker = await createHandLandmarkerWithTimeout(
-        "CPU",
-        "HandLandmarker CPU fallback",
+      const gpuBraceletMs = Math.min(
+        14000,
+        Math.max(7000, Math.floor(mpTimeoutMs * 0.55)),
       );
-      console.log("[omafit-ar] HandLandmarker OK (CPU fallback)");
+      handLandmarker = await omaMpRace(
+        createHandLandmarker("GPU"),
+        gpuBraceletMs,
+        "HandLandmarker GPU (pulseira primeiro)",
+      );
+      console.log("[omafit-ar] HandLandmarker OK (GPU, pulseira primeiro)");
+      braceletHandLog("mediapipe:hand_landmarker_ok", {
+        delegate: "GPU_bracelet_first",
+      });
+    } catch (eBf) {
+      console.warn(
+        "[omafit-ar] Pulseira: tentativa GPU inicial falhou, a usar CPU.",
+        eBf?.message || eBf,
+      );
+      braceletHandLog("mediapipe:bracelet_gpu_first_fail", {
+        message: eBf?.message || String(eBf),
+      });
+      handLandmarker = null;
     }
   }
+
+  if (!handLandmarker) {
+    if (cpuFirst) {
+      loading.textContent =
+        accessoryType === "bracelet"
+          ? "A carregar tracking da pulseira (CPU)…"
+          : "A carregar tracking do pulso (CPU)…";
+      await new Promise((res) =>
+        requestAnimationFrame(() => requestAnimationFrame(res)),
+      );
+      console.log(
+        "[omafit-ar] HandLandmarker CPU (default; relógio ou fallback pulseira)",
+      );
+      handLandmarker = await createHandLandmarkerWithTimeout(
+        "CPU",
+        "HandLandmarker CPU",
+      );
+      console.log("[omafit-ar] HandLandmarker OK (CPU)");
+      braceletHandLog("mediapipe:hand_landmarker_ok", { delegate: "CPU" });
+    } else {
+      try {
+        loading.textContent =
+          accessoryType === "bracelet"
+            ? "A carregar tracking da pulseira (GPU)…"
+            : "A carregar tracking do pulso (GPU)…";
+        handLandmarker = await Promise.race([
+          createHandLandmarker("GPU"),
+          new Promise((_, rej) => {
+            setTimeout(() => {
+              rej(new Error("omafit-ar: HandLandmarker GPU timeout"));
+            }, mpTimeoutMs);
+          }),
+        ]);
+        console.log("[omafit-ar] HandLandmarker OK (GPU)");
+        braceletHandLog("mediapipe:hand_landmarker_ok", { delegate: "GPU" });
+      } catch (eGpu) {
+        console.warn("[omafit-ar] HandLandmarker GPU falhou ou expirou:", eGpu?.message || eGpu);
+        braceletHandLog("mediapipe:hand_landmarker_gpu_fail", {
+          message: eGpu?.message || String(eGpu),
+        });
+        loading.textContent =
+          accessoryType === "bracelet"
+            ? "A trocar para tracking da pulseira (CPU)…"
+            : "A trocar para tracking do pulso (CPU)…";
+        handLandmarker = await createHandLandmarkerWithTimeout(
+          "CPU",
+          "HandLandmarker CPU fallback",
+        );
+        console.log("[omafit-ar] HandLandmarker OK (CPU fallback)");
+        braceletHandLog("mediapipe:hand_landmarker_ok", { delegate: "CPU_fallback" });
+      }
+    }
+  }
+
+  braceletHandLog("handSession:after_landmarker", {
+    nextUi: "arLoading / modelo 3D",
+  });
 
   loading.textContent = t.arLoading || t.loading || "A carregar modelo 3D…";
 
@@ -10922,7 +11108,6 @@ async function runHandArSession({
   let handHdrEquirectTexture = null;
   try {
     const dep = `deps=three@${ESM_THREE_VER}`;
-    const pmremUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/utils/PMREMGenerator.js?${dep}`;
     const roomUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/environments/RoomEnvironment.js?${dep}`;
     const rgbeUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/RGBELoader.js?${dep}`;
     const hdrUrl = cfgAttr("arHandHdrEnvUrl", "").trim();
@@ -10930,11 +11115,16 @@ async function runHandArSession({
     if (!Number.isFinite(pmremImpMs) || pmremImpMs <= 0) pmremImpMs = 20000;
     pmremImpMs = Math.min(45000, Math.max(6000, pmremImpMs));
 
-    const [{ PMREMGenerator }] = await omaMpRace(
-      import(pmremUrl),
+    braceletHandLog("pmrem:start", {
       pmremImpMs,
-      "PMREMGenerator import (esm)",
-    );
+      hdrCustom: Boolean(hdrUrl),
+      esmThree: ESM_THREE_VER,
+    });
+
+    const PMREMGenerator = THREE.PMREMGenerator;
+    if (typeof PMREMGenerator !== "function") {
+      throw new Error("THREE.PMREMGenerator indisponível (build Three antigo?)");
+    }
     const pmrem = new PMREMGenerator(renderer);
     if (hdrUrl) {
       const { RGBELoader } = await omaMpRace(
@@ -10965,8 +11155,10 @@ async function runHandArSession({
     pmrem.dispose();
     handAmbientLight.intensity = 0.38;
     handHemiLight.intensity = 0.2;
+    braceletHandLog("pmrem:ok", { hasSceneEnv: Boolean(scene.environment) });
   } catch (e) {
     console.warn("[omafit-ar] PMREM / IBL indisponível — reflexos reduzidos.", e?.message || e);
+    braceletHandLog("pmrem:fail", { message: e?.message || String(e) });
   }
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   /** Exposure > 1: metais com contraste de luxo sem “estourar” reflexos (com ACES). */
@@ -11549,6 +11741,11 @@ async function runHandArSession({
   const versionHint =
     arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "";
   const finalGlbUrl = buildGlbLoaderUrl(omafitAbsolutizeGlbUrlMaybe(glbUrl), versionHint);
+  braceletHandLog("glb:load_start", {
+    finalGlbUrl: String(finalGlbUrl || "").slice(0, 260),
+    glbVersionHint: String(versionHint || "").slice(0, 32),
+    dracoLoader: Boolean(dracoLoaderHand),
+  });
   let baseScale = 0.1;
   /** Raio local do anel/cilindro wrap (EIXO), em unidades GLB (pré-scale). */
   let localRingR = 0.025;
@@ -11628,7 +11825,7 @@ async function runHandArSession({
         braceletVertexDeform = null;
         if (accessoryType === "bracelet") {
           upgradeHandArLuxuryJewelryMaterials(THREE, glbScene);
-          braceletIsBangle = detectBraceletBangle(glbScene);
+          braceletIsBangle = detectBraceletBangle(THREE, glbScene);
           if (!braceletIsBangle) {
             if (countHandArSolidMeshes(glbScene) === 1) {
               braceletVertexDeform = initBraceletLinkVertexDeformation(
@@ -11719,12 +11916,24 @@ async function runHandArSession({
           ),
           bbox: { x: fitRes.size.x, y: fitRes.size.y, z: fitRes.size.z },
         });
+        braceletHandLog("glb:load_ok", {
+          baseScale: fitRes.baseScale,
+          bangle: accessoryType === "bracelet" ? braceletIsBangle : null,
+          braceletLinkVertex: accessoryType === "bracelet" ? Boolean(braceletVertexDeform) : null,
+          braceletLinkRadial: accessoryType === "bracelet" ? Boolean(braceletLinkRadial) : null,
+        });
 
         glbRoot.visible = true;
         resolve();
       },
       undefined,
-      (err) => reject(err),
+      (err) => {
+        braceletHandLog("glb:load_error", {
+          message: err?.message || String(err),
+          url: String(finalGlbUrl || "").slice(0, 260),
+        });
+        reject(err);
+      },
     );
   });
 
@@ -11800,6 +12009,7 @@ async function runHandArSession({
   let rafId = 0;
   let missedFrames = 0;
   const MISSED_HIDE_THRESHOLD = 6;
+  let braceletFirstLandmarkLogged = false;
 
   /**
    * === ESTABILIDADE DE HANDEDNESS (v11.2) ===
@@ -12647,6 +12857,14 @@ async function runHandArSession({
     }
     const handLabel = stableHandLabel;
     if (landmarks && landmarks.length >= 18) {
+      if (braceletHandDiag && !braceletFirstLandmarkLogged) {
+        braceletFirstLandmarkLogged = true;
+        braceletHandLog("tick:first_hand_landmarks", {
+          n: landmarks.length,
+          handLabel,
+          handScore: Number(lastHandScore || 0).toFixed(3),
+        });
+      }
       missedFrames = 0;
       updateAnchorFromHand(landmarks, dtMs, handLabel);
       anchor.visible = true;
@@ -12858,7 +13076,7 @@ async function runHandArSession({
               braceletVertexDeform = null;
               if (accessoryType === "bracelet") {
                 upgradeHandArLuxuryJewelryMaterials(THREE, next);
-                braceletIsBangle = detectBraceletBangle(next);
+                braceletIsBangle = detectBraceletBangle(THREE, next);
                 if (!braceletIsBangle) {
                   if (countHandArSolidMeshes(next) === 1) {
                     braceletVertexDeform = initBraceletLinkVertexDeformation(
