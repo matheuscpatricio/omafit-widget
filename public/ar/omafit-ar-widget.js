@@ -467,7 +467,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-top-occlusion-guard-v15";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-top-occlusion-guard-v16";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11709,7 +11709,7 @@ async function runHandArSession({
    * pulseira em mundo — ligeiramente menor que a cavidade interna para o
    * depth cortar antes do inner mesh (menos Z-fighting / atravessar).
    */
-  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.88;
+  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.84;
   /**
    * Ratio knuckle-span → raio do pulso (landmarks 5–17). Pulseira usa valor
    * mais alto que relógio: feedback persistente de pulseira sub-dimensionada
@@ -12915,7 +12915,7 @@ async function runHandArSession({
     const yFacingCamera = smY.dot(tmpCamToWrist) >= 0;
     const occluderYOffsetMag =
       accessoryType === "bracelet"
-        ? smoothWristRadius + 0.002
+        ? smoothWristRadius - 0.0015
         : smoothWristRadius + 0.006;
     armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
