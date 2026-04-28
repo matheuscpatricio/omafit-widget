@@ -422,7 +422,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-asset-v5-cachebust";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-glasses-ui-mirror-cart";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -435,7 +435,7 @@ try {
  * Serve para isolar problemas: óculos **dentro da cara** → provável Z; **invisível** → escala/rotação.
  * Manter `false` em produção.
  */
-const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = true;
+const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = false;
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -6154,8 +6154,10 @@ async function runArSession({
         bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
         left: "0",
         right: "0",
-        background: "linear-gradient(transparent, rgba(0,0,0,0.78))",
-        padding: "12px 10px calc(10px + env(safe-area-inset-bottom, 0px))",
+        /** Não levar o gradiente até preto sólido no fundo — o padding abaixo do CTA virava “borrão preto”. */
+        background:
+          "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.38) 100%)",
+        padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
         zIndex: "120",
         display: "flex",
         flexDirection: "column",
@@ -6276,8 +6278,9 @@ async function runArSession({
         bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
         left: "0",
         right: "0",
-        background: "linear-gradient(transparent, rgba(0,0,0,0.78))",
-        padding: "12px 10px calc(10px + env(safe-area-inset-bottom, 0px))",
+        background:
+          "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.38) 100%)",
+        padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
         zIndex: "120",
         pointerEvents: "auto",
       },
@@ -8672,7 +8675,27 @@ async function runArSession({
       let negModelX = false;
       if (mnx === "1" || mnx === "true" || mnx === "yes") negModelX = true;
       else if (mnx === "0" || mnx === "false" || mnx === "no") negModelX = false;
-      else negModelX = !disableFaceMirror;
+      else if (accessoryType === "glasses") {
+        /**
+         * Por defeito **não** espelhar o ramo 3D em X com o selfie: o MindAR
+         * já alinha o frame; `scaleX=-1` no grupo do GLB + `faceMatrix` costuma
+         * deslocar a armação (ex.: “virada à esquerda”) após o alinhamento
+         * interpupilar. Opt-in: `data-ar-glasses-projection-mirror-model-x="1"`.
+         * Outros acessórios: mantém o `auto` ≈ !disableFaceMirror.
+         */
+        const gmx = String(cfgAttr("arGlassesProjectionMirrorModelX", "0"))
+          .trim()
+          .toLowerCase();
+        if (gmx === "1" || gmx === "true" || gmx === "on" || gmx === "yes") {
+          negModelX = true;
+        } else if (gmx === "0" || gmx === "false" || gmx === "off" || gmx === "no") {
+          negModelX = false;
+        } else {
+          negModelX = !disableFaceMirror;
+        }
+      } else {
+        negModelX = !disableFaceMirror;
+      }
       if (negModelX && !flipSceneX) projectionMirrorFix.scale.set(-1, 1, 1);
       else projectionMirrorFix.scale.set(1, 1, 1);
     } catch {
