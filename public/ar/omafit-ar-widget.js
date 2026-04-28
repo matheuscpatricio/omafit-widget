@@ -331,8 +331,8 @@ const MEDIAPIPE_POSE_LANDMARKER_URL =
  *    correcto para envolver o pulso em vez de ficar minúsculo porque a
  *    dimensão máxima do bbox é o "fim do fecho" esticado em algumas GLBs.
  */
-const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.072;
-const OMAFIT_BRACELET_AR_WORLD_MEDIAN_DIM = 0.062;
+const OMAFIT_WRIST_AR_WORLD_MAX_DIM = 0.066;
+const OMAFIT_BRACELET_AR_WORLD_MEDIAN_DIM = 0.056;
 
 /**
  * Comprimento real (m) do segmento punho→MCP-médio numa mão adulta.
@@ -347,13 +347,13 @@ const OMAFIT_WRIST_TO_MCP_M = 0.10;
  */
 const OMAFIT_BASE_KNUCKLE_SPAN_M = 0.078;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
-const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
+const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 320;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
 const OMAFIT_METAL_ROUGHNESS_DEFAULT = 0.22;
 const OMAFIT_METAL_ENV_MAP_INTENSITY = 1.5;
 /** Inércia da “zona de deslize” da pulseira ao longo do antebraço (ms). */
-const OMAFIT_BRACELET_SLIDE_TAU_FAST_MS = 88;
-const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 265;
+const OMAFIT_BRACELET_SLIDE_TAU_FAST_MS = 140;
+const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 360;
 /**
  * Referência (m) do segmento punho (LM0) → MCP médio (LM9) em adulto (~9,4 cm).
  * Usada na escala Y (espessura ao longo do dorso) e no factor de alcance em Z.
@@ -361,8 +361,8 @@ const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 265;
 const OMAFIT_BRACELET_REF_FOREARM_REACH_M = 0.094;
 /** Deslocamento em −Y local da âncora (em direcção à palma) para encostar ao pulso. */
 const OMAFIT_BRACELET_SKIN_SINK_TARGET_M = 0.0031;
-const OMAFIT_BRACELET_METRICS_EMA_MS = 210;
-const OMAFIT_BRACELET_SINK_EMA_MS = 260;
+const OMAFIT_BRACELET_METRICS_EMA_MS = 320;
+const OMAFIT_BRACELET_SINK_EMA_MS = 360;
 /** Expoente suave para ajuste fino ao longo do antebraço (eixo Z do GLB). */
 const OMAFIT_BRACELET_Z_SCALE_EXP = 0.38;
 
@@ -387,8 +387,8 @@ const OMAFIT_HAND_AXIS_TAU_MS = 90;
  * v12.0: EMA fixa na âncora da mão (pedido produto — “peso” físico).
  * Posição α=0.15, rotação SLERP t=0.10 (substitui tau exponencial neste path).
  */
-const OMAFIT_HAND_EMA_POS_ALPHA = 0.15;
-const OMAFIT_HAND_EMA_ROT_ALPHA = 0.1;
+const OMAFIT_HAND_EMA_POS_ALPHA = 0.1;
+const OMAFIT_HAND_EMA_ROT_ALPHA = 0.075;
 /** Quanto da rotação axial (normal 0–5–17 vs base) entra no quaternion final. */
 const OMAFIT_HAND_WRIST_ROLL_GAIN = 0.72;
 /**
@@ -422,7 +422,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-ipd-metric-no-gradient";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_hand-scale-stability-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8195,6 +8195,26 @@ async function runArSession({
                 sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
                 sizeBboxPost: { x: szPost.x, y: szPost.y, z: szPost.z },
               });
+              /**
+               * Em alguns GLBs a auto-bind fica ambígua e o fix de handedness
+               * (`flippedWidthForRotation`) vira a armação para o lado errado.
+               * Neste caso aplicamos fallback determinístico `Ry(180)`.
+               */
+              if (signs?.flippedWidthForRotation) {
+                bx = 0;
+                by = 180;
+                bz = 0;
+                omafitApplyGlassesMindarBindFix(THREE, glasses, bx, by, bz);
+                glasses.updateMatrixWorld(true);
+                const szFix = new THREE.Vector3();
+                new THREE.Box3().setFromObject(glasses).getSize(szFix);
+                glassesFaceWideAxisX = szFix.x >= szFix.z;
+                console.warn("[omafit-ar] auto-bind ambíguo (flippedWidthForRotation); fallback Ry(180)", {
+                  widthSign: signs?.widthSign,
+                  rimHeightSign: auto.rimHeightSign,
+                  sizeBbox: { x: szFix.x, y: szFix.y, z: szFix.z },
+                });
+              }
             } else {
               /**
                * GLB Omafit canonical: frente lentes -Z, hastes +Z. Fallback
@@ -9620,11 +9640,19 @@ async function runArSession({
                      * distância após `applyMatrix4` infla o IPD e deixa a armação gigante.
                      */
                     const ipdLandmark = fa.eyeR.distanceTo(fa.eyeL);
+                    const be = fa.basis.elements;
+                    const sx = Math.hypot(be[0], be[1], be[2]);
+                    const sy = Math.hypot(be[4], be[5], be[6]);
+                    const szFace = Math.hypot(be[8], be[9], be[10]);
+                    const faceScale =
+                      Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(szFace)
+                        ? Math.max(1e-6, (sx + sy + szFace) / 3)
+                        : 1;
                     fa.eyeR.applyMatrix4(fa.faceWorld);
                     fa.eyeL.applyMatrix4(fa.faceWorld);
                     const ipdMetric =
                       st.glassesSimpleFaceOnly && glassesTrackingWrap
-                        ? ipdLandmark
+                        ? ipdLandmark / faceScale
                         : fa.eyeR.distanceTo(fa.eyeL);
                     if (Number.isFinite(ipdMetric) && ipdMetric > 0) {
                       const ipdMul =
@@ -11565,38 +11593,40 @@ async function runHandArSession({
    * Largura “segura” punho: distância MCP5–MCP17 × padding antes do ratio
    * antropométrico (folga 25–30 % pedida por produto).
    */
-  const OMAFIT_BRACELET_WRIST_WIDTH_PADDING = 1.34;
+  const OMAFIT_BRACELET_WRIST_WIDTH_PADDING = 1.08;
   /**
    * Ocupação vertical da mão em coord. normalizadas [0,1]: ≥ 0,4 → perto
    * (mais precisão); abaixo disso → suavização extra + possível aviso de proximidade.
    */
   const OMAFIT_HAND_SCREEN_CLOSE_FRAC = 0.4;
   /**
-   * Expansão biométrica vs distância normalizada MCP5–MCP17 (finos → 1,25, largos → 1,45).
+   * Expansão biométrica vs distância normalizada MCP5–MCP17.
+   * Valores anteriores (1,25–1,45) inflavam também relógios; mantemos só uma
+   * folga leve para não ultrapassar visualmente o pulso.
    */
-  const OMAFIT_BRACELET_EXPAND_THIN = 1.25;
-  const OMAFIT_BRACELET_EXPAND_WIDE = 1.45;
+  const OMAFIT_BRACELET_EXPAND_THIN = 1.02;
+  const OMAFIT_BRACELET_EXPAND_WIDE = 1.16;
   const OMAFIT_BRACELET_SPAN_NORM_LO = 0.056;
   const OMAFIT_BRACELET_SPAN_NORM_HI = 0.108;
   /** Pulso “largo”: +10 % só no eixo X (largura) vs profundidade. */
   const OMAFIT_BRACELET_WIDE_SCREEN_N = 0.095;
   const OMAFIT_BRACELET_WIDE_M = 0.086;
-  const OMAFIT_BRACELET_WIDE_LAT_BOOST = 1.1;
+  const OMAFIT_BRACELET_WIDE_LAT_BOOST = 1.04;
   /**
    * Elipse no plano do anel (XY local; eixo Z = braço após `fitWristGlb`):
    * X = largura ulnar–radial; Y = “profundidade” palmar–dorsal (pedido XZ no
    * texto do produto → aqui X e Y); Z = espessura ao longo do braço — só
    * `suBase` (sem W) para não deformar o perfil da peça no eixo do braço.
    */
-  const OMAFIT_BRACELET_ELLIPSE_X = 1.09;
+  const OMAFIT_BRACELET_ELLIPSE_X = 1.02;
   /** Quase neutro: evita “apertar” a abertura no eixo palmar–dorsal. */
   const OMAFIT_BRACELET_ELLIPSE_DEPTH = 0.99;
   /** Slerp do alinhamento punho→MCP9 em espaço de `calibRot` (ms). */
-  const OMAFIT_BRACELET_ALIGN_TAU_MS = 120;
+  const OMAFIT_BRACELET_ALIGN_TAU_MS = 190;
   /** Lerp da posição de wear (offset âncora) para a pulseira (ms). */
-  const OMAFIT_BRACELET_WEAR_LERP_MS = 155;
+  const OMAFIT_BRACELET_WEAR_LERP_MS = 240;
   /** Limite de correção angular extra (rad) — evita saltos quando MCP9 oscila. */
-  const OMAFIT_BRACELET_ALIGN_MAX_RAD = 0.14;
+  const OMAFIT_BRACELET_ALIGN_MAX_RAD = 0.11;
   /**
    * Raio do cilindro oclusor (mundo) = factor × raio interno estimado da
    * pulseira em mundo — ligeiramente menor que a cavidade interna para o
@@ -11612,8 +11642,8 @@ async function runHandArSession({
    * Raio estimado do punso a partir do segmento 5–17 (corda MCP): subir
    * alinha melhor as pontas do anel às extremidades laterais do punso.
    */
-  const OMAFIT_BRACELET_KNUCKLE_TO_WRIST_R = 0.39;
-  const OMAFIT_WATCH_KNUCKLE_TO_WRIST_R = 0.34;
+  const OMAFIT_BRACELET_KNUCKLE_TO_WRIST_R = 0.335;
+  const OMAFIT_WATCH_KNUCKLE_TO_WRIST_R = 0.325;
 
   /**
    * === CÁLCULO DO RAIO INTERNO REAL DO ANEL ===
@@ -12201,7 +12231,7 @@ async function runHandArSession({
   let proximityHintStable = 0;
 
   let running = true;
-  let lastHandTimestamp = -1;
+  let lastVideoFrameTime = -1;
   let rafId = 0;
   let missedFrames = 0;
   const MISSED_HIDE_THRESHOLD = 6;
@@ -12621,7 +12651,7 @@ async function runHandArSession({
      * das pontas laterais percebidas.
      */
     const wristRadiusFromSpanChord =
-      accessoryType === "bracelet" ? handKnuckleSpan * 0.446 : 0;
+      accessoryType === "bracelet" ? handKnuckleSpan * 0.34 : 0;
     const wristRadiusRaw = Math.max(
       0.018,
       Math.min(
@@ -13001,18 +13031,20 @@ async function runHandArSession({
       renderer.render(scene, camera);
       return;
     }
-    const nowTs = performance.now();
-    if (nowTs === lastHandTimestamp) {
+    const videoFrameTime = Number(video.currentTime) || 0;
+    if (videoFrameTime === lastVideoFrameTime) {
       renderer.render(scene, camera);
       return;
     }
+    lastVideoFrameTime = videoFrameTime;
+    const nowTs = performance.now();
     const dtMs = lastFrameTs < 0 ? 16 : nowTs - lastFrameTs;
     lastFrameTs = nowTs;
-    lastHandTimestamp = nowTs;
 
     let res = null;
     try {
-      res = handLandmarker.detectForVideo(video, nowTs);
+      const mediaTs = videoFrameTime > 0 ? videoFrameTime * 1000 : nowTs;
+      res = handLandmarker.detectForVideo(video, mediaTs);
     } catch (e) {
       console.warn("[omafit-ar] handLandmarker.detectForVideo:", e?.message || e);
     }
