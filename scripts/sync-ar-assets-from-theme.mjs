@@ -9,6 +9,10 @@
  * Uso: na raiz de omafit-widget → `npm run sync:theme-ar`
  *
  * Espera: ../omafit/extensions/omafit-theme/assets/
+ *
+ * Após editar o JS do AR, sobe `OMAFIT_AR_WIDGET_BUILD` nesse ficheiro e
+ * o mesmo sufixo em `src/components/WidgetPage.tsx` (`OMAFIT_AR_MODULE_CACHE_BUST`)
+ * e em `omafit-embed.liquid` (`oma_ar_asset=…`) para não servir módulo antigo.
  */
 import { copyFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";

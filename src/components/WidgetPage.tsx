@@ -5,6 +5,13 @@ import {
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 
+/**
+ * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
+ * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
+ * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
+ */
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-04-27_ar-asset-v5-cachebust';
+
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
   if (!raw) return null;
@@ -724,7 +731,9 @@ export function WidgetPage() {
     if (!showEyewearArNetlify) return;
     setArModuleBootError(null);
     let cancelled = false;
-    const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.js`;
+    const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.js?v=${encodeURIComponent(
+      OMAFIT_AR_MODULE_CACHE_BUST,
+    )}`;
     const tryStart = () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
