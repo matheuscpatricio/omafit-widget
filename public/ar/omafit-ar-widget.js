@@ -375,6 +375,8 @@ const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
 const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /** Proteção do topo da pulseira (não deixar “sumir” em excesso). */
 const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
+/** Evitar transparência artificial na pulseira; oclusão fica só no depth. */
+const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = false;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /**
@@ -469,7 +471,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-hand-occlusion-side-unify-v19";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-occlusion-bind-structural-fix-v20";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8420,6 +8422,9 @@ async function runArSession({
       glassesDepthForwardM: glassesDepthForwardMEffective,
     });
 
+    const glassesStaticBindQuatPostBind =
+      accessoryType === "glasses" ? glasses.quaternion.clone() : null;
+
     /** 4) Hierarquia (óculos):
      *   anchor.group → wearPosition → faceParent → calibRot → [tripOffsetGroup] →
      *   glassesPivot → glasses (GLB).
@@ -8626,7 +8631,11 @@ async function runArSession({
         glasses.updateMatrix();
         glassesStaticBindWrap.position.set(0, 0, 0);
         glassesStaticBindWrap.scale.set(1, 1, 1);
-        glassesStaticBindWrap.quaternion.copy(glasses.quaternion);
+        if (glassesStaticBindQuatPostBind) {
+          glassesStaticBindWrap.quaternion.copy(glassesStaticBindQuatPostBind);
+        } else {
+          glassesStaticBindWrap.quaternion.copy(glasses.quaternion);
+        }
         glasses.quaternion.identity();
         glasses.rotation.set(0, 0, 0);
       }
@@ -12531,7 +12540,6 @@ async function runHandArSession({
 
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
-    if (handLabel === "Left") tmpX.negate();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
 
     const w0to1 = handW0to1Scratch.subVectors(w1, w0);
@@ -12915,6 +12923,8 @@ async function runHandArSession({
       tmpCamToWrist.set(0, 0, 1);
     }
     const yFacingCamera = smY.dot(tmpCamToWrist) >= 0;
+    const braceletDorsumFacingCamera =
+      accessoryType === "bracelet" && yFacingCamera;
     const occluderYOffsetMag =
       accessoryType === "bracelet"
         ? Math.max(0.002, smoothWristRadius - 0.0055)
@@ -12924,6 +12934,8 @@ async function runHandArSession({
     } else {
       armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
     }
+    armOccluder.visible =
+      accessoryType === "bracelet" ? !braceletDorsumFacingCamera : true;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
@@ -12936,7 +12948,11 @@ async function runHandArSession({
      * - força adaptativa por largura do punho
      * - lado traseiro mais ocluído
      */
-    if (accessoryType === "bracelet" && braceletOcclusionMaterials.length > 0) {
+    if (
+      OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
+      accessoryType === "bracelet" &&
+      braceletOcclusionMaterials.length > 0
+    ) {
       braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
       braceletOccWidth.subVectors(w5, w17).normalize();
       braceletOccForward.subVectors(w5, w0).normalize();
@@ -13388,7 +13404,8 @@ async function runHandArSession({
       }
       /** Occluder só é útil quando há mão detectada. Evita deixar cilindro
        *  invisível a escrever depth no meio do ecrã quando a mão desaparece. */
-      armOccluder.visible = true;
+      armOccluder.visible =
+        accessoryType === "bracelet" ? armOccluder.visible : true;
       contactShadow.visible = true;
     } else {
       missedFrames += 1;
