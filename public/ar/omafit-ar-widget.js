@@ -389,6 +389,13 @@ const OMAFIT_HAND_AXIS_TAU_MS = 90;
  */
 const OMAFIT_HAND_EMA_POS_ALPHA = 0.17;
 const OMAFIT_HAND_EMA_ROT_ALPHA = 0.115;
+/** Filtro adaptativo (inspirado em One-Euro): menos jitter parado, menos lag em movimento. */
+const OMAFIT_HAND_POS_ALPHA_MIN = 0.06;
+const OMAFIT_HAND_POS_ALPHA_MAX = 0.28;
+const OMAFIT_HAND_POS_ALPHA_SPEED_GAIN = 0.12;
+const OMAFIT_HAND_ROT_ALPHA_MIN = 0.05;
+const OMAFIT_HAND_ROT_ALPHA_MAX = 0.22;
+const OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN = 0.016;
 /** Quanto da rotação axial (normal 0–5–17 vs base) entra no quaternion final. */
 const OMAFIT_HAND_WRIST_ROLL_GAIN = 0.5;
 /**
@@ -422,7 +429,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_hand-low-latency-v3";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_hand-oneeuro-stability-v4";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8162,9 +8169,15 @@ async function runArSession({
         const autoAttr = String(
           cfgAttr("arGlassesAutoDepthAxis", "1"),
         ).trim().toLowerCase();
-        const useAutoDepthAxis = !/^(0|off|false|no|legacy|ry180|manual)$/.test(
-          autoAttr,
-        );
+        const simpleFaceOnlyBindCandidate =
+          !glassesManualMindarRig &&
+          !glassesStructuralMindarRig &&
+          !glassesGlbStandardize &&
+          !glassesGeometryAnchor &&
+          !glassesCheekOrthogonalBasis;
+        const useAutoDepthAxis =
+          !simpleFaceOnlyBindCandidate &&
+          !/^(0|off|false|no|legacy|ry180|manual)$/.test(autoAttr);
         let bx = 0;
         let by = 0;
         let bz = 0;
@@ -9640,10 +9653,10 @@ async function runArSession({
                      * distância após `applyMatrix4` infla o IPD e deixa a armação gigante.
                      */
                     const ipdLandmark = fa.eyeR.distanceTo(fa.eyeL);
-                    const be = fa.basis.elements;
-                    const sx = Math.hypot(be[0], be[1], be[2]);
-                    const sy = Math.hypot(be[4], be[5], be[6]);
-                    const szFace = Math.hypot(be[8], be[9], be[10]);
+                    const fe = fa.faceWorld.elements;
+                    const sx = Math.hypot(fe[0], fe[1], fe[2]);
+                    const sy = Math.hypot(fe[4], fe[5], fe[6]);
+                    const szFace = Math.hypot(fe[8], fe[9], fe[10]);
                     const faceScale =
                       Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(szFace)
                         ? Math.max(1e-6, (sx + sy + szFace) / 3)
@@ -12226,6 +12239,8 @@ async function runHandArSession({
    * perspectiva sem “pulsar” frame a frame.
    */
   let handKnuckleSpanRef = 0;
+  let smoothKnuckleSpan = OMAFIT_BASE_KNUCKLE_SPAN_M;
+  let smoothKnuckleSpanInit = false;
   /** Jitter span 5–17 (m) + histerese para aviso “aproxime o pulso”. */
   let prevKnuckleSpan3d = 0;
   let knuckleJitterEma = 0;
@@ -12496,9 +12511,13 @@ async function runHandArSession({
       smPos.copy(tmpPos);
       smoothInitialized = true;
     } else {
-      const posAlpha = closeEnoughHand
-        ? OMAFIT_HAND_EMA_POS_ALPHA
-        : OMAFIT_HAND_EMA_POS_ALPHA * 0.48;
+      const dtSec = Math.max(1e-3, clampDt / 1000);
+      const posSpeed = tmpPos.distanceTo(smPos) / dtSec;
+      let posAlpha = OMAFIT_HAND_POS_ALPHA_MIN + OMAFIT_HAND_POS_ALPHA_SPEED_GAIN * posSpeed;
+      posAlpha = THREE.MathUtils.clamp(posAlpha, OMAFIT_HAND_POS_ALPHA_MIN, OMAFIT_HAND_POS_ALPHA_MAX);
+      if (!closeEnoughHand) posAlpha *= 0.62;
+      posAlpha = THREE.MathUtils.clamp(posAlpha, 0.035, OMAFIT_HAND_POS_ALPHA_MAX);
+      posAlpha = THREE.MathUtils.lerp(posAlpha, OMAFIT_HAND_EMA_POS_ALPHA, 0.18);
       smPos.lerp(tmpPos, posAlpha);
       /**
        * Anti-flip guard: medir ângulo entre smoothedQuat e tmpQuat.
@@ -12522,9 +12541,13 @@ async function runHandArSession({
           });
         }
       } else {
-        const rotAlpha = closeEnoughHand
-          ? OMAFIT_HAND_EMA_ROT_ALPHA
-          : OMAFIT_HAND_EMA_ROT_ALPHA * 0.55;
+        const dtSec = Math.max(1e-3, clampDt / 1000);
+        const rotSpeed = angleBetween / dtSec;
+        let rotAlpha = OMAFIT_HAND_ROT_ALPHA_MIN + OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN * rotSpeed;
+        rotAlpha = THREE.MathUtils.clamp(rotAlpha, OMAFIT_HAND_ROT_ALPHA_MIN, OMAFIT_HAND_ROT_ALPHA_MAX);
+        if (!closeEnoughHand) rotAlpha *= 0.7;
+        rotAlpha = THREE.MathUtils.clamp(rotAlpha, 0.03, OMAFIT_HAND_ROT_ALPHA_MAX);
+        rotAlpha = THREE.MathUtils.lerp(rotAlpha, OMAFIT_HAND_EMA_ROT_ALPHA, 0.2);
         smoothedQuat.slerp(tmpQuat, rotAlpha);
       }
     }
@@ -12594,9 +12617,19 @@ async function runHandArSession({
      * EMA lento (tau = 800 ms) para não pulsar com o jitter dos landmarks.
      */
     const handKnuckleSpan = w5.distanceTo(w17);
+    const aKn =
+      (1 - Math.exp(-clampDt / 220)) *
+      (closeEnoughHand ? 1 : 0.42);
+    if (!smoothKnuckleSpanInit) {
+      smoothKnuckleSpan = handKnuckleSpan;
+      smoothKnuckleSpanInit = true;
+    } else {
+      smoothKnuckleSpan += (handKnuckleSpan - smoothKnuckleSpan) * aKn;
+    }
+    const handKnuckleSpanStable = smoothKnuckleSpan;
     const isWideWrist =
       distanciaBaseNorm >= OMAFIT_BRACELET_WIDE_SCREEN_N ||
-      handKnuckleSpan >= OMAFIT_BRACELET_WIDE_M;
+      handKnuckleSpanStable >= OMAFIT_BRACELET_WIDE_M;
     const wideLatBoost = isWideWrist ? OMAFIT_BRACELET_WIDE_LAT_BOOST : 1;
     const braceletRingGeomMean = Math.sqrt(
       Math.max(1e-6, wristExpandMul * OMAFIT_BRACELET_ELLIPSE_X * wideLatBoost) *
@@ -12605,14 +12638,14 @@ async function runHandArSession({
     const aSpanRef =
       1 - Math.exp(-clampDt / OMAFIT_HAND_KNUCKLE_SPAN_REF_TAU_MS);
     if (handKnuckleSpanRef <= 1e-8) {
-      handKnuckleSpanRef = handKnuckleSpan;
-    } else if (handKnuckleSpan > handKnuckleSpanRef) {
-      handKnuckleSpanRef = handKnuckleSpan;
+      handKnuckleSpanRef = handKnuckleSpanStable;
+    } else if (handKnuckleSpanStable > handKnuckleSpanRef) {
+      handKnuckleSpanRef = handKnuckleSpanStable;
     } else {
-      handKnuckleSpanRef += (handKnuckleSpan - handKnuckleSpanRef) * aSpanRef;
+      handKnuckleSpanRef += (handKnuckleSpanStable - handKnuckleSpanRef) * aSpanRef;
     }
     const perspMul = THREE.MathUtils.clamp(
-      handKnuckleSpan / Math.max(0.034, handKnuckleSpanRef),
+      handKnuckleSpanStable / Math.max(0.034, handKnuckleSpanRef),
       accessoryType === "bracelet" ? 0.86 : 0.76,
       1.03,
     );
@@ -12644,15 +12677,15 @@ async function runHandArSession({
         : OMAFIT_WATCH_KNUCKLE_TO_WRIST_R;
     const effectiveKnuckleSpan =
       accessoryType === "bracelet"
-        ? handKnuckleSpan * OMAFIT_BRACELET_WRIST_WIDTH_PADDING
-        : handKnuckleSpan;
+        ? handKnuckleSpanStable * OMAFIT_BRACELET_WRIST_WIDTH_PADDING
+        : handKnuckleSpanStable;
     /**
      * Pulseira: garantir raio mínimo a partir da corda 5–17 (≈ largura do
      * punso na câmara) para as extremidades do anel não ficarem “dentro”
      * das pontas laterais percebidas.
      */
     const wristRadiusFromSpanChord =
-      accessoryType === "bracelet" ? handKnuckleSpan * 0.34 : 0;
+      accessoryType === "bracelet" ? handKnuckleSpanStable * 0.34 : 0;
     const wristRadiusRaw = Math.max(
       0.018,
       Math.min(
@@ -12672,8 +12705,8 @@ async function runHandArSession({
      */
     const forearmLengthRaw =
       accessoryType === "bracelet"
-        ? Math.max(0.46, Math.min(0.78, handKnuckleSpan * 5.05))
-        : Math.max(0.3, Math.min(0.6, handKnuckleSpan * 4.0));
+        ? Math.max(0.46, Math.min(0.78, handKnuckleSpanStable * 5.05))
+        : Math.max(0.3, Math.min(0.6, handKnuckleSpanStable * 4.0));
     if (!smoothOccluderInitialized) {
       smoothWristRadius = wristRadiusRaw;
       smoothForearmLength = forearmLengthRaw;
