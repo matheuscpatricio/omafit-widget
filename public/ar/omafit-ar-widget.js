@@ -422,7 +422,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-glasses-landmark-basis-vto";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-ipd-metric-no-gradient";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5153,9 +5153,13 @@ function injectGlobalStyles(root, primaryOverride) {
       animation: omafit-ar-ring-pulse 1.85s ease-in-out infinite;
     }
     /* Miniaturas + carrinho: filho de arWrap (fora do overflow do vídeo), acima do WebGL. */
-    .omafit-ar-shell .omafit-ar-variant-cart-strip {
+    .omafit-ar-shell .omafit-ar-variant-cart-strip,
+    .omafit-ar-variant-cart-strip {
       z-index: 120 !important;
       pointer-events: auto !important;
+      background: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
     }
     /* Botão carrinho mais alto e barra mais acima (evita barra gestual / canto inferior). */
     .omafit-ar-shell .omafit-ar-variant-cart-strip .omafit-ar-cart-btn {
@@ -9427,21 +9431,6 @@ async function runArSession({
                     parentInv: new THREE.Matrix4(),
                     localMat: new THREE.Matrix4(),
                     basis: new THREE.Matrix4(),
-                    /** Base 168+olhos+testa+queixo (métrico), depois × `faceWorld` — alinhamento VTO standard. */
-                    lmBasisMetric: new THREE.Matrix4(),
-                    composedLmFace: new THREE.Matrix4(),
-                    landmarkBasisReuse: {
-                      tmp: new THREE.Vector3(),
-                      O: new THREE.Vector3(),
-                      eR: new THREE.Vector3(),
-                      eL: new THREE.Vector3(),
-                      fh: new THREE.Vector3(),
-                      ch: new THREE.Vector3(),
-                      x: new THREE.Vector3(),
-                      yRaw: new THREE.Vector3(),
-                      y: new THREE.Vector3(),
-                      z: new THREE.Vector3(),
-                    },
                     q: new THREE.Quaternion(),
                     eyeR: new THREE.Vector3(),
                     eyeL: new THREE.Vector3(),
@@ -9483,33 +9472,14 @@ async function runArSession({
 
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
-                   * Rotação (VTO / referências comuns: Fittingbox, artigos try-on web):
-                   * base rígida a partir de **landmarks** 168+33+263+10+152 (eixos lente largura,
-                   * vertical, saída do rosto) em coord. métricas, depois `faceWorld` — coerente
-                   * com a âncora MindAR. **Não** usar só a rotação 3×3 da malha 468: a origem
-                   * do mesh facial não coincide com a ponte (168) e empurra o eixo.
-                   * Translação: ponto interpupilar em mundo → local do `glassesModelWrap`;
-                   * profundidade: eixo +Z do referencial composto, no espaço do pai.
+                   * Rotação: 3×3 de `parentInv*faceWorld` (mesma pose que a malha 468 suavizada).
+                   * (Evitar `faceWorld×lmBasis` no wrap: a composição alterava o eixo e a percepção
+                   * de escala/virado.) Translação: ponto interpupilar em mundo → local do wrap;
+                   * +Z de profundidade: coluna 2 de `fa.basis` no referencial do pai.
                    * O bind glTF→MindAR fica no `glassesStaticBindWrap`.
                    */
-                  const reuseLm =
-                    st.glassesBasisReuse && st.glassesBasisActive
-                      ? st.glassesBasisReuse
-                      : fa.landmarkBasisReuse;
-                  const okLmBasis = buildGlassesFaceBasisMatrix(
-                    THREE,
-                    lmLoc,
-                    st.lmSmoother,
-                    fa.lmBasisMetric,
-                    reuseLm,
-                  );
-                  if (okLmBasis) {
-                    fa.composedLmFace.multiplyMatrices(fa.faceWorld, fa.lmBasisMetric);
-                    glassesTrackingWrap.quaternion.setFromRotationMatrix(fa.composedLmFace);
-                  } else {
-                    fa.q.setFromRotationMatrix(fa.basis);
-                    glassesTrackingWrap.quaternion.copy(fa.q);
-                  }
+                  fa.q.setFromRotationMatrix(fa.basis);
+                  glassesTrackingWrap.quaternion.copy(fa.q);
                   const okMid = (() => {
                     if (!lmLoc) return false;
                     const smR0 = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
@@ -9553,9 +9523,7 @@ async function runArSession({
                   if (okMid && st.glassesEyeMidpointAlign && faceAlignParent) {
                     glassesTrackingWrap.position.copy(fa.midW);
                     faceAlignParent.worldToLocal(glassesTrackingWrap.position);
-                    const ce = okLmBasis
-                      ? fa.composedLmFace.elements
-                      : fa.basis.elements;
+                    const ce = fa.basis.elements;
                     fa.zFaceLocal.set(ce[8], ce[9], ce[10]);
                     if (fa.zFaceLocal.lengthSq() > 1e-12) fa.zFaceLocal.normalize();
                     fa.zFaceLocal.transformDirection(fa.parentInv);
@@ -9646,9 +9614,18 @@ async function runArSession({
                     return false;
                   })();
                   if (okR && okL) {
+                    /**
+                     * IPD **só** no espaço `metricLandmarks` (antes de `faceWorld`). A
+                     * `face.matrixWorld` inclui escala do modelo 468 / fitting — usar a
+                     * distância após `applyMatrix4` infla o IPD e deixa a armação gigante.
+                     */
+                    const ipdLandmark = fa.eyeR.distanceTo(fa.eyeL);
                     fa.eyeR.applyMatrix4(fa.faceWorld);
                     fa.eyeL.applyMatrix4(fa.faceWorld);
-                    const ipdMetric = fa.eyeR.distanceTo(fa.eyeL);
+                    const ipdMetric =
+                      st.glassesSimpleFaceOnly && glassesTrackingWrap
+                        ? ipdLandmark
+                        : fa.eyeR.distanceTo(fa.eyeL);
                     if (Number.isFinite(ipdMetric) && ipdMetric > 0) {
                       const ipdMul =
                         glassesTrackingWrap && st.glassesSimpleFaceOnly
