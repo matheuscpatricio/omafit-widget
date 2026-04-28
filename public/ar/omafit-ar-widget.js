@@ -357,13 +357,13 @@ const OMAFIT_BRACELET_GLB_LOCAL_Y_SIZE_MUL = 0.42;
 /** Recuo local em profundidade para reduzir efeito de flutuar à frente. */
 const OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL = 0.5;
 /** Inset adicional pela normal do pulso (wrapper quaternion), em metros. */
-const OMAFIT_BRACELET_WRIST_NORMAL_INSET_M = 0.015;
+const OMAFIT_BRACELET_WRIST_NORMAL_INSET_M = 0.006;
 /** Offset base pedido para recuar pulso para o braço. */
-const OMAFIT_BRACELET_WRIST_OFFSET_BASE_M = 0.025;
+const OMAFIT_BRACELET_WRIST_OFFSET_BASE_M = 0.006;
 /** Offset dinâmico por largura do punho (LM5–LM17). */
-const OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL = 0.25;
-const OMAFIT_BRACELET_WRIST_OFFSET_MIN_M = 0.015;
-const OMAFIT_BRACELET_WRIST_OFFSET_MAX_M = 0.035;
+const OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL = 0.08;
+const OMAFIT_BRACELET_WRIST_OFFSET_MIN_M = 0.004;
+const OMAFIT_BRACELET_WRIST_OFFSET_MAX_M = 0.012;
 /** Compensação de escala após reduzir recuo do pulso. */
 const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
@@ -379,8 +379,8 @@ const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
 const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = false;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
-/** Relógio: corrigir inversão lateral fixa no pulso (rotação 180° em torno do eixo do braço). */
-const OMAFIT_WATCH_WRIST_SIDE_FLIP = true;
+/** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
+const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 /** Pulseira: evitar sumiço no dorso desativando depth-occluder dedicado. */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
 /**
@@ -475,7 +475,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-visible-dorsum-v22";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-watch-orientation-handedness-fix-v24";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12525,7 +12525,9 @@ async function runHandArSession({
       tmpX.set(1, 0, 0);
     }
     tmpX.normalize();
-    if (handLabel === "Left") tmpX.negate();
+    if (handLabel === "Left" && (accessoryType !== "watch" || OMAFIT_WATCH_USE_HANDEDNESS_LABEL)) {
+      tmpX.negate();
+    }
     tmpY.crossVectors(handZForearm, tmpX).normalize();
 
     if (accessoryType === "watch" && triLenPalm > 1e-7) {
@@ -12545,11 +12547,6 @@ async function runHandArSession({
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
-    if (accessoryType === "watch" && OMAFIT_WATCH_WRIST_SIDE_FLIP) {
-      /** 180° em torno do eixo do braço (Z local): corrige "lado contrário". */
-      tmpX.negate();
-      tmpY.negate();
-    }
 
     const w0to1 = handW0to1Scratch.subVectors(w1, w0);
 
