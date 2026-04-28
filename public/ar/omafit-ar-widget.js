@@ -347,13 +347,13 @@ const OMAFIT_WRIST_TO_MCP_M = 0.10;
  */
 const OMAFIT_BASE_KNUCKLE_SPAN_M = 0.078;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
-const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 320;
+const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
 const OMAFIT_METAL_ROUGHNESS_DEFAULT = 0.22;
 const OMAFIT_METAL_ENV_MAP_INTENSITY = 1.5;
 /** Inércia da “zona de deslize” da pulseira ao longo do antebraço (ms). */
-const OMAFIT_BRACELET_SLIDE_TAU_FAST_MS = 140;
-const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 360;
+const OMAFIT_BRACELET_SLIDE_TAU_FAST_MS = 90;
+const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 230;
 /**
  * Referência (m) do segmento punho (LM0) → MCP médio (LM9) em adulto (~9,4 cm).
  * Usada na escala Y (espessura ao longo do dorso) e no factor de alcance em Z.
@@ -361,8 +361,8 @@ const OMAFIT_BRACELET_SLIDE_TAU_LAG_MS = 360;
 const OMAFIT_BRACELET_REF_FOREARM_REACH_M = 0.094;
 /** Deslocamento em −Y local da âncora (em direcção à palma) para encostar ao pulso. */
 const OMAFIT_BRACELET_SKIN_SINK_TARGET_M = 0.0031;
-const OMAFIT_BRACELET_METRICS_EMA_MS = 320;
-const OMAFIT_BRACELET_SINK_EMA_MS = 360;
+const OMAFIT_BRACELET_METRICS_EMA_MS = 210;
+const OMAFIT_BRACELET_SINK_EMA_MS = 260;
 /** Expoente suave para ajuste fino ao longo do antebraço (eixo Z do GLB). */
 const OMAFIT_BRACELET_Z_SCALE_EXP = 0.38;
 
@@ -387,10 +387,10 @@ const OMAFIT_HAND_AXIS_TAU_MS = 90;
  * v12.0: EMA fixa na âncora da mão (pedido produto — “peso” físico).
  * Posição α=0.15, rotação SLERP t=0.10 (substitui tau exponencial neste path).
  */
-const OMAFIT_HAND_EMA_POS_ALPHA = 0.1;
-const OMAFIT_HAND_EMA_ROT_ALPHA = 0.075;
+const OMAFIT_HAND_EMA_POS_ALPHA = 0.17;
+const OMAFIT_HAND_EMA_ROT_ALPHA = 0.115;
 /** Quanto da rotação axial (normal 0–5–17 vs base) entra no quaternion final. */
-const OMAFIT_HAND_WRIST_ROLL_GAIN = 0.72;
+const OMAFIT_HAND_WRIST_ROLL_GAIN = 0.5;
 /**
  * Raio efectivo do cilindro oclusor = scale × raio biométrico do pulso.
  * Valor < 1: ligeiramente mais estreito que a estimativa da pulseira — corta só
@@ -422,7 +422,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_hand-scale-stability-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_hand-low-latency-v3";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12182,6 +12182,7 @@ async function runHandArSession({
   const tmpY = new THREE.Vector3();
   const tmpZ = new THREE.Vector3();
   const tmpPos = new THREE.Vector3();
+  const tmpCamToWrist = new THREE.Vector3();
   /** Triângulo punho→MCP índice / mindinho: normal ≈ palma vs dorso (só relógio). */
   const wristTriA = new THREE.Vector3();
   const wristTriB = new THREE.Vector3();
@@ -12436,15 +12437,15 @@ async function runHandArSession({
      * Pulseira: pequeno deslocamento ao longo de punho→MCP (antebraço) e na
      * direcção 0→1 (base do polegar) para seguir o braço quando a peça desliza.
      */
-    tmpPos.copy(w0).addScaledVector(tmpY, 0.006);
+    tmpPos.copy(w0).addScaledVector(tmpY, 0.0025);
     if (accessoryType === "bracelet") {
       if (toMcpRaw.lengthSq() > 1e-12) {
         handToMcpScratch.copy(toMcpRaw).normalize();
-        tmpPos.addScaledVector(handToMcpScratch, 0.012);
+        tmpPos.addScaledVector(handToMcpScratch, 0.0045);
       }
       if (w0to1.lengthSq() > 1e-12) {
         handNAltScratch.copy(w0to1).normalize();
-        tmpPos.addScaledVector(handNAltScratch, 0.0065);
+        tmpPos.addScaledVector(handNAltScratch, 0.002);
       }
     }
 
@@ -12745,7 +12746,20 @@ async function runHandArSession({
      * determina a posição do eixo. occluderR é só a ESPESSURA visual do
      * cilindro para cobertura defensiva.)
      */
-    armOccluder.position.y = -(smoothWristRadius + 0.006);
+    /**
+     * Oclusão dinâmica por lado visível:
+     * - Se `smY` aponta para a câmara, esse lado está visível.
+     * - O cilindro é deslocado para o lado oposto (sempre oclui o “lado de trás”).
+     */
+    tmpCamToWrist.subVectors(camera.position, smPos);
+    if (tmpCamToWrist.lengthSq() > 1e-10) {
+      tmpCamToWrist.normalize();
+    } else {
+      tmpCamToWrist.set(0, 0, 1);
+    }
+    const yFacingCamera = smY.dot(tmpCamToWrist) >= 0;
+    const occluderYOffsetMag = smoothWristRadius + 0.006;
+    armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
