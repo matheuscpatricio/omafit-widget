@@ -371,10 +371,10 @@ const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
-const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.45;
+const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
 const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /** Proteção do topo da pulseira (não deixar “sumir” em excesso). */
-const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.55;
+const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -467,7 +467,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-occlusion-top-fix-v14";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-top-occlusion-guard-v15";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11709,7 +11709,7 @@ async function runHandArSession({
    * pulseira em mundo — ligeiramente menor que a cavidade interna para o
    * depth cortar antes do inner mesh (menos Z-fighting / atravessar).
    */
-  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.95;
+  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.88;
   /**
    * Ratio knuckle-span → raio do pulso (landmarks 5–17). Pulseira usa valor
    * mais alto que relógio: feedback persistente de pulseira sub-dimensionada
@@ -12913,7 +12913,10 @@ async function runHandArSession({
       tmpCamToWrist.set(0, 0, 1);
     }
     const yFacingCamera = smY.dot(tmpCamToWrist) >= 0;
-    const occluderYOffsetMag = smoothWristRadius + 0.006;
+    const occluderYOffsetMag =
+      accessoryType === "bracelet"
+        ? smoothWristRadius + 0.002
+        : smoothWristRadius + 0.006;
     armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
@@ -12953,7 +12956,7 @@ async function runHandArSession({
         OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP,
       );
       const occlusionStrength = OMAFIT_BRACELET_OCCLUSION_STRENGTH;
-      let opacityMul = 1 - braceletOcclusionSmooth * occlusionStrength;
+      let opacityMul = sideBack ? 1 - braceletOcclusionSmooth * occlusionStrength : 1;
       if (sideBack) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
       opacityMul = THREE.MathUtils.clamp(
         opacityMul,
