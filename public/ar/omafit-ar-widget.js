@@ -369,6 +369,11 @@ const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
+/** Oclusão adaptativa por angulação do pulso + largura da mão. */
+const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
+const OMAFIT_BRACELET_OCCLUSION_MIN_STRENGTH = 0.3;
+const OMAFIT_BRACELET_OCCLUSION_MAX_STRENGTH = 0.8;
+const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -461,7 +466,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_bracelet-offset-retune-v10";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_bracelet-adaptive-occlusion-v11";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3798,6 +3803,28 @@ function omafitRestoreModelOpacityBaseline(root) {
       m.transparent = !!m.userData.omafitTransparentBase;
     }
   });
+}
+
+/**
+ * Lista materiais únicos de um root para updates por frame.
+ * @param {import("three").Object3D | null | undefined} root
+ * @returns {any[]}
+ */
+function omafitCollectUniqueMaterials(root) {
+  if (!root?.traverse) return [];
+  const out = [];
+  const seen = new Set();
+  root.traverse((o) => {
+    if (!o?.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (let i = 0; i < mats.length; i++) {
+      const m = mats[i];
+      if (!m || typeof m !== "object" || seen.has(m)) continue;
+      seen.add(m);
+      out.push(m);
+    }
+  });
+  return out;
 }
 
 /**
@@ -12038,6 +12065,9 @@ async function runHandArSession({
   let braceletIsBangle = false;
   let braceletLinkRadial = null;
   let braceletVertexDeform = null;
+  let braceletOcclusionMaterials = [];
+  let braceletOcclusionSmooth = 0;
+  const braceletCameraDir = new THREE.Vector3();
   /** Deslize ao longo do antebraço (inércia dupla). */
   let braceletWristPrev = null;
   let braceletSlideFast = 0;
@@ -12124,6 +12154,8 @@ async function runHandArSession({
               linkGroup: Boolean(braceletLinkRadial),
             });
           }
+          braceletOcclusionMaterials = omafitCollectUniqueMaterials(glbScene);
+          braceletOcclusionSmooth = 0;
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
             watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
@@ -12879,6 +12911,54 @@ async function runHandArSession({
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
+
+    /**
+     * Oclusão adaptativa visual (material) para pulseira:
+     * - factor por angulação normal-do-pulso vs direcção da câmara
+     * - suavização temporal para evitar flicker
+     * - força adaptativa por largura do punho
+     * - lado traseiro mais ocluído
+     */
+    if (accessoryType === "bracelet" && braceletOcclusionMaterials.length > 0) {
+      braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      const sideFactor = THREE.MathUtils.clamp(smY.dot(braceletCameraDir), -1, 1);
+      const occlusionFactorRaw = THREE.MathUtils.clamp((sideFactor + 1) / 2, 0, 1);
+      braceletOcclusionSmooth = THREE.MathUtils.lerp(
+        braceletOcclusionSmooth,
+        occlusionFactorRaw,
+        OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP,
+      );
+      const occlusionStrength = THREE.MathUtils.clamp(
+        handKnuckleSpanStable * 2.0,
+        OMAFIT_BRACELET_OCCLUSION_MIN_STRENGTH,
+        OMAFIT_BRACELET_OCCLUSION_MAX_STRENGTH,
+      );
+      let opacityMul = 1 - braceletOcclusionSmooth * occlusionStrength;
+      if (sideFactor < 0) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
+      opacityMul = THREE.MathUtils.clamp(opacityMul, 0.15, 1);
+      const allowAdaptiveOpacity = handMicroUxDisabled || handMicroUx.introComplete;
+      for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
+        const m = braceletOcclusionMaterials[mi];
+        if (!m || typeof m !== "object") continue;
+        if (!m.userData) m.userData = {};
+        if (!m.userData.omafitOccBaseStored) {
+          m.userData.omafitOccBaseStored = true;
+          m.userData.omafitOccOpacityBase =
+            typeof m.opacity === "number" ? m.opacity : 1;
+          m.userData.omafitOccTransparentBase = m.transparent === true;
+          m.userData.omafitOccDepthWriteBase =
+            typeof m.depthWrite === "boolean" ? m.depthWrite : true;
+        }
+        const baseOpacity = Number(m.userData.omafitOccOpacityBase);
+        const opBase = Number.isFinite(baseOpacity) ? baseOpacity : 1;
+        m.depthTest = true;
+        m.depthWrite = false;
+        if (allowAdaptiveOpacity) {
+          m.transparent = true;
+          m.opacity = THREE.MathUtils.clamp(opBase * opacityMul, 0.12, opBase);
+        }
+      }
+    }
 
     const wristSpanScaleMul = THREE.MathUtils.clamp(
       (handKnuckleSpanStable * OMAFIT_HAND_KNUCKLE_SPAN_SCALE_K) /
