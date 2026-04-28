@@ -422,7 +422,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-glasses-ui-mirror-cart";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-27_ar-glasses-landmark-basis-vto";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -6154,9 +6154,7 @@ async function runArSession({
         bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
         left: "0",
         right: "0",
-        /** Não levar o gradiente até preto sólido no fundo — o padding abaixo do CTA virava “borrão preto”. */
-        background:
-          "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.38) 100%)",
+        background: "transparent",
         padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
         zIndex: "120",
         display: "flex",
@@ -6278,8 +6276,7 @@ async function runArSession({
         bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
         left: "0",
         right: "0",
-        background:
-          "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0.38) 100%)",
+        background: "transparent",
         padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
         zIndex: "120",
         pointerEvents: "auto",
@@ -9430,6 +9427,21 @@ async function runArSession({
                     parentInv: new THREE.Matrix4(),
                     localMat: new THREE.Matrix4(),
                     basis: new THREE.Matrix4(),
+                    /** Base 168+olhos+testa+queixo (métrico), depois × `faceWorld` — alinhamento VTO standard. */
+                    lmBasisMetric: new THREE.Matrix4(),
+                    composedLmFace: new THREE.Matrix4(),
+                    landmarkBasisReuse: {
+                      tmp: new THREE.Vector3(),
+                      O: new THREE.Vector3(),
+                      eR: new THREE.Vector3(),
+                      eL: new THREE.Vector3(),
+                      fh: new THREE.Vector3(),
+                      ch: new THREE.Vector3(),
+                      x: new THREE.Vector3(),
+                      yRaw: new THREE.Vector3(),
+                      y: new THREE.Vector3(),
+                      z: new THREE.Vector3(),
+                    },
                     q: new THREE.Quaternion(),
                     eyeR: new THREE.Vector3(),
                     eyeL: new THREE.Vector3(),
@@ -9471,14 +9483,33 @@ async function runArSession({
 
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
-                   * Pose da face no `glassesTrackingWrap`: rotação = malha facial;
-                   * translação = **ponto interpupilar** no espaço do `glassesModelWrap`
-                   * (não a origem da malha 468 — isso deslocava a armação do nariz),
-                   * mais avanço ao longo do eixo +Z local da face (profundidade lentes).
-                   * O bind glTF→MindAR fica no `glassesStaticBindWrap` (não no mesh).
+                   * Rotação (VTO / referências comuns: Fittingbox, artigos try-on web):
+                   * base rígida a partir de **landmarks** 168+33+263+10+152 (eixos lente largura,
+                   * vertical, saída do rosto) em coord. métricas, depois `faceWorld` — coerente
+                   * com a âncora MindAR. **Não** usar só a rotação 3×3 da malha 468: a origem
+                   * do mesh facial não coincide com a ponte (168) e empurra o eixo.
+                   * Translação: ponto interpupilar em mundo → local do `glassesModelWrap`;
+                   * profundidade: eixo +Z do referencial composto, no espaço do pai.
+                   * O bind glTF→MindAR fica no `glassesStaticBindWrap`.
                    */
-                  fa.q.setFromRotationMatrix(fa.basis);
-                  glassesTrackingWrap.quaternion.copy(fa.q);
+                  const reuseLm =
+                    st.glassesBasisReuse && st.glassesBasisActive
+                      ? st.glassesBasisReuse
+                      : fa.landmarkBasisReuse;
+                  const okLmBasis = buildGlassesFaceBasisMatrix(
+                    THREE,
+                    lmLoc,
+                    st.lmSmoother,
+                    fa.lmBasisMetric,
+                    reuseLm,
+                  );
+                  if (okLmBasis) {
+                    fa.composedLmFace.multiplyMatrices(fa.faceWorld, fa.lmBasisMetric);
+                    glassesTrackingWrap.quaternion.setFromRotationMatrix(fa.composedLmFace);
+                  } else {
+                    fa.q.setFromRotationMatrix(fa.basis);
+                    glassesTrackingWrap.quaternion.copy(fa.q);
+                  }
                   const okMid = (() => {
                     if (!lmLoc) return false;
                     const smR0 = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
@@ -9522,9 +9553,12 @@ async function runArSession({
                   if (okMid && st.glassesEyeMidpointAlign && faceAlignParent) {
                     glassesTrackingWrap.position.copy(fa.midW);
                     faceAlignParent.worldToLocal(glassesTrackingWrap.position);
-                    const el = fa.basis.elements;
-                    fa.zFaceLocal.set(el[8], el[9], el[10]);
+                    const ce = okLmBasis
+                      ? fa.composedLmFace.elements
+                      : fa.basis.elements;
+                    fa.zFaceLocal.set(ce[8], ce[9], ce[10]);
                     if (fa.zFaceLocal.lengthSq() > 1e-12) fa.zFaceLocal.normalize();
+                    fa.zFaceLocal.transformDirection(fa.parentInv);
                     const df = Math.max(
                       0,
                       Number.isFinite(st.glassesDepthForwardM) ? st.glassesDepthForwardM : 0,
