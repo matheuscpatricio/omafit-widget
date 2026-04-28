@@ -78,9 +78,10 @@ import {
  *    **mesh**; **escala da loja** (`cfg.scale`) + posição/rotação no `glassesPivot`.
  *    Em runtime MindAR:
  *      anchor.group → wearPosition → … → calibRot → [tripOffsetGroup] →
- *      glassesPivot → [micro-ux wrap] → **glassesModelWrap** → [**glassesTrackingWrap**] → glasses (GLB).
+ *      glassesPivot → [micro-ux wrap] → **glassesModelWrap** → [**glassesTrackingWrap**] →
+ *      [**glassesStaticBindWrap**] → glasses (GLB).
  *      Com **tracking wrap** (automático, sem manual MindAR / sem `glb-standardize`): pose facial
- *      só no wrap; o mesh mantém offsets correctivos do GLB (`position` estática). Em cada nó,
+ *      no wrap; bind eixo GLB no grupo estático; o mesh mantém offsets (`position`); em cada nó,
  *      preferir escrita **S → R → T** (`scale`, `quaternion`, `position`) antes de `updateMatrix`
  *      para alinhar à composição típica e evitar estados intermédios estranhos.
  *      Modo `data-ar-glasses-geometry-anchor="1"`: `glassesPivot` filho directo de
@@ -7913,9 +7914,10 @@ async function runArSession({
         : null;
 
     /**
-     * Óculos automáticos **sem** Tripo/geometria/bochechas/standardize: só `faceMatrix` →
-     * `glassesTrackingWrap` + offsets estáticos no mesh. Ignora wear/calib loja, fine pivot,
-     * `arGlassesDepthForwardM` e bump Z frontal (`OMAFIT_GLASSES_FACE_LOCAL_FORWARD_M`).
+     * Óculos automáticos **sem** Tripo/geometria/bochechas/standardize: `faceMatrix` →
+     * `glassesTrackingWrap` (interpupilar + `arGlassesDepthForwardM` ao longo do +Z da face),
+     * bind glTF→MindAR no `glassesStaticBindWrap`, offsets no mesh. Ignora wear/calib loja
+     * e micro-pivot; sem bump legado `OMAFIT_GLASSES_FACE_LOCAL_FORWARD_M`.
      */
     const glassesSimpleFaceOnly =
       accessoryType === "glasses" &&
@@ -7928,7 +7930,12 @@ async function runArSession({
     const glassesLocalFineMEffective = glassesSimpleFaceOnly
       ? { x: 0, y: 0, z: 0 }
       : glassesLocalFineM;
-    const glassesDepthForwardMEffective = glassesSimpleFaceOnly ? 0 : glassesDepthForwardM;
+    /**
+     * Modo simples: o deslocamento interpupilar e o “colar” ao rosto vêm do
+     * `glassesTrackingWrap` (mid-olhos + eixo de profundidade da face), não de
+     * `wearPosition`. Mantemos `arGlassesDepthForwardM` (nariz → lentes) aqui.
+     */
+    const glassesDepthForwardMEffective = glassesDepthForwardM;
     const glassesFaceForwardLocalM = glassesSimpleFaceOnly ? 0 : OMAFIT_GLASSES_FACE_LOCAL_FORWARD_M;
 
     const glassesPivotConfigEffective =
@@ -8478,11 +8485,16 @@ async function runArSession({
       }
       const useGlassesTrackingWrap =
         accessoryType === "glasses" && !glassesManualMindarRig && !glassesGlbStandardize;
+      /** Pai do mesh: rotação de bind glTF→MindAR; o wrap de tracking aplica só a pose da face (não zera o bind a cada frame). */
+      let glassesStaticBindWrap = null;
       if (useGlassesTrackingWrap) {
         glassesTrackingWrap = new GroupCtor();
         glassesTrackingWrap.name = "omafit-ar-glasses-tracking-wrap";
         glassesModelWrap.add(glassesTrackingWrap);
-        glassesTrackingWrap.add(glasses);
+        glassesStaticBindWrap = new GroupCtor();
+        glassesStaticBindWrap.name = "omafit-ar-glasses-static-bind";
+        glassesTrackingWrap.add(glassesStaticBindWrap);
+        glassesStaticBindWrap.add(glasses);
       } else {
         glassesModelWrap.add(glasses);
       }
@@ -8510,6 +8522,14 @@ async function runArSession({
         !glassesGlbStandardize
       ) {
         omafitStripGlassesMeshRollYxz(THREE, glasses);
+      }
+      if (glassesStaticBindWrap) {
+        glasses.updateMatrix();
+        glassesStaticBindWrap.position.set(0, 0, 0);
+        glassesStaticBindWrap.scale.set(1, 1, 1);
+        glassesStaticBindWrap.quaternion.copy(glasses.quaternion);
+        glasses.quaternion.identity();
+        glasses.rotation.set(0, 0, 0);
       }
       /** Centro lógico no wrap: translação só no mesh `glasses` (GLB inalterado). Com **tracking wrap**, soma também offset empírico estático. */
       if (accessoryType === "glasses") {
@@ -9391,9 +9411,13 @@ async function runArSession({
                     eyeR: new THREE.Vector3(),
                     eyeL: new THREE.Vector3(),
                     faceForwardOff: new THREE.Vector3(),
+                    midMetric: new THREE.Vector3(),
+                    midW: new THREE.Vector3(),
+                    zFaceLocal: new THREE.Vector3(),
                   };
                 }
                 const fa = _omafitSimpleGlassesFaceAlignScratch;
+                const lmLoc = lm;
                 if (!fa.faceForwardOff) fa.faceForwardOff = new THREE.Vector3();
                 faceSrc.updateMatrixWorld(true);
                 faceAlignParent.updateMatrixWorld(true);
@@ -9424,12 +9448,70 @@ async function runArSession({
 
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
-                   * Sem rotação base no modelo: `glasses.rotation.set(0,0,0)` — Euler ≠ 0 inclina.
-                   * Quaternion da malha só no `glassesTrackingWrap` (faceQuat).
+                   * Pose da face no `glassesTrackingWrap`: rotação = malha facial;
+                   * translação = **ponto interpupilar** no espaço do `glassesModelWrap`
+                   * (não a origem da malha 468 — isso deslocava a armação do nariz),
+                   * mais avanço ao longo do eixo +Z local da face (profundidade lentes).
+                   * O bind glTF→MindAR fica no `glassesStaticBindWrap` (não no mesh).
                    */
                   fa.q.setFromRotationMatrix(fa.basis);
-                  glassesTrackingWrap.position.setFromMatrixPosition(fa.basis);
                   glassesTrackingWrap.quaternion.copy(fa.q);
+                  const okMid = (() => {
+                    if (!lmLoc) return false;
+                    const smR0 = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
+                    if (
+                      smR0 &&
+                      Number.isFinite(smR0.x) &&
+                      Number.isFinite(smR0.y) &&
+                      Number.isFinite(smR0.z)
+                    ) {
+                      fa.eyeR.set(smR0.x, smR0.y, smR0.z);
+                    } else {
+                      const raw = lmLoc[OMAFIT_FACE_LM_EYE_R_OUT];
+                      if (!raw) return false;
+                      if (typeof raw.length === "number" && raw.length >= 3) {
+                        fa.eyeR.set(raw[0], raw[1], raw[2]);
+                      } else if (typeof raw.x === "number") {
+                        fa.eyeR.set(raw.x, raw.y, Number.isFinite(raw.z) ? raw.z : 0);
+                      } else return false;
+                    }
+                    const smL0 = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_L_OUT);
+                    if (
+                      smL0 &&
+                      Number.isFinite(smL0.x) &&
+                      Number.isFinite(smL0.y) &&
+                      Number.isFinite(smL0.z)
+                    ) {
+                      fa.eyeL.set(smL0.x, smL0.y, smL0.z);
+                    } else {
+                      const rawL = lmLoc[OMAFIT_FACE_LM_EYE_L_OUT];
+                      if (!rawL) return false;
+                      if (typeof rawL.length === "number" && rawL.length >= 3) {
+                        fa.eyeL.set(rawL[0], rawL[1], rawL[2]);
+                      } else if (typeof rawL.x === "number") {
+                        fa.eyeL.set(rawL.x, rawL.y, Number.isFinite(rawL.z) ? rawL.z : 0);
+                      } else return false;
+                    }
+                    fa.midMetric.addVectors(fa.eyeR, fa.eyeL).multiplyScalar(0.5);
+                    fa.midW.copy(fa.midMetric).applyMatrix4(fa.faceWorld);
+                    return true;
+                  })();
+                  if (okMid && st.glassesEyeMidpointAlign && faceAlignParent) {
+                    glassesTrackingWrap.position.copy(fa.midW);
+                    faceAlignParent.worldToLocal(glassesTrackingWrap.position);
+                    const el = fa.basis.elements;
+                    fa.zFaceLocal.set(el[8], el[9], el[10]);
+                    if (fa.zFaceLocal.lengthSq() > 1e-12) fa.zFaceLocal.normalize();
+                    const df = Math.max(
+                      0,
+                      Number.isFinite(st.glassesDepthForwardM) ? st.glassesDepthForwardM : 0,
+                    );
+                    if (df > 0) {
+                      glassesTrackingWrap.position.addScaledVector(fa.zFaceLocal, df);
+                    }
+                  } else {
+                    glassesTrackingWrap.position.setFromMatrixPosition(fa.basis);
+                  }
                   glasses.rotation.order = "XYZ";
                   glasses.rotation.set(0, 0, 0);
                   try {
@@ -9469,7 +9551,6 @@ async function runArSession({
                   }
                 }
 
-                const lmLoc = lm;
                 if (lmLoc) {
                   const okR = (() => {
                     const sm = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
