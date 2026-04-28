@@ -369,10 +369,9 @@ const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
-/** Oclusão adaptativa por angulação do pulso + largura da mão. */
+/** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
-const OMAFIT_BRACELET_OCCLUSION_MIN_STRENGTH = 0.3;
-const OMAFIT_BRACELET_OCCLUSION_MAX_STRENGTH = 0.8;
+const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.6;
 const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
@@ -466,7 +465,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_bracelet-adaptive-occlusion-v11";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-hand-wrist-side-instructions-v13";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11295,7 +11294,11 @@ async function runHandArSession({
     transition: "opacity 0.4s ease",
     boxShadow: "0 2px 14px rgba(0,0,0,0.28)",
   });
-  proximityHint.textContent = "Aproxime seu pulso para um ajuste perfeito";
+  const handWristInstruction =
+    accessoryType === "bracelet"
+      ? "Coloque seu pulso esquerdo em frente a camera"
+      : "Coloque seu pulso direito em frente a camera";
+  proximityHint.textContent = handWristInstruction;
   mindarHost.appendChild(proximityHint);
 
   let handDetectRingEl = null;
@@ -12068,6 +12071,9 @@ async function runHandArSession({
   let braceletOcclusionMaterials = [];
   let braceletOcclusionSmooth = 0;
   const braceletCameraDir = new THREE.Vector3();
+  const braceletOccWidth = new THREE.Vector3();
+  const braceletOccForward = new THREE.Vector3();
+  const braceletOccNormal = new THREE.Vector3();
   /** Deslize ao longo do antebraço (inércia dupla). */
   let braceletWristPrev = null;
   let braceletSlideFast = 0;
@@ -12921,20 +12927,32 @@ async function runHandArSession({
      */
     if (accessoryType === "bracelet" && braceletOcclusionMaterials.length > 0) {
       braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-      const sideFactor = THREE.MathUtils.clamp(smY.dot(braceletCameraDir), -1, 1);
-      const occlusionFactorRaw = THREE.MathUtils.clamp((sideFactor + 1) / 2, 0, 1);
+      braceletOccWidth.subVectors(w5, w17).normalize();
+      braceletOccForward.subVectors(w5, w0).normalize();
+      braceletOccNormal.crossVectors(braceletOccWidth, braceletOccForward);
+      if (braceletOccNormal.lengthSq() < 1e-10) {
+        braceletOccNormal.copy(smY);
+      } else {
+        braceletOccNormal.normalize();
+      }
+      // Correção 1: inverter normal base (quando necessário).
+      braceletOccNormal.negate();
+      let sideFactor = THREE.MathUtils.clamp(braceletOccNormal.dot(braceletCameraDir), -1, 1);
+      const sideBack = sideFactor < 0;
+      // Correção 3: flip dinâmico para frente sempre positiva.
+      if (sideFactor < 0) {
+        braceletOccNormal.negate();
+        sideFactor = THREE.MathUtils.clamp(braceletOccNormal.dot(braceletCameraDir), -1, 1);
+      }
+      const occlusionFactorRaw = THREE.MathUtils.clamp(sideFactor, 0, 1);
       braceletOcclusionSmooth = THREE.MathUtils.lerp(
         braceletOcclusionSmooth,
         occlusionFactorRaw,
         OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP,
       );
-      const occlusionStrength = THREE.MathUtils.clamp(
-        handKnuckleSpanStable * 2.0,
-        OMAFIT_BRACELET_OCCLUSION_MIN_STRENGTH,
-        OMAFIT_BRACELET_OCCLUSION_MAX_STRENGTH,
-      );
+      const occlusionStrength = OMAFIT_BRACELET_OCCLUSION_STRENGTH;
       let opacityMul = 1 - braceletOcclusionSmooth * occlusionStrength;
-      if (sideFactor < 0) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
+      if (sideBack) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
       opacityMul = THREE.MathUtils.clamp(opacityMul, 0.15, 1);
       const allowAdaptiveOpacity = handMicroUxDisabled || handMicroUx.introComplete;
       for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
@@ -13376,9 +13394,10 @@ async function runHandArSession({
         handKnuckleSpanRef = 0;
         prevKnuckleSpan3d = 0;
         knuckleJitterEma = 0;
-        proximityHintStable = 0;
+        proximityHintStable = 18;
         try {
-          proximityHint.style.opacity = "0";
+          proximityHint.textContent = handWristInstruction;
+          proximityHint.style.opacity = "1";
         } catch {
           /* ignore */
         }
