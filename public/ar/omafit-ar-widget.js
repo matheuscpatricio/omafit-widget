@@ -379,6 +379,10 @@ const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
 const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = false;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
+/** Relógio: corrigir inversão lateral fixa no pulso (rotação 180° em torno do eixo do braço). */
+const OMAFIT_WATCH_WRIST_SIDE_FLIP = true;
+/** Pulseira: evitar sumiço no dorso desativando depth-occluder dedicado. */
+const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -471,7 +475,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-occlusion-bind-structural-fix-v20";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-visible-dorsum-v22";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12541,6 +12545,11 @@ async function runHandArSession({
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
+    if (accessoryType === "watch" && OMAFIT_WATCH_WRIST_SIDE_FLIP) {
+      /** 180° em torno do eixo do braço (Z local): corrige "lado contrário". */
+      tmpX.negate();
+      tmpY.negate();
+    }
 
     const w0to1 = handW0to1Scratch.subVectors(w1, w0);
 
@@ -12935,7 +12944,9 @@ async function runHandArSession({
       armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
     }
     armOccluder.visible =
-      accessoryType === "bracelet" ? !braceletDorsumFacingCamera : true;
+      accessoryType === "bracelet"
+        ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && !braceletDorsumFacingCamera
+        : true;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
@@ -13405,7 +13416,9 @@ async function runHandArSession({
       /** Occluder só é útil quando há mão detectada. Evita deixar cilindro
        *  invisível a escrever depth no meio do ecrã quando a mão desaparece. */
       armOccluder.visible =
-        accessoryType === "bracelet" ? armOccluder.visible : true;
+        accessoryType === "bracelet"
+          ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && armOccluder.visible
+          : true;
       contactShadow.visible = true;
     } else {
       missedFrames += 1;
