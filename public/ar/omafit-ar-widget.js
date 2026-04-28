@@ -375,6 +375,8 @@ const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
 const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /** Proteção do topo da pulseira (não deixar “sumir” em excesso). */
 const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
+/** Relógio: corrigir inversão dorso/palma no lado do occluder. */
+const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = true;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -467,7 +469,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-top-occlusion-guard-v16";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-watch-dorsum-palm-occlusion-fix-v18";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11709,7 +11711,7 @@ async function runHandArSession({
    * pulseira em mundo — ligeiramente menor que a cavidade interna para o
    * depth cortar antes do inner mesh (menos Z-fighting / atravessar).
    */
-  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.84;
+  const OMAFIT_BRACELET_OCCLUDER_VS_INNER = 0.8;
   /**
    * Ratio knuckle-span → raio do pulso (landmarks 5–17). Pulseira usa valor
    * mais alto que relógio: feedback persistente de pulseira sub-dimensionada
@@ -12915,9 +12917,17 @@ async function runHandArSession({
     const yFacingCamera = smY.dot(tmpCamToWrist) >= 0;
     const occluderYOffsetMag =
       accessoryType === "bracelet"
-        ? smoothWristRadius - 0.0015
+        ? Math.max(0.003, smoothWristRadius - 0.0035)
         : smoothWristRadius + 0.006;
-    armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
+    if (accessoryType === "bracelet") {
+      // Pulseira: inverter lado relativo à câmera para evitar “comer” o dorso.
+      armOccluder.position.y = yFacingCamera ? occluderYOffsetMag : -occluderYOffsetMag;
+    } else if (accessoryType === "watch" && OMAFIT_WATCH_OCCLUDER_INVERT_SIDE) {
+      // Relógio: dorso/palma estavam trocados; inverter lado para oclusão correta.
+      armOccluder.position.y = yFacingCamera ? occluderYOffsetMag : -occluderYOffsetMag;
+    } else {
+      armOccluder.position.y = yFacingCamera ? -occluderYOffsetMag : occluderYOffsetMag;
+    }
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
