@@ -32,11 +32,24 @@ const AR_BUNDLE = [
   "omafit-mindar-glasses-pivot-rig.js",
 ];
 
+function hasBundledAssets() {
+  const arOk = AR_BUNDLE.every((f) => existsSync(join(arDir, f)));
+  const widgetOk = existsSync(join(pub, "omafit-widget.js"));
+  return arOk && widgetOk;
+}
+
 if (!existsSync(themeAssets)) {
+  if (hasBundledAssets()) {
+    console.warn(
+      "[sync-ar] Pasta do tema não encontrada; a usar assets já versionados em public/ (modo CI/deploy).",
+    );
+    process.exit(0);
+  }
   console.error(
     "[sync-ar] Pasta do tema não encontrada:\n  ",
     themeAssets,
-    "\n  Ajusta o caminho em scripts/sync-ar-assets-from-theme.mjs se o clone estiver doutro sítio.",
+    "\n  Ajusta o caminho em scripts/sync-ar-assets-from-theme.mjs se o clone estiver doutro sítio,",
+    "\n  ou versiona `public/ar/*.js` + `public/omafit-widget.js` para builds em CI sem o repo irmão.",
   );
   process.exit(1);
 }
