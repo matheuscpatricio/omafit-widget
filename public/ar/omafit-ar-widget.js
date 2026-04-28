@@ -359,11 +359,16 @@ const OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL = 0.5;
 /** Inset adicional pela normal do pulso (wrapper quaternion), em metros. */
 const OMAFIT_BRACELET_WRIST_NORMAL_INSET_M = 0.015;
 /** Offset base pedido para recuar pulso para o braço. */
-const OMAFIT_BRACELET_WRIST_OFFSET_BASE_M = 0.05;
+const OMAFIT_BRACELET_WRIST_OFFSET_BASE_M = 0.025;
 /** Offset dinâmico por largura do punho (LM5–LM17). */
-const OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL = 0.6;
-/** Lock extra no eixo do antebraço (evita drift). */
-const OMAFIT_BRACELET_FOREARM_LOCK_M = 0.01;
+const OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL = 0.25;
+const OMAFIT_BRACELET_WRIST_OFFSET_MIN_M = 0.015;
+const OMAFIT_BRACELET_WRIST_OFFSET_MAX_M = 0.035;
+/** Compensação de escala após reduzir recuo do pulso. */
+const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
+/** Micro-ajuste local para evitar efeito "afundado". */
+const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
+const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -456,7 +461,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_bracelet-wrist-offset-v9";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28_bracelet-offset-retune-v10";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11964,6 +11969,8 @@ async function runHandArSession({
     if (accessoryType === "bracelet") {
       glbScene.position.y -= size.y * OMAFIT_BRACELET_GLB_LOCAL_Y_SIZE_MUL;
       glbScene.position.z -= size.z * OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL;
+      glbScene.position.y += OMAFIT_BRACELET_GLB_MICRO_POS_Y_M;
+      glbScene.position.z += OMAFIT_BRACELET_GLB_MICRO_POS_Z_M;
     } else {
       glbScene.position.y += OMAFIT_HAND_GLB_LOCAL_Y_BIND_M;
     }
@@ -12524,17 +12531,14 @@ async function runHandArSession({
         handDir.normalize();
         const dynamicOffset = THREE.MathUtils.clamp(
           wristWidth * OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL,
-          0.03,
-          0.06,
+          OMAFIT_BRACELET_WRIST_OFFSET_MIN_M,
+          OMAFIT_BRACELET_WRIST_OFFSET_MAX_M,
         );
         const wristOffset = Math.max(
           OMAFIT_BRACELET_WRIST_OFFSET_BASE_M,
           dynamicOffset,
         );
-        tmpPos.addScaledVector(
-          handDir,
-          -(wristOffset + OMAFIT_BRACELET_FOREARM_LOCK_M),
-        );
+        tmpPos.addScaledVector(handDir, -wristOffset);
       }
       if (w0to1.lengthSq() > 1e-12) {
         handNAltScratch.copy(w0to1).normalize();
@@ -12918,7 +12922,8 @@ async function runHandArSession({
         userMul *
         adaptMul *
         perspMul *
-        wristSpanScaleMul;
+        wristSpanScaleMul *
+        (accessoryType === "bracelet" ? OMAFIT_BRACELET_SCALE_BOOST : 1);
       const Wb = wristExpandMul;
       if (accessoryType === "bracelet" && braceletPlaceState) {
         const sw = omafitBraceletWristScaleWearStep(THREE, braceletPlaceState, {
