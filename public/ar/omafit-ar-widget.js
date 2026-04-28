@@ -371,8 +371,10 @@ const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
-const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.6;
+const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.45;
 const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
+/** Proteção do topo da pulseira (não deixar “sumir” em excesso). */
+const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.55;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -465,7 +467,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-hand-wrist-side-instructions-v13";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-occlusion-top-fix-v14";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12935,16 +12937,16 @@ async function runHandArSession({
       } else {
         braceletOccNormal.normalize();
       }
-      // Correção 1: inverter normal base (quando necessário).
-      braceletOccNormal.negate();
-      let sideFactor = THREE.MathUtils.clamp(braceletOccNormal.dot(braceletCameraDir), -1, 1);
+      // Dot assinado: +1 mais "de frente", -1 mais "virado para trás".
+      const sideFactor = THREE.MathUtils.clamp(
+        braceletOccNormal.dot(braceletCameraDir),
+        -1,
+        1,
+      );
       const sideBack = sideFactor < 0;
-      // Correção 3: flip dinâmico para frente sempre positiva.
-      if (sideFactor < 0) {
-        braceletOccNormal.negate();
-        sideFactor = THREE.MathUtils.clamp(braceletOccNormal.dot(braceletCameraDir), -1, 1);
-      }
-      const occlusionFactorRaw = THREE.MathUtils.clamp(sideFactor, 0, 1);
+      const facingFactor = THREE.MathUtils.clamp((sideFactor + 1) / 2, 0, 1);
+      // Ocluir mais ao virar para trás; proteger topo quando de frente.
+      const occlusionFactorRaw = 1 - facingFactor;
       braceletOcclusionSmooth = THREE.MathUtils.lerp(
         braceletOcclusionSmooth,
         occlusionFactorRaw,
@@ -12953,7 +12955,11 @@ async function runHandArSession({
       const occlusionStrength = OMAFIT_BRACELET_OCCLUSION_STRENGTH;
       let opacityMul = 1 - braceletOcclusionSmooth * occlusionStrength;
       if (sideBack) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
-      opacityMul = THREE.MathUtils.clamp(opacityMul, 0.15, 1);
+      opacityMul = THREE.MathUtils.clamp(
+        opacityMul,
+        OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY,
+        1,
+      );
       const allowAdaptiveOpacity = handMicroUxDisabled || handMicroUx.introComplete;
       for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
         const m = braceletOcclusionMaterials[mi];
