@@ -367,8 +367,8 @@ const OMAFIT_BRACELET_WRIST_OFFSET_MAX_M = 0.012;
 /** Compensação de escala após reduzir recuo do pulso. */
 const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
-const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.008;
-const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.005;
+const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
+const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -376,7 +376,7 @@ const OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL = 0.5;
 /** Proteção do topo da pulseira (não deixar “sumir” em excesso). */
 const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
 /** Evitar transparência artificial na pulseira; oclusão fica só no depth. */
-const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = false;
+const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = true;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
@@ -475,7 +475,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-watch-orientation-handedness-fix-v24";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-dynamic-occlusion-v27";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11579,6 +11579,24 @@ async function runHandArSession({
   armOccluder.visible = false; // Só visível quando `anchor.visible = true`.
   anchor.add(armOccluder);
 
+  /**
+   * Plano de oclusão (depth-only), criado uma única vez.
+   * Escreve no depth buffer sem pintar cor para ajudar a esconder
+   * geometrias da pulseira que deveriam ficar atrás do punho.
+   */
+  const occPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.2, 0.2),
+    new THREE.MeshBasicMaterial({
+      colorWrite: false,
+      depthWrite: true,
+      depthTest: true,
+    }),
+  );
+  occPlane.visible = false;
+  occPlane.frustumCulled = false;
+  occPlane.renderOrder = 0;
+  scene.add(occPlane);
+
   /** Sombra de contacto (multiply) ligeira sob o mostrador — pele escurecida ao centro. */
   const contactRadialTex = createHandArRadialShadowTexture(THREE);
   const contactShadow = new THREE.Mesh(
@@ -12547,6 +12565,32 @@ async function runHandArSession({
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
+    if (accessoryType === "bracelet") {
+      handMidThumbPinky.addVectors(w5, w17).multiplyScalar(0.5);
+      handToMcpScratch.subVectors(handMidThumbPinky, w0);
+      if (handToMcpScratch.lengthSq() < 1e-12) {
+        handToMcpScratch.subVectors(w9, w0);
+      }
+      if (handToMcpScratch.lengthSq() < 1e-12) {
+        handToMcpScratch.copy(tmpY);
+      } else {
+        handToMcpScratch.normalize();
+      }
+      tmpX.subVectors(w5, w17);
+      if (tmpX.lengthSq() < 1e-12) tmpX.set(1, 0, 0);
+      else tmpX.normalize();
+      tmpY.copy(handToMcpScratch);
+      tmpZ.crossVectors(tmpX, tmpY);
+      if (tmpZ.lengthSq() < 1e-12) {
+        tmpZ.copy(palmTriN);
+      } else {
+        tmpZ.normalize();
+      }
+      handNAltScratch.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      if (tmpZ.dot(handNAltScratch) < 0) tmpZ.negate();
+      tmpX.crossVectors(tmpY, tmpZ).normalize();
+      tmpY.crossVectors(tmpZ, tmpX).normalize();
+    }
 
     const w0to1 = handW0to1Scratch.subVectors(w1, w0);
 
@@ -12585,16 +12629,8 @@ async function runHandArSession({
         .sub(w0);
       if (handDir.lengthSq() > 1e-12) {
         handDir.normalize();
-        const dynamicOffset = THREE.MathUtils.clamp(
-          wristWidth * OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL,
-          OMAFIT_BRACELET_WRIST_OFFSET_MIN_M,
-          OMAFIT_BRACELET_WRIST_OFFSET_MAX_M,
-        );
-        const wristOffset = Math.max(
-          OMAFIT_BRACELET_WRIST_OFFSET_BASE_M,
-          dynamicOffset,
-        );
-        tmpPos.addScaledVector(handDir, -wristOffset);
+        const wristOffset = THREE.MathUtils.clamp(wristWidth * 0.25, 0.015, 0.03);
+        tmpPos.copy(w0).addScaledVector(handDir, -wristOffset);
       }
       if (w0to1.lengthSq() > 1e-12) {
         handNAltScratch.copy(w0to1).normalize();
@@ -12642,7 +12678,9 @@ async function runHandArSession({
       handZForearm,
       wristRoll * OMAFIT_HAND_WRIST_ROLL_GAIN,
     );
-    tmpQuat.premultiply(handRollQuat);
+    if (accessoryType !== "bracelet") {
+      tmpQuat.premultiply(handRollQuat);
+    }
     if (!smoothInitialized) {
       smoothedQuat.copy(tmpQuat);
       prePos.copy(tmpPos);
@@ -12656,6 +12694,7 @@ async function runHandArSession({
       if (!closeEnoughHand) posAlpha *= 0.62;
       posAlpha = THREE.MathUtils.clamp(posAlpha, 0.035, OMAFIT_HAND_POS_ALPHA_MAX);
       posAlpha = THREE.MathUtils.lerp(posAlpha, OMAFIT_HAND_EMA_POS_ALPHA, 0.18);
+      if (accessoryType === "bracelet") posAlpha = 0.2;
       smPos.lerp(tmpPos, posAlpha);
       /**
        * Anti-flip guard: medir ângulo entre smoothedQuat e tmpQuat.
@@ -12686,6 +12725,7 @@ async function runHandArSession({
         if (!closeEnoughHand) rotAlpha *= 0.7;
         rotAlpha = THREE.MathUtils.clamp(rotAlpha, 0.03, OMAFIT_HAND_ROT_ALPHA_MAX);
         rotAlpha = THREE.MathUtils.lerp(rotAlpha, OMAFIT_HAND_EMA_ROT_ALPHA, 0.2);
+        if (accessoryType === "bracelet") rotAlpha = 0.2;
         smoothedQuat.slerp(tmpQuat, rotAlpha);
       }
     }
@@ -12948,6 +12988,14 @@ async function runHandArSession({
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
+    occPlane.visible = accessoryType === "bracelet";
+    if (occPlane.visible) {
+      occPlane.position.copy(smPos);
+      occPlane.quaternion.copy(smoothedQuat);
+      occPlane.position.addScaledVector(smY, -0.0015);
+      occPlane.updateMatrix();
+      occPlane.updateMatrixWorld(true);
+    }
 
     /**
      * Oclusão adaptativa visual (material) para pulseira:
@@ -12970,29 +13018,24 @@ async function runHandArSession({
       } else {
         braceletOccNormal.normalize();
       }
-      // Dot assinado: +1 mais "de frente", -1 mais "virado para trás".
-      const sideFactor = THREE.MathUtils.clamp(
+      const dot = THREE.MathUtils.clamp(
         braceletOccNormal.dot(braceletCameraDir),
         -1,
         1,
       );
-      const sideBack = sideFactor < 0;
-      const facingFactor = THREE.MathUtils.clamp((sideFactor + 1) / 2, 0, 1);
-      // Ocluir mais ao virar para trás; proteger topo quando de frente.
-      const occlusionFactorRaw = 1 - facingFactor;
+      const facing = THREE.MathUtils.clamp((dot + 1) / 2, 0, 1);
       braceletOcclusionSmooth = THREE.MathUtils.lerp(
         braceletOcclusionSmooth,
-        occlusionFactorRaw,
-        OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP,
+        facing,
+        0.15,
       );
-      const occlusionStrength = OMAFIT_BRACELET_OCCLUSION_STRENGTH;
-      let opacityMul = sideBack ? 1 - braceletOcclusionSmooth * occlusionStrength : 1;
-      if (sideBack) opacityMul *= OMAFIT_BRACELET_OCCLUSION_SIDE_BACK_MUL;
-      opacityMul = THREE.MathUtils.clamp(
-        opacityMul,
-        OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY,
-        1,
+      const wristWidth = w5.distanceTo(w17);
+      const occlusionStrength = THREE.MathUtils.clamp(
+        wristWidth * 2.0,
+        0.3,
+        0.7,
       );
+      const targetOpacity = 1.0 - braceletOcclusionSmooth * occlusionStrength;
       const allowAdaptiveOpacity = handMicroUxDisabled || handMicroUx.introComplete;
       for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
         const m = braceletOcclusionMaterials[mi];
@@ -13012,7 +13055,13 @@ async function runHandArSession({
         m.depthWrite = false;
         if (allowAdaptiveOpacity) {
           m.transparent = true;
-          m.opacity = THREE.MathUtils.clamp(opBase * opacityMul, 0.12, opBase);
+          const currentOpacity =
+            typeof m.opacity === "number" ? m.opacity : opBase;
+          m.opacity = THREE.MathUtils.lerp(
+            currentOpacity,
+            THREE.MathUtils.clamp(opBase * targetOpacity, 0.12, opBase),
+            0.15,
+          );
         }
       }
     }
@@ -13416,6 +13465,7 @@ async function runHandArSession({
         accessoryType === "bracelet"
           ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && armOccluder.visible
           : true;
+      occPlane.visible = accessoryType === "bracelet" && occPlane.visible;
       contactShadow.visible = true;
     } else {
       missedFrames += 1;
@@ -13430,6 +13480,7 @@ async function runHandArSession({
           }
         }
         armOccluder.visible = false;
+        occPlane.visible = false;
         contactShadow.visible = false;
         smoothInitialized = false;
         smoothOccluderInitialized = false;
