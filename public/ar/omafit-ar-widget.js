@@ -371,6 +371,7 @@ const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
 const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = true;
 const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = true;
+const OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL = true;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -477,7 +478,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-29-bracelet-occplane-normal-fix-v29";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-29-bracelet-occplane-anti-vanish-v30";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11632,6 +11633,13 @@ async function runHandArSession({
   occPlane.visible = false;
   occPlane.frustumCulled = false;
   occPlane.renderOrder = 0;
+  occPlane.scale.set(0.12, 0.08, 1);
+  if (OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL) {
+    occPlane.material.colorWrite = true;
+    occPlane.material.color.set(0xff0000);
+    occPlane.material.opacity = 0.3;
+    occPlane.material.transparent = true;
+  }
   scene.add(occPlane);
 
   /** Sombra de contacto (multiply) ligeira sob o mostrador — pele escurecida ao centro. */
@@ -13037,12 +13045,25 @@ async function runHandArSession({
       if (braceletOccNormal.dot(braceletCameraDir) > 0) {
         braceletOccNormal.negate();
       }
+      const dotOcc = THREE.MathUtils.clamp(
+        braceletOccNormal.dot(braceletCameraDir),
+        -1,
+        1,
+      );
+      occPlane.visible = dotOcc < -0.2;
       basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
       occPlane.quaternion.setFromRotationMatrix(basisMat);
-      const OCC_OFFSET = 0.0025;
-      occPlane.position.copy(smPos).addScaledVector(braceletOccNormal, OCC_OFFSET);
-      occPlane.updateMatrix();
-      occPlane.updateMatrixWorld(true);
+      const wristWidthOcc = w5.distanceTo(w17);
+      const dynamicOffset = THREE.MathUtils.clamp(
+        wristWidthOcc * 0.015,
+        0.0008,
+        0.0015,
+      );
+      occPlane.position.copy(smPos).addScaledVector(braceletOccNormal, dynamicOffset);
+      if (occPlane.visible) {
+        occPlane.updateMatrix();
+        occPlane.updateMatrixWorld(true);
+      }
       if (braceletOccNormalDebugLine?.geometry?.attributes?.position) {
         const occPos = braceletOccNormalDebugLine.geometry.attributes.position;
         occPos.setXYZ(0, smPos.x, smPos.y, smPos.z);
@@ -13095,6 +13116,7 @@ async function runHandArSession({
         0.7,
       );
       const targetOpacity = 1.0 - braceletOcclusionSmooth * occlusionStrength;
+      const fade = THREE.MathUtils.clamp(facing, 0.3, 1.0);
       const allowAdaptiveOpacity = handMicroUxDisabled || handMicroUx.introComplete;
       for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
         const m = braceletOcclusionMaterials[mi];
@@ -13116,9 +13138,10 @@ async function runHandArSession({
           m.transparent = true;
           const currentOpacity =
             typeof m.opacity === "number" ? m.opacity : opBase;
+          const antiVanishOpacity = Math.max(targetOpacity, fade);
           m.opacity = THREE.MathUtils.lerp(
             currentOpacity,
-            THREE.MathUtils.clamp(opBase * targetOpacity, 0.12, opBase),
+            THREE.MathUtils.clamp(opBase * antiVanishOpacity, 0.12, opBase),
             0.15,
           );
         }
