@@ -478,7 +478,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-29-bracelet-occplane-anti-vanish-v30";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-29-bracelet-single-occluder-v31";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11627,17 +11627,18 @@ async function runHandArSession({
       colorWrite: false,
       depthWrite: true,
       depthTest: true,
+      depthFunc: THREE.LessEqualDepth,
       side: THREE.DoubleSide,
     }),
   );
   occPlane.visible = false;
   occPlane.frustumCulled = false;
-  occPlane.renderOrder = 0;
+  occPlane.renderOrder = 1;
   occPlane.scale.set(0.12, 0.08, 1);
   if (OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL) {
     occPlane.material.colorWrite = true;
     occPlane.material.color.set(0xff0000);
-    occPlane.material.opacity = 0.3;
+    occPlane.material.opacity = 0.2;
     occPlane.material.transparent = true;
   }
   scene.add(occPlane);
@@ -12243,6 +12244,36 @@ async function runHandArSession({
             });
           }
           braceletOcclusionMaterials = omafitCollectUniqueMaterials(glbScene);
+          for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
+            const bm = braceletOcclusionMaterials[mi];
+            if (!bm || typeof bm !== "object") continue;
+            bm.depthWrite = true;
+            bm.depthTest = true;
+            bm.side = THREE.DoubleSide;
+          }
+          glbScene.traverse((obj) => {
+            if (!obj?.isMesh) return;
+            if (obj.renderOrder < 2) obj.renderOrder = 2;
+          });
+          scene.traverse((obj) => {
+            if (!obj?.isMesh) return;
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            let writesDepth = false;
+            for (let i = 0; i < mats.length; i++) {
+              const mat = mats[i];
+              if (!mat) continue;
+              if (mat.depthWrite) {
+                writesDepth = true;
+                if (obj !== occPlane) mat.depthWrite = false;
+              }
+            }
+            if (writesDepth && debug) {
+              console.log(
+                obj === occPlane ? "DEPTH WRITER: occPlane" : "DEPTH WRITER: disabled",
+                obj.name || obj.type || "mesh",
+              );
+            }
+          });
           braceletOcclusionSmooth = 0;
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
@@ -13050,7 +13081,11 @@ async function runHandArSession({
         -1,
         1,
       );
-      occPlane.visible = dotOcc < -0.2;
+      tmpCamToWrist.subVectors(camera.position, smPos);
+      if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
+      else tmpCamToWrist.set(0, 0, 1);
+      const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
+      occPlane.visible = isInFront && dotOcc < -0.2;
       basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
       occPlane.quaternion.setFromRotationMatrix(basisMat);
       const wristWidthOcc = w5.distanceTo(w17);
@@ -13133,7 +13168,8 @@ async function runHandArSession({
         const baseOpacity = Number(m.userData.omafitOccOpacityBase);
         const opBase = Number.isFinite(baseOpacity) ? baseOpacity : 1;
         m.depthTest = true;
-        m.depthWrite = false;
+        m.depthWrite = true;
+        m.side = THREE.DoubleSide;
         if (allowAdaptiveOpacity) {
           m.transparent = true;
           const currentOpacity =
