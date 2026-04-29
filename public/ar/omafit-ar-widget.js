@@ -369,6 +369,7 @@ const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
+const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = true;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -475,7 +476,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-04-28-bracelet-dynamic-occlusion-v27";
+const OMAFIT_AR_WIDGET_BUILD = "2026-04-29-bracelet-axis-fix-v28";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11496,6 +11497,7 @@ async function runHandArSession({
 
   /** Só pulseira: rotação suave punho→MCP9 em espaço de `calibRot`. */
   let braceletWristAlignGroup = null;
+  let braceletAxisDebugLine = null;
   const glbRoot = new THREE.Group();
   glbRoot.visible = false;
   const handMicroUxWrap = new THREE.Group();
@@ -11514,6 +11516,22 @@ async function runHandArSession({
     calibRot.add(braceletWristAlignGroup);
     braceletWristAlignGroup.add(handMicroUxWrap);
     handMicroUxWrap.add(glbRoot);
+    if (OMAFIT_BRACELET_AXIS_DEBUG_ENABLED) {
+      const dbgGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.05, 0),
+      ]);
+      const dbgMat = new THREE.LineBasicMaterial({
+        color: 0x00ff00,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      braceletAxisDebugLine = new THREE.Line(dbgGeom, dbgMat);
+      braceletAxisDebugLine.frustumCulled = false;
+      braceletAxisDebugLine.renderOrder = 999;
+      scene.add(braceletAxisDebugLine);
+    }
   } else {
     calibRot.add(handMicroUxWrap);
     handMicroUxWrap.add(glbRoot);
@@ -12015,6 +12033,8 @@ async function runHandArSession({
      * médio do anel no plano XY (eixo Z = braço após `fit`).
      */
     if (accessoryType === "bracelet") {
+      glbScene.rotation.set(0, 0, 0);
+      glbScene.quaternion.identity();
       glbScene.updateMatrixWorld(true);
       bbox.setFromObject(glbScene);
       bbox.getCenter(center);
@@ -13139,11 +13159,14 @@ async function runHandArSession({
             calibRot,
             alignGroup: braceletWristAlignGroup,
             w0,
+            w5,
             w9,
+            w17,
+            camera,
             clampDt,
             closeEnoughHand,
             alignTauMs: OMAFIT_BRACELET_ALIGN_TAU_MS,
-            maxAlignRad: OMAFIT_BRACELET_ALIGN_MAX_RAD,
+            debugAxisLine: braceletAxisDebugLine,
           });
         }
       } else {
@@ -13466,6 +13489,7 @@ async function runHandArSession({
           ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && armOccluder.visible
           : true;
       occPlane.visible = accessoryType === "bracelet" && occPlane.visible;
+      if (braceletAxisDebugLine) braceletAxisDebugLine.visible = accessoryType === "bracelet";
       contactShadow.visible = true;
     } else {
       missedFrames += 1;
@@ -13481,6 +13505,7 @@ async function runHandArSession({
         }
         armOccluder.visible = false;
         occPlane.visible = false;
+        if (braceletAxisDebugLine) braceletAxisDebugLine.visible = false;
         contactShadow.visible = false;
         smoothInitialized = false;
         smoothOccluderInitialized = false;
