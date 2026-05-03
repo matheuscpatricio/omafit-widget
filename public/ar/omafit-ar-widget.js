@@ -5233,7 +5233,7 @@ function injectGlobalStyles(root, primaryOverride) {
     /* Miniaturas + carrinho: filho de arWrap (fora do overflow do vídeo), acima do WebGL. */
     .omafit-ar-shell .omafit-ar-variant-cart-strip,
     .omafit-ar-variant-cart-strip {
-      z-index: 120 !important;
+      z-index: 999 !important;
       pointer-events: auto !important;
       background: transparent !important;
       background-image: none !important;
@@ -6184,7 +6184,18 @@ async function runArSession({
   arWrap.appendChild(arFit);
 
   // --- Variant bar + Add to Cart ---
-  let arVariants = Array.isArray(variants) ? variants.filter((v) => v && (v.glbUrl || glbUrl)) : [];
+  const sessionGlb = String(glbUrl || "").trim();
+  let variantSource = Array.isArray(variants) ? variants : [];
+  if (
+    !variantSource.length &&
+    typeof window !== "undefined" &&
+    Array.isArray(window.__OMAFIT_AR_VARIANTS__)
+  ) {
+    variantSource = window.__OMAFIT_AR_VARIANTS__;
+  }
+  let arVariants = variantSource.filter(
+    (v) => v && (String(v.glbUrl || "").trim() || sessionGlb),
+  );
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com
    * `data-variant-id` + `data-glb-url` sintetizamos uma variante para miniaturas
@@ -6193,10 +6204,10 @@ async function runArSession({
   try {
     const r = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
     const vid = r ? String(r.dataset.variantId || r.getAttribute("data-variant-id") || "").trim() : "";
-    if (arVariants.length === 0 && vid && String(glbUrl || "").trim()) {
+    if (arVariants.length === 0 && vid && sessionGlb) {
       const pimg = r ? String(r.dataset.productImage || r.getAttribute("data-product-image") || "").trim() : "";
       const ptitle = r ? String(r.dataset.productTitle || r.getAttribute("data-product-title") || "").trim() : "";
-      arVariants = [{ id: vid, title: ptitle || "Variant", imageUrl: pimg, glbUrl, calibration: null }];
+      arVariants = [{ id: vid, title: ptitle || "Variant", imageUrl: pimg, glbUrl: sessionGlb, calibration: null }];
       console.log("[omafit-ar] variante sintética (Netlify / sem __OMAFIT_AR_VARIANTS__)", {
         variantId: vid,
         hasImage: Boolean(pimg),
@@ -6206,7 +6217,7 @@ async function runArSession({
     /* ignore */
   }
   let currentVariantId = arVariants.length > 0 ? arVariants[0].id : null;
-  let currentGlbUrl = arVariants.length > 0 ? (arVariants[0].glbUrl || glbUrl) : glbUrl;
+  let currentGlbUrl = arVariants.length > 0 ? (String(arVariants[0].glbUrl || "").trim() || sessionGlb) : sessionGlb;
   try {
     const pqv = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search || "" : "",
@@ -6215,34 +6226,32 @@ async function runArSession({
       const mv = arVariants.find((vv) => String(vv.id) === String(pqv).trim());
       if (mv) {
         currentVariantId = mv.id;
-        currentGlbUrl = mv.glbUrl || glbUrl;
+        currentGlbUrl = String(mv.glbUrl || "").trim() || sessionGlb;
       }
     }
   } catch {
     /* noop */
   }
   let arBottomBar = null;
-  /** Barra “só carrinho” (uma variante) — filho de `arWrap`, não de `arFit`. */
-  let singleCartBar = null;
-
   const variantCalPayload = (v) =>
     v && typeof v.calibration === "object" && v.calibration !== null ? v.calibration : {};
 
-  if (arVariants.length > 1) {
+  /** Miniaturas + carrinho: sempre que existir pelo menos uma variante com GLB (próprio ou do produto). */
+  if (arVariants.length >= 1) {
     arBottomBar = el("div", {
       className: "omafit-ar-variant-cart-strip",
       style: {
-        position: "absolute",
-        bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
-        left: "0",
-        right: "0",
-        background: "transparent",
-        padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
-        zIndex: "120",
+        flexShrink: "0",
+        width: "100%",
+        boxSizing: "border-box",
+        background: "#0d0d0d",
+        padding: "10px 12px max(10px, env(safe-area-inset-bottom, 0px))",
+        zIndex: "20",
         display: "flex",
         flexDirection: "column",
         gap: "8px",
         pointerEvents: "auto",
+        borderTop: "1px solid rgba(255,255,255,0.12)",
       },
     });
 
@@ -6289,9 +6298,10 @@ async function runArSession({
         },
       });
       thumb.dataset.variantId = String(v.id);
-      if (v.imageUrl) {
+      const thumbImgSrc = omafitUpgradeShopifyMediaToHttps(v.imageUrl);
+      if (thumbImgSrc) {
         thumb.appendChild(el("img", {
-          src: v.imageUrl,
+          src: thumbImgSrc,
           alt: v.title || "",
           style: { width: "100%", height: "100%", objectFit: "cover", borderRadius: "7px", display: "block" },
         }));
@@ -6304,7 +6314,7 @@ async function runArSession({
       thumb.addEventListener("click", () => {
         if (String(v.id) === String(currentVariantId)) return;
         currentVariantId = v.id;
-        currentGlbUrl = v.glbUrl || glbUrl;
+        currentGlbUrl = String(v.glbUrl || "").trim() || sessionGlb;
         syncThumbBorders();
         if (typeof window.__omafitArSwitchGlb === "function") {
           window.__omafitArSwitchGlb(currentGlbUrl, variantCalPayload(v));
@@ -6350,61 +6360,7 @@ async function runArSession({
       }
     });
     arBottomBar.appendChild(cartBtn);
-  } else if (productId || arVariants.length === 1) {
-    singleCartBar = el("div", {
-      className: "omafit-ar-variant-cart-strip",
-      style: {
-        position: "absolute",
-        bottom: "max(88px, calc(10vh + env(safe-area-inset-bottom, 0px)))",
-        left: "0",
-        right: "0",
-        background: "transparent",
-        padding: "10px 10px max(8px, env(safe-area-inset-bottom, 0px))",
-        zIndex: "120",
-        pointerEvents: "auto",
-      },
-    });
-    const singleCartBtn = el("button", {
-      type: "button",
-      className: "omafit-ar-cart-btn",
-      textContent: t.addToCart,
-      style: {
-        width: "100%",
-        minHeight: "52px",
-        padding: "16px 20px",
-        borderRadius: "8px",
-        border: "none",
-        background: primaryColor,
-        color: "#fff",
-        fontWeight: "600",
-        fontSize: "1.05rem",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "filter 0.2s",
-      },
-    });
-    singleCartBtn.addEventListener("mouseenter", () => { singleCartBtn.style.filter = "brightness(0.9)"; });
-    singleCartBtn.addEventListener("mouseleave", () => { singleCartBtn.style.filter = "none"; });
-    singleCartBtn.addEventListener("click", async () => {
-      const vid = currentVariantId || (arVariants.length === 1 ? arVariants[0].id : null);
-      if (!vid) return;
-      singleCartBtn.disabled = true;
-      singleCartBtn.textContent = "…";
-      try {
-        await omafitArPostCartAddVariant(Number(vid));
-        singleCartBtn.textContent = t.addedToCart || "Added!";
-        setTimeout(() => { singleCartBtn.textContent = t.addToCart; singleCartBtn.disabled = false; }, 2000);
-      } catch {
-        singleCartBtn.textContent = t.addToCartError || "Error";
-        setTimeout(() => { singleCartBtn.textContent = t.addToCart; singleCartBtn.disabled = false; }, 2000);
-      }
-    });
-    singleCartBar.appendChild(singleCartBtn);
   }
-
-  /** Por cima do vídeo/WebGL (`arFit` tem overflow:hidden + host MindAR). */
-  if (arBottomBar) arWrap.appendChild(arBottomBar);
-  if (singleCartBar) arWrap.appendChild(singleCartBar);
 
   colContent.style.padding = "0";
   /**
@@ -6418,6 +6374,12 @@ async function runArSession({
   colContent.style.display = "flex";
   colContent.style.flexDirection = "column";
   colContent.appendChild(arWrap);
+  /**
+   * Barra de variantes + carrinho no `shell` (abaixo de `mainRow`), não dentro
+   * de `arWrap`: `mainRow`/`colContent` usam overflow:hidden para o MindAR e
+   * recortavam a faixa absoluta — miniaturas “invisíveis” na loja.
+   */
+  if (arBottomBar) shell.appendChild(arBottomBar);
 
   let mindarThree = null;
   let arResizeObserver = null;
@@ -14133,7 +14095,6 @@ async function main() {
   function openModal() {
     if (modal) return;
     document.body.style.overflow = "hidden";
-    const arVariants = Array.isArray(window.__OMAFIT_AR_VARIANTS__) ? window.__OMAFIT_AR_VARIANTS__ : [];
     const arProductId = root.dataset.productId || root.getAttribute("data-product-id") || "";
     modal = buildInfoModal({
       primaryColor,
@@ -14144,6 +14105,9 @@ async function main() {
       t,
       onClose: closeModal,
       onStartAr: (shell, mainRow, colContent, header) => {
+        const freshVariants = Array.isArray(window.__OMAFIT_AR_VARIANTS__)
+          ? window.__OMAFIT_AR_VARIANTS__
+          : [];
         runArSession({
           shell,
           mainRow,
@@ -14153,7 +14117,7 @@ async function main() {
           primaryColor,
           t,
           onClose: closeModal,
-          variants: arVariants,
+          variants: freshVariants,
           productId: arProductId,
         });
       },
