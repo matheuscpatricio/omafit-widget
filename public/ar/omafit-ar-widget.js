@@ -369,9 +369,9 @@ const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
-const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = true;
-const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = true;
-const OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL = true;
+const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = false;
+const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = false;
+const OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL = false;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -6097,6 +6097,59 @@ function fixMindARFaceVideoBehindCanvas(THREE, mindarThree, mindarHost, projecti
   }
 }
 
+/**
+ * Mescla dados do embed com `GET /products/{handle}.js` (JSON nativo da loja):
+ * lista completa de variantes e `featured_image` quando o Liquid não as preencheu.
+ */
+async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
+  const list = Array.isArray(existing) ? existing.slice() : [];
+  if (!productHandle || typeof fetch !== "function") return list;
+  const h = String(productHandle).trim();
+  if (!h) return list;
+  try {
+    const res = await fetch(`/products/${encodeURIComponent(h)}.js`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return list;
+    const data = await res.json();
+    const fromEmb = new Map(list.map((v) => [String(v.id), { ...v }]));
+    const out = [];
+    for (const sv of data.variants || []) {
+      const sid = String(sv.id);
+      const base = fromEmb.get(sid) || {
+        id: sv.id,
+        title: sv.name || sv.title || "",
+        price: sv.price,
+        imageUrl: "",
+        glbUrl: "",
+        glb_url: "",
+        calibration: null,
+      };
+      let img = String(base.imageUrl || base.image_url || "").trim();
+      if (!img) {
+        const feat = sv.featured_image;
+        const raw =
+          feat && (typeof feat === "string" ? feat : feat.src || feat.url || "");
+        if (raw) {
+          const s = String(raw).trim();
+          img = s.indexOf("//") === 0 ? `https:${s}` : s;
+        }
+      }
+      out.push({
+        ...base,
+        id: sv.id,
+        title: String(base.title || sv.name || sv.title || "").trim() || String(sv.name || sv.title || ""),
+        price: base.price ?? sv.price,
+        imageUrl: img || base.imageUrl || "",
+      });
+    }
+    return out.length ? out : list;
+  } catch {
+    return list;
+  }
+}
+
 async function runArSession({
   shell,
   mainRow,
@@ -6184,7 +6237,6 @@ async function runArSession({
   arWrap.appendChild(arFit);
 
   // --- Variant bar + Add to Cart ---
-  const sessionGlb = String(glbUrl || "").trim();
   let variantSource = Array.isArray(variants) && variants.length ? variants : [];
   if (
     !variantSource.length &&
@@ -6193,9 +6245,29 @@ async function runArSession({
   ) {
     variantSource = window.__OMAFIT_AR_VARIANTS__;
   }
+  const productHandleForFetch =
+    (typeof document !== "undefined" &&
+      String(
+        document.getElementById("omafit-widget-root")?.getAttribute("data-product-handle") ||
+          document.getElementById("omafit-ar-root")?.getAttribute("data-product-handle") ||
+          "",
+      ).trim()) ||
+    "";
+  if (productHandleForFetch) {
+    variantSource = await omafitEnrichVariantsFromStorefrontJs(productHandleForFetch, variantSource);
+  }
+
+  const sessionGlb = String(glbUrl || "").trim();
+  /** GLB do produto (`data-glb-url`) ou, se vazio, o primeiro `glbUrl` presente nas variantes (Liquid). */
+  const baseGlb =
+    sessionGlb ||
+    (Array.isArray(variantSource)
+      ? variantSource.map((v) => String(v?.glbUrl ?? v?.glb_url ?? "").trim()).find(Boolean) || ""
+      : "");
+
   const resolveVariantGlb = (v) =>
-    String(v?.glbUrl ?? v?.glb_url ?? "").trim() || sessionGlb;
-  /** Incluir todas as variantes com id — o GLB pode ser só ao nível do produto (`sessionGlb`). */
+    String(v?.glbUrl ?? v?.glb_url ?? "").trim() || baseGlb;
+  /** Incluir todas as variantes com id — GLB partilhado ao nível do produto ou numa variante (`baseGlb`). */
   let arVariants = variantSource.filter((v) => {
     if (!v) return false;
     const id = v.id != null ? String(v.id).trim() : "";
@@ -6210,10 +6282,10 @@ async function runArSession({
   try {
     const r = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
     const vid = r ? String(r.dataset.variantId || r.getAttribute("data-variant-id") || "").trim() : "";
-    if (arVariants.length === 0 && vid && sessionGlb) {
+    if (arVariants.length === 0 && vid && baseGlb) {
       const pimg = r ? String(r.dataset.productImage || r.getAttribute("data-product-image") || "").trim() : "";
       const ptitle = r ? String(r.dataset.productTitle || r.getAttribute("data-product-title") || "").trim() : "";
-      arVariants = [{ id: vid, title: ptitle || "Variant", imageUrl: pimg, glbUrl: sessionGlb, calibration: null }];
+      arVariants = [{ id: vid, title: ptitle || "Variant", imageUrl: pimg, glbUrl: baseGlb, calibration: null }];
       console.log("[omafit-ar] variante sintética (Netlify / sem __OMAFIT_AR_VARIANTS__)", {
         variantId: vid,
         hasImage: Boolean(pimg),
@@ -6223,7 +6295,7 @@ async function runArSession({
     /* ignore */
   }
   let currentVariantId = arVariants.length > 0 ? arVariants[0].id : null;
-  let currentGlbUrl = arVariants.length > 0 ? resolveVariantGlb(arVariants[0]) : sessionGlb;
+  let currentGlbUrl = arVariants.length > 0 ? resolveVariantGlb(arVariants[0]) : baseGlb;
   try {
     const pqv = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search || "" : "",
