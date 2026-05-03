@@ -6118,12 +6118,12 @@ async function runArSession({
 
   const arWrap = el("div", {
     style: {
-      flex: "1 1 auto",
+      flex: "1 1 0",
+      minHeight: "0",
       display: "flex",
       flexDirection: "column",
       alignItems: "stretch",
       justifyContent: "flex-start",
-      minHeight: "min(520px, 62dvh)",
       width: "100%",
       boxSizing: "border-box",
       background: "#111",
@@ -6185,7 +6185,7 @@ async function runArSession({
 
   // --- Variant bar + Add to Cart ---
   const sessionGlb = String(glbUrl || "").trim();
-  let variantSource = Array.isArray(variants) ? variants : [];
+  let variantSource = Array.isArray(variants) && variants.length ? variants : [];
   if (
     !variantSource.length &&
     typeof window !== "undefined" &&
@@ -6193,9 +6193,15 @@ async function runArSession({
   ) {
     variantSource = window.__OMAFIT_AR_VARIANTS__;
   }
-  let arVariants = variantSource.filter(
-    (v) => v && (String(v.glbUrl || "").trim() || sessionGlb),
-  );
+  const resolveVariantGlb = (v) =>
+    String(v?.glbUrl ?? v?.glb_url ?? "").trim() || sessionGlb;
+  /** Incluir todas as variantes com id — o GLB pode ser só ao nível do produto (`sessionGlb`). */
+  let arVariants = variantSource.filter((v) => {
+    if (!v) return false;
+    const id = v.id != null ? String(v.id).trim() : "";
+    if (!id) return false;
+    return Boolean(resolveVariantGlb(v));
+  });
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com
    * `data-variant-id` + `data-glb-url` sintetizamos uma variante para miniaturas
@@ -6217,7 +6223,7 @@ async function runArSession({
     /* ignore */
   }
   let currentVariantId = arVariants.length > 0 ? arVariants[0].id : null;
-  let currentGlbUrl = arVariants.length > 0 ? (String(arVariants[0].glbUrl || "").trim() || sessionGlb) : sessionGlb;
+  let currentGlbUrl = arVariants.length > 0 ? resolveVariantGlb(arVariants[0]) : sessionGlb;
   try {
     const pqv = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search || "" : "",
@@ -6226,7 +6232,7 @@ async function runArSession({
       const mv = arVariants.find((vv) => String(vv.id) === String(pqv).trim());
       if (mv) {
         currentVariantId = mv.id;
-        currentGlbUrl = String(mv.glbUrl || "").trim() || sessionGlb;
+        currentGlbUrl = resolveVariantGlb(mv);
       }
     }
   } catch {
@@ -6261,7 +6267,9 @@ async function runArSession({
         gap: "8px",
         overflowX: "auto",
         WebkitOverflowScrolling: "touch",
-        justifyContent: "center",
+        justifyContent: "flex-start",
+        flexWrap: "nowrap",
+        minHeight: "60px",
         padding: "0 4px 4px",
         touchAction: "pan-x",
         pointerEvents: "auto",
@@ -6298,7 +6306,9 @@ async function runArSession({
         },
       });
       thumb.dataset.variantId = String(v.id);
-      const thumbImgSrc = omafitUpgradeShopifyMediaToHttps(v.imageUrl);
+      const thumbImgSrc = omafitUpgradeShopifyMediaToHttps(
+        v.imageUrl || v.image_url || "",
+      );
       if (thumbImgSrc) {
         thumb.appendChild(el("img", {
           src: thumbImgSrc,
@@ -6314,7 +6324,7 @@ async function runArSession({
       thumb.addEventListener("click", () => {
         if (String(v.id) === String(currentVariantId)) return;
         currentVariantId = v.id;
-        currentGlbUrl = String(v.glbUrl || "").trim() || sessionGlb;
+        currentGlbUrl = resolveVariantGlb(v);
         syncThumbBorders();
         if (typeof window.__omafitArSwitchGlb === "function") {
           window.__omafitArSwitchGlb(currentGlbUrl, variantCalPayload(v));
@@ -6375,11 +6385,11 @@ async function runArSession({
   colContent.style.flexDirection = "column";
   colContent.appendChild(arWrap);
   /**
-   * Barra de variantes + carrinho no `shell` (abaixo de `mainRow`), não dentro
-   * de `arWrap`: `mainRow`/`colContent` usam overflow:hidden para o MindAR e
-   * recortavam a faixa absoluta — miniaturas “invisíveis” na loja.
+   * Miniaturas + carrinho: irmãos de `arWrap` dentro de `colContent` (coluna
+   * flex). `arWrap` com flex:1 e minHeight:0 liberta altura; antes a barra no
+   * `shell` ou posição absoluta sumia em alguns layouts/telemóveis.
    */
-  if (arBottomBar) shell.appendChild(arBottomBar);
+  if (arBottomBar) colContent.appendChild(arBottomBar);
 
   let mindarThree = null;
   let arResizeObserver = null;
@@ -6764,7 +6774,7 @@ async function runArSession({
         const ivSel = arVariants.find((vv) => String(vv.id) === String(currentVariantId));
         if (ivSel) {
           try {
-            window.__omafitArSwitchGlb(ivSel.glbUrl || glbUrl, variantCalPayload(ivSel));
+            window.__omafitArSwitchGlb(resolveVariantGlb(ivSel), variantCalPayload(ivSel));
           } catch (e) {
             console.warn("[omafit-ar] switch variante inicial (mão):", e?.message || e);
           }
