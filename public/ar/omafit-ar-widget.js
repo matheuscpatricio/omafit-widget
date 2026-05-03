@@ -6285,6 +6285,18 @@ async function runArSession({
       });
     };
 
+    /** `#omafit-ar-root` traz imagem principal do produto (900px); serve de fallback nas miniaturas. */
+    let productThumbFallback = "";
+    try {
+      const rRoot =
+        typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+      productThumbFallback = omafitUpgradeShopifyMediaToHttps(
+        String(rRoot?.dataset?.productImage || rRoot?.getAttribute("data-product-image") || "").trim(),
+      );
+    } catch {
+      productThumbFallback = "";
+    }
+
     arVariants.forEach((v) => {
       const thumb = el("button", {
         type: "button",
@@ -6306,15 +6318,33 @@ async function runArSession({
         },
       });
       thumb.dataset.variantId = String(v.id);
-      const thumbImgSrc = omafitUpgradeShopifyMediaToHttps(
-        v.imageUrl || v.image_url || "",
-      );
+      const rawVariantImg = String(v.imageUrl || v.image_url || "").trim();
+      const fromVariant = omafitUpgradeShopifyMediaToHttps(rawVariantImg);
+      const thumbImgSrc = fromVariant || productThumbFallback;
       if (thumbImgSrc) {
-        thumb.appendChild(el("img", {
+        const imgNode = el("img", {
           src: thumbImgSrc,
           alt: v.title || "",
+          loading: "eager",
+          decoding: "async",
           style: { width: "100%", height: "100%", objectFit: "cover", borderRadius: "7px", display: "block" },
-        }));
+        });
+        if (productThumbFallback) {
+          imgNode.addEventListener(
+            "error",
+            function omafitThumbErr() {
+              imgNode.removeEventListener("error", omafitThumbErr);
+              try {
+                const cur = String(imgNode.currentSrc || imgNode.src || "");
+                if (cur && cur !== String(productThumbFallback)) imgNode.src = productThumbFallback;
+              } catch {
+                /* ignore */
+              }
+            },
+            false,
+          );
+        }
+        thumb.appendChild(imgNode);
       } else {
         thumb.appendChild(el("span", {
           textContent: (v.title || "?").slice(0, 3),
