@@ -12264,6 +12264,54 @@ async function runHandArSession({
     };
   }
 
+  /** Bbox pós-fit: maior dimensão ≈ eixo do anel no espaço local do `glbScene`. */
+  function omafitDetectBraceletRingHoleAxisUnitInGlb(THREE, glbScene) {
+    glbScene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(glbScene);
+    const sz = new THREE.Vector3();
+    box.getSize(sz);
+    const ax = sz.x;
+    const ay = sz.y;
+    const az = sz.z;
+    if (
+      !Number.isFinite(ax + ay + az) ||
+      (ax < 1e-10 && ay < 1e-10 && az < 1e-10)
+    ) {
+      return new THREE.Vector3(0, 0, 1);
+    }
+    const d = [ax, ay, az];
+    let iMax = 0;
+    for (let i = 1; i < 3; i++) {
+      if (d[i] > d[iMax]) iMax = i;
+    }
+    return new THREE.Vector3(
+      iMax === 0 ? 1 : 0,
+      iMax === 1 ? 1 : 0,
+      iMax === 2 ? 1 : 0,
+    ).normalize();
+  }
+
+  /** Eixo do “furo” em espaço local de `calibRot` (pai de `braceletWristAlignGroup`). */
+  function omafitRefreshBraceletRingHoleAxisInCalibLocal(
+    THREE,
+    glbScene,
+    calibRot,
+    outAxisUnit,
+    tmpMat,
+  ) {
+    glbScene.matrixAutoUpdate = true;
+    glbScene.scale.set(1, 1, 1);
+    glbScene.updateMatrixWorld(true);
+    calibRot.updateMatrixWorld(true);
+    const h = omafitDetectBraceletRingHoleAxisUnitInGlb(THREE, glbScene);
+    outAxisUnit.copy(h);
+    outAxisUnit.transformDirection(glbScene.matrixWorld);
+    tmpMat.copy(calibRot.matrixWorld).invert();
+    outAxisUnit.transformDirection(tmpMat);
+    if (outAxisUnit.lengthSq() < 1e-12) outAxisUnit.set(0, 0, 1);
+    else outAxisUnit.normalize();
+  }
+
   // Load the GLB (Draco lazy: partilha WASM com o caminho face).
   const arGlbDracoHand = !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlbDraco", "1")).trim());
   let dracoLoaderHand = null;
@@ -12326,6 +12374,8 @@ async function runHandArSession({
     accessoryType === "bracelet"
       ? createOmafitBraceletWristPlacementState(THREE)
       : null;
+  const braceletRingHoleAxisAlignLocal = new THREE.Vector3(0, 0, 1);
+  const braceletRingHoleTmpMat = new THREE.Matrix4();
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
@@ -12435,6 +12485,13 @@ async function runHandArSession({
             }
           });
           braceletOcclusionSmooth = 0;
+          omafitRefreshBraceletRingHoleAxisInCalibLocal(
+            THREE,
+            glbScene,
+            calibRot,
+            braceletRingHoleAxisAlignLocal,
+            braceletRingHoleTmpMat,
+          );
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
             watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
@@ -13424,6 +13481,7 @@ async function runHandArSession({
             clampDt,
             closeEnoughHand,
             alignTauMs: OMAFIT_BRACELET_ALIGN_TAU_MS,
+            ringHoleAxisLocal: braceletRingHoleAxisAlignLocal,
             debugAxisLine: braceletAxisDebugLine,
           });
         }
@@ -13967,6 +14025,13 @@ async function runHandArSession({
                     );
                   }
                 }
+                omafitRefreshBraceletRingHoleAxisInCalibLocal(
+                  THREE,
+                  next,
+                  calibRot,
+                  braceletRingHoleAxisAlignLocal,
+                  braceletRingHoleTmpMat,
+                );
               } else if (accessoryType === "watch") {
                 if (countHandArSolidMeshes(next) === 1) {
                   watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
