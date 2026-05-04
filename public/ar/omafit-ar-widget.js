@@ -13799,6 +13799,7 @@ async function runHandArSession({
         }
         if (braceletWristAlignGroup) {
           braceletWristAlignGroup.quaternion.identity();
+          braceletWristAlignGroup.position.set(0, 0, 0);
         }
         if (braceletLinkRadial) {
           braceletLinkRadial.scale.set(1, 1, 1);

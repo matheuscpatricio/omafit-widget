@@ -5,13 +5,14 @@
  * @param {typeof import("three")} THREE
  */
 
-/** Slerp por frame em direcção ao quat alvo (eixo do “furo” = direcção do braço B). */
+/** Slerp por frame em direcção ao quat alvo. */
 export const OMAFIT_BRACELET_WRIST_ALIGN_SLERP = 0.2;
-/**
- * Se `true`, aplica rotação extra π/2 em X após `setFromUnitVectors(Y, B)` — só se o GLB
- * ainda ficar “chapado” com o eixo B directo.
- */
-export const OMAFIT_BRACELET_WRIST_ALIGN_PI2_FIX_X = false;
+/** Pulseira “deitada” no GLB: rotação extra π/2 em X após a base T/B/N (Prompt 3). */
+export const OMAFIT_BRACELET_RING_EULER_X = Math.PI / 2;
+/** Ganho da correcção de inclinação `tilt` em torno de T (Prompt 5). */
+export const OMAFIT_BRACELET_TILT_GAIN = 0.5;
+/** Deslocamento ao longo de −N para “abraçar” o pulso em espaço do pai (m). */
+export const OMAFIT_BRACELET_N_SHIFT_M = 0.01;
 
 /** @typedef {{ init: boolean, wearLerpPrimed: boolean, smoothWidth: number, smoothThick09: number, smoothReach: number, smoothSink: number, smoothPosLerp: import("three").Vector3, smoothAlignQuat: import("three").Quaternion }} OmafitBraceletWristPlacementState */
 
@@ -34,6 +35,13 @@ export function createOmafitBraceletWristPlacementState(THREE) {
     tmpRefY: new THREE.Vector3(0, 1, 0),
     tmpRefX: new THREE.Vector3(1, 0, 0),
     tmpFixQuat: new THREE.Quaternion(),
+    tmpQw: new THREE.Quaternion(),
+    tmpV3: new THREE.Vector3(),
+    tmpPos: new THREE.Vector3(),
+    tmpScale: new THREE.Vector3(),
+    tmpEuler: new THREE.Euler(),
+    /** Quaternion da base mundo Rw (makeBasis T,B,N). */
+    tmpQrw: new THREE.Quaternion(),
   };
 }
 
@@ -179,7 +187,8 @@ export function omafitBraceletWristScaleWearStep(THREE, st, p) {
 }
 
 /**
- * Rotação extra (slerp) para alinhar +Z de `calibRot` com punho→MCP9.
+ * Base anatómica do pulso (T,B,N) + `makeBasis` → quaternion em `alignGroup`
+ * (filho de `calibRot`). Inclui rotação “anel deitado” (π/2 em X) e correção de inclinação.
  * Chamar depois de `wearPosition` / `calibRot` terem `matrixWorld` actualizado.
  *
  * @param {OmafitBraceletWristPlacementState} st
@@ -199,49 +208,57 @@ export function omafitBraceletWristScaleWearStep(THREE, st, p) {
  */
 export function omafitBraceletWristAlignStep(THREE, st, p) {
   p.calibRot.updateMatrixWorld(true);
+  p.calibRot.matrixWorld.decompose(st.tmpPos, st.tmpQw, st.tmpScale);
 
-  // Eixos da mão (MCP índice w5, MCP mindinho w17, punho w0).
-  const mid = st.tmpV0.addVectors(p.w5, p.w17).multiplyScalar(0.5);
-  const T = st.tmpV1.subVectors(p.w5, p.w17);
-  if (T.lengthSq() > 1e-10) T.normalize();
-  else T.set(1, 0, 0);
+  /** T = mindinho − índice (largura do pulso). */
+  st.tmpV1.subVectors(p.w17, p.w5);
+  if (st.tmpV1.lengthSq() > 1e-10) st.tmpV1.normalize();
+  else st.tmpV1.set(1, 0, 0);
 
-  /** Direcção do braço no mundo: punho → meio da palma (eixo do “furo” da pulseira). */
-  const B = st.tmpV2.subVectors(mid, p.w0);
-  if (B.lengthSq() > 1e-10) B.normalize();
-  else B.set(0, 1, 0);
+  /** B = índice − punho (eixo longitudinal / “furo” da pulseira). */
+  st.tmpV2.subVectors(p.w5, p.w0);
+  if (st.tmpV2.lengthSq() > 1e-10) st.tmpV2.normalize();
+  else st.tmpV2.set(0, 1, 0);
 
-  const N = st.tmpV0.crossVectors(T, B);
-  if (N.lengthSq() > 1e-10) N.normalize();
-  else N.set(0, 0, 1);
+  /** N = T × B, depois B ← N × T (ortonormal). */
+  st.tmpV0.crossVectors(st.tmpV1, st.tmpV2);
+  if (st.tmpV0.lengthSq() > 1e-10) st.tmpV0.normalize();
+  else st.tmpV0.set(0, 0, 1);
 
-  const camDir = st.tmpV1.set(0, 0, -1).applyQuaternion(p.camera.quaternion).normalize();
-  if (N.dot(camDir) < 0) N.negate();
+  st.tmpV3.set(0, 0, -1).applyQuaternion(p.camera.quaternion).normalize();
+  if (st.tmpV0.dot(st.tmpV3) < 0) st.tmpV0.negate();
+
+  st.tmpV2.crossVectors(st.tmpV0, st.tmpV1).normalize();
 
   if (p.debugAxisLine && p.debugAxisLine.geometry?.attributes?.position) {
     const pos = p.debugAxisLine.geometry.attributes.position;
     const p0 = p.w0;
     const armLen = 0.08;
-    const p1x = p0.x + B.x * armLen;
-    const p1y = p0.y + B.y * armLen;
-    const p1z = p0.z + B.z * armLen;
     pos.setXYZ(0, p0.x, p0.y, p0.z);
-    pos.setXYZ(1, p1x, p1y, p1z);
+    pos.setXYZ(1, p0.x + st.tmpV2.x * armLen, p0.y + st.tmpV2.y * armLen, p0.z + st.tmpV2.z * armLen);
     pos.needsUpdate = true;
   }
 
-  st.tmpM.copy(p.calibRot.matrixWorld).invert();
-  /** B em espaço local de `calibRot` (pai de `alignGroup`). */
-  st.tmpV1.copy(B).transformDirection(st.tmpM);
-  if (st.tmpV1.lengthSq() > 1e-10) st.tmpV1.normalize();
-  else st.tmpV1.set(0, 1, 0);
+  /** Colunas da rotação mundo: X=T, Y=B, Z=N. */
+  st.tmpM.makeBasis(st.tmpV1, st.tmpV2, st.tmpV0);
+  st.tmpQrw.setFromRotationMatrix(st.tmpM);
+  st.tmpQ.copy(st.tmpQrw).premultiply(st.tmpFixQuat.copy(st.tmpQw).invert());
 
-  /** +Y do modelo da pulseira (pós-fitWristGlb) alinha com B no espaço de `calibRot`. */
-  st.tmpQ.setFromUnitVectors(st.tmpRefY, st.tmpV1);
-  if (OMAFIT_BRACELET_WRIST_ALIGN_PI2_FIX_X) {
-    st.tmpFixQuat.setFromAxisAngle(st.tmpRefX, Math.PI / 2);
-    st.tmpQ.multiply(st.tmpFixQuat);
-  }
+  /** Modelo de anel “deitado”: +π/2 em X local após a base. */
+  st.tmpEuler.set(OMAFIT_BRACELET_RING_EULER_X, 0, 0);
+  st.tmpFixQuat.setFromEuler(st.tmpEuler);
+  st.tmpQ.multiply(st.tmpFixQuat);
+
+  /** Anti “plano”: inclinação em torno de T conforme N·worldZ. */
+  const tilt = st.tmpV3.set(0, 0, 1).dot(st.tmpV0);
+  st.tmpFixQuat.setFromAxisAngle(st.tmpV1, tilt * OMAFIT_BRACELET_TILT_GAIN);
+  st.tmpQ.multiply(st.tmpFixQuat);
+
+  /** −N em mundo → posição local do pai (abraçar o pulso). */
+  st.tmpV3.copy(st.tmpV0).multiplyScalar(-OMAFIT_BRACELET_N_SHIFT_M);
+  st.tmpFixQuat.copy(st.tmpQw).invert();
+  st.tmpV3.applyQuaternion(st.tmpFixQuat);
+  p.alignGroup.position.copy(st.tmpV3);
 
   const tSlerp = p.closeEnoughHand ? OMAFIT_BRACELET_WRIST_ALIGN_SLERP : OMAFIT_BRACELET_WRIST_ALIGN_SLERP * 0.55;
   st.smoothAlignQuat.slerp(st.tmpQ, tSlerp);
