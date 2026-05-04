@@ -12264,31 +12264,172 @@ async function runHandArSession({
     };
   }
 
-  /** Bbox pós-fit: maior dimensão ≈ eixo do anel no espaço local do `glbScene`. */
+  /** @typedef {{ xx: number, xy: number, xz: number, yy: number, yz: number, zz: number }} OmafitCov3 */
+
+  function omafitMulCov3(C, v, out) {
+    out.x = C.xx * v.x + C.xy * v.y + C.xz * v.z;
+    out.y = C.xy * v.x + C.yy * v.y + C.yz * v.z;
+    out.z = C.xz * v.x + C.yz * v.y + C.zz * v.z;
+    return out;
+  }
+
+  function omafitPowerMaxUnitEigen3(C, vOut, tmp) {
+    vOut.set(1, 0.17, 0.03);
+    vOut.normalize();
+    for (let it = 0; it < 48; it++) {
+      omafitMulCov3(C, vOut, tmp);
+      const ls = tmp.lengthSq();
+      if (ls < 1e-28) {
+        vOut.set(1, 0, 0);
+        return;
+      }
+      tmp.multiplyScalar(1 / Math.sqrt(ls));
+      if (tmp.dot(vOut) < 0) tmp.negate();
+      vOut.copy(tmp);
+    }
+  }
+
+  function omafitPowerSecondUnitEigen3(C, e2, vOut, tmp) {
+    vOut.set(0.31, 1, 0.27);
+    vOut.addScaledVector(e2, -e2.dot(vOut)).normalize();
+    for (let it = 0; it < 48; it++) {
+      omafitMulCov3(C, vOut, tmp);
+      tmp.addScaledVector(e2, -e2.dot(tmp));
+      const ls = tmp.lengthSq();
+      if (ls < 1e-28) break;
+      tmp.multiplyScalar(1 / Math.sqrt(ls));
+      if (tmp.dot(vOut) < 0) tmp.negate();
+      vOut.copy(tmp);
+    }
+  }
+
+  /**
+   * Eixo do “furo” no espaço local do `glbScene`: PCA sobre vértices (amostrados),
+   * espessura ≈ autovetor da menor variância; eixo do anel ⟂ espessura.
+   */
   function omafitDetectBraceletRingHoleAxisUnitInGlb(THREE, glbScene) {
     glbScene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(glbScene);
-    const sz = new THREE.Vector3();
-    box.getSize(sz);
-    const ax = sz.x;
-    const ay = sz.y;
-    const az = sz.z;
-    if (
-      !Number.isFinite(ax + ay + az) ||
-      (ax < 1e-10 && ay < 1e-10 && az < 1e-10)
-    ) {
-      return new THREE.Vector3(0, 0, 1);
+    const tmp = new THREE.Vector3();
+    const tmp2 = new THREE.Vector3();
+    const tmp3 = new THREE.Vector3();
+    const ringOut = new THREE.Vector3(0, 0, 1);
+
+    let vertTotal = 0;
+    glbScene.traverse((obj) => {
+      if (!obj?.isMesh || !obj.geometry?.attributes?.position) return;
+      vertTotal += obj.geometry.attributes.position.count;
+    });
+    if (vertTotal < 1) {
+      const box = new THREE.Box3().setFromObject(glbScene);
+      const sz = new THREE.Vector3();
+      box.getSize(sz);
+      const ax = sz.x;
+      const ay = sz.y;
+      const az = sz.z;
+      if (!Number.isFinite(ax + ay + az) || (ax < 1e-10 && ay < 1e-10 && az < 1e-10)) {
+        return ringOut.set(0, 0, 1);
+      }
+      const d = [ax, ay, az];
+      let iMax = 0;
+      for (let i = 1; i < 3; i++) if (d[i] > d[iMax]) iMax = i;
+      return ringOut.set(iMax === 0 ? 1 : 0, iMax === 1 ? 1 : 0, iMax === 2 ? 1 : 0).normalize();
     }
-    const d = [ax, ay, az];
-    let iMax = 0;
-    for (let i = 1; i < 3; i++) {
-      if (d[i] > d[iMax]) iMax = i;
+
+    const MAX_SAMPLES = 10000;
+    const stride = Math.max(1, Math.ceil(vertTotal / MAX_SAMPLES));
+    const coords = [];
+    let capDone = false;
+    glbScene.traverse((obj) => {
+      if (capDone) return;
+      if (!obj?.isMesh || !obj.geometry?.attributes?.position) return;
+      const pos = obj.geometry.attributes.position;
+      obj.updateMatrixWorld(true);
+      for (let i = 0; i < pos.count; i += stride) {
+        if (coords.length >= MAX_SAMPLES * 3) {
+          capDone = true;
+          return;
+        }
+        tmp.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+        obj.localToWorld(tmp);
+        glbScene.worldToLocal(tmp);
+        coords.push(tmp.x, tmp.y, tmp.z);
+      }
+    });
+
+    const n = (coords.length / 3) | 0;
+    if (n < 4) {
+      const box = new THREE.Box3().setFromObject(glbScene);
+      const sz = new THREE.Vector3();
+      box.getSize(sz);
+      const ax = sz.x;
+      const ay = sz.y;
+      const az = sz.z;
+      if (!Number.isFinite(ax + ay + az) || (ax < 1e-10 && ay < 1e-10 && az < 1e-10)) {
+        return ringOut.set(0, 0, 1);
+      }
+      const d = [ax, ay, az];
+      let iMax = 0;
+      for (let i = 1; i < 3; i++) if (d[i] > d[iMax]) iMax = i;
+      return ringOut.set(iMax === 0 ? 1 : 0, iMax === 1 ? 1 : 0, iMax === 2 ? 1 : 0).normalize();
     }
-    return new THREE.Vector3(
-      iMax === 0 ? 1 : 0,
-      iMax === 1 ? 1 : 0,
-      iMax === 2 ? 1 : 0,
-    ).normalize();
+
+    let mx = 0;
+    let my = 0;
+    let mz = 0;
+    for (let i = 0; i < n; i++) {
+      const j = i * 3;
+      mx += coords[j];
+      my += coords[j + 1];
+      mz += coords[j + 2];
+    }
+    const invN = 1 / n;
+    mx *= invN;
+    my *= invN;
+    mz *= invN;
+
+    let xx = 0;
+    let xy = 0;
+    let xz = 0;
+    let yy = 0;
+    let yz = 0;
+    let zz = 0;
+    for (let i = 0; i < n; i++) {
+      const j = i * 3;
+      const x = coords[j] - mx;
+      const y = coords[j + 1] - my;
+      const z = coords[j + 2] - mz;
+      xx += x * x;
+      xy += x * y;
+      xz += x * z;
+      yy += y * y;
+      yz += y * z;
+      zz += z * z;
+    }
+    const invNm1 = n > 1 ? 1 / (n - 1) : 1;
+    xx *= invNm1;
+    xy *= invNm1;
+    xz *= invNm1;
+    yy *= invNm1;
+    yz *= invNm1;
+    zz *= invNm1;
+
+    /** @type {OmafitCov3} */
+    const C = { xx, xy, xz, yy, yz, zz };
+    const e2 = tmp;
+    const e1 = tmp2;
+    const thick = tmp3;
+    omafitPowerMaxUnitEigen3(C, e2, ringOut);
+    omafitPowerSecondUnitEigen3(C, e2, e1, ringOut);
+    thick.crossVectors(e2, e1);
+    if (thick.lengthSq() < 1e-16) thick.set(0, 0, 1);
+    else thick.normalize();
+
+    ringOut.crossVectors(thick, new THREE.Vector3(1, 0, 0));
+    if (ringOut.lengthSq() < 0.25) ringOut.crossVectors(thick, new THREE.Vector3(0, 1, 0));
+    if (ringOut.lengthSq() < 1e-16) ringOut.set(0, 0, 1);
+    else ringOut.normalize();
+
+    return ringOut;
   }
 
   /** Eixo do “furo” em espaço local de `calibRot` (pai de `braceletWristAlignGroup`). */
