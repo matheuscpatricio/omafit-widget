@@ -371,7 +371,6 @@ const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
 const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = false;
 const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = false;
-const OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL = false;
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -11703,18 +11702,20 @@ async function runHandArSession({
       depthTest: true,
       depthFunc: THREE.LessEqualDepth,
       side: THREE.DoubleSide,
+      /**
+       * O antigo overlay vermelho (`opacity` 0.2 + `transparent`) punha o plano na
+       * fila transparente e o depth combinava com o GLB curvo; só `colorWrite:false`
+       * opaco mudava o comportamento e a pulseira parecia “plana” no pulso.
+       * Mantemos fila transparente com opacidade 0 — invisível, mesmo efeito 3D.
+       */
+      transparent: true,
+      opacity: 0,
     }),
   );
   occPlane.visible = false;
   occPlane.frustumCulled = false;
   occPlane.renderOrder = 1;
   occPlane.scale.set(0.12, 0.08, 1);
-  if (OMAFIT_BRACELET_OCC_PLANE_DEBUG_VISUAL) {
-    occPlane.material.colorWrite = true;
-    occPlane.material.color.set(0xff0000);
-    occPlane.material.opacity = 0.2;
-    occPlane.material.transparent = true;
-  }
   scene.add(occPlane);
 
   /** Sombra de contacto (multiply) ligeira sob o mostrador — pele escurecida ao centro. */
