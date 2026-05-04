@@ -11753,6 +11753,7 @@ async function runHandArSession({
     occluderGeomHalfLen,
     accessoryType === "bracelet" ? 0.048 : 0.028,
   );
+  if (accessoryType === "bracelet") armOccluderMat.side = THREE.BackSide;
   const armOccluder = new THREE.Mesh(armOccluderGeom, armOccluderMat);
   /** Oclusor antes do GLB; meshes do relógio usam renderOrder 1. */
   armOccluder.renderOrder = 0;
@@ -12050,6 +12051,22 @@ async function runHandArSession({
         rotApplied = true;
       }
       if (rotApplied) {
+        glbScene.updateMatrixWorld(true);
+        bbox = new THREE.Box3().setFromObject(glbScene);
+        bbox.getSize(size);
+      }
+      const braceletDims = [size.x, size.y, size.z].sort((a, b) => a - b);
+      const braceletFlatRatio = braceletDims[2] / Math.max(1e-6, braceletDims[1]);
+      if (braceletFlatRatio > 1.85) {
+        const wrapFraction = 0.84;
+        const localR = braceletDims[2] / Math.max(1e-6, 2 * Math.PI * wrapFraction);
+        bendGeometryCylinder(
+          glbScene,
+          new THREE.Vector3(1, 0, 0),
+          new THREE.Vector3(0, 0, 1),
+          new THREE.Vector3(0, 1, 0),
+          Math.max(1e-6, localR),
+        );
         glbScene.updateMatrixWorld(true);
         bbox = new THREE.Box3().setFromObject(glbScene);
         bbox.getSize(size);
@@ -13059,19 +13076,13 @@ async function runHandArSession({
     }
     if (accessoryType === "bracelet") {
       const wristWidth = w5.distanceTo(w17);
-      const handDir = handToMcpRawScratch
-        .addVectors(w5, w17)
-        .multiplyScalar(0.5)
-        .sub(w0);
-      if (handDir.lengthSq() > 1e-12) {
-        handDir.normalize();
-        const wristOffset = THREE.MathUtils.clamp(wristWidth * 0.25, 0.015, 0.03);
-        tmpPos.copy(w0).addScaledVector(handDir, -wristOffset);
-      }
-      if (w0to1.lengthSq() > 1e-12) {
-        handNAltScratch.copy(w0to1).normalize();
-        tmpPos.addScaledVector(handNAltScratch, 0.0012);
-      }
+      const braceletRadius = wristWidth * 0.5 * 1.05;
+      const palmNormal = handNAltScratch
+        .subVectors(w5, w0)
+        .cross(handToMcpRawScratch.subVectors(w17, w0));
+      if (palmNormal.lengthSq() > 1e-12) palmNormal.normalize();
+      else palmNormal.copy(tmpY);
+      tmpPos.copy(w0).addScaledVector(palmNormal, -braceletRadius * 0.15);
     }
 
     /**
@@ -13376,7 +13387,8 @@ async function runHandArSession({
         smoothWristRadius * OMAFIT_HAND_OCCLUDER_RADIUS_SCALE,
       );
     }
-    const radiusScale = occluderR / OMAFIT_ARM_OCCLUDER_RADIUS_M;
+    const braceletOccShrink = accessoryType === "bracelet" ? 0.92 : 1;
+    const radiusScale = (occluderR / OMAFIT_ARM_OCCLUDER_RADIUS_M) * braceletOccShrink;
     const lengthScale = smoothForearmLength / OMAFIT_ARM_OCCLUDER_LENGTH_M;
     armOccluder.scale.set(
       radiusScale * OMAFIT_OCCLUDER_ELLIPSE_ULNAR_RADIAL,
@@ -13579,13 +13591,25 @@ async function runHandArSession({
         Number.isFinite(Number(userScale)) && Number(userScale) > 0
           ? Number(userScale)
           : 1;
-      const suBase =
+      let suBase =
         baseScale *
         userMul *
         adaptMul *
         perspMul *
         wristSpanScaleMul *
         (accessoryType === "bracelet" ? OMAFIT_BRACELET_SCALE_BOOST : 1);
+      if (accessoryType === "bracelet" && localInnerR > 1e-6) {
+        const wristWidthNow = w5.distanceTo(w17);
+        const targetCircumference = wristWidthNow * Math.PI;
+        const modelCircumference = 2 * Math.PI * localInnerR;
+        const circMul = targetCircumference / Math.max(1e-6, modelCircumference);
+        suBase =
+          circMul *
+          userMul *
+          perspMul *
+          wristSpanScaleMul *
+          OMAFIT_BRACELET_SCALE_BOOST;
+      }
       const Wb = wristExpandMul;
       if (accessoryType === "bracelet" && braceletPlaceState) {
         const sw = omafitBraceletWristScaleWearStep(THREE, braceletPlaceState, {
