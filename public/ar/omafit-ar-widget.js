@@ -11971,6 +11971,40 @@ async function runHandArSession({
     });
   }
 
+  function omafitBraceletRadialDebugEnabled(cfgAttrFn) {
+    try {
+      if (
+        /^(1|true|on|yes)$/i.test(
+          String(cfgAttrFn("arBraceletRadialDebug", "0")).trim(),
+        )
+      ) {
+        return true;
+      }
+      if (typeof window !== "undefined") {
+        const q = new URLSearchParams(window.location?.search || "").get(
+          "omafit_ar_bracelet_radial_debug",
+        );
+        if (q === "1") return true;
+      }
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
+
+  /**
+   * Remove tudo em `rootScene` excepto o grupo radial — evita GLB plano original visível.
+   */
+  function omafitBraceletRadialStripNonRadialChildren(rootScene, radialGroup) {
+    const ch = [...rootScene.children];
+    for (let i = 0; i < ch.length; i++) {
+      const c = ch[i];
+      if (c === radialGroup) continue;
+      rootScene.remove(c);
+      omafitDisposeMeshGeometriesOnly(c);
+    }
+  }
+
   /**
    * @returns {boolean}
    */
@@ -12009,7 +12043,13 @@ async function runHandArSession({
 
     const trash = [];
     rootScene.traverse((o) => {
-      if (o?.isMesh && o !== rootScene) trash.push(o);
+      if (
+        o !== rootScene &&
+        o?.geometry &&
+        (o.isMesh || o.isSkinnedMesh)
+      ) {
+        trash.push(o);
+      }
     });
     for (let ti = 0; ti < trash.length; ti++) {
       const m = trash[ti];
@@ -12036,7 +12076,19 @@ async function runHandArSession({
     inst.instanceMatrix.needsUpdate = true;
     group.add(inst);
     rootScene.add(group);
+    omafitBraceletRadialStripNonRadialChildren(rootScene, group);
     rootScene.updateMatrixWorld(true);
+
+    const radialDbg = omafitBraceletRadialDebugEnabled(cfgAttr);
+    if (radialDbg && mat) {
+      mat.wireframe = true;
+    }
+
+    console.log("[omafit-ar] bracelet radial children:", group.children.length, {
+      segments: seg,
+      wireframe: radialDbg,
+    });
+
     braceletRadialInstMesh = inst;
     braceletRadialSegCount = seg;
     return true;
