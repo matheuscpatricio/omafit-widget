@@ -371,6 +371,19 @@ const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
 const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = false;
 const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = false;
+
+/** Linha verde punho→B: `?omafit_ar_bracelet_b_axis=1` na URL do PDP. */
+function omafitBraceletBAxisDebugFromQuery() {
+  try {
+    return (
+      new URLSearchParams(typeof window !== "undefined" ? window.location.search || "" : "").get(
+        "omafit_ar_bracelet_b_axis",
+      ) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
 /** Oclusão adaptativa por angulação anatómica do pulso. */
 const OMAFIT_BRACELET_OCCLUSION_SMOOTH_LERP = 0.1;
 const OMAFIT_BRACELET_OCCLUSION_STRENGTH = 0.38;
@@ -11592,10 +11605,10 @@ async function runHandArSession({
     calibRot.add(braceletWristAlignGroup);
     braceletWristAlignGroup.add(handMicroUxWrap);
     handMicroUxWrap.add(glbRoot);
-    if (OMAFIT_BRACELET_AXIS_DEBUG_ENABLED) {
+    if (OMAFIT_BRACELET_AXIS_DEBUG_ENABLED || omafitBraceletBAxisDebugFromQuery()) {
       const dbgGeom = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0.05, 0),
+        new THREE.Vector3(0, 0.08, 0),
       ]);
       const dbgMat = new THREE.LineBasicMaterial({
         color: 0x00ff00,

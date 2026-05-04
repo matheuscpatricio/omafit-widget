@@ -5,6 +5,14 @@
  * @param {typeof import("three")} THREE
  */
 
+/** Slerp por frame em direcção ao quat alvo (eixo do “furo” = direcção do braço B). */
+export const OMAFIT_BRACELET_WRIST_ALIGN_SLERP = 0.2;
+/**
+ * Se `true`, aplica rotação extra π/2 em X após `setFromUnitVectors(Y, B)` — só se o GLB
+ * ainda ficar “chapado” com o eixo B directo.
+ */
+export const OMAFIT_BRACELET_WRIST_ALIGN_PI2_FIX_X = false;
+
 /** @typedef {{ init: boolean, wearLerpPrimed: boolean, smoothWidth: number, smoothThick09: number, smoothReach: number, smoothSink: number, smoothPosLerp: import("three").Vector3, smoothAlignQuat: import("three").Quaternion }} OmafitBraceletWristPlacementState */
 
 /** @returns {OmafitBraceletWristPlacementState} */
@@ -192,54 +200,50 @@ export function omafitBraceletWristScaleWearStep(THREE, st, p) {
 export function omafitBraceletWristAlignStep(THREE, st, p) {
   p.calibRot.updateMatrixWorld(true);
 
+  // Eixos da mão (MCP índice w5, MCP mindinho w17, punho w0).
   const mid = st.tmpV0.addVectors(p.w5, p.w17).multiplyScalar(0.5);
   const T = st.tmpV1.subVectors(p.w5, p.w17);
-  if (T.lengthSq() > 1e-10) {
-    T.normalize();
-  } else {
-    T.set(1, 0, 0);
-  }
+  if (T.lengthSq() > 1e-10) T.normalize();
+  else T.set(1, 0, 0);
 
+  /** Direcção do braço no mundo: punho → meio da palma (eixo do “furo” da pulseira). */
   const B = st.tmpV2.subVectors(mid, p.w0);
-  if (B.lengthSq() > 1e-10) {
-    B.normalize();
-  } else {
-    B.set(0, 1, 0);
-  }
+  if (B.lengthSq() > 1e-10) B.normalize();
+  else B.set(0, 1, 0);
 
   const N = st.tmpV0.crossVectors(T, B);
-  if (N.lengthSq() > 1e-10) {
-    N.normalize();
-  } else {
-    N.set(0, 0, 1);
-  }
+  if (N.lengthSq() > 1e-10) N.normalize();
+  else N.set(0, 0, 1);
+
   const camDir = st.tmpV1.set(0, 0, -1).applyQuaternion(p.camera.quaternion).normalize();
   if (N.dot(camDir) < 0) N.negate();
 
   if (p.debugAxisLine && p.debugAxisLine.geometry?.attributes?.position) {
     const pos = p.debugAxisLine.geometry.attributes.position;
     const p0 = p.w0;
-    const p1 = st.tmpV2.copy(p.w0).addScaledVector(B, 0.05);
+    const armLen = 0.08;
+    const p1x = p0.x + B.x * armLen;
+    const p1y = p0.y + B.y * armLen;
+    const p1z = p0.z + B.z * armLen;
     pos.setXYZ(0, p0.x, p0.y, p0.z);
-    pos.setXYZ(1, p1.x, p1.y, p1.z);
+    pos.setXYZ(1, p1x, p1y, p1z);
     pos.needsUpdate = true;
   }
 
   st.tmpM.copy(p.calibRot.matrixWorld).invert();
-  const braceletAxisLocal = st.tmpV2.copy(B).transformDirection(st.tmpM);
-  if (braceletAxisLocal.lengthSq() > 1e-10) {
-    braceletAxisLocal.normalize();
-  } else {
-    braceletAxisLocal.set(0, 1, 0);
+  /** B em espaço local de `calibRot` (pai de `alignGroup`). */
+  st.tmpV1.copy(B).transformDirection(st.tmpM);
+  if (st.tmpV1.lengthSq() > 1e-10) st.tmpV1.normalize();
+  else st.tmpV1.set(0, 1, 0);
+
+  /** +Y do modelo da pulseira (pós-fitWristGlb) alinha com B no espaço de `calibRot`. */
+  st.tmpQ.setFromUnitVectors(st.tmpRefY, st.tmpV1);
+  if (OMAFIT_BRACELET_WRIST_ALIGN_PI2_FIX_X) {
+    st.tmpFixQuat.setFromAxisAngle(st.tmpRefX, Math.PI / 2);
+    st.tmpQ.multiply(st.tmpFixQuat);
   }
 
-  st.tmpQ.setFromUnitVectors(st.tmpRefY, braceletAxisLocal);
-  st.tmpFixQuat.setFromAxisAngle(st.tmpRefX, Math.PI / 2);
-  st.tmpQ.multiply(st.tmpFixQuat);
-
-  const aAlign =
-    (1 - Math.exp(-p.clampDt / Math.max(1e-3, p.alignTauMs))) *
-    (p.closeEnoughHand ? 1 : 0.25);
-  st.smoothAlignQuat.slerp(st.tmpQ, aAlign);
+  const tSlerp = p.closeEnoughHand ? OMAFIT_BRACELET_WRIST_ALIGN_SLERP : OMAFIT_BRACELET_WRIST_ALIGN_SLERP * 0.55;
+  st.smoothAlignQuat.slerp(st.tmpQ, tSlerp);
   p.alignGroup.quaternion.copy(st.smoothAlignQuat);
 }
