@@ -3205,7 +3205,11 @@ const handleSubmit = async () => {
 
   return (
     <div
-      className={`omafit-tryon-root w-full min-h-0${embed ? ' flex h-full flex-1 flex-col' : ''}`}
+      className={`omafit-tryon-root w-full min-h-0${
+        embed
+          ? ' flex min-h-[85dvh] max-h-[85dvh] w-full flex-1 flex-col md:max-h-[min(85dvh,900px)] md:min-h-[min(85dvh,900px)]'
+          : ''
+      }`}
       onContextMenu={(e) => e.preventDefault()}
     >
       <style>{`

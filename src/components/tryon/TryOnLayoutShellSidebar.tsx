@@ -77,7 +77,8 @@ export function TryOnLayoutShellSidebar({
           const idx = steps.findIndex((x) => x.key === s.key);
           const cur = steps.findIndex((x) => x.key === step);
           const done = idx < cur;
-            const label = language === 'es' ? s.labelEs : language === 'en' ? s.labelEn : s.labelPt;
+          const active = idx === cur;
+          const label = language === 'es' ? s.labelEs : language === 'en' ? s.labelEn : s.labelPt;
           return (
             <div
               key={s.key}
