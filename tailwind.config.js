@@ -89,6 +89,8 @@ export default {
         inter: ['Inter', 'sans-serif'],
         /** Landing Omafit */
         gloock: ['Gloock', 'Georgia', 'serif'],
+        /** Wordmark do logotipo Omafit (JHC Rasbora via CDNFonts em index.html) */
+        rasbora: ['"JHC Rasbora"', 'Georgia', 'serif'],
         bricolage: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
         'dm-mono': ['"DM Mono"', 'ui-monospace', 'monospace'],
         bungee: ['Bungee', 'sans-serif'],

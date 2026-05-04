@@ -3249,36 +3249,46 @@ const handleSubmit = async () => {
         <motion.div
           className={
             embed
-              ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-white'
+              ? 'relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white'
               : 'fixed inset-0 z-50 flex flex-col bg-white'
           }
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Header */}
-          <div
-            className={`flex items-center justify-between border-b ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}
-            style={{ borderColor: localPrimaryColor }}
-          >
+          {embed ? (
             <button
+              type="button"
               onClick={resetWidget}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
+              className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800"
+              aria-label={t('back')}
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="h-5 w-5" />
             </button>
+          ) : (
+            <div
+              className="flex items-center justify-between border-b p-4"
+              style={{ borderColor: localPrimaryColor }}
+            >
+              <button
+                onClick={resetWidget}
+                className="text-gray-500 transition-colors hover:text-gray-700"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
 
-            <div className="flex flex-1 justify-center">
-              {!embed && localStoreLogo && (
-                <img src={localStoreLogo} alt={localStoreName} className="h-12 w-auto object-contain" />
-              )}
+              <div className="flex flex-1 justify-center">
+                {localStoreLogo && (
+                  <img src={localStoreLogo} alt={localStoreName} className="h-12 w-auto object-contain" />
+                )}
+              </div>
+
+              <div className="w-10" />
             </div>
-
-            <div className="w-10"></div>
-          </div>
+          )}
 
           {/* Chat Messages */}
-          <div className={`flex-1 overflow-y-auto space-y-4 ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}>
+          <div className={`flex-1 space-y-4 overflow-y-auto ${embed ? 'px-2 pb-2 pt-12 sm:px-3' : 'p-4'}`}>
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <motion.div
               className="flex justify-start"
@@ -3492,44 +3502,61 @@ const handleSubmit = async () => {
               : `fixed inset-0 z-50 flex flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
           }
         >
-      {/* Header - Padronizado em todas steps */}
-      <div
-        className={`flex items-center justify-between border-b ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}
-        style={{ borderColor: localPrimaryColor }}
-      >
-        {/* Botão voltar (esquerda) */}
-        {step !== 'info' && step !== 'processing' && step !== 'result' ? (
-          <button
-            onClick={goBack}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-        ) : (
-          <div className="w-6"></div>
-        )}
-
-        {/* Logo centralizado (omitido no layout sidebar — logo no painel esquerdo) */}
-        <div className="flex flex-1 justify-center">
-          {!embed && localStoreLogo && localStoreLogo.trim() !== '' && (
-            <img
-              src={localStoreLogo}
-              alt={localStoreName || t('storeLogoAlt')}
-              className="h-12 w-auto object-contain"
-              onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
-              onError={(e) => {
-                console.error('❌ Erro ao carregar logo:', localStoreLogo);
-                console.error('❌ Erro detalhado:', e);
-              }}
-            />
+      {/* Layout clássico: barra superior completa. Embed sidebar: só barra mínima com voltar quando aplicável */}
+      {!embed ? (
+        <div
+          className="flex items-center justify-between border-b p-4"
+          style={{ borderColor: localPrimaryColor }}
+        >
+          {step !== 'info' && step !== 'processing' && step !== 'result' ? (
+            <button
+              onClick={goBack}
+              className="text-gray-500 transition-colors hover:text-gray-700"
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </button>
+          ) : (
+            <div className="w-6" />
           )}
+
+          <div className="flex flex-1 justify-center">
+            {localStoreLogo && localStoreLogo.trim() !== '' && (
+              <img
+                src={localStoreLogo}
+                alt={localStoreName || t('storeLogoAlt')}
+                className="h-12 w-auto object-contain"
+                onLoad={() => console.log('✅ Logo carregado com sucesso:', localStoreLogo)}
+                onError={(e) => {
+                  console.error('❌ Erro ao carregar logo:', localStoreLogo);
+                  console.error('❌ Erro detalhado:', e);
+                }}
+              />
+            )}
+          </div>
+
+          <div className="w-6" />
         </div>
+      ) : (
+        step !== 'info' &&
+        step !== 'processing' &&
+        step !== 'result' && (
+          <div
+            className="flex shrink-0 items-center border-b px-2 py-2 sm:px-3"
+            style={{ borderColor: localPrimaryColor }}
+          >
+            <button
+              type="button"
+              onClick={goBack}
+              className="text-gray-500 transition-colors hover:text-gray-700"
+              aria-label={t('back')}
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </button>
+          </div>
+        )
+      )}
 
-        {/* Espaço vazio (direita) para balancear o layout */}
-        <div className="w-6"></div>
-      </div>
-
-      {/* Layout: em embed sidebar — coluna única (imagem centrada nas etapas 1 e 3); senão — duas colunas em md+ na etapa info */}
+      {/* Layout: em embed sidebar — colunas nas etapas 1 e 3; clássico — duas colunas em md+ na etapa info */}
       <div
         className={
           embed
@@ -3554,8 +3581,12 @@ const handleSubmit = async () => {
 
         {/* Coluna do conteúdo */}
         <div
-          className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out ${
-            embed ? 'min-h-0 px-2 py-2 sm:px-3' : `p-2 md:p-4${step !== 'info' ? ' md:w-full' : ''}`
+          className={`flex-1 transition-all duration-300 ease-in-out ${
+            embed && (step === 'info' || step === 'photo')
+              ? 'flex min-h-0 min-w-0 flex-col overflow-hidden px-2 py-2 sm:px-3'
+              : embed
+                ? 'min-h-0 overflow-y-auto px-2 py-2 sm:px-3'
+                : `overflow-y-auto p-2 md:p-4${step !== 'info' ? ' md:w-full' : ''}`
           }`}
         >
           {error && (
@@ -3565,72 +3596,91 @@ const handleSubmit = async () => {
             </div>
           )}
 
-        {/* Step 1: Info */}
-        {step === 'info' && (
+        {/* Step 1: Info — embed: duas colunas (imagem à esquerda, texto à direita); clássico: inalterado */}
+        {step === 'info' && embed && (
           <motion.div
-            className={
-              embed
-                ? 'flex flex-col items-center space-y-4 text-center'
-                : 'space-y-4 md:space-y-4 md:flex md:flex-col md:justify-center md:h-full'
-            }
+            className="flex min-h-0 flex-1 flex-row gap-3 overflow-hidden sm:gap-4"
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
           >
             <motion.div
               variants={tryonTextStaggerChild}
-              className={
-                embed
-                  ? 'flex w-full justify-center bg-gray-50 py-3 sm:py-4'
-                  : 'md:hidden bg-gray-50 rounded-xl p-3'
-              }
+              className="flex min-h-0 w-[min(38%,10.5rem)] shrink-0 flex-col justify-center sm:w-[min(36%,12rem)]"
             >
-              <div
-                className={`w-full overflow-hidden bg-gray-100 ${
-                  embed ? 'max-w-xs rounded-2xl sm:max-w-sm' : 'rounded-2xl'
-                }`}
+              <div className="overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70">
+                <img
+                  src={displayImage}
+                  alt={product.name}
+                  className="block max-h-[min(70dvh,480px)] w-full rounded-2xl object-contain object-center"
+                />
+              </div>
+            </motion.div>
+            <motion.div
+              variants={tryonTextStaggerChild}
+              className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-3 overflow-y-auto text-center sm:gap-4"
+            >
+              <div>
+                <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
+                  {t('visualExperience')}
+                </h3>
+                <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+                <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t('howItWorks')}</h4>
+                <p className="text-center text-xs text-blue-700 sm:text-sm">{t('howItWorksDesc')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep('calculator')}
+                className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium text-white transition-all duration-300 hover:bg-primary-dark sm:py-3.5 sm:text-lg"
               >
-              <img
-                src={displayImage}
-                alt={product.name}
-                className={
-                  embed
-                    ? 'mx-auto block w-full max-h-[min(52vh,420px)] object-contain sm:max-h-[min(50vh,480px)]'
-                    : 'h-auto w-full object-contain'
-                }
-              />
+                {t('startNow')}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <p className="text-center text-xs text-gray-500 sm:text-sm">{t('privacyNote')}</p>
+            </motion.div>
+          </motion.div>
+        )}
+        {step === 'info' && !embed && (
+          <motion.div
+            className="space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4"
+            variants={tryonTextStaggerParent}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={tryonTextStaggerChild} className="rounded-xl bg-gray-50 p-3 md:hidden">
+              <div className="w-full overflow-hidden rounded-2xl bg-gray-100">
+                <img src={displayImage} alt={product.name} className="h-auto w-full object-contain" />
               </div>
             </motion.div>
 
             <motion.div variants={tryonTextStaggerChild} className="w-full text-center">
-              <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
+              <h3 className="mb-2 text-2xl font-semibold md:text-3xl" style={{ color: primaryColor }}>
                 {t('visualExperience')}
               </h3>
-              <p className="text-gray-700 text-lg md:text-xl">
-                {t('visualExperienceDesc')}
-              </p>
+              <p className="text-lg text-gray-700 md:text-xl">{t('visualExperienceDesc')}</p>
             </motion.div>
 
-            <motion.div variants={tryonTextStaggerChild} className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
+            <motion.div variants={tryonTextStaggerChild} className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:p-4">
               <div className="text-center">
-                <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">{t('howItWorks')}</h4>
-                <p className="text-base md:text-lg text-blue-700">
-                  {t('howItWorksDesc')}
-                </p>
+                <h4 className="mb-2 text-base font-medium text-blue-800 md:text-lg">{t('howItWorks')}</h4>
+                <p className="text-base text-blue-700 md:text-lg">{t('howItWorksDesc')}</p>
               </div>
             </motion.div>
 
             <motion.div variants={tryonTextStaggerChild}>
-            <button
-              onClick={() => setStep('calculator')}
-              className="w-full bg-primary text-white py-3.5 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl"
-                          >
-              {t('startNow')}
-              <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setStep('calculator')}
+                className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3.5 text-lg font-medium text-white transition-all duration-300 hover:bg-primary-dark md:py-4 md:text-xl"
+              >
+                {t('startNow')}
+                <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
+              </button>
             </motion.div>
 
-            <motion.p variants={tryonTextStaggerChild} className="text-sm md:text-base text-center text-gray-500">
+            <motion.p variants={tryonTextStaggerChild} className="text-center text-sm text-gray-500 md:text-base">
               {t('privacyNote')}
             </motion.p>
           </motion.div>
@@ -3679,20 +3729,138 @@ const handleSubmit = async () => {
           </motion.div>
         )}
 
-        {/* Step 3: Photo Upload */}
-        {step === 'photo' && (
+        {/* Step 3: Photo — embed: imagem à esquerda, instruções + upload à direita (menos scroll) */}
+        {step === 'photo' && embed && (
           <motion.div
-            className={embed ? 'flex min-h-0 w-full flex-col items-center space-y-4' : 'space-y-4'}
+            className="flex min-h-0 flex-1 flex-row gap-3 overflow-hidden sm:gap-4"
             initial={tryonFadeUp.initial}
             animate={tryonFadeUp.animate}
             transition={tryonFadeUp.transition}
           >
-            {/* Mobile / embed: coluna única com imagem do produto centrada */}
-            <div className={embed ? 'w-full max-w-md space-y-4 sm:max-w-lg' : 'space-y-4 md:hidden'}>
+            <div className="flex min-h-0 w-[min(40%,10.75rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(38%,12.5rem)] sm:pr-3">
+              <p className="mb-0.5 text-center text-[10px] font-semibold leading-tight text-gray-900 sm:text-xs">
+                {t('productImage')}
+              </p>
+              {availableImages.length > 1 && (
+                <p className="mb-1 text-center text-[9px] leading-tight text-gray-600 sm:text-[10px]">
+                  {t('chooseImageNote')}
+                </p>
+              )}
+              <div className="relative mx-auto mt-1 w-full max-w-[9.5rem] sm:max-w-[11.5rem]">
+                <div
+                  className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <img
+                    src={selectedProductImage}
+                    alt="Produto"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                {availableImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={prevImage}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextImage}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+                      {availableImages.map((_, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`h-1.5 rounded-full transition-all ${
+                            index === currentImageIndex ? 'bg-primary w-5' : 'w-1.5 bg-white/80 hover:bg-white'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-2 overflow-y-auto py-0.5 sm:gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-primary sm:text-xl">{t('yourPhoto')}</h3>
+                <p className="text-xs text-gray-700 sm:text-sm">{t('betterResults')}</p>
+              </div>
+              <div className="rounded-lg border border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-2 shadow-sm sm:p-3">
+                <h4 className="mb-1 flex flex-wrap items-center gap-1 text-xs font-bold text-blue-900 sm:text-sm">
+                  {t('photoInstructions')}
+                  <span className="rounded-full bg-blue-800 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:text-[10px]">
+                    {t('importantBadge')}
+                  </span>
+                </h4>
+                <ul className="mb-1 space-y-0.5 text-[10px] leading-snug text-blue-900 sm:text-xs">
+                  <li>
+                    • <strong>{t('fullBody')}</strong> — {t('fullBodyDesc')}
+                  </li>
+                  <li>
+                    • <strong>{t('frontFacing')}</strong> — {t('frontFacingDesc')}
+                  </li>
+                  <li>
+                    • <strong>{t('noObstacles')}</strong> — {t('noObstaclesDesc')}
+                  </li>
+                  <li>
+                    • <strong>{t('goodLighting')}</strong> — {t('goodLightingDesc')}
+                  </li>
+                  <li>
+                    • <strong>{t('neutralBackground')}</strong> — {t('neutralBackgroundDesc')}
+                  </li>
+                </ul>
+                <div className="rounded border-l-4 border-blue-700 bg-blue-100 p-1.5">
+                  <p className="text-[10px] font-semibold leading-snug text-blue-900 sm:text-xs">
+                    {t('photoInstructionWarning')}
+                  </p>
+                </div>
+              </div>
+              <motion.div
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-3 text-center transition-all duration-300 hover:border-primary sm:p-4"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Camera className="mx-auto mb-2 h-8 w-8 text-gray-400 sm:h-10 sm:w-10" />
+                <p className="mb-1 text-sm font-medium text-gray-800">{t('clickToUpload')}</p>
+                <p className="text-xs text-gray-500">{t('imageFormats')}</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Step 3: Photo Upload (layout clássico) */}
+        {step === 'photo' && !embed && (
+          <motion.div
+            className="space-y-4"
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
+          >
+            <div className="space-y-4 md:hidden">
               {/* Sempre mostrar imagem do produto no mobile */}
-              <div className={`mb-4 w-full ${embed ? 'flex flex-col items-center' : ''}`}>
+              <div className="mb-4 w-full">
                 <motion.div
-                  className={`mb-3 text-center ${embed ? 'w-full' : ''}`}
+                  className="mb-3 text-center"
                   variants={tryonTextStaggerParent}
                   initial="hidden"
                   animate="show"
@@ -3707,7 +3875,7 @@ const handleSubmit = async () => {
                   )}
                 </motion.div>
 
-                <div className={`relative w-full ${embed ? 'max-w-[220px] sm:max-w-xs' : ''}`}>
+                <div className="relative w-full">
                   <div
                     className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
                     onTouchStart={handleTouchStart}
@@ -3717,7 +3885,7 @@ const handleSubmit = async () => {
                     <img
                       src={selectedProductImage}
                       alt="Produto"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   </div>
 
@@ -3725,27 +3893,25 @@ const handleSubmit = async () => {
                     <>
                       <button
                         onClick={prevImage}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white"
                       >
-                        <ArrowLeft className="w-5 h-5" />
+                        <ArrowLeft className="h-5 w-5" />
                       </button>
 
                       <button
                         onClick={nextImage}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white"
                       >
-                        <ArrowRight className="w-5 h-5" />
+                        <ArrowRight className="h-5 w-5" />
                       </button>
 
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
                         {availableImages.map((_, index) => (
                           <button
                             key={index}
                             onClick={() => setCurrentImageIndex(index)}
-                            className={`w-2 h-2 rounded-full transition-all ${
-                              index === currentImageIndex
-                                ? 'bg-primary w-6'
-                                : 'bg-white/70 hover:bg-white'
+                            className={`h-2 w-2 rounded-full transition-all ${
+                              index === currentImageIndex ? 'bg-primary w-6' : 'bg-white/70 hover:bg-white'
                             }`}
                           />
                         ))}
@@ -3756,59 +3922,65 @@ const handleSubmit = async () => {
               </div>
 
               <motion.div
-                className="text-center mb-3"
+                className="mb-3 text-center"
                 variants={tryonTextStaggerParent}
                 initial="hidden"
                 animate="show"
               >
-                <motion.h3 variants={tryonTextStaggerChild} className="text-2xl font-semibold text-primary mb-2">
+                <motion.h3 variants={tryonTextStaggerChild} className="mb-2 text-2xl font-semibold text-primary">
                   {t('yourPhoto')}
                 </motion.h3>
-                <motion.p variants={tryonTextStaggerChild} className="text-gray-700 text-base">
+                <motion.p variants={tryonTextStaggerChild} className="text-base text-gray-700">
                   {t('betterResults')}
                 </motion.p>
               </motion.div>
 
               <motion.div
-                className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md"
+                className="mb-3 rounded-lg border-2 border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-4 shadow-md"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.36, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
               >
                 <div>
-                  <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
+                  <h4 className="mb-2 flex items-center gap-2 text-base font-bold text-blue-900">
                     {t('photoInstructions')}
-                    <span className="text-xs bg-blue-800 text-white px-2 py-0.5 rounded-full font-semibold">
+                    <span className="rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white">
                       {t('importantBadge')}
                     </span>
                   </h4>
-                  <ul className="text-base text-blue-900 space-y-1.5 mb-3">
-                    <li>• <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}</li>
-                    <li>• <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}</li>
-                    <li>• <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}</li>
-                    <li>• <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}</li>
-                    <li>• <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}</li>
+                  <ul className="mb-3 space-y-1.5 text-base text-blue-900">
+                    <li>
+                      • <strong>{t('fullBody')}</strong> - {t('fullBodyDesc')}
+                    </li>
+                    <li>
+                      • <strong>{t('frontFacing')}</strong> - {t('frontFacingDesc')}
+                    </li>
+                    <li>
+                      • <strong>{t('noObstacles')}</strong> - {t('noObstaclesDesc')}
+                    </li>
+                    <li>
+                      • <strong>{t('goodLighting')}</strong> - {t('goodLightingDesc')}
+                    </li>
+                    <li>
+                      • <strong>{t('neutralBackground')}</strong> - {t('neutralBackgroundDesc')}
+                    </li>
                   </ul>
-                  <div className="bg-blue-100 border-l-4 border-blue-700 p-2 rounded mt-2">
-                    <p className="text-sm text-blue-900 font-semibold">
-                      {t('photoInstructionWarning')}
-                    </p>
+                  <div className="mt-2 rounded border-l-4 border-blue-700 bg-blue-100 p-2">
+                    <p className="text-sm font-semibold text-blue-900">{t('photoInstructionWarning')}</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+                className="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-all duration-300 hover:border-primary"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.34, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
               >
-                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-700 mb-2 text-lg">{t('clickToUpload')}</p>
-                <p className="text-base text-gray-500">
-                  {t('imageFormats')}
-                </p>
+                <Camera className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                <p className="mb-2 text-lg text-gray-700">{t('clickToUpload')}</p>
+                <p className="text-base text-gray-500">{t('imageFormats')}</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -3819,8 +3991,8 @@ const handleSubmit = async () => {
               </motion.div>
             </div>
 
-            {/* Desktop Layout (layout clássico; em embed usa-se só o bloco acima) */}
-            <div className={embed ? 'hidden' : 'hidden md:flex md:gap-6'}>
+            {/* Desktop Layout */}
+            <div className="hidden md:flex md:gap-6">
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
                 <motion.div
