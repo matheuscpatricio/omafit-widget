@@ -11894,6 +11894,54 @@ async function runHandArSession({
   }
 
   /**
+   * Pulseira plana → wrap cilíndrico real em torno do eixo local Y:
+   * - normaliza X pelo bbox global da `glbScene` (evita distorção entre meshes),
+   * - converte para ângulo [-π, π],
+   * - projecta para círculo (X,Z) com raio fixo.
+   */
+  function wrapBraceletCylinderNormalized(glbScene, radius) {
+    glbScene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(glbScene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const width = Math.max(1e-6, size.x);
+    const halfW = width * 0.5;
+
+    const worldP = new THREE.Vector3();
+    const sceneP = new THREE.Vector3();
+    const localP = new THREE.Vector3();
+    const invWorld = new THREE.Matrix4();
+    glbScene.traverse((obj) => {
+      if (!obj?.isMesh || !obj.geometry?.attributes?.position) return;
+      const pos = obj.geometry.attributes.position;
+      obj.updateMatrixWorld(true);
+      invWorld.copy(obj.matrixWorld).invert();
+      for (let i = 0; i < pos.count; i++) {
+        localP.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+        worldP.copy(localP).applyMatrix4(obj.matrixWorld);
+        sceneP.copy(worldP);
+        glbScene.worldToLocal(sceneP);
+
+        const nx = THREE.MathUtils.clamp((sceneP.x - center.x) / halfW, -1, 1);
+        const angle = nx * Math.PI;
+        sceneP.x = center.x + Math.cos(angle) * radius;
+        sceneP.z = center.z + Math.sin(angle) * radius;
+
+        worldP.copy(sceneP);
+        glbScene.localToWorld(worldP);
+        localP.copy(worldP).applyMatrix4(invWorld);
+        pos.setXYZ(i, localP.x, localP.y, localP.z);
+      }
+      pos.needsUpdate = true;
+      obj.geometry.computeBoundingBox();
+      obj.geometry.computeBoundingSphere();
+      obj.geometry.computeVertexNormals();
+    });
+  }
+
+  /**
    * Default wrist radius (m) usado no load até termos leitura estável do
    * raio real via landmarks. Escala é depois re-ajustada por frame em
    * `updateAnchorFromHand` para `smoothWristRadius`.
@@ -12058,15 +12106,8 @@ async function runHandArSession({
       const braceletDims = [size.x, size.y, size.z].sort((a, b) => a - b);
       const braceletFlatRatio = braceletDims[2] / Math.max(1e-6, braceletDims[1]);
       if (braceletFlatRatio > 1.85) {
-        const wrapFraction = 0.84;
-        const localR = braceletDims[2] / Math.max(1e-6, 2 * Math.PI * wrapFraction);
-        bendGeometryCylinder(
-          glbScene,
-          new THREE.Vector3(1, 0, 0),
-          new THREE.Vector3(0, 0, 1),
-          new THREE.Vector3(0, 1, 0),
-          Math.max(1e-6, localR),
-        );
+        const wrapRadius = Math.max(1e-6, size.x * 0.5 * 1.1);
+        wrapBraceletCylinderNormalized(glbScene, wrapRadius);
         glbScene.updateMatrixWorld(true);
         bbox = new THREE.Box3().setFromObject(glbScene);
         bbox.getSize(size);
