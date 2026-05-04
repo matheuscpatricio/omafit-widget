@@ -46,6 +46,8 @@ interface TryOnWidgetProps {
   tryonEnabled?: boolean;
   /** Força layout do iframe (ex. query na WidgetPage); se omitido, usa Supabase `tryon_layout`. */
   tryonLayoutOverride?: TryonLayoutMode;
+  /** Notifica a página (ex. WidgetPage) quando o layout efetivo muda — útil para full-bleed no iframe. */
+  onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
 }
 
 interface ProductCatalog {
@@ -369,6 +371,7 @@ export function TryOnWidget({
   selectedVariantOptions: initialSelectedVariantOptions = {},
   tryonEnabled: tryonEnabledProp,
   tryonLayoutOverride,
+  onTryonLayoutChange,
 }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -477,6 +480,11 @@ export function TryOnWidget({
       setTryonLayout(tryonLayoutOverride);
     }
   }, [tryonLayoutOverride, layoutFromUrl]);
+
+  useEffect(() => {
+    onTryonLayoutChange?.(tryonLayout);
+  }, [tryonLayout, onTryonLayoutChange]);
+
   const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
   const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -3206,9 +3214,7 @@ const handleSubmit = async () => {
   return (
     <div
       className={`omafit-tryon-root w-full min-h-0${
-        embed
-          ? ' flex min-h-[85dvh] max-h-[85dvh] w-full flex-1 flex-col md:max-h-[min(85dvh,900px)] md:min-h-[min(85dvh,900px)]'
-          : ''
+        embed ? ' flex h-full min-h-0 w-full flex-1 flex-col' : ''
       }`}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -3228,7 +3234,7 @@ const handleSubmit = async () => {
       `}</style>
 
       {/* Full Screen — com layout sidebar: painel + conteúdo; `contents` evita wrapper extra no layout default */}
-      <div className={embed ? 'flex h-full min-h-0 w-full flex-1 flex-col md:flex-row' : 'contents'}>
+      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-row' : 'contents'}>
         {embed && (
           <TryOnLayoutShellSidebar
             primaryColor={localPrimaryColor}
@@ -3251,7 +3257,10 @@ const handleSubmit = async () => {
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
+          <div
+            className={`flex items-center justify-between border-b ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}
+            style={{ borderColor: localPrimaryColor }}
+          >
             <button
               onClick={resetWidget}
               className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -3269,7 +3278,7 @@ const handleSubmit = async () => {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className={`flex-1 overflow-y-auto space-y-4 ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}>
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <motion.div
               className="flex justify-start"
@@ -3484,7 +3493,10 @@ const handleSubmit = async () => {
           }
         >
       {/* Header - Padronizado em todas steps */}
-      <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
+      <div
+        className={`flex items-center justify-between border-b ${embed ? 'px-2 py-2 sm:px-3' : 'p-4'}`}
+        style={{ borderColor: localPrimaryColor }}
+      >
         {/* Botão voltar (esquerda) */}
         {step !== 'info' && step !== 'processing' && step !== 'result' ? (
           <button
@@ -3517,10 +3529,16 @@ const handleSubmit = async () => {
         <div className="w-6"></div>
       </div>
 
-      {/* Layout com duas colunas no desktop */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Coluna da imagem (esquerda no desktop) - Apenas na step info */}
-        {step === 'info' && (
+      {/* Layout: em embed sidebar — coluna única (imagem centrada nas etapas 1 e 3); senão — duas colunas em md+ na etapa info */}
+      <div
+        className={
+          embed
+            ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+            : 'flex flex-1 flex-col overflow-hidden md:flex-row'
+        }
+      >
+        {/* Coluna da imagem (só layout clássico desktop, etapa info) */}
+        {step === 'info' && !embed && (
           <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
             <div className="w-full flex items-center justify-center">
               <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
@@ -3534,8 +3552,12 @@ const handleSubmit = async () => {
           </div>
         )}
 
-        {/* Coluna do conteúdo (direita no desktop) */}
-        <div className={`flex-1 p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out ${step !== 'info' ? 'md:w-full' : ''}`}>
+        {/* Coluna do conteúdo */}
+        <div
+          className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out ${
+            embed ? 'min-h-0 px-2 py-2 sm:px-3' : `p-2 md:p-4${step !== 'info' ? ' md:w-full' : ''}`
+          }`}
+        >
           {error && (
             <div className="bg-red-500/10 backdrop-blur-sm border border-red-400/30 rounded-lg p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -3546,22 +3568,41 @@ const handleSubmit = async () => {
         {/* Step 1: Info */}
         {step === 'info' && (
           <motion.div
-            className="space-y-4 md:space-y-4 md:flex md:flex-col md:justify-center md:h-full"
+            className={
+              embed
+                ? 'flex flex-col items-center space-y-4 text-center'
+                : 'space-y-4 md:space-y-4 md:flex md:flex-col md:justify-center md:h-full'
+            }
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
           >
-            <motion.div variants={tryonTextStaggerChild} className="md:hidden bg-gray-50 rounded-xl p-3">
-              <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
+            <motion.div
+              variants={tryonTextStaggerChild}
+              className={
+                embed
+                  ? 'flex w-full justify-center bg-gray-50 py-3 sm:py-4'
+                  : 'md:hidden bg-gray-50 rounded-xl p-3'
+              }
+            >
+              <div
+                className={`w-full overflow-hidden bg-gray-100 ${
+                  embed ? 'max-w-xs rounded-2xl sm:max-w-sm' : 'rounded-2xl'
+                }`}
+              >
               <img
                 src={displayImage}
                 alt={product.name}
-                className="w-full h-auto object-contain"
+                className={
+                  embed
+                    ? 'mx-auto block w-full max-h-[min(52vh,420px)] object-contain sm:max-h-[min(50vh,480px)]'
+                    : 'h-auto w-full object-contain'
+                }
               />
               </div>
             </motion.div>
 
-            <motion.div variants={tryonTextStaggerChild} className="text-center">
+            <motion.div variants={tryonTextStaggerChild} className="w-full text-center">
               <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
                 {t('visualExperience')}
               </h3>
@@ -3641,17 +3682,17 @@ const handleSubmit = async () => {
         {/* Step 3: Photo Upload */}
         {step === 'photo' && (
           <motion.div
-            className="space-y-4"
+            className={embed ? 'flex min-h-0 w-full flex-col items-center space-y-4' : 'space-y-4'}
             initial={tryonFadeUp.initial}
             animate={tryonFadeUp.animate}
             transition={tryonFadeUp.transition}
           >
-            {/* Mobile Layout */}
-            <div className="md:hidden space-y-4">
+            {/* Mobile / embed: coluna única com imagem do produto centrada */}
+            <div className={embed ? 'w-full max-w-md space-y-4 sm:max-w-lg' : 'space-y-4 md:hidden'}>
               {/* Sempre mostrar imagem do produto no mobile */}
-              <div className="mb-4">
+              <div className={`mb-4 w-full ${embed ? 'flex flex-col items-center' : ''}`}>
                 <motion.div
-                  className="text-center mb-3"
+                  className={`mb-3 text-center ${embed ? 'w-full' : ''}`}
                   variants={tryonTextStaggerParent}
                   initial="hidden"
                   animate="show"
@@ -3666,9 +3707,9 @@ const handleSubmit = async () => {
                   )}
                 </motion.div>
 
-                <div className="relative">
+                <div className={`relative w-full ${embed ? 'max-w-[220px] sm:max-w-xs' : ''}`}>
                   <div
-                    className="aspect-[2/3] bg-gray-50 border border-gray-200 rounded-lg overflow-hidden"
+                    className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
@@ -3778,8 +3819,8 @@ const handleSubmit = async () => {
               </motion.div>
             </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden md:flex md:gap-6">
+            {/* Desktop Layout (layout clássico; em embed usa-se só o bloco acima) */}
+            <div className={embed ? 'hidden' : 'hidden md:flex md:gap-6'}>
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
                 <motion.div

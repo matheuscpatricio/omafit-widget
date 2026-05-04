@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
-import { parseTryonLayoutFromUrl } from '../utils/parseTryonLayoutFromUrl';
+import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
@@ -340,6 +340,11 @@ export function WidgetPage() {
 
   const tryonLayoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
   const tryonIframeSidebar = tryonLayoutFromUrl === 'sidebar';
+  /** Sidebar ativa (URL ou config vinda do TryOnWidget) — iframe sem margens para o layout encaixar. */
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => tryonIframeSidebar);
+  const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
+    setTryonSidebarChrome(layout === 'sidebar');
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -867,14 +872,22 @@ export function WidgetPage() {
 
   return (
     <div
-      className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4"
+      className={
+        tryonSidebarChrome
+          ? 'flex h-dvh min-h-0 flex-col overflow-hidden bg-transparent p-0'
+          : 'flex min-h-screen items-center justify-center bg-transparent px-2 py-4 sm:p-4'
+      }
       style={{ fontFamily: fontFamily || 'inherit' }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <div
-        className={`flex w-full min-h-0 max-h-[85vh] flex-col overflow-hidden ${
-          tryonIframeSidebar ? 'sm:max-w-6xl' : 'sm:max-w-2xl'
-        }`}
+        className={
+          tryonSidebarChrome
+            ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden'
+            : `flex w-full min-h-0 max-h-[85vh] flex-col overflow-hidden ${
+                tryonIframeSidebar ? 'sm:max-w-6xl' : 'sm:max-w-2xl'
+              }`
+        }
       >
         <TryOnWidget
           garmentImage={productImage}
@@ -902,6 +915,7 @@ export function WidgetPage() {
           selectedVariantOptions={selectedVariantOptions}
           tryonEnabled={tryonEnabledOverride}
           tryonLayoutOverride={tryonLayoutFromUrl}
+          onTryonLayoutChange={handleTryonLayoutChange}
         />
       </div>
     </div>
