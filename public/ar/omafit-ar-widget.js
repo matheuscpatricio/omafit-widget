@@ -6109,9 +6109,68 @@ function fixMindARFaceVideoBehindCanvas(THREE, mindarThree, mindarHost, projecti
   }
 }
 
+/** Normaliza URL de imagem Shopify (Ajax / Liquid). */
+function omafitNormalizeShopifyProductImgUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (s.indexOf("//") === 0) return `https:${s}`;
+  return s;
+}
+
 /**
- * Mescla dados do embed com `GET /products/{handle}.js` (JSON nativo da loja):
- * lista completa de variantes e `featured_image` quando o Liquid não as preencheu.
+ * Mapa variante → URL a partir de `product.images` no JSON Ajax (muitas lojas
+ * não enviam `featured_image` por variante, só `variant_ids` nas imagens).
+ */
+function omafitVariantImageUrlMapFromProductJson(data) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  const images = data?.images;
+  if (!Array.isArray(images)) return map;
+  for (const im of images) {
+    const src = omafitNormalizeShopifyProductImgUrl(
+      typeof im === "string" ? im : im?.src || im?.url || im?.preview_image?.src || "",
+    );
+    if (!src) continue;
+    const vids = im?.variant_ids || im?.variants;
+    if (Array.isArray(vids)) {
+      for (const vid of vids) {
+        if (vid != null && String(vid).trim()) map.set(String(vid), src);
+      }
+    }
+  }
+  return map;
+}
+
+function omafitFeaturedImageUrlFromStorefrontVariant(sv) {
+  const feat = sv?.featured_image ?? sv?.image;
+  if (!feat) return "";
+  if (typeof feat === "string") return omafitNormalizeShopifyProductImgUrl(feat);
+  const raw = feat.src || feat.url || feat.preview_image?.src || "";
+  return omafitNormalizeShopifyProductImgUrl(raw);
+}
+
+/** Handle do produto para `/products/{handle}.js` (data-attrs ou URL `/products/...`). */
+function omafitResolveProductHandleForVariantFetch() {
+  const fromDom =
+    typeof document !== "undefined"
+      ? String(
+          document.getElementById("omafit-widget-root")?.getAttribute("data-product-handle") ||
+            document.getElementById("omafit-ar-root")?.getAttribute("data-product-handle") ||
+            "",
+        ).trim()
+      : "";
+  if (fromDom) return fromDom;
+  try {
+    const m = typeof location !== "undefined" ? location.pathname.match(/\/products\/([^/?#]+)/i) : null;
+    return m && m[1] ? decodeURIComponent(m[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Mescla dados do embed com `GET {locale}products/{handle}.js` (JSON Ajax Shopify):
+ * lista completa de variantes + imagens (`featured_image` ou `images[].variant_ids`).
  */
 async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
   const list = Array.isArray(existing) ? existing.slice() : [];
@@ -6119,14 +6178,36 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
   const h = String(productHandle).trim();
   if (!h) return list;
   try {
-    const res = await fetch(`/products/${encodeURIComponent(h)}.js`, {
+    const rootRaw =
+      typeof window !== "undefined" && window.Shopify?.routes?.root != null
+        ? String(window.Shopify.routes.root).trim()
+        : "";
+    const root = rootRaw && rootRaw !== "undefined" ? rootRaw : "/";
+    const prefix = root.endsWith("/") ? root : `${root}/`;
+    const path = `${prefix}products/${encodeURIComponent(h)}.js`;
+    const res = await fetch(path, {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return list;
     const data = await res.json();
     const fromEmb = new Map(list.map((v) => [String(v.id), { ...v }]));
+    const variantImgMap = omafitVariantImageUrlMapFromProductJson(data);
+    /** Fallback quando não há imagem por variante: roda pelas URLs do produto. */
+    const flatProductImgs = [];
+    if (Array.isArray(data.images)) {
+      for (const im of data.images) {
+        const u = omafitNormalizeShopifyProductImgUrl(
+          typeof im === "string" ? im : im?.src || im?.url || "",
+        );
+        if (u) flatProductImgs.push(u);
+      }
+    }
+    const featGlobal = omafitNormalizeShopifyProductImgUrl(data?.featured_image || "");
+    if (featGlobal && !flatProductImgs.includes(featGlobal)) flatProductImgs.unshift(featGlobal);
+
     const out = [];
+    let rotImg = 0;
     for (const sv of data.variants || []) {
       const sid = String(sv.id);
       const base = fromEmb.get(sid) || {
@@ -6139,21 +6220,19 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
         calibration: null,
       };
       let img = String(base.imageUrl || base.image_url || "").trim();
-      if (!img) {
-        const feat = sv.featured_image;
-        const raw =
-          feat && (typeof feat === "string" ? feat : feat.src || feat.url || "");
-        if (raw) {
-          const s = String(raw).trim();
-          img = s.indexOf("//") === 0 ? `https:${s}` : s;
-        }
+      if (!img) img = omafitFeaturedImageUrlFromStorefrontVariant(sv);
+      if (!img) img = variantImgMap.get(sid) || "";
+      if (!img && flatProductImgs.length === 1) img = flatProductImgs[0];
+      if (!img && flatProductImgs.length > 1) {
+        img = flatProductImgs[rotImg % flatProductImgs.length] || "";
+        rotImg += 1;
       }
       out.push({
         ...base,
         id: sv.id,
         title: String(base.title || sv.name || sv.title || "").trim() || String(sv.name || sv.title || ""),
         price: base.price ?? sv.price,
-        imageUrl: img || base.imageUrl || "",
+        imageUrl: omafitNormalizeShopifyProductImgUrl(img) || String(base.imageUrl || "").trim(),
       });
     }
     return out.length ? out : list;
@@ -6257,14 +6336,7 @@ async function runArSession({
   ) {
     variantSource = window.__OMAFIT_AR_VARIANTS__;
   }
-  const productHandleForFetch =
-    (typeof document !== "undefined" &&
-      String(
-        document.getElementById("omafit-widget-root")?.getAttribute("data-product-handle") ||
-          document.getElementById("omafit-ar-root")?.getAttribute("data-product-handle") ||
-          "",
-      ).trim()) ||
-    "";
+  const productHandleForFetch = omafitResolveProductHandleForVariantFetch();
   if (productHandleForFetch) {
     variantSource = await omafitEnrichVariantsFromStorefrontJs(productHandleForFetch, variantSource);
   }
