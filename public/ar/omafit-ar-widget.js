@@ -11975,6 +11975,8 @@ async function runHandArSession({
    * @returns {boolean}
    */
   function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments, outRadiusLocal) {
+    braceletRadialInstMesh = null;
+    braceletRadialSegCount = 0;
     let srcMesh = null;
     rootScene.updateMatrixWorld(true);
     rootScene.traverse((o) => {
@@ -12023,23 +12025,87 @@ async function runHandArSession({
     inst.name = "omafit-ar-bracelet-radial-inst";
     inst.frustumCulled = false;
 
-    const dummy = new THREE.Object3D();
+    const id = new THREE.Object3D();
+    id.position.set(0, 0, 0);
+    id.quaternion.identity();
+    id.scale.set(1, 1, 1);
+    id.updateMatrix();
     for (let i = 0; i < seg; i++) {
-      const angle = (i / seg) * Math.PI * 2;
-      dummy.position.set(
-        Math.cos(angle) * wristRadiusLocal,
-        0,
-        Math.sin(angle) * wristRadiusLocal,
-      );
-      dummy.lookAt(0, 0, 0);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
+      inst.setMatrixAt(i, id.matrix);
     }
     inst.instanceMatrix.needsUpdate = true;
     group.add(inst);
     rootScene.add(group);
     rootScene.updateMatrixWorld(true);
+    braceletRadialInstMesh = inst;
+    braceletRadialSegCount = seg;
     return true;
+  }
+
+  /**
+   * Círculo no plano (tangente, normal) do pulso em **mundo**; `lookAt(wrist)`.
+   * Matrizes em espaço do pai do `instMesh` (grupo sob `glbScene`).
+   */
+  function omafitUpdateBraceletRadialWristOriented(
+    THREE,
+    instMesh,
+    segCount,
+    wrist,
+    middleMcp,
+    indexLm,
+    pinkyLm,
+    radiusWorld,
+  ) {
+    if (
+      !instMesh?.isInstancedMesh ||
+      !instMesh.instanceMatrix ||
+      segCount < 2
+    ) {
+      return;
+    }
+    const parent = instMesh.parent;
+    if (!parent) return;
+
+    braceletRadWristDir.subVectors(wrist, middleMcp);
+    if (braceletRadWristDir.lengthSq() < 1e-12) return;
+    braceletRadWristDir.normalize();
+
+    braceletRadHandDir.subVectors(indexLm, pinkyLm);
+    if (braceletRadHandDir.lengthSq() < 1e-12) return;
+    braceletRadHandDir.normalize();
+
+    braceletRadNormal.crossVectors(braceletRadWristDir, braceletRadHandDir);
+    if (braceletRadNormal.lengthSq() < 1e-12) return;
+    braceletRadNormal.normalize();
+
+    braceletRadTangent.crossVectors(braceletRadNormal, braceletRadWristDir);
+    if (braceletRadTangent.lengthSq() < 1e-12) return;
+    braceletRadTangent.normalize();
+
+    parent.updateMatrixWorld(true);
+    braceletRadInvParent.copy(parent.matrixWorld).invert();
+
+    for (let i = 0; i < segCount; i++) {
+      const angle = (i / segCount) * Math.PI * 2;
+      const x = Math.cos(angle) * radiusWorld;
+      const y = Math.sin(angle) * radiusWorld;
+      braceletRadPos
+        .copy(wrist)
+        .addScaledVector(braceletRadTangent, x)
+        .addScaledVector(braceletRadNormal, y);
+
+      braceletRadDummy.position.copy(braceletRadPos);
+      braceletRadDummy.scale.set(1, 1, 1);
+      braceletRadDummy.up.copy(braceletRadNormal);
+      braceletRadDummy.lookAt(wrist.x, wrist.y, wrist.z);
+      braceletRadDummy.updateMatrix();
+      braceletRadTmpM.multiplyMatrices(
+        braceletRadInvParent,
+        braceletRadDummy.matrix,
+      );
+      instMesh.setMatrixAt(i, braceletRadTmpM);
+    }
+    instMesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -12679,6 +12745,17 @@ async function runHandArSession({
   let braceletProceduralRadial = false;
   /** Raio do anel procedural (`InstancedMesh`), unidades GLB antes do scale root. */
   let braceletRadialRadiusLocal = 0;
+  /** `InstancedMesh` da pulseira radial (actualização por frame com base no pulso). */
+  let braceletRadialInstMesh = null;
+  let braceletRadialSegCount = 0;
+  const braceletRadDummy = new THREE.Object3D();
+  const braceletRadTmpM = new THREE.Matrix4();
+  const braceletRadInvParent = new THREE.Matrix4();
+  const braceletRadPos = new THREE.Vector3();
+  const braceletRadWristDir = new THREE.Vector3();
+  const braceletRadHandDir = new THREE.Vector3();
+  const braceletRadNormal = new THREE.Vector3();
+  const braceletRadTangent = new THREE.Vector3();
   let braceletIsBangle = false;
   let braceletLinkRadial = null;
   let braceletVertexDeform = null;
@@ -12727,6 +12804,8 @@ async function runHandArSession({
         });
         braceletProceduralRadial = false;
         braceletRadialRadiusLocal = 0;
+        braceletRadialInstMesh = null;
+        braceletRadialSegCount = 0;
         if (accessoryType === "bracelet") {
           const radialMode = cfgAttr("arBraceletRadial", "auto");
           if (omafitBraceletRadialShouldRebuild(THREE, glbScene, radialMode)) {
@@ -13839,6 +13918,23 @@ async function runHandArSession({
             debugAxisLine: braceletAxisDebugLine,
           });
         }
+        if (braceletProceduralRadial && braceletRadialInstMesh) {
+          calibRot.updateMatrixWorld(true);
+          handMicroUxWrap.updateMatrixWorld(true);
+          glbRoot.updateMatrixWorld(true);
+          if (handMicroOpacityRoot) handMicroOpacityRoot.updateMatrixWorld(true);
+          const rWorld = w5.distanceTo(w17) * 0.5 * 1.1;
+          omafitUpdateBraceletRadialWristOriented(
+            THREE,
+            braceletRadialInstMesh,
+            braceletRadialSegCount,
+            w0,
+            w9,
+            w5,
+            w17,
+            rWorld,
+          );
+        }
       } else {
         glbRoot.scale.setScalar(suBase * Wb);
       }
@@ -14348,6 +14444,8 @@ async function runHandArSession({
               bakeGLBTransforms(THREE, next, () => {});
               braceletProceduralRadial = false;
               braceletRadialRadiusLocal = 0;
+              braceletRadialInstMesh = null;
+              braceletRadialSegCount = 0;
               if (accessoryType === "bracelet") {
                 const radialMode = cfgAttr("arBraceletRadial", "auto");
                 if (omafitBraceletRadialShouldRebuild(THREE, next, radialMode)) {
