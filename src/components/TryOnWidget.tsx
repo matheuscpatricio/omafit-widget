@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Sparkles } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
@@ -10,6 +11,8 @@ import {
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
+import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 
 interface TryOnWidgetProps {
   garmentImage: string;
@@ -41,6 +44,8 @@ interface TryOnWidgetProps {
    * Evita corrida em que o utilizador submete antes de `widget_configurations.tryon_enabled` chegar.
    */
   tryonEnabled?: boolean;
+  /** Força layout do iframe (ex. query na WidgetPage); se omitido, usa Supabase `tryon_layout`. */
+  tryonLayoutOverride?: TryonLayoutMode;
 }
 
 interface ProductCatalog {
@@ -82,6 +87,30 @@ const TRYON_IMAGE_QUALITY = 0.76;
 const TRYON_REMOTE_IMAGE_MAX_DIMENSION = 1024;
 const TRYON_REMOTE_IMAGE_QUALITY = 75;
 const TRYON_MAX_POLL_MS = 300000;
+
+/** Entrada de textos (Framer Motion) — variantes estáveis fora do componente. */
+const tryonTextStaggerParent = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.07, delayChildren: 0.05 },
+  },
+} as const;
+
+const tryonTextStaggerChild = {
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.38, ease: [0.22, 1, 0.36, 1] as const },
+  },
+} as const;
+
+const tryonFadeUp = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
+} as const;
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -339,6 +368,7 @@ export function TryOnWidget({
   selectedVariantId: initialSelectedVariantId = '',
   selectedVariantOptions: initialSelectedVariantOptions = {},
   tryonEnabled: tryonEnabledProp,
+  tryonLayoutOverride,
 }: TryOnWidgetProps) {
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
@@ -433,6 +463,20 @@ export function TryOnWidget({
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
+
+  const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromUrl(), []);
+  const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutMode>(() => {
+    if (layoutFromUrl !== undefined) return layoutFromUrl;
+    if (tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') return tryonLayoutOverride;
+    return 'default';
+  });
+
+  React.useEffect(() => {
+    if (layoutFromUrl !== undefined) return;
+    if (tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') {
+      setTryonLayout(tryonLayoutOverride);
+    }
+  }, [tryonLayoutOverride, layoutFromUrl]);
   const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
   const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -930,12 +974,17 @@ export function TryOnWidget({
     }
   }, [step, sizeData]);
 
-  // Auto-scroll para última mensagem
+  // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages]);
+    let rafId = 0;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [chatMessages, gptLoading]);
 
   // ═══════════════════════════════════════════════════════════════════
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
@@ -1022,6 +1071,13 @@ export function TryOnWidget({
         if (event.data.primaryColor) {
           console.log('✅ Atualizando primaryColor:', event.data.primaryColor);
           setLocalPrimaryColor(event.data.primaryColor);
+        }
+
+        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+          const tl = event.data.tryon_layout ?? event.data.tryonLayout;
+          if (tl === 'sidebar' || tl === 'default') {
+            setTryonLayout(tl);
+          }
         }
 
         if (event.data.storeName) {
@@ -1120,7 +1176,7 @@ export function TryOnWidget({
       try {
         const { data: configs, error } = await supabase
           .from('widget_configurations')
-          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at, tryon_enabled')
+          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at, tryon_enabled, tryon_layout')
           .eq('shop_domain', effectiveShopDomain)
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -1150,6 +1206,11 @@ export function TryOnWidget({
             setLocalPrimaryColor(config.primary_color);
           }
 
+          if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+            const rawLayout = (config as { tryon_layout?: string }).tryon_layout;
+            setTryonLayout(rawLayout === 'sidebar' ? 'sidebar' : 'default');
+          }
+
           // Fonte de verdade do idioma: admin_locale salvo no Supabase.
           const adminLocale = normalizeWidgetLanguage(config.admin_locale);
           if (adminLocale) {
@@ -1163,6 +1224,8 @@ export function TryOnWidget({
     };
 
     fetchWidgetConfig();
+    // tryonLayoutOverride / layoutFromUrl: lidos no fecho; não re-fetch ao mudarem
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- shop domain é a fonte de novo fetch
   }, [effectiveShopDomain, tryonEnabledProp]);
 
   React.useEffect(() => {
@@ -3094,8 +3157,13 @@ const handleSubmit = async () => {
         className="w-full h-full bg-white flex items-center justify-center rounded-2xl"
         onContextMenu={(e) => e.preventDefault()}
       >
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-4">
+        <motion.div
+          className="text-center"
+          variants={tryonTextStaggerParent}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.div variants={tryonTextStaggerChild} className="flex items-center justify-center gap-1 mb-4">
             <span
               className="inline-block w-2 h-2 rounded-full animate-bounce"
               style={{
@@ -3120,9 +3188,11 @@ const handleSubmit = async () => {
                 animationDuration: '1.4s'
               }}
             />
-          </div>
-          <p className="text-gray-700 text-base">{t('loadingProduct')}</p>
-        </div>
+          </motion.div>
+          <motion.p variants={tryonTextStaggerChild} className="text-gray-700 text-base">
+            {t('loadingProduct')}
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
@@ -3131,8 +3201,13 @@ const handleSubmit = async () => {
 
   console.log('🎨 Estilos aplicados no widget:', { fontFamily });
 
+  const embed = tryonLayout === 'sidebar';
+
   return (
-    <div className="omafit-tryon-root w-full min-h-0" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className={`omafit-tryon-root w-full min-h-0${embed ? ' flex h-full flex-1 flex-col' : ''}`}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
 
@@ -3148,9 +3223,29 @@ const handleSubmit = async () => {
         .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
       `}</style>
 
-      {/* Full Screen - All steps now use full screen */}
+      {/* Full Screen — com layout sidebar: painel + conteúdo; `contents` evita wrapper extra no layout default */}
+      <div className={embed ? 'flex h-full min-h-0 w-full flex-1 flex-col md:flex-row' : 'contents'}>
+        {embed && (
+          <TryOnLayoutShellSidebar
+            primaryColor={localPrimaryColor}
+            storeName={localStoreName || storeName || ''}
+            logoUrl={localStoreLogo || ''}
+            language={currentLanguage}
+            step={step}
+          />
+        )}
+        <div className={embed ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'contents'}>
       {step === 'result' ? (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+        <motion.div
+          className={
+            embed
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-white'
+              : 'fixed inset-0 z-50 flex flex-col bg-white'
+          }
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
             <button
@@ -3160,8 +3255,8 @@ const handleSubmit = async () => {
               <ArrowLeft className="w-6 h-6" />
             </button>
 
-            <div className="flex-1 flex justify-center">
-              {localStoreLogo && (
+            <div className="flex flex-1 justify-center">
+              {!embed && localStoreLogo && (
                 <img src={localStoreLogo} alt={localStoreName} className="h-12 w-auto object-contain" />
               )}
             </div>
@@ -3172,7 +3267,12 @@ const handleSubmit = async () => {
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
-            <div className="flex justify-start">
+            <motion.div
+              className="flex justify-start"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            >
               <div className="max-w-[65%] md:max-w-[30%]">
                 {result ? (
                   <img
@@ -3182,13 +3282,18 @@ const handleSubmit = async () => {
                   />
                 ) : null}
               </div>
-            </div>
+            </motion.div>
 
             {/* Chat Messages */}
+            <AnimatePresence initial={false}>
             {chatMessages.map((message, index) => (
-              <div
-                key={index}
+              <motion.div
+                key={`${message.timestamp}-${index}`}
                 className={`flex gap-2 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               >
                 {message.role === 'assistant' && localStoreLogo && (
                   <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
@@ -3209,12 +3314,20 @@ const handleSubmit = async () => {
                 >
                   <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
 
             {/* Loading Indicator */}
+            <AnimatePresence>
             {gptLoading && (
-              <div className="flex gap-2 justify-start">
+              <motion.div
+                className="flex gap-2 justify-start"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+              >
                 {localStoreLogo && (
                   <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
                     <img
@@ -3252,15 +3365,21 @@ const handleSubmit = async () => {
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
             <div ref={chatEndRef} />
           </div>
 
           {/* Input Area */}
           {interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
-            <div className="p-4 border-t bg-gray-50">
+            <motion.div
+              className="p-4 border-t bg-gray-50"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
               <button
                 type="button"
                 onClick={handleAddToCart}
@@ -3333,22 +3452,33 @@ const handleSubmit = async () => {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Mensagem de agradecimento quando limite for atingido */}
           {interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
-            <div className="p-4 border-t bg-gray-50">
+            <motion.div
+              className="p-4 border-t bg-gray-50"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
               <p className="text-sm text-gray-600 text-center">
                 {currentLanguage === 'pt' && `Obrigado por usar o assistente da ${localStoreName}! Clique no X e adicione o produto ao carrinho.`}
                 {currentLanguage === 'es' && `¡Gracias por usar el asistente de ${localStoreName}! Haz clic en la X y agrega el producto al carrito.`}
                 {currentLanguage === 'en' && `Thank you for using ${localStoreName}'s assistant! Click the X and add the product to cart.`}
               </p>
-            </div>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
       ) : (
-        <div className={`fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div
+          className={
+            embed
+              ? `flex min-h-0 flex-1 flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
+              : `fixed inset-0 z-50 flex flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
+          }
+        >
       {/* Header - Padronizado em todas steps */}
       <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: localPrimaryColor }}>
         {/* Botão voltar (esquerda) */}
@@ -3363,9 +3493,9 @@ const handleSubmit = async () => {
           <div className="w-6"></div>
         )}
 
-        {/* Logo centralizado */}
-        <div className="flex-1 flex justify-center">
-          {localStoreLogo && localStoreLogo.trim() !== '' && (
+        {/* Logo centralizado (omitido no layout sidebar — logo no painel esquerdo) */}
+        <div className="flex flex-1 justify-center">
+          {!embed && localStoreLogo && localStoreLogo.trim() !== '' && (
             <img
               src={localStoreLogo}
               alt={localStoreName || t('storeLogoAlt')}
@@ -3411,8 +3541,13 @@ const handleSubmit = async () => {
 
         {/* Step 1: Info */}
         {step === 'info' && (
-          <div className="space-y-4 md:space-y-4 animate-fade-in md:flex md:flex-col md:justify-center md:h-full">
-            <div className="md:hidden bg-gray-50 rounded-xl p-3">
+          <motion.div
+            className="space-y-4 md:space-y-4 md:flex md:flex-col md:justify-center md:h-full"
+            variants={tryonTextStaggerParent}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={tryonTextStaggerChild} className="md:hidden bg-gray-50 rounded-xl p-3">
               <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src={displayImage}
@@ -3420,26 +3555,27 @@ const handleSubmit = async () => {
                 className="w-full h-auto object-contain"
               />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="text-center">
+            <motion.div variants={tryonTextStaggerChild} className="text-center">
               <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
                 {t('visualExperience')}
               </h3>
               <p className="text-gray-700 text-lg md:text-xl">
                 {t('visualExperienceDesc')}
               </p>
-            </div>
+            </motion.div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
+            <motion.div variants={tryonTextStaggerChild} className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:p-4">
               <div className="text-center">
                 <h4 className="font-medium text-blue-800 mb-2 text-base md:text-lg">{t('howItWorks')}</h4>
                 <p className="text-base md:text-lg text-blue-700">
                   {t('howItWorksDesc')}
                 </p>
               </div>
-            </div>
+            </motion.div>
 
+            <motion.div variants={tryonTextStaggerChild}>
             <button
               onClick={() => setStep('calculator')}
               className="w-full bg-primary text-white py-3.5 md:py-4 rounded-lg hover:bg-primary-dark transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl"
@@ -3447,16 +3583,21 @@ const handleSubmit = async () => {
               {t('startNow')}
               <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
+            </motion.div>
 
-            <p className="text-sm md:text-base text-center text-gray-500">
+            <motion.p variants={tryonTextStaggerChild} className="text-sm md:text-base text-center text-gray-500">
               {t('privacyNote')}
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
         )}
 
         {/* Step 2: Size Calculator */}
         {step === 'calculator' && (
-          <div className="animate-fade-in">
+          <motion.div
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
+          >
           <SizeCalculator
             key={`calculator-${step}`}
             onComplete={(data) => {
@@ -3490,26 +3631,36 @@ const handleSubmit = async () => {
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
             language={currentLanguage}
           />
-          </div>
+          </motion.div>
         )}
 
         {/* Step 3: Photo Upload */}
         {step === 'photo' && (
-          <div className="space-y-4 animate-fade-in">
+          <motion.div
+            className="space-y-4"
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
+          >
             {/* Mobile Layout */}
             <div className="md:hidden space-y-4">
               {/* Sempre mostrar imagem do produto no mobile */}
               <div className="mb-4">
-                <div className="text-center mb-3">
-                  <h4 className="text-lg font-semibold text-gray-900">
+                <motion.div
+                  className="text-center mb-3"
+                  variants={tryonTextStaggerParent}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <motion.h4 variants={tryonTextStaggerChild} className="text-lg font-semibold text-gray-900">
                     {t('productImage')}
-                  </h4>
+                  </motion.h4>
                   {availableImages.length > 1 && (
-                    <p className="text-base text-gray-600">
+                    <motion.p variants={tryonTextStaggerChild} className="text-base text-gray-600">
                       {t('chooseImageNote')}
-                    </p>
+                    </motion.p>
                   )}
-                </div>
+                </motion.div>
 
                 <div className="relative">
                   <div
@@ -3559,16 +3710,26 @@ const handleSubmit = async () => {
                 </div>
               </div>
 
-              <div className="text-center mb-3">
-                <h3 className="text-2xl font-semibold text-primary mb-2">
+              <motion.div
+                className="text-center mb-3"
+                variants={tryonTextStaggerParent}
+                initial="hidden"
+                animate="show"
+              >
+                <motion.h3 variants={tryonTextStaggerChild} className="text-2xl font-semibold text-primary mb-2">
                   {t('yourPhoto')}
-                </h3>
-                <p className="text-gray-700 text-base">
+                </motion.h3>
+                <motion.p variants={tryonTextStaggerChild} className="text-gray-700 text-base">
                   {t('betterResults')}
-                </p>
-              </div>
+                </motion.p>
+              </motion.div>
 
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md">
+              <motion.div
+                className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.36, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              >
                 <div>
                   <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
                     {t('photoInstructions')}
@@ -3589,11 +3750,14 @@ const handleSubmit = async () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
-              <div
+              <motion.div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.34, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
               >
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-700 mb-2 text-lg">{t('clickToUpload')}</p>
@@ -3607,23 +3771,28 @@ const handleSubmit = async () => {
                   onChange={handleImageChange}
                   className="hidden"
                 />
-              </div>
+              </motion.div>
             </div>
 
             {/* Desktop Layout */}
             <div className="hidden md:flex md:gap-6">
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
-                <div className="text-center mb-3">
-                  <h4 className="text-xl font-semibold text-gray-900">
+                <motion.div
+                  className="text-center mb-3"
+                  variants={tryonTextStaggerParent}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <motion.h4 variants={tryonTextStaggerChild} className="text-xl font-semibold text-gray-900">
                     {t('productImage')}
-                  </h4>
+                  </motion.h4>
                   {availableImages.length > 1 && (
-                    <p className="text-base text-gray-600">
+                    <motion.p variants={tryonTextStaggerChild} className="text-base text-gray-600">
                       {t('chooseImageNote')}
-                    </p>
+                    </motion.p>
                   )}
-                </div>
+                </motion.div>
 
                 {availableImages.length > 1 ? (
                   <div className="relative">
@@ -3676,16 +3845,26 @@ const handleSubmit = async () => {
 
               {/* Right Side: Photo Upload */}
               <div className="md:w-1/2 flex flex-col justify-center">
-                <div className="text-center mb-3">
-                  <h3 className="text-2xl font-semibold text-primary mb-1">
+                <motion.div
+                  className="text-center mb-3"
+                  variants={tryonTextStaggerParent}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <motion.h3 variants={tryonTextStaggerChild} className="text-2xl font-semibold text-primary mb-1">
                     {t('yourPhoto')}
-                  </h3>
-                  <p className="text-gray-700 text-base">
+                  </motion.h3>
+                  <motion.p variants={tryonTextStaggerChild} className="text-gray-700 text-base">
                     {t('betterResults')}
-                  </p>
-                </div>
+                  </motion.p>
+                </motion.div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-3 mb-3 shadow-md">
+                <motion.div
+                  className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-3 mb-3 shadow-md"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.36, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                >
                   <div>
                     <h4 className="font-bold text-blue-900 mb-1.5 text-sm flex items-center gap-2">
                       {t('photoInstructions')}
@@ -3706,11 +3885,14 @@ const handleSubmit = async () => {
                       </p>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div
+                <motion.div
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-all duration-300 ease-in-out"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.34, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-700 mb-1 text-lg">{t('clickToUpload')}</p>
@@ -3724,25 +3906,30 @@ const handleSubmit = async () => {
                     onChange={handleImageChange}
                     className="hidden"
                   />
-                </div>
+                </motion.div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Step 4: Confirm */}
         {step === 'confirm' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="text-center mb-3 md:mb-4">
+          <motion.div
+            className="space-y-4"
+            variants={tryonTextStaggerParent}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={tryonTextStaggerChild} className="text-center mb-3 md:mb-4">
               <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
                 {t('confirmData')}
               </h3>
               <p className="text-gray-700 text-base md:text-lg">
                 {t('verifyBeforeProcess')}
               </p>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+            <motion.div variants={tryonTextStaggerChild} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               {/* Produto */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
                 <h4 className="font-medium mb-3 text-center text-base md:text-lg" style={{ color: primaryColor }}>
@@ -3782,9 +3969,9 @@ const handleSubmit = async () => {
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="flex gap-3">
+            <motion.div variants={tryonTextStaggerChild} className="flex gap-3">
               <button
                 onClick={() => {
                   invalidatePreparedModelAssets();
@@ -3806,14 +3993,19 @@ const handleSubmit = async () => {
                 <Sparkles className="w-5 h-5" />
                 {t('process')}
               </button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {/* Step 5: Processing */}
         {step === 'processing' && (
-          <div className="text-center py-10 md:py-12 animate-fade-in">
-            <div className="flex items-center justify-center gap-2 mb-6">
+          <motion.div
+            className="text-center py-10 md:py-12"
+            variants={tryonTextStaggerParent}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={tryonTextStaggerChild} className="flex items-center justify-center gap-2 mb-6">
               <span
                 className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
                 style={{
@@ -3838,22 +4030,24 @@ const handleSubmit = async () => {
                   animationDuration: '1.4s'
                 }}
               />
-            </div>
-            <h3 className="text-2xl md:text-3xl font-semibold text-primary mb-3">
+            </motion.div>
+            <motion.h3 variants={tryonTextStaggerChild} className="text-2xl md:text-3xl font-semibold text-primary mb-3">
               {processingMessage}
-            </h3>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
+            </motion.h3>
+            <motion.div variants={tryonTextStaggerChild} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4">
               <p className="text-yellow-800 text-base md:text-lg">
                 {t('estimatedTime')}
               </p>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         </div>
       </div>
     </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

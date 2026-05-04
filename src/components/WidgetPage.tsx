@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
+import { parseTryonLayoutFromUrl } from '../utils/parseTryonLayoutFromUrl';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
@@ -336,6 +337,9 @@ export function WidgetPage() {
   const [tryonEnabledOverride, setTryonEnabledOverride] = useState<boolean | undefined>(() =>
     parseTryonEnabledUrlParam()
   );
+
+  const tryonLayoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
+  const tryonIframeSidebar = tryonLayoutFromUrl === 'sidebar';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -867,7 +871,11 @@ export function WidgetPage() {
       style={{ fontFamily: fontFamily || 'inherit' }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="w-full sm:max-w-2xl max-h-[85vh] overflow-auto">
+      <div
+        className={`flex w-full min-h-0 max-h-[85vh] flex-col overflow-hidden ${
+          tryonIframeSidebar ? 'sm:max-w-6xl' : 'sm:max-w-2xl'
+        }`}
+      >
         <TryOnWidget
           garmentImage={productImage}
           productImages={productImages}
@@ -893,6 +901,7 @@ export function WidgetPage() {
           selectedVariantId={selectedVariantId}
           selectedVariantOptions={selectedVariantOptions}
           tryonEnabled={tryonEnabledOverride}
+          tryonLayoutOverride={tryonLayoutFromUrl}
         />
       </div>
     </div>

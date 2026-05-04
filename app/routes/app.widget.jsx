@@ -35,7 +35,8 @@ export default function WidgetPage() {
     button_color: '#000000',
     button_text_color: '#FFFFFF',
     button_position: 'below_add_to_cart',
-    widget_enabled: true
+    widget_enabled: true,
+    tryon_layout: 'default',
   });
 
   useEffect(() => {
@@ -62,7 +63,15 @@ export default function WidgetPage() {
       if (response.ok) {
         const data = await response.json();
         if (data && data.length > 0) {
-          setConfig(data[0]);
+          const row = data[0];
+          setConfig((prev) => ({
+            ...prev,
+            ...row,
+            tryon_layout:
+              row.tryon_layout === 'sidebar' || row.tryon_layout === 'default'
+                ? row.tryon_layout
+                : 'default',
+          }));
         }
       }
     } catch (err) {
@@ -195,6 +204,17 @@ export default function WidgetPage() {
                 ]}
                 value={config.button_position}
                 onChange={(value) => handleChange('button_position', value)}
+              />
+
+              <Select
+                label="Try-on layout"
+                helpText="Classic keeps the current full-width steps. Sidebar adds a branded left panel with progress."
+                options={[
+                  { label: 'Classic (default)', value: 'default' },
+                  { label: 'Sidebar — primary panel + progress', value: 'sidebar' },
+                ]}
+                value={config.tryon_layout === 'sidebar' ? 'sidebar' : 'default'}
+                onChange={(value) => handleChange('tryon_layout', value)}
               />
 
               <Divider />
