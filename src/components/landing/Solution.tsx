@@ -67,20 +67,34 @@ const itemVariants: Variants = {
   },
 };
 
-function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boolean }) {
+function FeatureInfoCard({
+  feature,
+  compact,
+  row,
+}: {
+  feature: Feature;
+  compact?: boolean;
+  /** Uma única linha de 6 colunas (mobile + desktop): tipografia mais compacta. */
+  row?: boolean;
+}) {
   const highlight = Boolean(feature.accent);
 
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col rounded-xl border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 shadow-elegant sm:rounded-2xl',
+        'flex h-full min-h-0 flex-col rounded-lg border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 shadow-elegant sm:rounded-xl',
         highlight && 'ring-1 ring-oma-accent/30',
-        compact ? 'p-3.5 sm:p-4' : 'p-6 sm:p-8',
+        row && 'p-1.5 sm:p-2.5 md:p-3',
+        !row && compact && 'p-3.5 sm:p-4',
+        !row && !compact && 'p-6 sm:p-8',
       )}
     >
       <span
         className={cn(
-          'inline-flex w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest sm:text-[11px]',
+          'inline-flex w-fit max-w-full rounded-full border font-semibold uppercase leading-none tracking-widest',
+          row
+            ? 'px-1 py-px text-[6px] sm:px-1.5 sm:py-0.5 sm:text-[7px] md:text-[8px]'
+            : 'px-2 py-0.5 text-[10px] sm:text-[11px]',
           highlight
             ? 'border-oma-accent/45 bg-oma-accent/15 text-oma-cream'
             : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/85',
@@ -90,8 +104,12 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
       </span>
       <h3
         className={cn(
-          'mt-2 font-semibold leading-snug tracking-tight text-oma-cream sm:mt-2.5',
-          compact ? 'text-sm sm:text-base' : 'text-xl sm:text-2xl',
+          'font-semibold leading-[1.15] tracking-tight text-oma-cream',
+          row && 'mt-1 line-clamp-4 text-[8px] sm:mt-1.5 sm:line-clamp-3 sm:text-[10px] md:text-xs lg:text-sm',
+          !row &&
+            compact &&
+            'mt-2 text-sm sm:mt-2.5 sm:text-base',
+          !row && !compact && 'mt-2 text-xl sm:text-2xl',
         )}
         style={{ letterSpacing: '-0.02em' }}
       >
@@ -99,17 +117,29 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
       </h3>
       <p
         className={cn(
-          'mt-2 flex-1 leading-relaxed text-oma-cream/80',
-          compact ? 'line-clamp-4 text-[11px] sm:text-xs' : 'text-sm sm:text-base',
+          'flex-1 leading-relaxed text-oma-cream/80',
+          row && 'mt-1 line-clamp-4 text-[7px] sm:line-clamp-5 sm:text-[9px] md:text-[11px]',
+          !row && compact && 'mt-2 line-clamp-4 text-[11px] sm:text-xs',
+          !row && !compact && 'mt-2 text-sm sm:text-base',
         )}
       >
         {feature.description}
       </p>
-      <ul className={cn('mt-2.5 space-y-1.5 text-oma-cream/90 sm:mt-3', compact ? 'text-[10px] sm:text-[11px]' : 'text-sm sm:text-[15px]')}>
+      <ul
+        className={cn(
+          'text-oma-cream/90',
+          row && 'mt-1 space-y-0.5 text-[6px] sm:space-y-1 sm:text-[8px] md:text-[10px]',
+          !row && compact && 'mt-2.5 space-y-1.5 text-[10px] sm:mt-3 sm:text-[11px]',
+          !row && !compact && 'mt-2.5 space-y-1.5 text-sm sm:mt-3 sm:text-[15px]',
+        )}
+      >
         {feature.bullets.map((b) => (
-          <li key={b} className="flex gap-1.5 leading-snug">
-            <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-oma-accent" aria-hidden />
-            <span className={compact ? 'line-clamp-2' : ''}>{b}</span>
+          <li key={b} className="flex gap-0.5 leading-tight sm:gap-1.5 sm:leading-snug">
+            <span
+              className={cn('mt-0.5 shrink-0 rounded-full bg-oma-accent', row ? 'h-0.5 w-0.5 sm:h-1 sm:w-1' : 'mt-1 h-1 w-1')}
+              aria-hidden
+            />
+            <span className={cn(row ? 'line-clamp-2 sm:line-clamp-3' : compact ? 'line-clamp-2' : '')}>{b}</span>
           </li>
         ))}
       </ul>
@@ -119,25 +149,29 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
 
 function FeatureGridBlock({ features: list }: { features: Feature[] }) {
   return (
-    <div className="grid w-full shrink-0 grid-cols-2 gap-2.5 px-3 sm:grid-cols-3 sm:gap-4 sm:px-4 md:px-5 lg:gap-5">
+    <div className="flex w-full shrink-0 flex-nowrap gap-1 px-2 sm:gap-2 sm:px-3 md:gap-3 md:px-4">
       {list.map((feature) => (
-        <FeatureInfoCard key={feature.title} feature={feature} compact />
+        <div key={feature.title} className="min-w-0 flex-1 basis-0">
+          <FeatureInfoCard feature={feature} compact row />
+        </div>
       ))}
     </div>
   );
 }
 
-/** Faixa com dois blocos 2×3 idênticos; animação `marquee` desloca -50% (loop). Pausa com hover (rato). */
+/** Faixa com dois blocos idênticos (1 linha × 6); animação `marquee` desloca -50% (loop). Pausa com hover (rato). */
 function SolutionAutoMarqueeGrid() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
 
   if (reduceMotion) {
     return (
-      <div className="mx-auto max-w-6xl px-3 sm:px-4">
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:gap-5">
+      <div className="mx-auto w-full max-w-6xl px-2 sm:px-3">
+        <div className="flex flex-nowrap gap-1 sm:gap-2 md:gap-3">
           {features.map((feature) => (
-            <FeatureInfoCard key={feature.title} feature={feature} compact />
+            <div key={feature.title} className="min-w-0 flex-1 basis-0">
+              <FeatureInfoCard feature={feature} compact row />
+            </div>
           ))}
         </div>
       </div>
