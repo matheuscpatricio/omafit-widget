@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { isTryonWidgetEmbedded } from '../utils/isTryonWidgetEmbedded';
 import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 
 export type TryonLayoutPreferenceState = TryonLayoutMode | 'pending';
@@ -49,7 +50,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
       if (cached !== null) return cached;
       return 'pending';
     }
-    return 'default';
+    return isTryonWidgetEmbedded() ? 'pending' : 'default';
   });
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
     if (layoutFromUrl !== undefined || layoutOverride !== undefined) return;
     setTryonLayout((prev) => {
       if (prev !== 'pending') return prev;
-      if (!effectiveShopDomain) return 'default';
+      if (!effectiveShopDomain) return isTryonWidgetEmbedded() ? prev : 'default';
       const cached = readTryonLayoutFromSession(effectiveShopDomain);
       return cached ?? 'pending';
     });
@@ -95,6 +96,9 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
     const run = async () => {
       if (layoutFromUrl !== undefined || layoutOverride !== undefined) return;
       if (!effectiveShopDomain) {
+        if (!isTryonWidgetEmbedded()) {
+          setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+        }
         return;
       }
       try {

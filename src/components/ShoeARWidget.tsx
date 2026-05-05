@@ -18,6 +18,7 @@ import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
 import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
+import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
 import { SHOE_SIDEBAR_STEPS } from './tryon/shoeSidebarStepMeta';
 
 interface ShoeARWidgetProps {
@@ -1441,55 +1442,38 @@ export function ShoeARWidget({
   /** Hero visual desligado no chat pós-medida — mesmo aspeto que layout default (fundo branco). */
   const heroChromeActive = isHeroLayout && step !== 'measure-result';
 
-  if (tryonLayout === 'pending' && effectiveShopDomain) {
+  if (tryonLayout === 'pending') {
     const loadingLabel =
       language === 'es' ? 'Cargando…' : language === 'en' ? 'Loading…' : 'A carregar…';
     return (
       <div
-        className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-white"
+        className="flex h-full min-h-0 w-full flex-1 flex-col bg-white"
         onContextMenu={(e) => e.preventDefault()}
       >
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
-          .omafit-shoe-pending, .omafit-shoe-pending * {
+          .omafit-shoe-pending-root, .omafit-shoe-pending-root * {
             font-family: '${fontFamily}', sans-serif !important;
           }
         `}</style>
-        <div className="omafit-shoe-pending text-center px-4">
-          <div className="mb-4 flex justify-center gap-1">
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="inline-block h-2 w-2 animate-bounce rounded-full"
-                style={{
-                  backgroundColor: primaryColor,
-                  animationDelay: `${i * 200}ms`,
-                  animationDuration: '1.4s',
-                }}
-              />
-            ))}
-          </div>
-          <motion.p
-            className="text-base text-gray-700"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {loadingLabel}
-          </motion.p>
+        <div className="omafit-shoe-pending-root h-full min-h-0 w-full flex-1">
+          <TryonLayoutPendingSplash primaryColor={primaryColor} label={loadingLabel} />
         </div>
       </div>
     );
   }
 
   return (
-    <div
+    <motion.div
       className={
         embed
           ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${heroChromeActive ? 'omafit-shoe-hero bg-transparent' : 'bg-white'}`
           : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
       }
       onContextMenu={(e) => e.preventDefault()}
+      initial={embed && isHeroLayout ? { opacity: 0, y: 14 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
@@ -2180,6 +2164,6 @@ export function ShoeARWidget({
           />
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

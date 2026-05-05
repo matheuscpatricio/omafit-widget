@@ -12,6 +12,8 @@ import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } f
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { isTryonWidgetEmbedded } from '../utils/isTryonWidgetEmbedded';
+import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
@@ -507,7 +509,7 @@ export function TryOnWidget({
       if (cached !== null) return cached;
       return 'pending';
     }
-    return 'default';
+    return isTryonWidgetEmbedded() ? 'pending' : 'default';
   });
 
   React.useEffect(() => {
@@ -613,7 +615,7 @@ export function TryOnWidget({
     setTryonLayout((prev) => {
       if (prev !== 'pending') return prev;
       const sd = (localShopDomain || shopDomain || '').trim();
-      if (!sd) return 'default';
+      if (!sd) return isTryonWidgetEmbedded() ? prev : 'default';
       const cached = readTryonLayoutFromSession(sd);
       return cached ?? 'pending';
     });
@@ -1246,7 +1248,7 @@ export function TryOnWidget({
     const fetchWidgetConfig = async () => {
       if (!effectiveShopDomain) {
         console.log('⚠️ Não há shopDomain para buscar configurações');
-        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined && !isTryonWidgetEmbedded()) {
           setTryonLayout((p) => (p === 'pending' ? 'default' : p));
         }
         return;
@@ -3292,49 +3294,11 @@ const handleSubmit = async () => {
     );
   }
 
-  /** Evita 1 frame do layout default antes do fetch ao Supabase (ou cache). */
+  /** Evita layout default antes do fetch ao Supabase / postMessage (iframe). */
   if (tryonLayout === 'pending') {
     return (
-      <div
-        className="omafit-tryon-root flex h-full min-h-0 w-full flex-1 items-center justify-center bg-white"
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <motion.div
-          className="text-center"
-          variants={tryonTextStaggerParent}
-          initial="hidden"
-          animate="show"
-        >
-          <motion.div variants={tryonTextStaggerChild} className="mb-4 flex items-center justify-center gap-1">
-            <span
-              className="inline-block h-2 w-2 animate-bounce rounded-full"
-              style={{
-                backgroundColor: localPrimaryColor,
-                animationDelay: '0ms',
-                animationDuration: '1.4s',
-              }}
-            />
-            <span
-              className="inline-block h-2 w-2 animate-bounce rounded-full"
-              style={{
-                backgroundColor: localPrimaryColor,
-                animationDelay: '200ms',
-                animationDuration: '1.4s',
-              }}
-            />
-            <span
-              className="inline-block h-2 w-2 animate-bounce rounded-full"
-              style={{
-                backgroundColor: localPrimaryColor,
-                animationDelay: '400ms',
-                animationDuration: '1.4s',
-              }}
-            />
-          </motion.div>
-          <motion.p variants={tryonTextStaggerChild} className="text-base text-gray-700">
-            {t('loadingProduct')}
-          </motion.p>
-        </motion.div>
+      <div className="omafit-tryon-root h-full min-h-0 w-full flex-1" onContextMenu={(e) => e.preventDefault()}>
+        <TryonLayoutPendingSplash primaryColor={localPrimaryColor} label={t('loadingProduct')} />
       </div>
     );
   }
@@ -3350,11 +3314,14 @@ const handleSubmit = async () => {
   const heroChromeActive = isHeroLayout && step !== 'result';
 
   return (
-    <div
+    <motion.div
       className={`omafit-tryon-root w-full min-h-0${
         embed ? ' flex h-full min-h-0 w-full flex-1 flex-col' : ''
       }${heroChromeActive ? ' omafit-tryon-hero' : ''}`}
       onContextMenu={(e) => e.preventDefault()}
+      initial={embed && isHeroLayout ? { opacity: 0, y: 14 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
@@ -4564,6 +4531,6 @@ const handleSubmit = async () => {
       )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

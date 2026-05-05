@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { User, Ruler, Weight } from 'lucide-react';
 import { widgetTranslations, type WidgetTranslationKey } from '../locales/widget-translations';
 
@@ -41,6 +42,24 @@ const fitOptions = [
   { labelKey: 'fitRegular', factor: 1.00 },
   { labelKey: 'fitLoose', factor: 1.03 }
 ];
+
+const bodyTypeEase = [0.22, 1, 0.36, 1] as const;
+
+const bodyTypeGalleryMotion = {
+  initial: { opacity: 0, y: 14, filter: 'blur(8px)' },
+  animate: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.4, ease: bodyTypeEase },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    filter: 'blur(6px)',
+    transition: { duration: 0.28, ease: bodyTypeEase },
+  },
+};
 
 export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female', language = 'en' }: SizeCalculatorProps) {
   // Usar defaultGender como valor inicial, convertendo 'unisex' para 'female'
@@ -183,73 +202,105 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
               <User className="w-4 h-4" />
               {t('bodyTypeQuestion')}
             </label>
-            <div className="flex flex-col gap-2">
-              {/* Mobile: Primeira linha com 3 imagens */}
-              <div className="grid grid-cols-3 gap-2 md:hidden">
-                {bodyTypes.slice(0, 3).map((type, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setBodyTypeIndex(index)}
-                    style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
-                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                      bodyTypeIndex === index
-                        ? ''
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+            <div className="relative overflow-hidden">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={gender}
+                  className="flex flex-col gap-2"
+                  variants={bodyTypeGalleryMotion}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  {/* Mobile: Primeira linha com 3 imagens */}
+                  <div className="grid grid-cols-3 gap-2 md:hidden">
+                    {bodyTypes.slice(0, 3).map((type, index) => (
+                      <button
+                        key={`${gender}-${index}`}
+                        type="button"
+                        onClick={() => setBodyTypeIndex(index)}
+                        style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                        className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                          bodyTypeIndex === index
+                            ? ''
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <motion.img
+                          src={type.image}
+                          alt={t(type.labelKey as WidgetTranslationKey)}
+                          className="w-full h-full object-cover object-top"
+                          loading="lazy"
+                          decoding="async"
+                          initial={{ opacity: 0.85, scale: 1.02 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {/* Mobile: Segunda linha com 2 imagens centralizadas entre as lacunas */}
+                  <div
+                    className="flex justify-center gap-2 md:hidden"
+                    style={{ marginLeft: 'calc((100% / 3 + 0.5rem) / 2)', marginRight: 'calc((100% / 3 + 0.5rem) / 2)' }}
                   >
-                    <img
-                      src={type.image}
-                      alt={t(type.labelKey as WidgetTranslationKey)}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  </button>
-                ))}
-              </div>
-              {/* Mobile: Segunda linha com 2 imagens centralizadas entre as lacunas */}
-              <div className="flex justify-center gap-2 md:hidden" style={{ marginLeft: 'calc((100% / 3 + 0.5rem) / 2)', marginRight: 'calc((100% / 3 + 0.5rem) / 2)' }}>
-                {bodyTypes.slice(3, 5).map((type, index) => (
-                  <button
-                    key={index + 3}
-                    onClick={() => setBodyTypeIndex(index + 3)}
-                    style={{
-                      width: 'calc(50% - 0.25rem)',
-                      ...(bodyTypeIndex === index + 3 ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {})
-                    }}
-                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                      bodyTypeIndex === index + 3
-                        ? ''
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={type.image}
-                      alt={t(type.labelKey as WidgetTranslationKey)}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  </button>
-                ))}
-              </div>
-              {/* Desktop: Todas as 5 imagens em uma linha */}
-              <div className="hidden md:grid grid-cols-5 gap-2">
-                {bodyTypes.map((type, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setBodyTypeIndex(index)}
-                    style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
-                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                      bodyTypeIndex === index
-                        ? ''
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={type.image}
-                      alt={t(type.labelKey as WidgetTranslationKey)}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  </button>
-                ))}
-              </div>
+                    {bodyTypes.slice(3, 5).map((type, index) => (
+                      <button
+                        key={`${gender}-${index + 3}`}
+                        type="button"
+                        onClick={() => setBodyTypeIndex(index + 3)}
+                        style={{
+                          width: 'calc(50% - 0.25rem)',
+                          ...(bodyTypeIndex === index + 3 ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}),
+                        }}
+                        className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                          bodyTypeIndex === index + 3
+                            ? ''
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <motion.img
+                          src={type.image}
+                          alt={t(type.labelKey as WidgetTranslationKey)}
+                          className="w-full h-full object-cover object-top"
+                          loading="lazy"
+                          decoding="async"
+                          initial={{ opacity: 0.85, scale: 1.02 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {/* Desktop: Todas as 5 imagens em uma linha */}
+                  <div className="hidden md:grid grid-cols-5 gap-2">
+                    {bodyTypes.map((type, index) => (
+                      <button
+                        key={`${gender}-d-${index}`}
+                        type="button"
+                        onClick={() => setBodyTypeIndex(index)}
+                        style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                        className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                          bodyTypeIndex === index
+                            ? ''
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <motion.img
+                          src={type.image}
+                          alt={t(type.labelKey as WidgetTranslationKey)}
+                          className="w-full h-full object-cover object-top"
+                          loading="lazy"
+                          decoding="async"
+                          initial={{ opacity: 0.85, scale: 1.02 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.32, delay: index * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
 
