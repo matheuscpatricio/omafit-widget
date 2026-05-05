@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 
 type Props = {
@@ -6,45 +7,58 @@ type Props = {
   blurBackground?: boolean;
 };
 
+/** Hero: imagem de fundo + cor primária com degradê na junção (desktop: esq. primária / dir. imagem; mobile: cima imagem / baixo primária). */
 export function TryOnLayoutShellHero({
   primaryColor,
   backgroundImage,
   blurBackground = false,
 }: Props) {
+  const p = primaryColor || '#810707';
   const bg = backgroundImage || '';
-  const mobileImageStyle = bg
-    ? {
-        backgroundImage: `linear-gradient(180deg, ${primaryColor}f0 0%, ${primaryColor}aa 40%, ${primaryColor}40 78%, ${primaryColor}10 100%), url("${bg}")`,
-      }
-    : { backgroundImage: `linear-gradient(180deg, ${primaryColor}f0 0%, ${primaryColor}30 100%)` };
 
-  const desktopImageStyle = bg
+  const mobileStyle: CSSProperties = bg
     ? {
-        backgroundImage: `linear-gradient(270deg, ${primaryColor}f0 0%, ${primaryColor}aa 36%, ${primaryColor}4d 68%, ${primaryColor}12 100%), url("${bg}")`,
+        backgroundImage: `linear-gradient(180deg, ${p}00 0%, ${p}00 18%, ${p}d9 42%, ${p}f2 58%, ${p} 100%), url("${bg}")`,
+        backgroundSize: 'cover, cover',
+        backgroundPosition: 'center top, center top',
+        backgroundRepeat: 'no-repeat, no-repeat',
       }
-    : { backgroundImage: `linear-gradient(270deg, ${primaryColor}f0 0%, ${primaryColor}30 100%)` };
+    : {
+        backgroundImage: `linear-gradient(180deg, ${p}cc 0%, ${p} 100%)`,
+        backgroundSize: 'cover',
+      };
+
+  const desktopStyle: CSSProperties = bg
+    ? {
+        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p} 32%, ${p}e8 44%, ${p}55 56%, ${p}00 68%), url("${bg}")`,
+        backgroundSize: 'cover, cover',
+        backgroundPosition: 'left center, right center',
+        backgroundRepeat: 'no-repeat, no-repeat',
+      }
+    : {
+        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p}dd 100%)`,
+        backgroundSize: 'cover',
+      };
+
+  const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
       <motion.section
-        className="absolute inset-x-0 top-0 h-[30dvh] min-h-[170px] md:hidden"
-        style={{ ...mobileImageStyle, backgroundSize: 'cover', backgroundPosition: 'center top' }}
+        className={`absolute inset-0 transition-[filter,transform] duration-200 ease-out md:hidden ${bgBlurClass}`}
+        style={mobileStyle}
         initial={{ opacity: 0.96, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       />
 
       <motion.aside
-        className="absolute inset-y-0 right-0 hidden w-[min(46%,560px)] md:block"
-        style={{ ...desktopImageStyle, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        className={`absolute inset-0 hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
+        style={desktopStyle}
         initial={{ opacity: 0.96, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       />
-
-      {blurBackground && (
-        <div className="absolute inset-0 backdrop-blur-[4px] bg-white/25 md:bg-white/20" />
-      )}
     </div>
   );
 }

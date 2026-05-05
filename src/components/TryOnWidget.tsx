@@ -3744,11 +3744,13 @@ const handleSubmit = async () => {
             initial="hidden"
             animate="show"
           >
-            <motion.div variants={tryonTextStaggerChild} className="rounded-xl bg-gray-50 p-3 md:hidden">
-              <div className="w-full overflow-hidden rounded-2xl bg-gray-100">
-                <img src={displayImage} alt={product.name} className="h-auto w-full object-contain" />
-              </div>
-            </motion.div>
+            {!isHeroLayout && (
+              <motion.div variants={tryonTextStaggerChild} className="rounded-xl bg-gray-50 p-3 md:hidden">
+                <div className="w-full overflow-hidden rounded-2xl bg-gray-100">
+                  <img src={displayImage} alt={product.name} className="h-auto w-full object-contain" />
+                </div>
+              </motion.div>
+            )}
 
             <motion.div variants={tryonTextStaggerChild} className="w-full text-center">
               <h3 className="mb-2 text-2xl font-semibold md:text-3xl" style={{ color: primaryColor }}>
@@ -3787,15 +3789,17 @@ const handleSubmit = async () => {
                 initial="hidden"
                 animate="show"
               >
-                <motion.div variants={tryonTextStaggerChild} className="flex w-full shrink-0 justify-center">
-                  <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
-                    <img
-                      src={displayImage}
-                      alt={product.name}
-                      className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
-                    />
-                  </div>
-                </motion.div>
+                {!isHeroLayout && (
+                  <motion.div variants={tryonTextStaggerChild} className="flex w-full shrink-0 justify-center">
+                    <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
+                      <img
+                        src={displayImage}
+                        alt={product.name}
+                        className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
+                      />
+                    </div>
+                  </motion.div>
+                )}
                 <motion.div
                   variants={tryonTextStaggerChild}
                   className="flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4"

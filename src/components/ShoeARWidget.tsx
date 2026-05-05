@@ -1562,33 +1562,37 @@ export function ShoeARWidget({
 
       {step === 'info' && (
         <>
-          <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
-            <div className="w-full flex items-center justify-center">
-              <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
-                {productImage ? (
-                  <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
-                ) : (
-                  <div className="flex min-h-[420px] items-center justify-center text-gray-400">
-                    <Box className="h-12 w-12" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 p-2 md:p-4 overflow-y-auto">
-            <div className="space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in">
-              <div className="md:hidden bg-gray-50 rounded-xl p-3">
-                <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
+          {!isHeroLayout && (
+            <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
+              <div className="w-full flex items-center justify-center">
+                <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
                   {productImage ? (
                     <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
                   ) : (
-                    <div className="flex min-h-[280px] items-center justify-center text-gray-400">
-                      <Box className="h-10 w-10" />
+                    <div className="flex min-h-[420px] items-center justify-center text-gray-400">
+                      <Box className="h-12 w-12" />
                     </div>
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          <div className="flex-1 p-2 md:p-4 overflow-y-auto">
+            <div className="space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in">
+              {!isHeroLayout && (
+                <div className="md:hidden bg-gray-50 rounded-xl p-3">
+                  <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
+                    {productImage ? (
+                      <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
+                    ) : (
+                      <div className="flex min-h-[280px] items-center justify-center text-gray-400">
+                        <Box className="h-10 w-10" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <motion.div
                 className="text-center"

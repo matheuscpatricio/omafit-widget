@@ -5376,27 +5376,22 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
       position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
     }
     .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-mobile {
-      position: absolute; left: 0; right: 0; top: 0;
-      height: max(170px, min(32dvh, 280px));
-      background-size: cover; background-position: center top;
+      position: absolute; inset: 0;
+      transition: filter .24s ease, transform .24s ease;
     }
     .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-desktop {
       display: none;
-      position: absolute; top: 0; right: 0; bottom: 0;
-      width: min(46%, 560px);
-      background-size: cover; background-position: center;
+      position: absolute; inset: 0;
+      transition: filter .24s ease, transform .24s ease;
     }
-    .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-blur {
-      position: absolute; inset: 0; opacity: 0; pointer-events: none;
-      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-      background: rgba(255,255,255,.24);
-      transition: opacity .24s ease;
+    .omafit-ar-shell-hero-layout.omafit-ar-hero-blur-on .omafit-ar-hero-bg-mobile,
+    .omafit-ar-shell-hero-layout.omafit-ar-hero-blur-on .omafit-ar-hero-bg-desktop {
+      filter: blur(4px);
+      transform: scale(1.03);
     }
-    .omafit-ar-shell-hero-layout.omafit-ar-hero-blur-on .omafit-ar-hero-bg-blur { opacity: 1; }
     @media (min-width: 768px) {
       .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-mobile { display: none; }
       .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-desktop { display: block; }
-      .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-blur { background: rgba(255,255,255,.2); }
     }
   `;
   document.head.appendChild(s);
@@ -5527,11 +5522,11 @@ function buildInfoModal({
   const isHero = layoutMode === "hero";
   const heroBg = omafitUpgradeShopifyMediaToHttps(layoutBackgroundImage || productImgHttps);
   const heroBgMobileCss = heroBg
-    ? `linear-gradient(180deg, ${primaryColor}f0 0%, ${primaryColor}aa 40%, ${primaryColor}40 78%, ${primaryColor}10 100%), url("${heroBg.replace(/"/g, "%22")}")`
-    : `linear-gradient(180deg, ${primaryColor}f0 0%, ${primaryColor}30 100%)`;
+    ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
+    : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   const heroBgDesktopCss = heroBg
-    ? `linear-gradient(270deg, ${primaryColor}f0 0%, ${primaryColor}aa 36%, ${primaryColor}4d 68%, ${primaryColor}12 100%), url("${heroBg.replace(/"/g, "%22")}")`
-    : `linear-gradient(270deg, ${primaryColor}f0 0%, ${primaryColor}30 100%)`;
+    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 32%, ${primaryColor}e8 44%, ${primaryColor}55 56%, ${primaryColor}00 68%), url("${heroBg.replace(/"/g, "%22")}")`
+    : `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`;
   // #region agent log
   __omafitArDbgLog({
     location: "omafit-ar-widget.js:buildInfoModal",
@@ -6000,7 +5995,7 @@ function buildInfoModal({
     /* ignore */
   }
 
-  colContent.appendChild(mobileImgWrap);
+  if (!isHero) colContent.appendChild(mobileImgWrap);
   colContent.appendChild(titleBlock);
   colContent.appendChild(blueBox);
   colContent.appendChild(cta);
@@ -6030,9 +6025,32 @@ function buildInfoModal({
       },
     });
     const bgRoot = el("div", { className: "omafit-ar-hero-bg-root" });
-    bgRoot.appendChild(el("div", { className: "omafit-ar-hero-bg-mobile", style: { backgroundImage: heroBgMobileCss } }));
-    bgRoot.appendChild(el("div", { className: "omafit-ar-hero-bg-desktop", style: { backgroundImage: heroBgDesktopCss } }));
-    bgRoot.appendChild(el("div", { className: "omafit-ar-hero-bg-blur" }));
+    bgRoot.appendChild(
+      el("div", {
+        className: "omafit-ar-hero-bg-mobile",
+        style: heroBg
+          ? {
+              backgroundImage: heroBgMobileCss,
+              backgroundSize: "cover, cover",
+              backgroundPosition: "center top, center top",
+              backgroundRepeat: "no-repeat, no-repeat",
+            }
+          : { backgroundImage: heroBgMobileCss, backgroundSize: "cover" },
+      }),
+    );
+    bgRoot.appendChild(
+      el("div", {
+        className: "omafit-ar-hero-bg-desktop",
+        style: heroBg
+          ? {
+              backgroundImage: heroBgDesktopCss,
+              backgroundSize: "cover, cover",
+              backgroundPosition: "left center, right center",
+              backgroundRepeat: "no-repeat, no-repeat",
+            }
+          : { backgroundImage: heroBgDesktopCss, backgroundSize: "cover" },
+      }),
+    );
     shell.appendChild(bgRoot);
     contentOuter.appendChild(mainRow);
     shell.appendChild(contentOuter);
@@ -6055,7 +6073,7 @@ function buildInfoModal({
   function applyMq() {
     if (isSidebar || isHero) {
       colImg.style.display = "none";
-      mobileImgWrap.style.display = "block";
+      mobileImgWrap.style.display = isHero ? "none" : "block";
       if (isSidebar && mq.matches) {
         mobileImgWrap.style.maxWidth = "240px";
         mobileImgWrap.style.width = "100%";
