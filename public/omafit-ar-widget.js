@@ -5589,7 +5589,7 @@ function buildInfoModal({
     ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   const heroBgDesktopCss = heroBg
-    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 18%, ${primaryColor}fb 32%, ${primaryColor}ee 44%, ${primaryColor}d0 56%, ${primaryColor}98 66%, ${primaryColor}50 76%, ${primaryColor}18 86%, ${primaryColor}00 94%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
+    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 14%, ${primaryColor}fc 20%, ${primaryColor}f4 28%, ${primaryColor}e6 36%, ${primaryColor}d2 44%, ${primaryColor}b8 52%, ${primaryColor}98 60%, ${primaryColor}74 67%, ${primaryColor}54 74%, ${primaryColor}38 80%, ${primaryColor}24 86%, ${primaryColor}14 90%, ${primaryColor}0a 94%, ${primaryColor}03 97%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`;
   // #region agent log
   __omafitArDbgLog({
@@ -6151,7 +6151,6 @@ function buildInfoModal({
         className: "omafit-ar-hero-bg-desktop",
         style: heroBg
           ? {
-              backgroundColor: primaryColor,
               backgroundImage: heroBgDesktopCss,
               backgroundSize: "cover, contain",
               backgroundPosition: "left center, right center",

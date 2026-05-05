@@ -31,13 +31,13 @@ export function TryOnLayoutShellHero({
         backgroundSize: 'cover',
       };
 
+  /** Transição longa e contínua (sem “linha”): muitas paradas + sem fundo sólido por baixo; imagem em cover alinhada à direita. */
   const desktopGradient = infoStep
-    ? `linear-gradient(90deg, ${p} 0%, ${p} 18%, ${p}fb 32%, ${p}ee 44%, ${p}d0 56%, ${p}98 66%, ${p}50 76%, ${p}18 86%, ${p}00 94%, ${p}00 100%)`
-    : `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%)`;
+    ? `linear-gradient(90deg, ${p} 0%, ${p} 14%, ${p}fc 20%, ${p}f4 28%, ${p}e6 36%, ${p}d2 44%, ${p}b8 52%, ${p}98 60%, ${p}74 67%, ${p}54 74%, ${p}38 80%, ${p}24 86%, ${p}14 90%, ${p}0a 94%, ${p}03 97%, ${p}00 100%)`
+    : `linear-gradient(90deg, ${p} 0%, ${p}fa 10%, ${p}ee 22%, ${p}dc 34%, ${p}c4 44%, ${p}a5 54%, ${p}82 63%, ${p}62 71%, ${p}44 78%, ${p}2c 84%, ${p}1a 89%, ${p}0c 93%, ${p}04 97%, ${p}00 100%)`;
 
   const desktopStyle: CSSProperties = bg
     ? {
-        backgroundColor: p,
         backgroundImage: `${desktopGradient}, url("${bg}")`,
         backgroundSize: 'cover, contain',
         backgroundPosition: 'left center, right center',
