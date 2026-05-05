@@ -242,7 +242,10 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   }
 
   let tryonLayoutEyewear: TryonLayoutMode | undefined;
-  if (configFromUrl) {
+  const tryLayoutRaw = pickQ(['tryonLayout', 'tryon_layout']).trim().toLowerCase();
+  if (tryLayoutRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
+  else if (tryLayoutRaw === 'default' || tryLayoutRaw === 'classic') tryonLayoutEyewear = 'default';
+  if (!tryonLayoutEyewear && configFromUrl) {
     const tlRaw = String(configFromUrl.tryon_layout ?? configFromUrl.tryonLayout ?? '').trim().toLowerCase();
     if (tlRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
     else if (tlRaw === 'default' || tlRaw === 'classic') tryonLayoutEyewear = 'default';
@@ -768,7 +771,7 @@ export function WidgetPage() {
       setEyewearTryonLayoutFromDb(null);
       return;
     }
-    if (eyewearTryonLayoutFromMessage !== null) {
+    if (eyewearBootstrap.tryonLayout !== undefined || eyewearTryonLayoutFromMessage !== null) {
       setEyewearTryonLayoutFromDb(null);
       return;
     }
@@ -804,9 +807,9 @@ export function WidgetPage() {
 
   const eyewearResolvedTryonLayout = useMemo((): TryonLayoutMode | null => {
     if (!showEyewearArNetlify || !eyewearBootstrap) return null;
+    if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
     if (eyewearTryonLayoutFromMessage !== null) return eyewearTryonLayoutFromMessage;
     if (eyewearTryonLayoutFromDb !== null) return eyewearTryonLayoutFromDb;
-    if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
     return 'default';
   }, [showEyewearArNetlify, eyewearBootstrap, eyewearTryonLayoutFromMessage, eyewearTryonLayoutFromDb]);
 
