@@ -3234,7 +3234,7 @@ const handleSubmit = async () => {
       `}</style>
 
       {/* Full Screen — com layout sidebar: painel + conteúdo; `contents` evita wrapper extra no layout default */}
-      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-row' : 'contents'}>
+      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
         {embed && (
           <TryOnLayoutShellSidebar
             primaryColor={localPrimaryColor}
@@ -3498,12 +3498,24 @@ const handleSubmit = async () => {
         <div
           className={
             embed
-              ? `flex min-h-0 flex-1 flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
+              ? `relative flex min-h-0 flex-1 flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
               : `fixed inset-0 z-50 flex flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
           }
         >
-      {/* Layout clássico: barra superior completa. Embed sidebar: só barra mínima com voltar quando aplicável */}
-      {!embed ? (
+      {/* Embed sidebar: sem barra superior — só botão voltar flutuante (como resultado), nas etapas que precisam */}
+      {embed && (step === 'calculator' || step === 'photo' || step === 'confirm') && (
+        <button
+          type="button"
+          onClick={goBack}
+          className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800"
+          aria-label={t('back')}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* Layout clássico: barra superior completa */}
+      {!embed && (
         <div
           className="flex items-center justify-between border-b p-4"
           style={{ borderColor: localPrimaryColor }}
@@ -3536,24 +3548,6 @@ const handleSubmit = async () => {
 
           <div className="w-6" />
         </div>
-      ) : (
-        step !== 'info' &&
-        step !== 'processing' &&
-        step !== 'result' && (
-          <div
-            className="flex shrink-0 items-center border-b px-2 py-2 sm:px-3"
-            style={{ borderColor: localPrimaryColor }}
-          >
-            <button
-              type="button"
-              onClick={goBack}
-              className="text-gray-500 transition-colors hover:text-gray-700"
-              aria-label={t('back')}
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-          </div>
-        )
       )}
 
       {/* Layout: em embed sidebar — colunas nas etapas 1 e 3; clássico — duas colunas em md+ na etapa info */}
@@ -3583,9 +3577,11 @@ const handleSubmit = async () => {
         <div
           className={`flex-1 transition-all duration-300 ease-in-out ${
             embed && (step === 'info' || step === 'photo')
-              ? 'flex min-h-0 min-w-0 flex-col overflow-hidden px-2 py-2 sm:px-3'
+              ? `flex min-h-0 min-w-0 flex-col overflow-hidden px-2 py-2 sm:px-3${step === 'photo' ? ' pt-11' : ''}`
               : embed
-                ? 'min-h-0 overflow-y-auto px-2 py-2 sm:px-3'
+                ? `min-h-0 overflow-y-auto px-2 py-2 sm:px-3${
+                    step === 'calculator' || step === 'confirm' ? ' pt-11' : ''
+                  }`
                 : `overflow-y-auto p-2 md:p-4${step !== 'info' ? ' md:w-full' : ''}`
           }`}
         >
@@ -3599,7 +3595,7 @@ const handleSubmit = async () => {
         {/* Step 1: Info — embed: imagem acima do texto, tamanho moderado */}
         {step === 'info' && embed && (
           <motion.div
-            className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto py-1 text-center sm:gap-4"
+            className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4"
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
@@ -3615,7 +3611,7 @@ const handleSubmit = async () => {
             </motion.div>
             <motion.div
               variants={tryonTextStaggerChild}
-              className="flex w-full max-w-md min-w-0 flex-col justify-center gap-3 sm:gap-4"
+              className="flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4"
             >
               <div>
                 <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>

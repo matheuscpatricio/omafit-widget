@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import type { CarouselApi } from '../ui/carousel';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 import { cn } from '../../lib/utils';
+import { LANDING_IMAGES } from '../../lib/site';
 import { useIsMdUp } from '../../hooks/useMediaQuery';
-import { CtaBlockSurface } from './CtaBlockSurface';
+import { CircularGallery, type CircularGalleryItem } from '../ui/circular-gallery';
 
 interface Feature {
   title: string;
@@ -44,10 +43,10 @@ const features: Feature[] = [
     description:
       'Painéis que ligam o uso do widget a resultados de negócio: estime o retorno sobre o investimento e acompanhe o perfil agregado de quem usa o provador — dados como altura, peso e biotipo médios da sua audiência, sempre anonimizados.',
     bullets: [
-      'Modelos de ROI com conversão, ticket e devoluções',
-      'Médias de altura, peso e biotipo dos usuários',
-      'Funil de engajamento e sessões de try-on',
-    ],
+        'Modelos de ROI com conversão, ticket e devoluções',
+        'Médias de altura, peso e biotipo dos usuários',
+        'Funil de engajamento e sessões de try-on',
+      ],
   },
   {
     title: 'Widget Personalizável',
@@ -56,9 +55,6 @@ const features: Feature[] = [
     bullets: ['100% white-label', 'Integração em minutos', 'Mobile-first'],
   },
 ];
-
-/** Intervalo entre avanços — maior que a animação Embla para não cortar o scroll. */
-const AUTO_MS = 6400;
 
 const containerVariants: Variants = {
   hidden: {},
@@ -74,7 +70,30 @@ const itemVariants: Variants = {
   },
 };
 
+const galleryImageCycle = [
+  LANDING_IMAGES.heroLifestyleRiver,
+  LANDING_IMAGES.heroLifestyleBeach,
+  LANDING_IMAGES.heroLifestyleBoardwalk,
+  LANDING_IMAGES.midBanner,
+] as const;
+
+const objectPositions = ['48% 32%', '52% 42%', '45% 28%', '50% 35%'] as const;
+
+function buildGalleryItems(): CircularGalleryItem[] {
+  return features.map((f, i) => ({
+    title: f.title,
+    subtitle: f.bullets[0] ?? f.description.slice(0, 96).trim(),
+    imageUrl: galleryImageCycle[i % galleryImageCycle.length],
+    imageAlt: f.title,
+    objectPosition: objectPositions[i % objectPositions.length],
+  }));
+}
+
 export function Solution() {
+  const isMdUp = useIsMdUp();
+  const reduceMotion = useReducedMotion();
+  const galleryItems = useMemo(() => buildGalleryItems(), []);
+
   return (
     <section id="solucao" className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="relative z-[1] mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
@@ -114,253 +133,29 @@ export function Solution() {
           variants={containerVariants}
           className="mt-14 sm:mt-16"
         >
-          <motion.div variants={itemVariants}>
-            <SolutionTripletCarousel />
+          <motion.div variants={itemVariants} className="mx-auto max-w-6xl">
+            <div
+              className={cn(
+                'relative w-full overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated/40 shadow-elegant-lg sm:rounded-3xl',
+                'min-h-[min(68vh,520px)] sm:min-h-[min(72vh,580px)] md:min-h-[min(76vh,620px)]',
+              )}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_80%,rgba(217,104,69,0.12),transparent)] pointer-events-none" />
+              <CircularGallery
+                items={galleryItems}
+                radius={isMdUp ? 400 : 228}
+                autoRotateSpeed={reduceMotion ? 0 : 0.011}
+                className="relative z-[1] h-[min(68vh,520px)] sm:h-[min(72vh,580px)] md:h-[min(76vh,620px)]"
+              />
+            </div>
+            <p className="mt-4 text-center text-xs text-oma-muted sm:text-sm">
+              {reduceMotion
+                ? 'Deslize para ver cada recurso.'
+                : 'Galeria em rotação suave — aproxime-se do centro para ler o destaque.'}
+            </p>
           </motion.div>
         </motion.div>
       </div>
     </section>
-  );
-}
-
-function SolutionTripletCarousel() {
-  const [api, setApi] = useState<CarouselApi>();
-  const [selected, setSelected] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const reduceMotion = useReducedMotion();
-  const isMdUp = useIsMdUp();
-
-  /** Embla v8: `breakpoints` ajusta opções por media query (reInit automático no resize). */
-  const emblaOpts = useMemo(
-    () => ({
-      align: 'center' as const,
-      loop: true,
-      duration: reduceMotion ? 18 : 56,
-      skipSnaps: false,
-      dragFree: false,
-      breakpoints: {
-        '(max-width: 767px)': {
-          duration: reduceMotion ? 14 : 40,
-        },
-      },
-    }),
-    [reduceMotion],
-  );
-
-  const onSelect = useCallback((carouselApi: CarouselApi) => {
-    if (!carouselApi) return;
-    setSelected(carouselApi.selectedScrollSnap());
-  }, []);
-
-  useEffect(() => {
-    if (!api) return;
-    onSelect(api);
-    api.on('reInit', onSelect);
-    api.on('select', onSelect);
-    return () => {
-      api.off('select', onSelect);
-      api.off('reInit', onSelect);
-    };
-  }, [api, onSelect]);
-
-  useEffect(() => {
-    if (!api || reduceMotion || paused) return;
-    const id = window.setInterval(() => {
-      api.scrollNext();
-    }, AUTO_MS);
-    return () => window.clearInterval(id);
-  }, [api, reduceMotion, paused]);
-
-  /** Remonta o Embla ao cruzar md — troca entre 1 slide (mobile) e trio (desktop). */
-  const carouselKey = isMdUp ? 'solution-md' : 'solution-sm';
-
-  return (
-    <div
-      className="relative w-full min-w-0 touch-manipulation"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      aria-roledescription="carousel"
-    >
-      <Carousel
-        key={carouselKey}
-        setApi={setApi}
-        opts={emblaOpts}
-        className="w-full min-w-0"
-        aria-label="Recursos da solução Omafit"
-      >
-        <CarouselContent className="-ml-0 w-full min-w-0 will-change-transform">
-          {isMdUp
-            ? features.map((_, centerIndex) => (
-                <CarouselItem key={centerIndex} className="basis-full pl-0">
-                  <div className="flex w-full min-w-0 items-stretch py-1 sm:py-2 md:min-h-[min(52vh,420px)] md:py-3">
-                    <TripletSlide centerIndex={centerIndex} />
-                  </div>
-                </CarouselItem>
-              ))
-            : features.map((feature, i) => (
-                <CarouselItem key={feature.title} className="basis-full pl-0">
-                  <div className="flex w-full min-w-0 justify-center px-1 py-2 sm:px-2">
-                    <div className="w-full max-w-md">
-                      <SolutionPane feature={feature} placement="center" soloLayout />
-                    </div>
-                  </div>
-                </CarouselItem>
-              ))}
-        </CarouselContent>
-        <CarouselPrevious
-          type="button"
-          className="left-1 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream md:left-2 md:flex"
-        />
-        <CarouselNext
-          type="button"
-          className="right-1 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 border border-oma-line/40 bg-oma-elevated/90 text-oma-cream shadow-lg backdrop-blur-sm hover:bg-oma-elevated hover:text-oma-cream md:right-2 md:flex"
-        />
-      </Carousel>
-
-      <div className="mt-6 flex justify-center gap-2" role="tablist" aria-label="Indicador de slides">
-        {features.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === selected}
-            aria-label={`Ir para conjunto ${i + 1}`}
-            className={cn(
-              'h-2 rounded-full transition-all duration-300',
-              i === selected ? 'w-8 bg-oma-accent' : 'w-2 bg-oma-line hover:bg-oma-muted/80',
-            )}
-            onClick={() => api?.scrollTo(i)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TripletSlide({ centerIndex }: { centerIndex: number }) {
-  const n = features.length;
-  const prev = features[(centerIndex - 1 + n) % n];
-  const curr = features[centerIndex];
-  const next = features[(centerIndex + 1) % n];
-
-  /* Sempre uma linha: esquerda | centro (maior) | direita — evita coluna no mobile (Embla já desliza o conjunto). */
-  return (
-    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-row items-stretch gap-1.5 sm:gap-2.5 md:gap-4 lg:gap-5">
-      <SolutionPane feature={prev} placement="left" className="min-w-0 flex-[0.74] sm:flex-[0.78]" />
-      <SolutionPane feature={curr} placement="center" className="z-[1] min-w-0 flex-[1.32] sm:flex-[1.42] md:flex-[1.45]" />
-      <SolutionPane feature={next} placement="right" className="min-w-0 flex-[0.74] sm:flex-[0.78]" />
-    </div>
-  );
-}
-
-function SolutionPane({
-  feature,
-  placement,
-  className,
-  soloLayout,
-}: {
-  feature: Feature;
-  placement: 'left' | 'center' | 'right';
-  className?: string;
-  /** Um cartão por slide (mobile): tipografia e padding confortáveis. */
-  soloLayout?: boolean;
-}) {
-  const isCenter = placement === 'center';
-  const highlight = Boolean(feature.accent && isCenter);
-
-  const shell = (
-    <>
-      <span
-        className={cn(
-          'inline-flex w-fit rounded-full border px-2 py-0.5 font-semibold uppercase tracking-widest',
-          soloLayout ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[10px]',
-          highlight
-            ? 'border-oma-accent/40 bg-oma-accent/15 text-oma-cream'
-            : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/80',
-        )}
-      >
-        {highlight ? 'Destaque' : 'Recurso'}
-      </span>
-      <h3
-        className={cn(
-          'mt-2 font-semibold tracking-tight text-oma-cream sm:mt-3',
-          soloLayout && 'text-lg leading-snug sm:text-xl md:text-2xl',
-          !soloLayout &&
-            isCenter &&
-            'text-[0.8125rem] leading-snug sm:text-xl md:text-2xl',
-          !soloLayout && !isCenter && 'text-[9px] leading-tight sm:text-sm md:text-base',
-        )}
-        style={{ letterSpacing: '-0.02em' }}
-      >
-        {feature.title}
-      </h3>
-      <p
-        className={cn(
-          'mt-1.5 leading-relaxed text-oma-cream/75 sm:mt-2',
-          soloLayout && 'text-sm sm:text-base',
-          !soloLayout && isCenter && 'text-[11px] sm:text-[15px]',
-          !soloLayout &&
-            !isCenter &&
-            'line-clamp-2 text-[8.5px] sm:line-clamp-3 sm:text-xs md:line-clamp-4 md:text-[13px]',
-        )}
-      >
-        {feature.description}
-      </p>
-      <ul
-        className={cn(
-          'mt-2 min-h-0 flex-1 text-oma-cream/85 sm:mt-3',
-          soloLayout ? 'space-y-2 text-sm sm:text-[15px]' : 'space-y-1 sm:space-y-2',
-          !soloLayout && isCenter && 'text-[10px] sm:text-[13px]',
-          !soloLayout && !isCenter && 'text-[8px] sm:text-[11px] md:text-[12px]',
-        )}
-      >
-        {feature.bullets.map((b) => (
-          <li
-            key={b}
-            className={cn(
-              'flex gap-1.5 leading-snug sm:gap-2',
-              !soloLayout && !isCenter && 'line-clamp-1 sm:line-clamp-2',
-            )}
-          >
-            <span
-              className={cn(
-                'mt-1 shrink-0 rounded-full bg-oma-accent/90 sm:mt-1.5',
-                soloLayout ? 'h-1.5 w-1.5' : 'h-0.5 w-0.5 sm:h-1 sm:w-1',
-              )}
-              aria-hidden
-            />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-
-  const surfaceClass = cn(
-    'h-full min-h-0 w-full border border-oma-line/40 shadow-[0_14px_44px_-12px_rgba(0,0,0,0.55)] ring-1 ring-oma-line/40',
-    soloLayout && 'rounded-2xl sm:rounded-3xl',
-    !soloLayout &&
-      isCenter &&
-      'rounded-xl sm:rounded-2xl md:rounded-3xl md:scale-[1.03]',
-    !soloLayout &&
-      !isCenter &&
-      'rounded-lg opacity-[0.92] sm:rounded-xl sm:opacity-[0.9] md:rounded-2xl md:scale-[0.94]',
-  );
-
-  const innerPad = cn(
-    'flex min-h-0 flex-col',
-    soloLayout && 'min-h-[280px] p-5 sm:min-h-[300px] sm:p-6 md:p-8',
-    !soloLayout &&
-      isCenter &&
-      'p-2.5 sm:p-4 md:min-h-[240px] md:p-6 lg:min-h-[260px] lg:p-8',
-    !soloLayout && !isCenter && 'p-1.5 sm:p-3 md:min-h-[180px] md:p-4 lg:min-h-[200px] lg:p-5',
-  );
-
-  return (
-    <div className={cn('flex min-h-0 min-w-0 flex-col', className)}>
-      <CtaBlockSurface className={surfaceClass} contentClassName={innerPad}>
-        {shell}
-      </CtaBlockSurface>
-    </div>
   );
 }
