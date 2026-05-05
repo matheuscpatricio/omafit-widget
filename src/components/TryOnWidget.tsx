@@ -3837,7 +3837,7 @@ const handleSubmit = async () => {
           <motion.div
             className={
               embed && isHeroLayout
-                ? 'flex flex-1 flex-col justify-end space-y-4 pb-5 pt-2'
+                ? 'flex flex-1 flex-col items-center justify-end space-y-3 pb-5 pt-2 text-center'
                 : 'space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4'
             }
             variants={tryonTextStaggerParent}
@@ -3854,29 +3854,43 @@ const handleSubmit = async () => {
 
             <motion.div
               variants={tryonTextStaggerChild}
-              className={`w-full ${embed && isHeroLayout ? 'text-left' : 'text-center'}`}
+              className={isHeroLayout ? 'w-full max-w-sm text-center' : 'w-full text-center'}
             >
-              <h3 className="mb-2 text-2xl font-semibold md:text-3xl" style={{ color: primaryColor }}>
+              <h3
+                className={`mb-1.5 font-semibold ${isHeroLayout ? 'text-xl' : 'text-2xl md:text-3xl'}`}
+                style={{ color: primaryColor }}
+              >
                 {t('visualExperience')}
               </h3>
-              <p className="text-lg text-gray-700 md:text-xl">{t('visualExperienceDesc')}</p>
+              <p className={`text-gray-700 ${isHeroLayout ? 'text-base leading-snug' : 'text-lg md:text-xl'}`}>
+                {t('visualExperienceDesc')}
+              </p>
             </motion.div>
 
-            <motion.div variants={tryonTextStaggerChild} className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:p-4">
-              <div className={embed && isHeroLayout ? 'text-left' : 'text-center'}>
-                <h4 className="mb-2 text-base font-medium text-blue-800 md:text-lg">{t('howItWorks')}</h4>
-                <p className="text-base text-blue-700 md:text-lg">{t('howItWorksDesc')}</p>
+            <motion.div
+              variants={tryonTextStaggerChild}
+              className={`rounded-lg border border-blue-200 bg-blue-50 ${isHeroLayout ? 'w-full max-w-sm p-3' : 'p-4 md:p-4'}`}
+            >
+              <div className="text-center">
+                <h4
+                  className={`mb-1.5 font-medium text-blue-800 ${isHeroLayout ? 'text-sm' : 'text-base md:text-lg'}`}
+                >
+                  {t('howItWorks')}
+                </h4>
+                <p className={`text-blue-700 ${isHeroLayout ? 'text-sm leading-snug' : 'text-base md:text-lg'}`}>
+                  {t('howItWorksDesc')}
+                </p>
               </div>
             </motion.div>
 
-            <motion.div variants={tryonTextStaggerChild}>
+            <motion.div variants={tryonTextStaggerChild} className={isHeroLayout ? 'w-full max-w-sm' : ''}>
               <button
                 type="button"
                 onClick={() => setStep('calculator')}
-                className={`flex w-full items-center justify-center gap-2 rounded-lg py-3.5 text-lg font-medium transition-all duration-300 md:py-4 md:text-xl ${
+                className={`flex w-full items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300 ${
                   isHeroLayout
-                    ? 'omafit-hero-start-now shadow-sm'
-                    : 'bg-primary text-white hover:bg-primary-dark'
+                    ? 'omafit-hero-start-now py-3 text-base shadow-sm md:py-4 md:text-xl'
+                    : 'bg-primary py-3.5 text-lg text-white hover:bg-primary-dark md:py-4 md:text-xl'
                 }`}
               >
                 {t('startNow')}
@@ -3886,7 +3900,7 @@ const handleSubmit = async () => {
 
             <motion.p
               variants={tryonTextStaggerChild}
-              className={`text-sm text-gray-500 md:text-base ${embed && isHeroLayout ? 'text-left' : 'text-center'}`}
+              className={`text-center text-gray-500 ${isHeroLayout ? 'max-w-sm text-xs leading-snug' : 'text-sm'}`}
             >
               {t('privacyNote')}
             </motion.p>

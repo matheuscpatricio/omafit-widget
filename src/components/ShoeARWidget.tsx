@@ -1637,7 +1637,7 @@ export function ShoeARWidget({
             <div
               className={
                 isHeroLayout
-                  ? 'flex flex-1 flex-col justify-end space-y-4 pb-4 animate-fade-in md:flex md:h-full md:justify-center md:pb-0'
+                  ? 'flex flex-1 flex-col items-center justify-end space-y-3 pb-4 text-center animate-fade-in md:flex md:h-full md:items-stretch md:justify-center md:space-y-4 md:pb-0 md:text-left'
                   : 'space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in'
               }
             >
@@ -1656,19 +1656,26 @@ export function ShoeARWidget({
               )}
 
               <motion.div
-                className={isHeroLayout ? 'text-left md:max-w-xl' : 'text-center'}
+                className={
+                  isHeroLayout
+                    ? 'w-full max-w-sm md:max-w-xl'
+                    : 'text-center'
+                }
                 initial="hidden"
                 animate="show"
                 variants={textStaggerParent}
               >
                 <motion.h3
                   variants={textStaggerChild}
-                  className="text-2xl md:text-3xl font-semibold mb-2"
+                  className={`font-semibold mb-2 ${isHeroLayout ? 'text-xl md:text-3xl' : 'text-2xl md:text-3xl'}`}
                   style={{ color: primaryColor }}
                 >
                   {replaceStoreName(t.welcomeTitle, storeName)}
                 </motion.h3>
-                <motion.p variants={textStaggerChild} className="text-gray-700 text-lg md:text-xl">
+                <motion.p
+                  variants={textStaggerChild}
+                  className={`text-gray-700 ${isHeroLayout ? 'text-base leading-snug md:text-xl' : 'text-lg md:text-xl'}`}
+                >
                   {t.infoBody}
                 </motion.p>
               </motion.div>
@@ -1676,8 +1683,10 @@ export function ShoeARWidget({
               <button
                 type="button"
                 onClick={() => setStep('measure-capture')}
-                className={`w-full py-3.5 md:py-4 rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl ${
-                  isHeroLayout ? 'shadow-sm' : ''
+                className={`rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium ${
+                  isHeroLayout
+                    ? 'w-full max-w-sm py-3 text-base shadow-sm md:max-w-none md:py-4 md:text-xl'
+                    : 'w-full py-3.5 text-lg md:py-4 md:text-xl'
                 }`}
                 style={
                   isHeroLayout

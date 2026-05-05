@@ -5502,6 +5502,63 @@ function svgX() {
   return svg;
 }
 
+function omafitHeroClampPct(n) {
+  return Math.max(0, Math.min(100, n));
+}
+
+function omafitHeroContainImageLeftPercent(w, h, iw, ih) {
+  if (w <= 0 || h <= 0 || iw <= 0 || ih <= 0) return 58;
+  const scale = Math.min(w / iw, h / ih);
+  const dispW = iw * scale;
+  return omafitHeroClampPct(((w - dispW) / w) * 100);
+}
+
+/** Degradê overlay desktop: reforço em volta de seam (% da largura) = borda esquerda da imagem em contain + right. */
+function omafitHeroDesktopShadeGradient(primaryColor, seam) {
+  const p = primaryColor;
+  if (seam == null || Number.isNaN(seam)) {
+    return `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%)`;
+  }
+  const s = omafitHeroClampPct(seam);
+  let t1 = omafitHeroClampPct(s - 18);
+  let t2 = omafitHeroClampPct(s - 10);
+  let t3 = omafitHeroClampPct(s - 4);
+  let t4 = s;
+  let t5 = omafitHeroClampPct(s + 5);
+  let t6 = omafitHeroClampPct(s + 14);
+  let t7 = Math.min(100, Math.max(t6 + 0.5, s + 24));
+  if (t2 <= t1) t2 = Math.min(100, t1 + 0.5);
+  if (t3 <= t2) t3 = Math.min(100, t2 + 0.5);
+  if (t4 <= t3) t4 = Math.min(100, t3 + 0.5);
+  if (t5 <= t4) t5 = Math.min(100, t4 + 0.5);
+  if (t6 <= t5) t6 = Math.min(100, t5 + 0.5);
+  if (t7 <= t6) t7 = Math.min(100, t6 + 0.5);
+  return `linear-gradient(90deg, ${p} 0%, ${p} ${t1}%, ${p}fc ${t2}%, ${p}f7 ${t3}%, ${p}ee ${t4}%, ${p}8a ${t5}%, ${p}32 ${t6}%, ${p}00 ${t7}%, ${p}00 100%)`;
+}
+
+function omafitBindHeroDesktopShadeFromContain(shadeEl, measureEl, primaryColor, heroBgSrc) {
+  const img = new Image();
+  function apply() {
+    const w = measureEl.clientWidth;
+    const h = measureEl.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (iw <= 0 || ih <= 0) return;
+    const seam = omafitHeroContainImageLeftPercent(w, h, iw, ih);
+    shadeEl.style.backgroundImage = omafitHeroDesktopShadeGradient(primaryColor, seam);
+  }
+  function fallback() {
+    shadeEl.style.backgroundImage = omafitHeroDesktopShadeGradient(primaryColor, null);
+  }
+  img.onload = apply;
+  img.onerror = fallback;
+  img.src = heroBgSrc;
+  const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => apply()) : null;
+  if (measureEl && ro) ro.observe(measureEl);
+  requestAnimationFrame(apply);
+}
+
 function buildInfoModal({
   primaryColor,
   logoUrl,
@@ -5524,7 +5581,6 @@ function buildInfoModal({
   const heroBgMobileCss = heroBg
     ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
-  const heroBgDesktopGradientOnly = `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}f2 42%, ${primaryColor}d9 58%, ${primaryColor}00 82%, ${primaryColor}00 100%)`;
   const heroBgDesktopSolidGradient = `linear-gradient(90deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   // #region agent log
   __omafitArDbgLog({
@@ -6054,20 +6110,20 @@ function buildInfoModal({
           },
         }),
       );
-      desktopWrap.appendChild(
-        el("div", {
-          className: "omafit-ar-hero-bg-desktop-shade",
-          style: {
-            position: "absolute",
-            inset: 0,
-            backgroundImage: heroBgDesktopGradientOnly,
-            backgroundSize: "100% 100%",
-            backgroundRepeat: "no-repeat",
-            pointerEvents: "none",
-          },
-        }),
-      );
+      const shadeEl = el("div", {
+        className: "omafit-ar-hero-bg-desktop-shade",
+        style: {
+          position: "absolute",
+          inset: 0,
+          backgroundImage: omafitHeroDesktopShadeGradient(primaryColor, null),
+          backgroundSize: "100% 100%",
+          backgroundRepeat: "no-repeat",
+          pointerEvents: "none",
+        },
+      });
+      desktopWrap.appendChild(shadeEl);
       bgRoot.appendChild(desktopWrap);
+      omafitBindHeroDesktopShadeFromContain(shadeEl, bgRoot, primaryColor, heroBg);
     } else {
       bgRoot.appendChild(
         el("div", {
