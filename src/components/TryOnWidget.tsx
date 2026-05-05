@@ -3396,6 +3396,15 @@ const handleSubmit = async () => {
         .omafit-tryon-hero .bg-primary,
         .omafit-tryon-hero button.bg-primary { color: ${contrastTextOnHex(localPrimaryColor)} !important; }
         .omafit-tryon-hero .hover\\:bg-primary-dark:hover { color: ${contrastTextOnHex(hoverColor)} !important; }
+        .omafit-tryon-hero button.omafit-hero-start-now {
+          background-color: #ffffff !important;
+          color: ${localPrimaryColor} !important;
+          border: 2px solid rgba(255, 255, 255, 0.95) !important;
+        }
+        .omafit-tryon-hero button.omafit-hero-start-now:hover {
+          background-color: rgb(255 255 255 / 0.92) !important;
+          color: ${localPrimaryColor} !important;
+        }
         .omafit-tryon-hero .bg-gray-100 { background-color: rgb(243 244 246) !important; }
         .omafit-tryon-hero .bg-gray-100.text-gray-700,
         .omafit-tryon-hero .hover\\:bg-gray-200:hover { color: #374151 !important; }
@@ -3409,7 +3418,7 @@ const handleSubmit = async () => {
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isHeroLayout && (
           <>
-            <div className="pointer-events-none relative z-30 flex w-full shrink-0 justify-center px-3 pb-1 pt-3 md:hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center px-3 pt-3 md:hidden">
               <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
                 {localStoreLogo && localStoreLogo.trim() !== '' ? (
                   <img
@@ -3713,7 +3722,7 @@ const handleSubmit = async () => {
         <div
           className={
             embed
-              ? `relative flex min-h-0 flex-1 flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
+              ? `relative flex min-h-0 flex-1 flex-col animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'} ${isHeroLayout ? 'bg-transparent' : 'bg-white'}`
               : `fixed inset-0 z-50 flex flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
           }
         >
@@ -3862,7 +3871,11 @@ const handleSubmit = async () => {
               <button
                 type="button"
                 onClick={() => setStep('calculator')}
-                className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3.5 text-lg font-medium text-white transition-all duration-300 hover:bg-primary-dark md:py-4 md:text-xl"
+                className={`flex w-full items-center justify-center gap-2 rounded-lg py-3.5 text-lg font-medium transition-all duration-300 md:py-4 md:text-xl ${
+                  isHeroLayout
+                    ? 'omafit-hero-start-now shadow-sm'
+                    : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
               >
                 {t('startNow')}
                 <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
@@ -3926,7 +3939,11 @@ const handleSubmit = async () => {
                   <button
                     type="button"
                     onClick={() => setStep('calculator')}
-                    className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium text-white transition-all duration-300 hover:bg-primary-dark sm:py-3.5 sm:text-lg"
+                    className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium transition-all duration-300 sm:py-3.5 sm:text-lg ${
+                      isHeroLayout
+                        ? 'omafit-hero-start-now shadow-sm'
+                        : 'bg-primary text-white hover:bg-primary-dark'
+                    }`}
                   >
                     {t('startNow')}
                     <ArrowRight className="h-5 w-5" />
@@ -4128,7 +4145,7 @@ const handleSubmit = async () => {
               </motion.div>
             </div>
 
-            {!embed && (
+            {(!embed || (embed && isHeroLayout)) && (
             <div className="hidden md:flex md:gap-6">
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
@@ -4265,7 +4282,7 @@ const handleSubmit = async () => {
             </div>
             )}
 
-            {embed && (
+            {embed && !isHeroLayout && (
               <div className="hidden min-h-0 w-full flex-1 flex-row gap-2 overflow-hidden sm:gap-3 md:flex">
                 <div className="flex min-h-0 w-[min(56%,15.5rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(54%,18rem)] sm:pr-3">
                   <p className="mb-0.5 text-center text-[11px] font-semibold leading-tight text-gray-900 sm:text-xs">
@@ -4517,6 +4534,7 @@ const handleSubmit = async () => {
             primaryColor={localPrimaryColor}
             backgroundImage={localHeroBackgroundImage || displayImage}
             blurBackground={step !== 'info'}
+            infoStep={step === 'info'}
           />
         )}
       </div>

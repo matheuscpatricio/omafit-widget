@@ -1509,7 +1509,7 @@ export function ShoeARWidget({
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isHeroLayout && (
           <>
-            <div className="pointer-events-none relative z-30 flex w-full shrink-0 justify-center px-3 pb-1 pt-3 md:hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center px-3 pt-3 md:hidden">
               <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
                 {storeLogo && storeLogo.trim() !== '' ? (
                   <img
@@ -1674,8 +1674,18 @@ export function ShoeARWidget({
               <button
                 type="button"
                 onClick={() => setStep('measure-capture')}
-                className="w-full py-3.5 md:py-4 rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl"
-                style={{ backgroundColor: primaryColor, color: buttonTextColor }}
+                className={`w-full py-3.5 md:py-4 rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium text-lg md:text-xl ${
+                  isHeroLayout ? 'shadow-sm' : ''
+                }`}
+                style={
+                  isHeroLayout
+                    ? {
+                        backgroundColor: '#ffffff',
+                        color: primaryColor,
+                        border: '2px solid rgba(255,255,255,0.95)',
+                      }
+                    : { backgroundColor: primaryColor, color: buttonTextColor }
+                }
               >
                 {replaceStoreName(t.sizeButton, storeName)}
               </button>
@@ -2015,6 +2025,7 @@ export function ShoeARWidget({
             primaryColor={primaryColor}
             backgroundImage={tryonLayoutBackgroundImage || productImage || ''}
             blurBackground={step !== 'info'}
+            infoStep={step === 'info'}
           />
         )}
       </div>

@@ -5589,7 +5589,7 @@ function buildInfoModal({
     ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   const heroBgDesktopCss = heroBg
-    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}f2 42%, ${primaryColor}d9 58%, ${primaryColor}00 82%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
+    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 18%, ${primaryColor}fb 32%, ${primaryColor}ee 44%, ${primaryColor}d0 56%, ${primaryColor}98 66%, ${primaryColor}50 76%, ${primaryColor}18 86%, ${primaryColor}00 94%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`;
   // #region agent log
   __omafitArDbgLog({
@@ -5994,9 +5994,9 @@ function buildInfoModal({
       type: "button",
       style: {
         width: "100%",
-        background: primaryColor,
-        color: omafitContrastOnPrimary(primaryColor),
-        border: "none",
+        background: isHero ? "#ffffff" : primaryColor,
+        color: isHero ? primaryColor : omafitContrastOnPrimary(primaryColor),
+        border: isHero ? `2px solid rgba(255,255,255,0.95)` : "none",
         padding: isSidebar || isHero ? "11px 14px" : "14px 20px",
         borderRadius: "8px",
         fontSize: isSidebar || isHero ? "clamp(0.9rem, 1.8vw, 1rem)" : "clamp(1rem, 3vw, 1.15rem)",
@@ -6015,7 +6015,7 @@ function buildInfoModal({
   );
   cta.appendChild(document.createTextNode(t.cta + " "));
   const arw = svgArrowRight();
-  arw.style.color = omafitContrastOnPrimary(primaryColor);
+  arw.style.color = isHero ? primaryColor : omafitContrastOnPrimary(primaryColor);
   cta.appendChild(arw);
   cta.addEventListener("mouseenter", () => {
     cta.style.filter = "brightness(0.92)";

@@ -5,6 +5,8 @@ type Props = {
   primaryColor: string;
   backgroundImage?: string;
   blurBackground?: boolean;
+  /** Step 1 (info): degradê desktop mais longo e marcante até à zona da imagem. */
+  infoStep?: boolean;
 };
 
 /** Hero: imagem de fundo + cor primária com degradê na junção (desktop: esq. primária / dir. imagem; mobile: cima imagem / baixo primária). */
@@ -12,6 +14,7 @@ export function TryOnLayoutShellHero({
   primaryColor,
   backgroundImage,
   blurBackground = false,
+  infoStep = false,
 }: Props) {
   const p = primaryColor || '#810707';
   const bg = backgroundImage || '';
@@ -28,11 +31,14 @@ export function TryOnLayoutShellHero({
         backgroundSize: 'cover',
       };
 
-  /** Mesma “curva” do mobile (transparente → primária), espelhada no eixo horizontal: esq. primária → dir. imagem. */
+  const desktopGradient = infoStep
+    ? `linear-gradient(90deg, ${p} 0%, ${p} 18%, ${p}fb 32%, ${p}ee 44%, ${p}d0 56%, ${p}98 66%, ${p}50 76%, ${p}18 86%, ${p}00 94%, ${p}00 100%)`
+    : `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%)`;
+
   const desktopStyle: CSSProperties = bg
     ? {
         backgroundColor: p,
-        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%), url("${bg}")`,
+        backgroundImage: `${desktopGradient}, url("${bg}")`,
         backgroundSize: 'cover, contain',
         backgroundPosition: 'left center, right center',
         backgroundRepeat: 'no-repeat, no-repeat',
