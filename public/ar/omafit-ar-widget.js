@@ -5174,6 +5174,7 @@ function omafitResolveTryonLayout(root) {
       .trim()
       .toLowerCase();
     if (ds === "sidebar") return true;
+    if (ds === "default" || ds === "classic") return false;
     const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
     if ((q.get("tryonLayout") || q.get("tryon_layout") || "").trim().toLowerCase() === "sidebar")
       return true;
