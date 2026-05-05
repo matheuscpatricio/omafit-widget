@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, Play, ShieldCheck, Sparkles, Zap } from 'lucide-react';
-import { Button, ButtonLink } from '../ui/button';
+import { Button } from '../ui/button';
 import { LANDING_IMAGES } from '../../lib/site';
 import { Marquee } from './magic/Marquee';
 import { ShimmerHeading } from './magic/ShimmerHeading';
@@ -9,7 +9,7 @@ import { useIsMdUp } from '../../hooks/useMediaQuery';
 import { HeroMobileSlides } from './HeroMobileSlides';
 
 interface HeroProps {
-  onInstallShopify?: () => void;
+  onOpenInstallModal?: () => void;
   onRequestDemo?: () => void;
 }
 
@@ -102,7 +102,7 @@ function HeroDesktopRotator() {
   );
 }
 
-export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
+export function Hero({ onOpenInstallModal, onRequestDemo }: HeroProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const isMdUp = useIsMdUp();
 
@@ -129,7 +129,7 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
         animate="visible"
         className="relative z-10 mb-4 w-full min-w-0 md:hidden"
       >
-        <HeroMobileSlides onInstallShopify={onInstallShopify} onRequestDemo={onRequestDemo} />
+        <HeroMobileSlides onOpenInstallModal={onOpenInstallModal} onRequestDemo={onRequestDemo} />
       </motion.div>
 
       <motion.div
@@ -199,24 +199,17 @@ export function Hero({ onInstallShopify, onRequestDemo }: HeroProps) {
                 variants={itemVariants}
                 className="mt-8 flex w-full max-w-md flex-col items-stretch justify-center gap-3 sm:mt-9 sm:max-w-none sm:flex-row sm:items-center md:mt-8"
               >
-                <ButtonLink
+                <Button
+                  type="button"
                   variant="primary"
                   size="lg"
-                  href="https://apps.shopify.com/omafit"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="w-full shadow-[0_8px_28px_-4px_rgba(217,104,69,0.45)] sm:w-auto"
-                  onClick={(e) => {
-                    if (onInstallShopify) {
-                      e.preventDefault();
-                      onInstallShopify();
-                    }
-                  }}
+                  onClick={() => onOpenInstallModal?.()}
                 >
-                  Instalar Omafit na Shopify
+                  Instalar
                   <span className="ml-0.5 text-xs font-normal text-oma-cream/85">(instalação grátis)</span>
                   <ArrowRight className="w-4 h-4" />
-                </ButtonLink>
+                </Button>
 
                 <Button
                   variant="secondary"

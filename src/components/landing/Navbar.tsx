@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { ButtonLink } from '../ui/button';
+import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { OmafitLogo } from './OmafitLogo';
 
 interface NavbarProps {
-  onInstall?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 const links = [
@@ -16,7 +16,7 @@ const links = [
   { href: '#faq', label: 'FAQ' },
 ];
 
-export function Navbar({ onInstall }: NavbarProps) {
+export function Navbar({ onOpenInstallModal }: NavbarProps) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -89,21 +89,14 @@ export function Navbar({ onInstall }: NavbarProps) {
             </nav>
 
             <div className="hidden md:flex items-center gap-2">
-              <ButtonLink
+              <Button
+                type="button"
                 size="sm"
                 variant="primary"
-                href="https://apps.shopify.com/omafit"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (onInstall) {
-                    e.preventDefault();
-                    onInstall();
-                  }
-                }}
+                onClick={() => onOpenInstallModal?.()}
               >
-                Instalar na Shopify
-              </ButtonLink>
+                Instalar
+              </Button>
             </div>
 
             <button
@@ -172,21 +165,16 @@ export function Navbar({ onInstall }: NavbarProps) {
                 ))}
               </nav>
               <div className="mt-4 grid gap-2">
-                <a
-                  href="https://apps.shopify.com/omafit"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    if (onInstall) {
-                      e.preventDefault();
-                      setMobileOpen(false);
-                      onInstall();
-                    }
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    onOpenInstallModal?.();
                   }}
                   className="grid h-11 place-items-center rounded-[6px] bg-[#D96845] font-bricolage text-sm font-medium tracking-[0.05em] text-[#F6F0E2] hover:bg-[var(--color-accent-dark)]"
                 >
-                  Instalar na Shopify
-                </a>
+                  Instalar
+                </button>
               </div>
             </motion.div>
           </motion.div>

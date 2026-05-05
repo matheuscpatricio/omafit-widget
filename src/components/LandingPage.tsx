@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Lenis from '@studio-freight/lenis';
 import { supabase } from '../lib/supabase';
@@ -14,6 +14,7 @@ import { FAQ } from './landing/FAQ';
 import { FinalCTA } from './landing/FinalCTA';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
+import { InstallPlatformModal } from './landing/InstallPlatformModal';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -29,6 +30,7 @@ const paidPlanPriceIds: Record<'growth' | 'pro' | 'enterprise', string> = {
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
   const navigate = useNavigate();
+  const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
     let lenis: Lenis | null = null;
@@ -96,11 +98,16 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       style={{ colorScheme: 'dark' }}
     >
       <LandingSEO />
-      <Navbar onInstall={handleInstallShopify} />
+      <InstallPlatformModal
+        open={installModalOpen}
+        onClose={() => setInstallModalOpen(false)}
+        onSelectShopify={handleInstallShopify}
+      />
+      <Navbar onOpenInstallModal={() => setInstallModalOpen(true)} />
 
       <main className="relative">
         <Hero
-          onInstallShopify={handleInstallShopify}
+          onOpenInstallModal={() => setInstallModalOpen(true)}
           onRequestDemo={handleRequestDemo}
         />
 
@@ -117,7 +124,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         <FAQ />
 
         <FinalCTA
-          onInstallShopify={handleInstallShopify}
+          onOpenInstallModal={() => setInstallModalOpen(true)}
           onScheduleDemo={handleScheduleDemo}
         />
       </main>

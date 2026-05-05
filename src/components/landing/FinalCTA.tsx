@@ -1,9 +1,9 @@
 import { motion, type Variants } from 'framer-motion';
 import { ArrowRight, Calendar } from 'lucide-react';
-import { Button, ButtonLink } from '../ui/button';
+import { Button } from '../ui/button';
 import { CtaBlockSurface } from './CtaBlockSurface';
 interface FinalCTAProps {
-  onInstallShopify?: () => void;
+  onOpenInstallModal?: () => void;
   onScheduleDemo?: () => void;
 }
 
@@ -21,7 +21,7 @@ const itemVariants: Variants = {
   },
 };
 
-export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
+export function FinalCTA({ onOpenInstallModal, onScheduleDemo }: FinalCTAProps) {
   return (
     <section className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
@@ -66,28 +66,21 @@ export function FinalCTA({ onInstallShopify, onScheduleDemo }: FinalCTAProps) {
               variants={itemVariants}
               className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center"
             >
-              <ButtonLink
+              <Button
+                type="button"
                 variant="primary"
                 size="lg"
-                href="https://apps.shopify.com/omafit"
-                target="_blank"
-                rel="noopener noreferrer"
                 className="min-h-0 w-full !h-auto flex-col items-center gap-1 whitespace-normal px-5 py-3.5 text-center leading-snug sm:w-auto sm:px-7 sm:py-4"
-                onClick={(e) => {
-                  if (onInstallShopify) {
-                    e.preventDefault();
-                    onInstallShopify();
-                  }
-                }}
+                onClick={() => onOpenInstallModal?.()}
               >
                 <span className="inline-flex items-center justify-center gap-2">
-                  <span>Instalar Omafit na Shopify</span>
+                  <span>Instalar</span>
                   <ArrowRight className="h-4 w-4 shrink-0" />
                 </span>
                 <span className="text-[11px] font-normal leading-tight text-oma-cream/80 sm:text-xs">
                   (instalação grátis)
                 </span>
-              </ButtonLink>
+              </Button>
 
               <Button
                 variant="secondary"

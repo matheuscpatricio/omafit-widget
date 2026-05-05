@@ -3596,29 +3596,26 @@ const handleSubmit = async () => {
             </div>
           )}
 
-        {/* Step 1: Info — embed: duas colunas (imagem à esquerda, texto à direita); clássico: inalterado */}
+        {/* Step 1: Info — embed: imagem acima do texto, tamanho moderado */}
         {step === 'info' && embed && (
           <motion.div
-            className="flex min-h-0 flex-1 flex-row gap-3 overflow-hidden sm:gap-4"
+            className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto py-1 text-center sm:gap-4"
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
           >
-            <motion.div
-              variants={tryonTextStaggerChild}
-              className="flex min-h-0 w-[min(38%,10.5rem)] shrink-0 flex-col justify-center sm:w-[min(36%,12rem)]"
-            >
-              <div className="overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70">
+            <motion.div variants={tryonTextStaggerChild} className="flex w-full shrink-0 justify-center">
+              <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
                 <img
                   src={displayImage}
                   alt={product.name}
-                  className="block max-h-[min(70dvh,480px)] w-full rounded-2xl object-contain object-center"
+                  className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
                 />
               </div>
             </motion.div>
             <motion.div
               variants={tryonTextStaggerChild}
-              className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-3 overflow-y-auto text-center sm:gap-4"
+              className="flex w-full max-w-md min-w-0 flex-col justify-center gap-3 sm:gap-4"
             >
               <div>
                 <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
@@ -3729,24 +3726,24 @@ const handleSubmit = async () => {
           </motion.div>
         )}
 
-        {/* Step 3: Photo — embed: imagem à esquerda, instruções + upload à direita (menos scroll) */}
+        {/* Step 3: Photo — embed: imagem do produto maior à esquerda; direita mais estreita e compacta */}
         {step === 'photo' && embed && (
           <motion.div
-            className="flex min-h-0 flex-1 flex-row gap-3 overflow-hidden sm:gap-4"
+            className="flex min-h-0 flex-1 flex-row gap-2 overflow-hidden sm:gap-3"
             initial={tryonFadeUp.initial}
             animate={tryonFadeUp.animate}
             transition={tryonFadeUp.transition}
           >
-            <div className="flex min-h-0 w-[min(40%,10.75rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(38%,12.5rem)] sm:pr-3">
-              <p className="mb-0.5 text-center text-[10px] font-semibold leading-tight text-gray-900 sm:text-xs">
+            <div className="flex min-h-0 w-[min(56%,15.5rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(54%,18rem)] sm:pr-3">
+              <p className="mb-0.5 text-center text-[11px] font-semibold leading-tight text-gray-900 sm:text-xs">
                 {t('productImage')}
               </p>
               {availableImages.length > 1 && (
-                <p className="mb-1 text-center text-[9px] leading-tight text-gray-600 sm:text-[10px]">
+                <p className="mb-1 text-center text-[10px] leading-tight text-gray-600 sm:text-[11px]">
                   {t('chooseImageNote')}
                 </p>
               )}
-              <div className="relative mx-auto mt-1 w-full max-w-[9.5rem] sm:max-w-[11.5rem]">
+              <div className="relative mx-auto mt-1 w-full max-w-[14rem] sm:max-w-[17rem]">
                 <div
                   className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
                   onTouchStart={handleTouchStart}
@@ -3791,19 +3788,20 @@ const handleSubmit = async () => {
                 )}
               </div>
             </div>
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-2 overflow-y-auto py-0.5 sm:gap-3">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto py-0.5">
+              <div className="flex w-full max-w-[9.75rem] flex-col gap-1.5 sm:max-w-[10.75rem] sm:gap-2">
               <div>
-                <h3 className="text-lg font-semibold text-primary sm:text-xl">{t('yourPhoto')}</h3>
-                <p className="text-xs text-gray-700 sm:text-sm">{t('betterResults')}</p>
+                <h3 className="text-sm font-semibold text-primary sm:text-base">{t('yourPhoto')}</h3>
+                <p className="text-[10px] leading-snug text-gray-700 sm:text-[11px]">{t('betterResults')}</p>
               </div>
-              <div className="rounded-lg border border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-2 shadow-sm sm:p-3">
-                <h4 className="mb-1 flex flex-wrap items-center gap-1 text-xs font-bold text-blue-900 sm:text-sm">
+              <div className="rounded-md border border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-1.5 shadow-sm sm:p-2">
+                <h4 className="mb-0.5 flex flex-wrap items-center gap-0.5 text-[10px] font-bold leading-tight text-blue-900 sm:text-[11px]">
                   {t('photoInstructions')}
-                  <span className="rounded-full bg-blue-800 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:text-[10px]">
+                  <span className="rounded-full bg-blue-800 px-1 py-0.5 text-[8px] font-semibold text-white sm:text-[9px]">
                     {t('importantBadge')}
                   </span>
                 </h4>
-                <ul className="mb-1 space-y-0.5 text-[10px] leading-snug text-blue-900 sm:text-xs">
+                <ul className="mb-0.5 space-y-0.5 text-[9px] leading-snug text-blue-900 sm:text-[10px]">
                   <li>
                     • <strong>{t('fullBody')}</strong> — {t('fullBodyDesc')}
                   </li>
@@ -3820,22 +3818,22 @@ const handleSubmit = async () => {
                     • <strong>{t('neutralBackground')}</strong> — {t('neutralBackgroundDesc')}
                   </li>
                 </ul>
-                <div className="rounded border-l-4 border-blue-700 bg-blue-100 p-1.5">
-                  <p className="text-[10px] font-semibold leading-snug text-blue-900 sm:text-xs">
+                <div className="rounded border-l-2 border-blue-700 bg-blue-100 p-1">
+                  <p className="text-[9px] font-semibold leading-snug text-blue-900 sm:text-[10px]">
                     {t('photoInstructionWarning')}
                   </p>
                 </div>
               </div>
               <motion.div
                 onClick={() => fileInputRef.current?.click()}
-                className="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-3 text-center transition-all duration-300 hover:border-primary sm:p-4"
+                className="cursor-pointer rounded-md border-2 border-dashed border-gray-300 p-2 text-center transition-all duration-300 hover:border-primary sm:p-2.5"
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
               >
-                <Camera className="mx-auto mb-2 h-8 w-8 text-gray-400 sm:h-10 sm:w-10" />
-                <p className="mb-1 text-sm font-medium text-gray-800">{t('clickToUpload')}</p>
-                <p className="text-xs text-gray-500">{t('imageFormats')}</p>
+                <Camera className="mx-auto mb-1 h-6 w-6 text-gray-400 sm:mb-1.5 sm:h-7 sm:w-7" />
+                <p className="mb-0.5 text-[11px] font-medium leading-tight text-gray-800 sm:text-xs">{t('clickToUpload')}</p>
+                <p className="text-[9px] leading-tight text-gray-500 sm:text-[10px]">{t('imageFormats')}</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -3844,6 +3842,7 @@ const handleSubmit = async () => {
                   className="hidden"
                 />
               </motion.div>
+              </div>
             </div>
           </motion.div>
         )}

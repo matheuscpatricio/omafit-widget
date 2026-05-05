@@ -10,14 +10,14 @@ import {
   CarouselPrevious,
 } from '../ui/carousel';
 import { Card } from '../ui/card';
-import { Button, ButtonLink } from '../ui/button';
+import { Button } from '../ui/button';
 import { BorderBeamCard } from './magic/BorderBeam';
 import { ShimmerHeading } from './magic/ShimmerHeading';
 import { LANDING_IMAGES } from '../../lib/site';
 import { cn } from '../../lib/utils';
 
 export interface HeroMobileSlidesProps {
-  onInstallShopify?: () => void;
+  onOpenInstallModal?: () => void;
   onRequestDemo?: () => void;
 }
 
@@ -94,7 +94,7 @@ const slides: Slide[] = [
   },
 ];
 
-export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobileSlidesProps) {
+export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobileSlidesProps) {
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
 
@@ -221,23 +221,16 @@ export function HeroMobileSlides({ onInstallShopify, onRequestDemo }: HeroMobile
                             slide.subtleOverlay ? 'mt-2 gap-1.5' : 'mt-3 gap-2',
                           )}
                         >
-                          <ButtonLink
+                          <Button
+                            type="button"
                             variant="primary"
                             size="md"
-                            href="https://apps.shopify.com/omafit"
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="w-full justify-center shadow-lg"
-                            onClick={(e) => {
-                              if (onInstallShopify) {
-                                e.preventDefault();
-                                onInstallShopify();
-                              }
-                            }}
+                            onClick={() => onOpenInstallModal?.()}
                           >
-                            Instalar na Shopify
+                            Instalar
                             <ArrowRight className="h-4 w-4" />
-                          </ButtonLink>
+                          </Button>
                           <Button
                             variant="secondary"
                             size="md"
