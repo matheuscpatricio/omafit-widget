@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
@@ -287,6 +288,23 @@ function hexToRgba(hex: string, alpha: number) {
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
+
+const textStaggerParent = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+} as const;
+
+const textStaggerChild = {
+  hidden: { opacity: 0, y: 10 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
+  },
+} as const;
 
 function normalizeOptionValue(value: unknown) {
   return String(value || '').trim();
@@ -1437,7 +1455,14 @@ export function ShoeARWidget({
               />
             ))}
           </div>
-          <p className="text-base text-gray-700">{loadingLabel}</p>
+          <motion.p
+            className="text-base text-gray-700"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {loadingLabel}
+          </motion.p>
         </div>
       </div>
     );
@@ -1562,12 +1587,23 @@ export function ShoeARWidget({
                 </div>
               </div>
 
-              <div className="text-center">
-                <h3 className="text-2xl md:text-3xl font-semibold mb-2" style={{ color: primaryColor }}>
+              <motion.div
+                className="text-center"
+                initial="hidden"
+                animate="show"
+                variants={textStaggerParent}
+              >
+                <motion.h3
+                  variants={textStaggerChild}
+                  className="text-2xl md:text-3xl font-semibold mb-2"
+                  style={{ color: primaryColor }}
+                >
                   {replaceStoreName(t.welcomeTitle, storeName)}
-                </h3>
-                <p className="text-gray-700 text-lg md:text-xl">{t.infoBody}</p>
-              </div>
+                </motion.h3>
+                <motion.p variants={textStaggerChild} className="text-gray-700 text-lg md:text-xl">
+                  {t.infoBody}
+                </motion.p>
+              </motion.div>
 
               <button
                 type="button"
@@ -1587,13 +1623,23 @@ export function ShoeARWidget({
           <div className="mx-auto max-w-5xl animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="order-1 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-                <div className="text-center mb-3">
+                <motion.div
+                  className="text-center mb-3"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                >
                   <p className="text-gray-700 text-base">
                     {t.betterResults}
                   </p>
-                </div>
+                </motion.div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md">
+                <motion.div
+                  className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.34, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
+                >
                   <div>
                     <h4 className="font-bold text-blue-900 mb-2 text-base flex items-center gap-2">
                       {t.photoInstructions}
@@ -1613,7 +1659,7 @@ export function ShoeARWidget({
                       </p>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
                 {isAnalyzing && (
                   <div className="mt-6 rounded-2xl p-4 text-sm font-medium text-slate-700" style={{ backgroundColor: surfaceTint }}>
@@ -1623,7 +1669,14 @@ export function ShoeARWidget({
               </div>
 
               <div className="order-2 md:order-2 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
-                <h3 className="text-2xl font-semibold text-slate-900">{t.footPhotoLabel}</h3>
+                <motion.h3
+                  className="text-2xl font-semibold text-slate-900"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {t.footPhotoLabel}
+                </motion.h3>
 
                 <div className="mt-6">
                   {footPhotoPreview ? (
@@ -1664,10 +1717,19 @@ export function ShoeARWidget({
 
       {step === 'processing' && (
         <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center">
-            <h3 className="text-2xl md:text-3xl font-semibold mb-4" style={{ color: primaryColor }}>
+          <motion.div
+            className="text-center"
+            initial="hidden"
+            animate="show"
+            variants={textStaggerParent}
+          >
+            <motion.h3
+              variants={textStaggerChild}
+              className="text-2xl md:text-3xl font-semibold mb-4"
+              style={{ color: primaryColor }}
+            >
               {t.processingTitle}
-            </h3>
+            </motion.h3>
             <div className="flex items-center justify-center gap-2">
               <span
                 className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
@@ -1682,7 +1744,7 @@ export function ShoeARWidget({
                 style={{ backgroundColor: primaryColor, animationDelay: '400ms', animationDuration: '1.4s' }}
               />
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -1815,10 +1877,14 @@ export function ShoeARWidget({
               <div className="rounded-2xl p-3" style={{ backgroundColor: surfaceTint }}>
                 <Camera className="h-6 w-6" style={{ color: primaryColor }} />
               </div>
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900">{t.arIntroTitle}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{t.arIntroBody}</p>
-              </div>
+              <motion.div initial="hidden" animate="show" variants={textStaggerParent}>
+                <motion.h3 variants={textStaggerChild} className="text-2xl font-semibold text-slate-900">
+                  {t.arIntroTitle}
+                </motion.h3>
+                <motion.p variants={textStaggerChild} className="mt-3 text-sm leading-6 text-slate-600">
+                  {t.arIntroBody}
+                </motion.p>
+              </motion.div>
             </div>
 
             <div className="mt-6 rounded-2xl p-5" style={{ backgroundColor: surfaceTint }}>
@@ -1847,13 +1913,28 @@ export function ShoeARWidget({
       {step === 'ar-viewer' && (
         <div className="flex-1 p-2 md:p-4 overflow-y-auto">
           <div className="space-y-5">
-          <div>
-            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={textStaggerParent}
+          >
+            <motion.p
+              variants={textStaggerChild}
+              className="mb-2 text-sm font-semibold uppercase tracking-[0.18em]"
+              style={{ color: primaryColor }}
+            >
               {t.shoeArLabel}
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">{productName}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">{t.viewerNote}</p>
-          </div>
+            </motion.p>
+            <motion.h1
+              variants={textStaggerChild}
+              className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl"
+            >
+              {productName}
+            </motion.h1>
+            <motion.p variants={textStaggerChild} className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+              {t.viewerNote}
+            </motion.p>
+          </motion.div>
 
           <div className="overflow-hidden rounded-[28px] border" style={{ borderColor: borderTint, backgroundColor: surfaceTint }}>
             {modelViewer}

@@ -5225,12 +5225,25 @@ function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
   s.id = "omafit-ar-styles";
   s.textContent = `
     @keyframes omafit-ar-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes omafit-ar-text-enter {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
     /* Modal AR está em document.body (fora de #omafit-ar-root) — incluir .omafit-ar-shell como no TryOnWidget. */
     #omafit-ar-root, #omafit-ar-root *,
     .omafit-ar-shell, .omafit-ar-shell * {
       font-family: ${appliedStack} !important;
     }
     .omafit-ar-shell { animation: omafit-ar-fade-in 0.35s ease-out; }
+    .omafit-ar-text-enter {
+      opacity: 0;
+      transform: translateY(10px);
+      animation-name: omafit-ar-text-enter;
+      animation-duration: 360ms;
+      animation-fill-mode: forwards;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: opacity, transform;
+    }
     .omafit-ar-link:hover { opacity: 0.7; text-decoration-thickness: 2px; }
     .omafit-ar-try-on-link:focus { outline: 2px solid ${primary}; outline-offset: 2px; }
     /* Temas que metem x via ::before/::after em <button> — sem isto parecem dois X sobrepostos. */
@@ -5368,6 +5381,21 @@ function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
     },
   });
   // #endregion
+}
+
+function omafitAnimateTextEntrance(root) {
+  if (!root?.querySelectorAll) return;
+  const nodes = root.querySelectorAll(
+    "h1, h2, h3, h4, p, li, [data-omafit-text-anim='1']",
+  );
+  let idx = 0;
+  for (const node of nodes) {
+    if (!node || node.dataset?.omafitTextAnimated === "1") continue;
+    node.dataset.omafitTextAnimated = "1";
+    node.classList.add("omafit-ar-text-enter");
+    node.style.animationDelay = `${Math.min(idx, 10) * 48}ms`;
+    idx += 1;
+  }
 }
 
 function createTriggerLink(text, primaryColor) {
@@ -5980,6 +6008,7 @@ function buildInfoModal({
   }
   mq.addEventListener("change", applyMq);
   applyMq();
+  omafitAnimateTextEntrance(shell);
 
   return shell;
 }
@@ -6845,6 +6874,7 @@ async function runArSession({
    * `shell` ou posição absoluta sumia em alguns layouts/telemóveis.
    */
   if (arBottomBar) colContent.appendChild(arBottomBar);
+  omafitAnimateTextEntrance(colContent);
 
   let mindarThree = null;
   let arResizeObserver = null;
