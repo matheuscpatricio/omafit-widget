@@ -5944,6 +5944,12 @@ function buildInfoModal({
   } else {
     shell.appendChild(header);
     shell.appendChild(mainRow);
+    const closeBtns = header.querySelectorAll(".omafit-ar-close-btn");
+    if (closeBtns.length > 1) {
+      for (let i = 1; i < closeBtns.length; i += 1) {
+        closeBtns[i]?.remove?.();
+      }
+    }
   }
 
   const mq = window.matchMedia("(min-width: 768px)");
@@ -5951,6 +5957,17 @@ function buildInfoModal({
     if (layoutSidebar) {
       colImg.style.display = "none";
       mobileImgWrap.style.display = "block";
+      if (mq.matches) {
+        mobileImgWrap.style.maxWidth = "240px";
+        mobileImgWrap.style.width = "100%";
+        mobileImgWrap.style.marginLeft = "auto";
+        mobileImgWrap.style.marginRight = "auto";
+      } else {
+        mobileImgWrap.style.maxWidth = "";
+        mobileImgWrap.style.width = "";
+        mobileImgWrap.style.marginLeft = "";
+        mobileImgWrap.style.marginRight = "";
+      }
       return;
     }
     if (mq.matches) {
