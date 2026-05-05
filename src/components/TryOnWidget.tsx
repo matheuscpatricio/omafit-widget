@@ -3407,6 +3407,13 @@ const handleSubmit = async () => {
           background-color: rgb(255 255 255 / 0.92) !important;
           color: ${localPrimaryColor} !important;
         }
+        .omafit-tryon-hero button.omafit-hero-floating-back {
+          color: ${localPrimaryColor} !important;
+        }
+        .omafit-tryon-hero button.omafit-hero-floating-back:hover {
+          color: ${localPrimaryColor} !important;
+          opacity: 0.88;
+        }
         .omafit-tryon-hero .bg-gray-100 { background-color: rgb(243 244 246) !important; }
         .omafit-tryon-hero .bg-gray-100.text-gray-700,
         .omafit-tryon-hero .hover\\:bg-gray-200:hover { color: #374151 !important; }
@@ -3733,7 +3740,7 @@ const handleSubmit = async () => {
         <button
           type="button"
           onClick={goBack}
-          className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800"
+          className={`absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800${isHeroLayout ? ' omafit-hero-floating-back' : ''}`}
           aria-label={t('back')}
         >
           <ArrowLeft className="h-5 w-5" />

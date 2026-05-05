@@ -88,6 +88,9 @@ const copy = {
     infoTitle: 'Como funciona?',
     infoBody:
       'Envie uma foto do seu pé para calcularmos o tamanho ideal desse calçado para você, tire qualquer dúvida!',
+    howWorksDesc:
+      'Envie uma foto do pé para medição segura; indicamos o número ideal deste calçado e você pode tirar dúvidas na conversa.',
+    privacyNote: 'Suas fotos são processadas de forma segura e não são compartilhadas.',
     sizeButton: 'Descobrir meu número na {storeName}',
     arButton: 'Ver como fica no meu pé',
     measureTitle: 'Descubra seu número ideal',
@@ -151,6 +154,9 @@ const copy = {
     infoTitle: '¿Cómo funciona?',
     infoBody:
       'Envía una foto de tu pie para calcular la talla ideal de este calzado para ti y resuelve cualquier duda al final.',
+    howWorksDesc:
+      'Envía una foto del pie para una medición segura; indicamos la talla ideal de este calzado y puedes resolver dudas en el chat.',
+    privacyNote: 'Tus fotos se procesan de forma segura y no se comparten.',
     sizeButton: 'Descubrir mi talla en {storeName}',
     arButton: 'Ver como queda en mi pie',
     measureTitle: 'Descubre tu talla ideal',
@@ -214,6 +220,9 @@ const copy = {
     infoTitle: 'How does it work?',
     infoBody:
       'Send a photo of your foot so we can calculate the ideal size for this footwear and answer any questions at the end.',
+    howWorksDesc:
+      'Upload a foot photo for secure measurement; we suggest the ideal size for this footwear and you can ask questions in the chat.',
+    privacyNote: 'Your photos are securely processed and not shared.',
     sizeButton: 'Find my size at {storeName}',
     arButton: 'See how it looks on my foot',
     measureTitle: 'Find your ideal size',
@@ -1517,7 +1526,25 @@ export function ShoeARWidget({
         .omafit-shoe-hero .border-gray-300 { border-color: rgb(255 255 255 / 0.35) !important; }
         .omafit-shoe-hero .bg-gray-50 { background-color: rgb(0 0 0 / 0.22) !important; }
         .omafit-shoe-hero .hover\\:bg-slate-50:hover { background-color: rgb(255 255 255 / 0.08) !important; }
+        .omafit-shoe-hero .border-blue-200 { border-color: rgb(255 255 255 / 0.35) !important; }
         .omafit-shoe-hero h3 { color: #ffffff !important; }
+        .omafit-shoe-hero h4 { color: rgb(255 255 255 / 0.96) !important; }
+        .omafit-shoe-hero button.omafit-hero-start-now {
+          background-color: #ffffff !important;
+          color: ${primaryColor} !important;
+          border: 2px solid rgba(255, 255, 255, 0.95) !important;
+        }
+        .omafit-shoe-hero button.omafit-hero-start-now:hover {
+          background-color: rgb(255 255 255 / 0.92) !important;
+          color: ${primaryColor} !important;
+        }
+        .omafit-shoe-hero button.omafit-hero-floating-back {
+          color: ${primaryColor} !important;
+        }
+        .omafit-shoe-hero button.omafit-hero-floating-back:hover {
+          color: ${primaryColor} !important;
+          opacity: 0.88;
+        }
         `
             : ''
         }
@@ -1612,113 +1639,190 @@ export function ShoeARWidget({
             <button
               type="button"
               onClick={goBack}
-              className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800 md:flex"
+              className={`absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800 md:flex${isHeroLayout ? ' omafit-hero-floating-back' : ''}`}
               aria-label={t.back}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
 
-          <div
-            className={
-              embed
-                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${heroChromeActive ? ' relative z-10 md:pt-14' : isHeroLayout ? ' relative z-10' : ''}`
-                : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
-            }
-            style={{ fontFamily: fontFamily || 'inherit' }}
-          >
+          {embed && isHeroLayout && step === 'info' ? (
+            <div
+              className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden overflow-y-auto p-2 sm:px-3 md:pt-14"
+              style={{ fontFamily: fontFamily || 'inherit' }}
+            >
+              <>
+                <div className="flex min-h-0 flex-1 flex-col md:hidden">
+                  <motion.div
+                    className="flex flex-1 flex-col items-center justify-end space-y-3 pb-5 pt-2 text-center"
+                    variants={textStaggerParent}
+                    initial="hidden"
+                    animate="show"
+                  >
+                    <motion.div variants={textStaggerChild} className="w-full max-w-sm text-center">
+                      <h3 className="mb-1.5 text-xl font-semibold" style={{ color: primaryColor }}>
+                        {replaceStoreName(t.welcomeTitle, storeName)}
+                      </h3>
+                      <p className="text-base leading-snug text-gray-700">{t.infoBody}</p>
+                    </motion.div>
 
-      {step === 'info' && (
-        <>
-          {!isHeroLayout && (
-            <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
-              <div className="w-full flex items-center justify-center">
-                <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
-                  {productImage ? (
-                    <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
-                  ) : (
-                    <div className="flex min-h-[420px] items-center justify-center text-gray-400">
-                      <Box className="h-12 w-12" />
-                    </div>
-                  )}
+                    <motion.div
+                      variants={textStaggerChild}
+                      className="w-full max-w-sm rounded-lg border border-blue-200 bg-blue-50 p-3"
+                    >
+                      <div className="text-center">
+                        <h4 className="mb-1.5 text-sm font-medium text-blue-800">{t.infoTitle}</h4>
+                        <p className="text-sm leading-snug text-blue-700">{t.howWorksDesc}</p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div variants={textStaggerChild} className="w-full max-w-sm">
+                      <button
+                        type="button"
+                        onClick={() => setStep('measure-capture')}
+                        className="omafit-hero-start-now flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium shadow-sm transition-all duration-300 md:py-4 md:text-xl"
+                      >
+                        {replaceStoreName(t.sizeButton, storeName)}
+                        <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
+                      </button>
+                    </motion.div>
+
+                    <motion.p
+                      variants={textStaggerChild}
+                      className="max-w-sm text-center text-xs leading-snug text-gray-500"
+                    >
+                      {t.privacyNote}
+                    </motion.p>
+                  </motion.div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          <div
-            className={`flex-1 p-2 md:p-4 overflow-y-auto${isHeroLayout ? ' flex min-h-0 flex-col' : ''}`}
-          >
+                <motion.div
+                  className="hidden min-h-0 w-full max-w-lg flex-1 flex-col items-start justify-center gap-3 overflow-x-hidden overflow-y-auto px-3 py-2 text-left sm:gap-4 md:flex md:pl-5 md:pr-4"
+                  variants={textStaggerParent}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <motion.div
+                    variants={textStaggerChild}
+                    className="flex w-full min-w-0 max-w-md flex-col items-start gap-3 sm:gap-4"
+                  >
+                    <div className="text-left">
+                      <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
+                        {replaceStoreName(t.welcomeTitle, storeName)}
+                      </h3>
+                      <p className="text-sm text-gray-700 sm:text-base">{t.infoBody}</p>
+                    </div>
+                    <div className="w-full rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+                      <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t.infoTitle}</h4>
+                      <p className="text-left text-xs text-blue-700 sm:text-sm">{t.howWorksDesc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep('measure-capture')}
+                      className="omafit-hero-start-now flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium shadow-sm transition-all duration-300 sm:py-3.5 sm:text-lg"
+                    >
+                      {replaceStoreName(t.sizeButton, storeName)}
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                    <p className="text-left text-xs text-gray-500 sm:text-sm">{t.privacyNote}</p>
+                  </motion.div>
+                </motion.div>
+              </>
+            </div>
+          ) : (
             <div
               className={
-                isHeroLayout
-                  ? 'flex flex-1 flex-col items-center justify-end space-y-3 pb-4 text-center animate-fade-in md:flex md:h-full md:items-stretch md:justify-center md:space-y-4 md:pb-0 md:text-left'
-                  : 'space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in'
+                embed
+                  ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${heroChromeActive ? ' relative z-10 md:pt-14' : isHeroLayout ? ' relative z-10' : ''}`
+                  : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
               }
+              style={{ fontFamily: fontFamily || 'inherit' }}
             >
-              {!isHeroLayout && (
-                <div className="md:hidden bg-gray-50 rounded-xl p-3">
-                  <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
-                    {productImage ? (
-                      <img src={productImage} alt={productName} className="w-full h-auto object-contain" />
-                    ) : (
-                      <div className="flex min-h-[280px] items-center justify-center text-gray-400">
-                        <Box className="h-10 w-10" />
+              {step === 'info' && (
+                <>
+                  {!isHeroLayout && (
+                    <div className="hidden md:flex md:w-1/2 items-center justify-center bg-gray-50 p-4 md:p-8">
+                      <div className="flex w-full items-center justify-center">
+                        <div className="w-full max-w-md overflow-hidden rounded-2xl bg-gray-100">
+                          {productImage ? (
+                            <img src={productImage} alt={productName} className="h-auto w-full object-contain" />
+                          ) : (
+                            <div className="flex min-h-[420px] items-center justify-center text-gray-400">
+                              <Box className="h-12 w-12" />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
 
-              <motion.div
-                className={
-                  isHeroLayout
-                    ? 'w-full max-w-sm md:max-w-xl'
-                    : 'text-center'
-                }
-                initial="hidden"
-                animate="show"
-                variants={textStaggerParent}
-              >
-                <motion.h3
-                  variants={textStaggerChild}
-                  className={`font-semibold mb-2 ${isHeroLayout ? 'text-xl md:text-3xl' : 'text-2xl md:text-3xl'}`}
-                  style={{ color: primaryColor }}
-                >
-                  {replaceStoreName(t.welcomeTitle, storeName)}
-                </motion.h3>
-                <motion.p
-                  variants={textStaggerChild}
-                  className={`text-gray-700 ${isHeroLayout ? 'text-base leading-snug md:text-xl' : 'text-lg md:text-xl'}`}
-                >
-                  {t.infoBody}
-                </motion.p>
-              </motion.div>
-
-              <button
-                type="button"
-                onClick={() => setStep('measure-capture')}
-                className={`rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 font-medium ${
-                  isHeroLayout
-                    ? 'w-full max-w-sm py-3 text-base shadow-sm md:max-w-none md:py-4 md:text-xl'
-                    : 'w-full py-3.5 text-lg md:py-4 md:text-xl'
-                }`}
-                style={
-                  isHeroLayout
-                    ? {
-                        backgroundColor: '#ffffff',
-                        color: primaryColor,
-                        border: '2px solid rgba(255,255,255,0.95)',
+                  <div className={`flex-1 overflow-y-auto p-2 md:p-4${isHeroLayout ? ' flex min-h-0 flex-col' : ''}`}>
+                    <div
+                      className={
+                        isHeroLayout
+                          ? 'flex flex-1 animate-fade-in flex-col items-center justify-end space-y-3 pb-4 text-center md:flex md:h-full md:items-stretch md:justify-center md:space-y-4 md:pb-0 md:text-left'
+                          : 'animate-fade-in space-y-4 md:flex md:h-full md:flex-col md:justify-center'
                       }
-                    : { backgroundColor: primaryColor, color: buttonTextColor }
-                }
-              >
-                {replaceStoreName(t.sizeButton, storeName)}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+                    >
+                      {!isHeroLayout && (
+                        <div className="rounded-xl bg-gray-50 p-3 md:hidden">
+                          <div className="w-full overflow-hidden rounded-2xl bg-gray-100">
+                            {productImage ? (
+                              <img src={productImage} alt={productName} className="h-auto w-full object-contain" />
+                            ) : (
+                              <div className="flex min-h-[280px] items-center justify-center text-gray-400">
+                                <Box className="h-10 w-10" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <motion.div
+                        className={isHeroLayout ? 'w-full max-w-sm md:max-w-xl' : 'text-center'}
+                        initial="hidden"
+                        animate="show"
+                        variants={textStaggerParent}
+                      >
+                        <motion.h3
+                          variants={textStaggerChild}
+                          className={`mb-2 font-semibold ${isHeroLayout ? 'text-xl md:text-3xl' : 'text-2xl md:text-3xl'}`}
+                          style={{ color: primaryColor }}
+                        >
+                          {replaceStoreName(t.welcomeTitle, storeName)}
+                        </motion.h3>
+                        <motion.p
+                          variants={textStaggerChild}
+                          className={`text-gray-700 ${isHeroLayout ? 'text-base leading-snug md:text-xl' : 'text-lg md:text-xl'}`}
+                        >
+                          {t.infoBody}
+                        </motion.p>
+                      </motion.div>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep('measure-capture')}
+                        className={`flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300 ease-in-out ${
+                          isHeroLayout
+                            ? 'w-full max-w-sm py-3 text-base shadow-sm md:max-w-none md:py-4 md:text-xl'
+                            : 'w-full py-3.5 text-lg md:py-4 md:text-xl'
+                        }`}
+                        style={
+                          isHeroLayout
+                            ? {
+                                backgroundColor: '#ffffff',
+                                color: primaryColor,
+                                border: '2px solid rgba(255,255,255,0.95)',
+                              }
+                            : { backgroundColor: primaryColor, color: buttonTextColor }
+                        }
+                      >
+                        {replaceStoreName(t.sizeButton, storeName)}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
       {step === 'measure-capture' && (
         <div className="flex-1 p-2 md:p-4 overflow-y-auto">
@@ -2066,6 +2170,7 @@ export function ShoeARWidget({
         </div>
       )}
           </div>
+          )}
         </div>
         {heroChromeActive && (
           <TryOnLayoutShellHero
