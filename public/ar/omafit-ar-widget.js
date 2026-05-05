@@ -5470,7 +5470,7 @@ function buildInfoModal({
     `z-index: ${Z_SHELL}`,
     "background: #fff",
     "display: flex",
-    "flex-direction: column",
+    layoutSidebar ? "flex-direction: row" : "flex-direction: column",
     "overflow: hidden",
   ].join(";");
 
@@ -5718,7 +5718,7 @@ function buildInfoModal({
     style: {
       flex: "1",
       display: "flex",
-      flexDirection: "row",
+      flexDirection: layoutSidebar ? "column" : "row",
       overflow: "hidden",
       minHeight: "0",
     },
@@ -5931,6 +5931,11 @@ function buildInfoModal({
 
   const mq = window.matchMedia("(min-width: 768px)");
   function applyMq() {
+    if (layoutSidebar) {
+      colImg.style.display = "none";
+      mobileImgWrap.style.display = "block";
+      return;
+    }
     if (mq.matches) {
       colImg.style.display = "flex";
       mobileImgWrap.style.display = "none";
