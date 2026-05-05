@@ -5166,44 +5166,7 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
   });
 }
 
-/** Layout “barra lateral” alinhado ao admin (`tryon_layout`) / query / data-tryon-layout no root. */
-function omafitResolveTryonLayout(root) {
-  try {
-    const ds = String(
-      root?.dataset?.tryonLayout ?? root?.getAttribute?.("data-tryon-layout") ?? "",
-    )
-      .trim()
-      .toLowerCase();
-    if (ds === "sidebar") return true;
-    const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
-    if ((q.get("tryonLayout") || q.get("tryon_layout") || "").trim().toLowerCase() === "sidebar")
-      return true;
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
-
-function omafitContrastOnPrimary(hex) {
-  const h = String(hex || "").replace("#", "").trim();
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  if (full.length !== 6) return "#ffffff";
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.55 ? "#111827" : "#ffffff";
-}
-
-function omafitArSidebarStepLabels(lang) {
-  const base = String(lang || "pt").toLowerCase().split("-")[0];
-  if (base === "es")
-    return { progress: "Progreso", step1: "Bienvenida", step2: "Probador AR" };
-  if (base === "en") return { progress: "Progress", step1: "Welcome", step2: "AR try-on" };
-  return { progress: "Progresso", step1: "Boas-vindas", step2: "Provador AR" };
-}
-
-function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
+function injectGlobalStyles(root, primaryOverride) {
   const old = document.getElementById("omafit-ar-styles");
   if (old) old.remove();
 
@@ -5307,47 +5270,6 @@ function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
     /* Se forcarmos width/height:100% no canvas por CSS, o canvas "estica"   */
     /* ao container mas as projecoes 3D continuam calculadas para o aspect   */
     /* do video -> oculos aparecem rodados/offset ("virado pro lado").       */
-    ${
-      tryonLayoutSidebar
-        ? `
-    .omafit-ar-shell-sidebar-layout { flex-direction: column !important; }
-    @media (min-width: 768px) {
-      .omafit-ar-shell-sidebar-layout { flex-direction: row !important; align-items: stretch; }
-      .omafit-ar-sbar-mobile-only { display: none !important; }
-      .omafit-ar-sbar-desktop-only {
-        display: flex !important;
-        flex-direction: column;
-        width: min(288px, 30vw);
-        min-height: 0;
-        flex-shrink: 0;
-      }
-    }
-    .omafit-ar-sbar-mobile-only { display: block; width: 100%; box-sizing: border-box; }
-    .omafit-ar-sbar-desktop-only {
-      display: none;
-      flex-direction: column;
-      height: 100%;
-      min-height: 0;
-      box-sizing: border-box;
-      padding: 22px 16px;
-      overflow: hidden;
-    }
-    .omafit-ar-sbar-progress-track {
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.2);
-      overflow: hidden;
-      position: relative;
-    }
-    .omafit-ar-sbar-progress-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.88);
-      transition: width 0.35s ease;
-    }
-    `
-        : ""
-    }
   `;
   document.head.appendChild(s);
   const hasThemeFontFace = document.getElementById("omafit-ar-theme-font-face");
@@ -5453,8 +5375,6 @@ function buildInfoModal({
   t,
   onClose,
   onStartAr,
-  layoutSidebar = false,
-  locale = "pt",
 }) {
   const productImgHttps = omafitUpgradeShopifyMediaToHttps(productImage);
   // #region agent log
@@ -5470,24 +5390,7 @@ function buildInfoModal({
   });
   // #endregion
 
-  let header = null;
-  let sidebarWrap = null;
-  const contentOuter = layoutSidebar
-    ? el("div", {
-        style: {
-          flex: "1",
-          display: "flex",
-          flexDirection: "column",
-          minHeight: "0",
-          overflow: "hidden",
-          width: "100%",
-        },
-      })
-    : null;
-
-  const shell = el("div", {
-    className: layoutSidebar ? "omafit-ar-shell omafit-ar-shell-sidebar-layout" : "omafit-ar-shell",
-  });
+  const shell = el("div", { className: "omafit-ar-shell" });
   shell.style.cssText = [
     "position: fixed",
     "inset: 0",
@@ -5498,398 +5401,103 @@ function buildInfoModal({
     "overflow: hidden",
   ].join(";");
 
-  if (!layoutSidebar) {
-    header = el("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "16px",
-        borderBottom: `1px solid ${primaryColor}`,
-        flexShrink: "0",
-      },
-    });
+  const header = el("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "16px",
+      borderBottom: `1px solid ${primaryColor}`,
+      flexShrink: "0",
+    },
+  });
 
-    const leftPad = el("div", { style: { width: "40px", flexShrink: "0" } });
-    const logoWrap = el("div", {
-      style: {
-        flex: "1",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "48px",
-      },
+  const leftPad = el("div", { style: { width: "40px", flexShrink: "0" } });
+  const logoWrap = el("div", {
+    style: {
+      flex: "1",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      minHeight: "48px",
+    },
+  });
+  if (logoUrl) {
+    const img = el("img", {
+      src: logoUrl,
+      alt: shopName || "",
+      loading: "eager",
+      decoding: "async",
+      style: { maxHeight: "48px", width: "auto", maxWidth: "min(200px, 70vw)", objectFit: "contain" },
     });
-    if (logoUrl) {
-      const img = el("img", {
-        src: logoUrl,
-        alt: shopName || "",
-        loading: "eager",
-        decoding: "async",
-        style: { maxHeight: "48px", width: "auto", maxWidth: "min(200px, 70vw)", objectFit: "contain" },
-      });
-      // #region agent log
-      img.addEventListener("error", () => {
-        let host = "";
-        try {
-          host = new URL(logoUrl, typeof location !== "undefined" ? location.href : undefined).hostname;
-        } catch {
-          host = "bad-url";
-        }
-        __omafitArDbgLog({
-          location: "omafit-ar-widget.js:buildInfoModal",
-          message: "logo img load error",
-          hypothesisId: "H3",
-          data: { logoHost: host },
-        });
-      });
-      // #endregion
-      logoWrap.appendChild(img);
-    } else if (shopName) {
-      logoWrap.appendChild(
-        el("span", {
-          textContent: shopName,
-          style: {
-            fontSize: "1.125rem",
-            fontWeight: "600",
-            color: primaryColor,
-            textAlign: "center",
-            lineHeight: "1.2",
-            padding: "0 8px",
-          },
-        }),
-      );
-    }
-
-    const closeBtn = el(
-      "div",
-      {
-        role: "button",
-        tabIndex: 0,
-        className: "omafit-ar-close-btn",
-        title: t.close,
-        style: {
-          width: "40px",
-          height: "40px",
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          color: "#6b7280",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: "0",
-          borderRadius: "8px",
-        },
-      },
-      [svgX()],
-    );
-    closeBtn.setAttribute("data-omafit-ar-close-modal", "1");
-    closeBtn.addEventListener("click", onClose);
-    closeBtn.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        onClose();
+    // #region agent log
+    img.addEventListener("error", () => {
+      let host = "";
+      try {
+        host = new URL(logoUrl, typeof location !== "undefined" ? location.href : undefined).hostname;
+      } catch {
+        host = "bad-url";
       }
-    });
-
-    header.appendChild(leftPad);
-    header.appendChild(logoWrap);
-    header.appendChild(closeBtn);
-  } else {
-    const fg = omafitContrastOnPrimary(primaryColor);
-    const L = omafitArSidebarStepLabels(locale);
-
-    function mkCloseBtn() {
-      const btn = el(
-        "div",
-        {
-          role: "button",
-          tabIndex: 0,
-          className: "omafit-ar-close-btn",
-          title: t.close,
-          style: {
-            width: "40px",
-            height: "40px",
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            color: fg,
-            opacity: "0.92",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: "0",
-            borderRadius: "8px",
-          },
-        },
-        [svgX()],
-      );
-      btn.setAttribute("data-omafit-ar-close-modal", "1");
-      btn.addEventListener("click", onClose);
-      btn.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") {
-          ev.preventDefault();
-          onClose();
-        }
+      __omafitArDbgLog({
+        location: "omafit-ar-widget.js:buildInfoModal",
+        message: "logo img load error",
+        hypothesisId: "H3",
+        data: { logoHost: host },
       });
-      return btn;
-    }
-
-    const progFillM = el("div", { className: "omafit-ar-sbar-progress-fill" });
-    progFillM.style.width = "50%";
-    const progTrackM = el("div", { className: "omafit-ar-sbar-progress-track" }, [progFillM]);
-
-    const progFillD = el("div", { className: "omafit-ar-sbar-progress-fill" });
-    progFillD.style.width = "50%";
-    const progTrackD = el("div", { className: "omafit-ar-sbar-progress-track" }, [progFillD]);
-
-    const mobileStepLine = el("p", {
-      style: {
-        margin: "10px 14px 12px",
-        textAlign: "center",
-        fontSize: "11px",
-        fontWeight: "600",
-        lineHeight: "1.25",
-      },
     });
-    mobileStepLine.textContent = `1. ${L.step1}`;
-
-    const deskCur = el("p", {
-      style: { marginTop: "14px", fontSize: "12px", lineHeight: "1.35", opacity: "0.78" },
-    });
-    deskCur.textContent = L.step1;
-
-    const mobFrac = el("span", {
-      textContent: "1/2",
-      style: { fontSize: "10px", fontWeight: "600", flexShrink: "0" },
-    });
-
-    const nav1 = el("div", {
-      style: {
-        display: "flex",
-        alignItems: "flex-start",
-        gap: "10px",
-        padding: "10px 14px",
-        borderRadius: "10px",
-        background: "rgba(255,255,255,0.2)",
-        fontWeight: "600",
-        fontSize: "13px",
-      },
-    });
-    nav1.appendChild(
+    // #endregion
+    logoWrap.appendChild(img);
+  } else if (shopName) {
+    logoWrap.appendChild(
       el("span", {
-        textContent: "1",
+        textContent: shopName,
         style: {
-          flexShrink: "0",
-          display: "inline-flex",
-          width: "22px",
-          height: "22px",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "999px",
-          border: `1px solid ${fg}`,
-          fontSize: "10px",
-        },
-      }),
-    );
-    nav1.appendChild(el("span", { textContent: L.step1, style: { minWidth: "0", flex: "1" } }));
-
-    const nav2 = el("div", {
-      style: {
-        display: "flex",
-        alignItems: "flex-start",
-        gap: "10px",
-        padding: "10px 14px",
-        borderRadius: "10px",
-        opacity: "0.55",
-        fontSize: "13px",
-      },
-    });
-    nav2.appendChild(
-      el("span", {
-        textContent: "2",
-        style: {
-          flexShrink: "0",
-          display: "inline-flex",
-          width: "22px",
-          height: "22px",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "999px",
-          border: `1px solid ${fg}`,
-          fontSize: "10px",
-        },
-      }),
-    );
-    nav2.appendChild(el("span", { textContent: L.step2, style: { minWidth: "0", flex: "1" } }));
-
-    function applySidebarStep(arKey) {
-      const isAr = arKey === "ar";
-      const w = isAr ? "100%" : "50%";
-      progFillM.style.width = w;
-      progFillD.style.width = w;
-      const label = isAr ? L.step2 : L.step1;
-      const n = isAr ? 2 : 1;
-      mobileStepLine.textContent = `${n}. ${label}`;
-      deskCur.textContent = label;
-      mobFrac.textContent = isAr ? "2/2" : "1/2";
-      nav1.style.opacity = isAr ? "0.55" : "1";
-      nav1.style.fontWeight = isAr ? "400" : "600";
-      nav2.style.opacity = isAr ? "1" : "0.55";
-      nav2.style.fontWeight = isAr ? "600" : "400";
-    }
-
-    const mobileHead = el("div", { className: "omafit-ar-sbar-mobile-only" });
-    const mobTop = el("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        padding: "8px 10px 0",
-      },
-    });
-    mobTop.appendChild(mkCloseBtn());
-
-    const mobLogo = el("div", {
-      style: { display: "flex", justifyContent: "center", padding: "4px 14px 10px" },
-    });
-    if (logoUrl) {
-      mobLogo.appendChild(
-        el("img", {
-          src: logoUrl,
-          alt: shopName || "",
-          loading: "eager",
-          decoding: "async",
-          style: { maxHeight: "42px", width: "auto", maxWidth: "min(220px,72vw)", objectFit: "contain" },
-        }),
-      );
-    } else if (shopName) {
-      mobLogo.appendChild(
-        el("span", {
-          textContent: shopName,
-          style: { fontSize: "14px", fontWeight: "600", textAlign: "center" },
-        }),
-      );
-    }
-
-    const mobProg = el("div", {
-      style: {
-        borderTop: "1px solid rgba(255,255,255,0.15)",
-        padding: "10px 14px 6px",
-      },
-    });
-    const mobProgTop = el("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "8px",
-        gap: "10px",
-      },
-    });
-    mobProgTop.appendChild(
-      el("span", {
-        textContent: L.progress,
-        style: {
-          fontSize: "10px",
+          fontSize: "1.125rem",
           fontWeight: "600",
-          letterSpacing: "0.12em",
-          opacity: "0.82",
-          textTransform: "uppercase",
+          color: primaryColor,
+          textAlign: "center",
+          lineHeight: "1.2",
+          padding: "0 8px",
         },
       }),
     );
-    mobProgTop.appendChild(mobFrac);
-    mobProg.appendChild(mobProgTop);
-    mobProg.appendChild(progTrackM);
-
-    mobileHead.appendChild(mobTop);
-    mobileHead.appendChild(mobLogo);
-    mobileHead.appendChild(mobProg);
-    mobileHead.appendChild(mobileStepLine);
-
-    const deskAside = el("aside", { className: "omafit-ar-sbar-desktop-only" });
-    const deskLogo = el("div", { style: { marginBottom: "16px" } });
-    if (logoUrl) {
-      deskLogo.appendChild(
-        el("img", {
-          src: logoUrl,
-          alt: shopName || "",
-          style: {
-            maxHeight: "48px",
-            width: "auto",
-            maxWidth: "100%",
-            objectFit: "contain",
-            objectPosition: "left",
-          },
-        }),
-      );
-    } else if (shopName) {
-      deskLogo.appendChild(
-        el("span", {
-          textContent: shopName,
-          style: { fontSize: "14px", fontWeight: "600", lineHeight: "1.25", opacity: "0.92" },
-        }),
-      );
-    }
-    deskAside.appendChild(deskLogo);
-    deskAside.appendChild(
-      el("p", {
-        textContent: L.progress,
-        style: {
-          fontSize: "10px",
-          fontWeight: "600",
-          letterSpacing: "0.14em",
-          opacity: "0.8",
-          margin: "0 0 10px",
-          textTransform: "uppercase",
-        },
-      }),
-    );
-    deskAside.appendChild(progTrackD);
-
-    const deskNav = el("nav", {
-      style: {
-        marginTop: "16px",
-        flex: "1",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        overflowY: "auto",
-        minHeight: "0",
-      },
-    });
-    deskNav.setAttribute("aria-label", "Steps");
-    deskNav.appendChild(nav1);
-    deskNav.appendChild(nav2);
-    deskAside.appendChild(deskNav);
-    deskAside.appendChild(deskCur);
-
-    const deskCloseWrap = el("div", {
-      style: {
-        marginTop: "14px",
-        paddingTop: "12px",
-        borderTop: "1px solid rgba(255,255,255,0.15)",
-      },
-    });
-    deskCloseWrap.appendChild(mkCloseBtn());
-    deskAside.appendChild(deskCloseWrap);
-
-    sidebarWrap = el("div", {
-      style: {
-        flexShrink: "0",
-        display: "flex",
-        flexDirection: "column",
-        background: primaryColor,
-        color: fg,
-      },
-    });
-    sidebarWrap.appendChild(mobileHead);
-    sidebarWrap.appendChild(deskAside);
-
-    shell.__omafitArSidebarApi = { setStep: applySidebarStep };
   }
+
+  const closeBtn = el(
+    "div",
+    {
+      role: "button",
+      tabIndex: 0,
+      className: "omafit-ar-close-btn",
+      title: t.close,
+      style: {
+        width: "40px",
+        height: "40px",
+        border: "none",
+        background: "transparent",
+        cursor: "pointer",
+        color: "#6b7280",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: "0",
+        borderRadius: "8px",
+      },
+    },
+    [svgX()],
+  );
+  closeBtn.setAttribute("data-omafit-ar-close-modal", "1");
+  closeBtn.addEventListener("click", onClose);
+  closeBtn.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      onClose();
+    }
+  });
+
+  header.appendChild(leftPad);
+  header.appendChild(logoWrap);
+  header.appendChild(closeBtn);
 
   const mainRow = el("div", {
     style: {
@@ -6093,14 +5701,8 @@ function buildInfoModal({
   mainRow.appendChild(colImg);
   mainRow.appendChild(colContent);
 
-  if (layoutSidebar) {
-    shell.appendChild(sidebarWrap);
-    contentOuter.appendChild(mainRow);
-    shell.appendChild(contentOuter);
-  } else {
-    shell.appendChild(header);
-    shell.appendChild(mainRow);
-  }
+  shell.appendChild(header);
+  shell.appendChild(mainRow);
 
   const mq = window.matchMedia("(min-width: 768px)");
   function applyMq() {
@@ -6652,11 +6254,6 @@ async function runArSession({
   productId,
 }) {
   colContent.innerHTML = "";
-  try {
-    shell.__omafitArSidebarApi?.setStep?.("ar");
-  } catch {
-    /* ignore */
-  }
   const desktopCol = shell.querySelector(".omafit-ar-col-desktop");
   if (desktopCol) desktopCol.style.display = "none";
 
@@ -6996,8 +6593,6 @@ async function runArSession({
   let removeOrientationListeners = null;
   /** Timeouts de `_resize` tardio (layout do modal / safe-area) — limpar no cleanup. */
   let lateMindarResizeTimerIds = [];
-  /** RAF pendente de `scheduleMindarResize` — cancelar no cleanup. */
-  let mindarResizeRafId = 0;
   /** `loadedmetadata` no `<video>` — voltar a sincronizar canvas/câmara. */
   let faceProjectionVideoCleanup = null;
   /** Remover painel de debug Tripo (sliders) ao fechar o modal. */
@@ -7013,14 +6608,6 @@ async function runArSession({
       arFit.style.transformOrigin = "";
     } catch {
       /* ignore */
-    }
-    if (mindarResizeRafId) {
-      try {
-        cancelAnimationFrame(mindarResizeRafId);
-      } catch {
-        /* ignore */
-      }
-      mindarResizeRafId = 0;
     }
     if (arResizeObserver) {
       arResizeObserver.disconnect();
@@ -7119,9 +6706,8 @@ async function runArSession({
     }
   };
 
-  const closeTargets = shell.querySelectorAll("[data-omafit-ar-close-modal]");
-  for (const headerClose of closeTargets) {
-    if (headerClose?.dataset?.omafitArSessionClose === "1") continue;
+  const headerClose = header.querySelector("[data-omafit-ar-close-modal]");
+  if (headerClose && headerClose.dataset.omafitArSessionClose !== "1") {
     headerClose.dataset.omafitArSessionClose = "1";
     headerClose.addEventListener(
       "click",
@@ -7937,19 +7523,12 @@ async function runArSession({
         /* ignore */
       }
     };
-    const scheduleMindarResize = () => {
-      if (mindarResizeRafId) return;
-      mindarResizeRafId = requestAnimationFrame(() => {
-        mindarResizeRafId = 0;
-        triggerMindarResize();
-      });
-    };
     /**
      * `ResizeObserver` + `resize` + timeouts tardios: o MindAR mede `clientWidth`
      * do container; se o modal ainda não terminou layout, o vídeo fica descentrado
      * e parece “cortado” num dos lados.
      */
-    arResizeObserver = new ResizeObserver(scheduleMindarResize);
+    arResizeObserver = new ResizeObserver(triggerMindarResize);
     arResizeObserver.observe(arWrap);
     arResizeObserver.observe(mindarHost);
     requestAnimationFrame(triggerMindarResize);
@@ -7968,13 +7547,13 @@ async function runArSession({
       );
     }
     try {
-      window.addEventListener("orientationchange", scheduleMindarResize);
+      window.addEventListener("orientationchange", triggerMindarResize);
       if (screen?.orientation?.addEventListener) {
-        screen.orientation.addEventListener("change", scheduleMindarResize);
+        screen.orientation.addEventListener("change", triggerMindarResize);
       }
       removeOrientationListeners = () => {
-        try { window.removeEventListener("orientationchange", scheduleMindarResize); } catch { /* ignore */ }
-        try { screen?.orientation?.removeEventListener?.("change", scheduleMindarResize); } catch { /* ignore */ }
+        try { window.removeEventListener("orientationchange", triggerMindarResize); } catch { /* ignore */ }
+        try { screen?.orientation?.removeEventListener?.("change", triggerMindarResize); } catch { /* ignore */ }
       };
     } catch {
       /* ignore */
@@ -7988,7 +7567,7 @@ async function runArSession({
       const vMeta = mindarHost?.querySelector?.("video");
       if (vMeta) {
         const onVideoProjectionDims = () => {
-          scheduleMindarResize();
+          triggerMindarResize();
         };
         vMeta.addEventListener("loadedmetadata", onVideoProjectionDims);
         vMeta.addEventListener("loadeddata", onVideoProjectionDims);
@@ -13542,16 +13121,8 @@ async function runHandArSession({
   }
 
   // Size + start animation loop.
-  let handResizeRafId = 0;
-  const scheduleHandResize = () => {
-    if (handResizeRafId) return;
-    handResizeRafId = requestAnimationFrame(() => {
-      handResizeRafId = 0;
-      resizeRenderer();
-    });
-  };
   resizeRenderer();
-  const ro = new ResizeObserver(() => scheduleHandResize());
+  const ro = new ResizeObserver(() => resizeRenderer());
   ro.observe(mindarHost);
 
   const tmpMat = new THREE.Matrix4();
@@ -15095,14 +14666,6 @@ async function runHandArSession({
     running = false;
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
-    if (handResizeRafId) {
-      try {
-        cancelAnimationFrame(handResizeRafId);
-      } catch {
-        /* ignore */
-      }
-      handResizeRafId = 0;
-    }
     try {
       ro.disconnect();
     } catch {
@@ -15357,7 +14920,7 @@ async function main() {
   // #endregion
 
   try {
-  injectGlobalStyles(root, primaryColor, omafitResolveTryonLayout(root));
+  injectGlobalStyles(root, primaryColor);
   {
     const deferPreload =
       String(root?.dataset?.arDeferModulePreload ?? root?.getAttribute?.("data-ar-defer-module-preload") ?? "")
@@ -15387,8 +14950,6 @@ async function main() {
       productTitle,
       productImage,
       t,
-      layoutSidebar: omafitResolveTryonLayout(root),
-      locale: lang,
       onClose: closeModal,
       onStartAr: (shell, mainRow, colContent, header) => {
         const freshVariants = Array.isArray(window.__OMAFIT_AR_VARIANTS__)
@@ -15578,26 +15139,6 @@ function bootOmafitArWidget() {
   let rafBoot = 0;
   const maxRaf = 720;
   function tick() {
-    rafBoot++;
-    if (rafBoot > maxRaf) {
-      // #region agent log
-      __omafitArDbgLog({
-        location: "omafit-ar-widget.js:boot.tick",
-        message: "boot timeout without root+glb",
-        hypothesisId: "H4",
-        data: {
-          rafBoot,
-          hasRootEl: Boolean(document.getElementById("omafit-ar-root")),
-        },
-      });
-      // #endregion
-      return;
-    }
-    /** Só consultar DOM em frames pares: reflows agrupam e reduzimos ~50% de trabalho à espera do root. */
-    if (rafBoot % 2 === 1) {
-      requestAnimationFrame(tick);
-      return;
-    }
     const root = document.getElementById("omafit-ar-root");
     const glb = omafitReadGlbUrlFromRootOrQuery();
     if (root && glb) {
@@ -15628,6 +15169,20 @@ function bootOmafitArWidget() {
       startOmafitAr().catch((e) => {
         console.error("[omafit-ar]", e);
       });
+      return;
+    }
+    if (++rafBoot > maxRaf) {
+      // #region agent log
+      __omafitArDbgLog({
+        location: "omafit-ar-widget.js:boot.tick",
+        message: "boot timeout without root+glb",
+        hypothesisId: "H4",
+        data: {
+          rafBoot,
+          hasRootEl: Boolean(document.getElementById("omafit-ar-root")),
+        },
+      });
+      // #endregion
       return;
     }
     requestAnimationFrame(tick);

@@ -122,10 +122,10 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
   );
 }
 
-/** Largura de cada cartão para caber exatamente 2 por vista (mobile) ou 4 (md+), numa única linha. */
+/** Largura de cada cartão: 2 por vista (< md), 3 (md–lg), 4 (lg+); uma única linha + marquee. */
 function useMarqueeViewportCardWidth() {
   const ref = useRef<HTMLDivElement>(null);
-  const [cardWidth, setCardWidth] = useState(280);
+  const [cardWidth, setCardWidth] = useState(300);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -134,9 +134,17 @@ function useMarqueeViewportCardWidth() {
     const compute = () => {
       const cw = el.getBoundingClientRect().width;
       if (cw <= 0) return;
+      const lg = window.matchMedia('(min-width: 1024px)').matches;
       const md = window.matchMedia('(min-width: 768px)').matches;
-      const gapPx = md ? 16 : 8;
-      const cols = md ? 4 : 2;
+      let cols = 2;
+      let gapPx = 8;
+      if (lg) {
+        cols = 4;
+        gapPx = 16;
+      } else if (md) {
+        cols = 3;
+        gapPx = 16;
+      }
       const gapsTotal = (cols - 1) * gapPx;
       setCardWidth(Math.max(168, (cw - gapsTotal) / cols));
     };
@@ -144,11 +152,14 @@ function useMarqueeViewportCardWidth() {
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
-    const mq = window.matchMedia('(min-width: 768px)');
-    mq.addEventListener('change', compute);
+    const mqMd = window.matchMedia('(min-width: 768px)');
+    const mqLg = window.matchMedia('(min-width: 1024px)');
+    mqMd.addEventListener('change', compute);
+    mqLg.addEventListener('change', compute);
     return () => {
       ro.disconnect();
-      mq.removeEventListener('change', compute);
+      mqMd.removeEventListener('change', compute);
+      mqLg.removeEventListener('change', compute);
     };
   }, []);
 
@@ -171,7 +182,7 @@ function FeatureMarqueeStrip({ features: list, cardWidth }: { features: Feature[
   );
 }
 
-/** Uma fileira horizontal; 2 cartões visíveis no mobile e 4 no desktop (larguras via ResizeObserver). Marquee duplicado. */
+/** Uma fileira horizontal; ~2 / ~3 / ~4 cartões visíveis (<768 / md / lg+). Marquee duplicado. */
 function SolutionAutoMarqueeGrid() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -244,8 +255,8 @@ export function Solution() {
           variants={containerVariants}
           className="mt-14 sm:mt-16"
         >
-          <motion.div variants={itemVariants} className="sm:mx-auto sm:max-w-6xl">
-            <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 sm:left-auto sm:mx-auto sm:w-full sm:max-w-6xl sm:translate-x-0">
+          <motion.div variants={itemVariants} className="sm:mx-auto sm:max-w-7xl">
+            <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 sm:left-auto sm:mx-auto sm:w-full sm:max-w-7xl sm:translate-x-0">
               <div className="border-y border-oma-line/35 bg-oma-elevated/20 py-6 sm:rounded-2xl sm:border sm:shadow-elegant-lg sm:py-8 md:rounded-3xl md:py-10">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_50%_30%,rgba(217,104,69,0.08),transparent)] sm:rounded-2xl md:rounded-3xl" />
                 <div className="relative z-[1]">

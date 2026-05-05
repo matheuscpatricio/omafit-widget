@@ -11,7 +11,7 @@ export type TryOnSidebarStepDef = {
   labelEn: string;
 };
 
-const STEPS: TryOnSidebarStepDef[] = [
+export const TRYON_CLOTHING_SIDEBAR_STEPS: TryOnSidebarStepDef[] = [
   { key: 'info', progress: 20, labelPt: 'Boas-vindas', labelEs: 'Bienvenida', labelEn: 'Welcome' },
   { key: 'calculator', progress: 40, labelPt: 'Medidas', labelEs: 'Medidas', labelEn: 'Measurements' },
   { key: 'photo', progress: 60, labelPt: 'Foto', labelEs: 'Foto', labelEn: 'Photo' },
@@ -20,14 +20,12 @@ const STEPS: TryOnSidebarStepDef[] = [
   { key: 'result', progress: 100, labelPt: 'Resultado', labelEs: 'Resultado', labelEn: 'Result' },
 ];
 
-const STEPS = TRYON_CLOTHING_SIDEBAR_STEPS as TryOnSidebarStepDef[];
-
 export function getTryonSidebarSteps(): TryOnSidebarStepDef[] {
-  return STEPS;
+  return TRYON_CLOTHING_SIDEBAR_STEPS;
 }
 
 export function tryonSidebarProgressForStep(step: TryOnFlowStep): number | null {
-  const row = STEPS.find((s) => s.key === step);
+  const row = TRYON_CLOTHING_SIDEBAR_STEPS.find((s) => s.key === step);
   return row ? row.progress : 0;
 }
 
@@ -35,7 +33,7 @@ export function tryonSidebarLabelForStep(
   step: TryOnFlowStep,
   lang: 'pt' | 'es' | 'en',
 ): string {
-  const row = STEPS.find((s) => s.key === step);
+  const row = TRYON_CLOTHING_SIDEBAR_STEPS.find((s) => s.key === step);
   if (!row) return '';
   if (lang === 'es') return row.labelEs;
   if (lang === 'en') return row.labelEn;

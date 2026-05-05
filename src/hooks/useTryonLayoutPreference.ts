@@ -95,7 +95,6 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
     const run = async () => {
       if (layoutFromUrl !== undefined || layoutOverride !== undefined) return;
       if (!effectiveShopDomain) {
-        setTryonLayout((p) => (p === 'pending' ? 'default' : p));
         return;
       }
       try {

@@ -936,7 +936,8 @@
           widgetEnabled: true,
           isActive: true,
           embedPosition: 'below_buy_buttons',
-          ctaType: 'link'
+          ctaType: 'link',
+          tryonLayout: 'default'
         };
       }
 
@@ -951,7 +952,7 @@
         'Content-Type': 'application/json'
       };
       var selectWidgetCfgFull =
-        'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,embed_position,cta_type,created_at,updated_at';
+        'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,embed_position,cta_type,tryon_layout,created_at,updated_at';
       var selectWidgetCfgLegacy =
         'id,shop_domain,link_text,store_logo,primary_color,widget_enabled,excluded_collections,admin_locale,created_at,updated_at';
       var selectWidgetCfgNoExcluded =
@@ -963,6 +964,20 @@
       );
       if (!configResponse.ok) {
         var errT = await configResponse.text().catch(function () { return ''; });
+        if (
+          configResponse.status === 400 &&
+          errT &&
+          errT.indexOf('tryon_layout') !== -1 &&
+          selectWidgetCfgFull.indexOf('tryon_layout') !== -1
+        ) {
+          console.warn('⚠️ Coluna tryon_layout ausente no Supabase. Repetindo busca sem ela.');
+          selectWidgetCfgFull = selectWidgetCfgFull.replace(',tryon_layout', '');
+          configResponse = await fetch(
+            `${supabaseUrl}/rest/v1/widget_configurations?shop_domain=eq.${encodeURIComponent(shopDomain)}&select=${selectWidgetCfgFull}`,
+            { headers: configHeaders }
+          );
+          errT = await configResponse.text().catch(function () { return ''; });
+        }
         if (
           configResponse.status === 400 &&
           errT &&
@@ -1185,6 +1200,14 @@
           : 'below_buy_buttons';
       var normCta = String(rawCta || '').trim().toLowerCase() === 'button' ? 'button' : 'link';
 
+      var normTryonLayout =
+        config &&
+        String(config.tryon_layout != null ? config.tryon_layout : '')
+          .trim()
+          .toLowerCase() === 'sidebar'
+          ? 'sidebar'
+          : 'default';
+
       const mappedConfig = {
         publicId: validPublicId,
         linkText: config?.link_text || 'Experimentar virtualmente',
@@ -1209,7 +1232,8 @@
         isActive: isWidgetActive,
         excludedCollections: excludedCollections,
         embedPosition: normEmbed,
-        ctaType: normCta
+        ctaType: normCta,
+        tryonLayout: normTryonLayout
       };
       mappedConfig.storeName = ensureStoreName(mappedConfig);
       
@@ -1240,7 +1264,8 @@
         widgetEnabled: true,
         isActive: true,
         embedPosition: 'below_buy_buttons',
-        ctaType: 'link'
+        ctaType: 'link',
+        tryonLayout: 'default'
       };
     }
   }
@@ -1547,7 +1572,8 @@
               text: '#810707',
               overlay: '#810707CC'
             },
-            shopDomain: ''
+            shopDomain: '',
+            tryonLayout: 'default'
           };
         }
       } catch (e) {
@@ -1565,7 +1591,8 @@
             text: '#810707',
             overlay: '#810707CC'
           },
-          shopDomain: ''
+          shopDomain: '',
+          tryonLayout: 'default'
         };
       }
     }
@@ -1823,6 +1850,9 @@
     const availableSizesList = Array.isArray(productVariantCatalog.sizes) ? productVariantCatalog.sizes : [];
     const availableColorsList = Array.isArray(productVariantCatalog.colors) ? productVariantCatalog.colors : [];
 
+    var omafitIframeTryonLayout =
+      OMAFIT_CONFIG && OMAFIT_CONFIG.tryonLayout === 'sidebar' ? 'sidebar' : 'default';
+
     const widgetPath = collectionType === 'footwear' ? '/widget-shoes' : '/widget';
 
     let widgetUrl =
@@ -1841,6 +1871,8 @@
       '&store_name=' + encodeURIComponent(resolvedStoreName) +
       '&language=' + encodeURIComponent(storeLanguage) +
       '&locale=' + encodeURIComponent(storeLanguage) +
+      '&tryon_layout=' + encodeURIComponent(omafitIframeTryonLayout) +
+      '&tryonLayout=' + encodeURIComponent(omafitIframeTryonLayout) +
       (collectionHandle ? '&collectionHandle=' + encodeURIComponent(collectionHandle) : '') +
       (productCollectionHandles.length
         ? '&collectionHandles=' + encodeURIComponent(productCollectionHandles.join(','))
@@ -2063,7 +2095,9 @@
           collectionElasticity: typeof collectionElasticity === 'string' ? collectionElasticity : '',
           complementaryProduct: complementaryProduct || null,
           recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+          recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+          tryon_layout: omafitIframeTryonLayout,
+          tryonLayout: omafitIframeTryonLayout
           }, OMAFIT_WIDGET_ORIGIN);
 
           // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
@@ -2135,7 +2169,9 @@
                 collectionElasticity: collectionElasticity || '',
                 complementaryProduct: complementaryProduct || null,
                 recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+                tryon_layout: omafitIframeTryonLayout,
+                tryonLayout: omafitIframeTryonLayout
               }, OMAFIT_WIDGET_ORIGIN);
             } else {
               // Enviar atualização de configuração sem logo (logo inválido)
@@ -2163,7 +2199,9 @@
                 collectionElasticity: collectionElasticity || '',
                 complementaryProduct: complementaryProduct || null,
                 recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+                recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+                tryon_layout: omafitIframeTryonLayout,
+                tryonLayout: omafitIframeTryonLayout
               }, OMAFIT_WIDGET_ORIGIN);
             }
           } else {
@@ -2192,7 +2230,9 @@
               collectionElasticity: collectionElasticity || '',
               complementaryProduct: complementaryProduct || null,
               recommendedProductName: complementaryProduct ? complementaryProduct.title : '',
-              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : ''
+              recommendedProductUrl: complementaryProduct ? complementaryProduct.url : '',
+              tryon_layout: omafitIframeTryonLayout,
+              tryonLayout: omafitIframeTryonLayout
             }, OMAFIT_WIDGET_ORIGIN);
           }
         };
@@ -3113,7 +3153,8 @@
         fontFamily: 'inherit',
         shopDomain: '',
         embedPosition: 'below_buy_buttons',
-        ctaType: 'link'
+        ctaType: 'link',
+        tryonLayout: 'default'
       };
     }
     syncAdminBrandingToWidgetRoot(OMAFIT_CONFIG);
@@ -3344,7 +3385,8 @@
           widgetEnabled: true,
           isActive: true,
           embedPosition: 'below_buy_buttons',
-          ctaType: 'link'
+          ctaType: 'link',
+          tryonLayout: 'default'
         };
       }
 
@@ -3383,7 +3425,8 @@
             widgetEnabled: true,
             isActive: true,
             embedPosition: 'below_buy_buttons',
-            ctaType: 'link'
+            ctaType: 'link',
+            tryonLayout: 'default'
           };
         }
         // Verificar se está habilitado mesmo no fallback

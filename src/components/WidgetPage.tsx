@@ -5,6 +5,7 @@ import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
+import { supabase } from '../lib/supabase';
 
 /**
  * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
@@ -149,6 +150,8 @@ type EyewearArBootstrap = {
   /** Domínio da loja (`loja.myshopify.com`) — `fetch` do carrinho usa `https://{domínio}/cart/add.js`. */
   shopDomain?: string;
   productId?: string;
+  /** Layout do iframe (query `tryon_layout` / tema Shopify). */
+  tryonLayout?: TryonLayoutMode;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -235,6 +238,16 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     }
   }
 
+  let tryonLayoutEyewear: TryonLayoutMode | undefined;
+  const tryLayoutRaw = pickQ(['tryonLayout', 'tryon_layout']).trim().toLowerCase();
+  if (tryLayoutRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
+  else if (tryLayoutRaw === 'default' || tryLayoutRaw === 'classic') tryonLayoutEyewear = 'default';
+  if (!tryonLayoutEyewear && configFromUrl) {
+    const tlRaw = String(configFromUrl.tryon_layout ?? configFromUrl.tryonLayout ?? '').trim().toLowerCase();
+    if (tlRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
+    else if (tlRaw === 'default' || tlRaw === 'classic') tryonLayoutEyewear = 'default';
+  }
+
   /**
    * Link text default baseado no tipo de acessório — evita "Experimentar
    * óculos (AR)" aparecer para relógios/pulseiras/colares se o lojista não
@@ -289,6 +302,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
+    tryonLayout: tryonLayoutEyewear,
   };
 };
 
@@ -729,15 +743,72 @@ export function WidgetPage() {
     };
   }, []);
 
-  const eyewearBootstrap =
-    typeof window !== 'undefined' ? parseEyewearArBootstrapFromSearch(window.location.search) : null;
+  const eyewearSearchSnapshot =
+    typeof window !== 'undefined' ? window.location.search : '';
+
+  const eyewearBootstrap = useMemo(
+    () =>
+      typeof window !== 'undefined' ? parseEyewearArBootstrapFromSearch(window.location.search) : null,
+    [eyewearSearchSnapshot],
+  );
   /** Basta `arGlbUrl` na query — não exigir `omafit_mode`/heurísticas (URLs antigas ou mínimas). */
   const showEyewearArNetlify = typeof window !== 'undefined' && eyewearBootstrap !== null;
+
+  const [eyewearTryonLayoutFromDb, setEyewearTryonLayoutFromDb] = useState<TryonLayoutMode | null>(null);
+
+  useEffect(() => {
+    if (!showEyewearArNetlify || !eyewearBootstrap) {
+      setEyewearTryonLayoutFromDb(null);
+      return;
+    }
+    const fromUrl = parseTryonLayoutFromUrl();
+    if (fromUrl !== undefined || eyewearBootstrap.tryonLayout !== undefined) {
+      setEyewearTryonLayoutFromDb(null);
+      return;
+    }
+    const sd = (eyewearBootstrap.shopDomain || '').trim();
+    if (!sd) {
+      setEyewearTryonLayoutFromDb('default');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('widget_configurations')
+          .select('tryon_layout')
+          .eq('shop_domain', sd)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        if (cancelled) return;
+        if (error || !data?.length) {
+          setEyewearTryonLayoutFromDb('default');
+          return;
+        }
+        const raw = (data[0] as { tryon_layout?: string }).tryon_layout;
+        setEyewearTryonLayoutFromDb(raw === 'sidebar' ? 'sidebar' : 'default');
+      } catch {
+        if (!cancelled) setEyewearTryonLayoutFromDb('default');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showEyewearArNetlify, eyewearBootstrap, eyewearSearchSnapshot]);
+
+  const eyewearResolvedTryonLayout = useMemo((): TryonLayoutMode | null => {
+    if (!showEyewearArNetlify || !eyewearBootstrap) return null;
+    const u = parseTryonLayoutFromUrl();
+    if (u !== undefined) return u;
+    if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
+    return eyewearTryonLayoutFromDb;
+  }, [showEyewearArNetlify, eyewearBootstrap, eyewearTryonLayoutFromDb]);
 
   const [arModuleBootError, setArModuleBootError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showEyewearArNetlify) return;
+    if (eyewearResolvedTryonLayout === null) return;
     setArModuleBootError(null);
     let cancelled = false;
     const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.js?v=${encodeURIComponent(
@@ -787,7 +858,7 @@ export function WidgetPage() {
     return () => {
       cancelled = true;
     };
-  }, [showEyewearArNetlify]);
+  }, [showEyewearArNetlify, eyewearResolvedTryonLayout]);
 
   if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams() && !eyewearBootstrap) {
     return (
@@ -805,6 +876,17 @@ export function WidgetPage() {
   }
 
   if (showEyewearArNetlify && eyewearBootstrap) {
+    if (eyewearResolvedTryonLayout === null) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center p-6" onContextMenu={(e) => e.preventDefault()}>
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-[#810707]" />
+            <p className="text-sm text-gray-600">A preparar provador AR…</p>
+          </div>
+        </div>
+      );
+    }
+
     /** Propaga todos os data-ar-* recebidos via query string para o DOM onde
      *  o `/ar/omafit-ar-widget.js` hosteado lê — sem isto o widget cai em
      *  `glasses` por default (era esse o bug "conteúdo de óculos no relógio"). */
@@ -831,7 +913,7 @@ export function WidgetPage() {
         ) : null}
         <div
           id="omafit-ar-root"
-          data-tryon-layout={tryonIframeSidebar ? 'sidebar' : 'default'}
+          data-tryon-layout={eyewearResolvedTryonLayout}
           data-glb-url={eyewearBootstrap.glbUrl}
           data-primary-color={eyewearBootstrap.primaryColor}
           data-product-title={eyewearBootstrap.productTitle}
