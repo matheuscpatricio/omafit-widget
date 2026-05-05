@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-04-29-bracelet-single-occluder-v31';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-05-hero-layout-v1';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -152,6 +152,7 @@ type EyewearArBootstrap = {
   productId?: string;
   /** Layout do iframe (query `tryon_layout` / tema Shopify). */
   tryonLayout?: TryonLayoutMode;
+  tryonLayoutBackgroundImage?: string;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -243,12 +244,18 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
 
   let tryonLayoutEyewear: TryonLayoutMode | undefined;
   const tryLayoutRaw = pickQ(['tryonLayout', 'tryon_layout']).trim().toLowerCase();
-  if (tryLayoutRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
+  if (tryLayoutRaw === 'hero') tryonLayoutEyewear = 'hero';
+  else if (tryLayoutRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
   else if (tryLayoutRaw === 'default' || tryLayoutRaw === 'classic') tryonLayoutEyewear = 'default';
+  let tryonLayoutBackgroundImage = pickQ(['tryonLayoutBackgroundImage', 'tryon_layout_background_image']);
   if (!tryonLayoutEyewear && configFromUrl) {
     const tlRaw = String(configFromUrl.tryon_layout ?? configFromUrl.tryonLayout ?? '').trim().toLowerCase();
-    if (tlRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
+    if (tlRaw === 'hero') tryonLayoutEyewear = 'hero';
+    else if (tlRaw === 'sidebar') tryonLayoutEyewear = 'sidebar';
     else if (tlRaw === 'default' || tlRaw === 'classic') tryonLayoutEyewear = 'default';
+  }
+  if (!tryonLayoutBackgroundImage && configFromUrl) {
+    tryonLayoutBackgroundImage = String(configFromUrl.tryon_layout_background_image ?? configFromUrl.tryonLayoutBackgroundImage ?? '').trim();
   }
 
   /**
@@ -306,6 +313,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
     tryonLayout: tryonLayoutEyewear,
+    tryonLayoutBackgroundImage: tryonLayoutBackgroundImage || undefined,
   };
 };
 
@@ -354,13 +362,14 @@ export function WidgetPage() {
   const [tryonEnabledOverride, setTryonEnabledOverride] = useState<boolean | undefined>(() =>
     parseTryonEnabledUrlParam()
   );
+  const [tryonLayoutBackgroundImage, setTryonLayoutBackgroundImage] = useState<string>('');
 
   const tryonIframeSidebar = false;
   /** Sidebar ativa (URL ou config vinda do TryOnWidget) — iframe sem margens para o layout encaixar. */
   const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
   const [eyewearTryonLayoutFromMessage, setEyewearTryonLayoutFromMessage] = useState<TryonLayoutMode | null>(null);
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
-    setTryonSidebarChrome(layout === 'sidebar');
+    setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
 
   useEffect(() => {
@@ -563,6 +572,8 @@ export function WidgetPage() {
         } else if (typeof config.tryon_enabled === 'boolean') {
           setTryonEnabledOverride(config.tryon_enabled);
         }
+        const heroBg = config.tryonLayoutBackgroundImage || config.tryon_layout_background_image;
+        if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
       } catch (error) {
         console.error('Error parsing config:', error);
       }
@@ -572,9 +583,13 @@ export function WidgetPage() {
       console.log('📨 Mensagem recebida:', event.data.type);
       const msgType = event?.data?.type;
       const msgLayout = event?.data?.tryon_layout ?? event?.data?.tryonLayout;
-      if ((msgType === 'omafit-context' || msgType === 'omafit-config-update') && (msgLayout === 'sidebar' || msgLayout === 'default')) {
+      if ((msgType === 'omafit-context' || msgType === 'omafit-config-update') && (msgLayout === 'hero' || msgLayout === 'sidebar' || msgLayout === 'default')) {
         setEyewearTryonLayoutFromMessage(msgLayout);
-        setTryonSidebarChrome(msgLayout === 'sidebar');
+        setTryonSidebarChrome(msgLayout === 'sidebar' || msgLayout === 'hero');
+      }
+      if (msgType === 'omafit-context' || msgType === 'omafit-config-update') {
+        const heroBg = event.data.tryon_layout_background_image ?? event.data.tryonLayoutBackgroundImage;
+        if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
       }
 
       if (event.data.type === 'omafit-store-logo') {
@@ -785,7 +800,7 @@ export function WidgetPage() {
       try {
         const { data, error } = await supabase
           .from('widget_configurations')
-          .select('tryon_layout')
+          .select('tryon_layout, tryon_layout_background_image')
           .eq('shop_domain', sd)
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -795,7 +810,9 @@ export function WidgetPage() {
           return;
         }
         const raw = (data[0] as { tryon_layout?: string }).tryon_layout;
-        setEyewearTryonLayoutFromDb(raw === 'sidebar' ? 'sidebar' : 'default');
+        setEyewearTryonLayoutFromDb(raw === 'hero' ? 'hero' : raw === 'sidebar' ? 'sidebar' : 'default');
+        const heroBg = (data[0] as { tryon_layout_background_image?: string }).tryon_layout_background_image;
+        if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
       } catch {
         if (!cancelled) setEyewearTryonLayoutFromDb('default');
       }
@@ -923,6 +940,7 @@ export function WidgetPage() {
         <div
           id="omafit-ar-root"
           data-tryon-layout={eyewearResolvedTryonLayout}
+          data-tryon-layout-background-image={tryonLayoutBackgroundImage || eyewearBootstrap.tryonLayoutBackgroundImage || ''}
           data-glb-url={eyewearBootstrap.glbUrl}
           data-primary-color={eyewearBootstrap.primaryColor}
           data-product-title={eyewearBootstrap.productTitle}
@@ -1007,6 +1025,7 @@ export function WidgetPage() {
           selectedVariantOptions={selectedVariantOptions}
           tryonEnabled={tryonEnabledOverride}
           tryonLayoutOverride={undefined}
+          tryonLayoutBackgroundImage={tryonLayoutBackgroundImage}
           onTryonLayoutChange={handleTryonLayoutChange}
         />
       </div>

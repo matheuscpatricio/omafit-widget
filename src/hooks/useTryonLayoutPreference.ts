@@ -10,7 +10,7 @@ function readTryonLayoutFromSession(shopDomain: string): TryonLayoutMode | null 
   if (typeof window === 'undefined' || !shopDomain) return null;
   try {
     const raw = window.sessionStorage.getItem(`${SESSION_PREFIX}${shopDomain}`);
-    if (raw === 'sidebar' || raw === 'default') return raw;
+    if (raw === 'hero' || raw === 'sidebar' || raw === 'default') return raw;
   } catch {
     /* ignore */
   }
@@ -43,7 +43,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
 
   const [tryonLayout, setTryonLayout] = useState<TryonLayoutPreferenceState>(() => {
     if (layoutFromUrl !== undefined) return layoutFromUrl;
-    if (layoutOverride === 'sidebar' || layoutOverride === 'default') return layoutOverride;
+    if (layoutOverride === 'hero' || layoutOverride === 'sidebar' || layoutOverride === 'default') return layoutOverride;
     if (effectiveShopDomain) {
       const cached = readTryonLayoutFromSession(effectiveShopDomain);
       if (cached !== null) return cached;
@@ -54,7 +54,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
 
   useEffect(() => {
     if (layoutFromUrl !== undefined) return;
-    if (layoutOverride === 'sidebar' || layoutOverride === 'default') {
+    if (layoutOverride === 'hero' || layoutOverride === 'sidebar' || layoutOverride === 'default') {
       setTryonLayout(layoutOverride);
     }
   }, [layoutOverride, layoutFromUrl]);
@@ -81,7 +81,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
       if (d.type !== 'omafit-context' && d.type !== 'omafit-config-update') return;
       if (layoutFromUrl !== undefined || layoutOverride !== undefined) return;
       const tl = d.tryon_layout ?? d.tryonLayout;
-      if (tl !== 'sidebar' && tl !== 'default') return;
+      if (tl !== 'hero' && tl !== 'sidebar' && tl !== 'default') return;
       const sd = String(d.shopDomain ?? d.shop_domain ?? effectiveShopDomain ?? '').trim();
       setTryonLayout(tl);
       if (sd) writeTryonLayoutToSession(sd, tl);
@@ -112,7 +112,7 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
         }
         if (configs && configs.length > 0) {
           const raw = (configs[0] as { tryon_layout?: string }).tryon_layout;
-          const resolved: TryonLayoutMode = raw === 'sidebar' ? 'sidebar' : 'default';
+          const resolved: TryonLayoutMode = raw === 'hero' ? 'hero' : raw === 'sidebar' ? 'sidebar' : 'default';
           setTryonLayout(resolved);
           writeTryonLayoutToSession(effectiveShopDomain, resolved);
         } else {
@@ -129,11 +129,15 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
     };
   }, [effectiveShopDomain, layoutFromUrl, layoutOverride]);
 
-  const embed = tryonLayout === 'sidebar';
+  const embed = tryonLayout === 'sidebar' || tryonLayout === 'hero';
+  const isSidebarLayout = tryonLayout === 'sidebar';
+  const isHeroLayout = tryonLayout === 'hero';
 
   return {
     tryonLayout,
     embed,
+    isSidebarLayout,
+    isHeroLayout,
     layoutFromUrl,
   };
 }

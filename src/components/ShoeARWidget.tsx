@@ -17,6 +17,7 @@ import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
 import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
+import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { SHOE_SIDEBAR_STEPS } from './tryon/shoeSidebarStepMeta';
 
 interface ShoeARWidgetProps {
@@ -41,6 +42,7 @@ interface ShoeARWidgetProps {
   selectedVariantId?: string;
   selectedVariantOptions?: Record<string, string>;
   tryonLayoutOverride?: TryonLayoutMode;
+  tryonLayoutBackgroundImage?: string;
   onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
 }
 
@@ -668,11 +670,12 @@ export function ShoeARWidget({
   selectedVariantId = '',
   selectedVariantOptions = {},
   tryonLayoutOverride,
+  tryonLayoutBackgroundImage = '',
   onTryonLayoutChange,
 }: ShoeARWidgetProps) {
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
   const effectiveShopDomain = (shopDomain || '').trim();
-  const { tryonLayout, embed } = useTryonLayoutPreference({
+  const { tryonLayout, embed, isSidebarLayout, isHeroLayout } = useTryonLayoutPreference({
     shopDomain: effectiveShopDomain,
     layoutOverride: tryonLayoutOverride,
     onLayoutResolved: onTryonLayoutChange,
@@ -1487,7 +1490,7 @@ export function ShoeARWidget({
       `}</style>
 
       <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
-        {embed && (
+        {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={primaryColor}
             storeName={storeName}
@@ -1944,6 +1947,14 @@ export function ShoeARWidget({
       )}
           </div>
         </div>
+        {isHeroLayout && (
+          <TryOnLayoutShellHero
+            primaryColor={primaryColor}
+            storeName={storeName}
+            logoUrl={storeLogo || ''}
+            backgroundImage={tryonLayoutBackgroundImage || productImage || ''}
+          />
+        )}
       </div>
     </div>
   );

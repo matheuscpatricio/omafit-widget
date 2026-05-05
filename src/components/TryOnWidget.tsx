@@ -13,6 +13,7 @@ import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
+import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
@@ -24,7 +25,7 @@ function readTryonLayoutFromSession(shopDomain: string): TryonLayoutMode | null 
   if (typeof window === 'undefined' || !shopDomain) return null;
   try {
     const raw = window.sessionStorage.getItem(`${TRYON_LAYOUT_SESSION_PREFIX}${shopDomain}`);
-    if (raw === 'sidebar' || raw === 'default') return raw;
+    if (raw === 'hero' || raw === 'sidebar' || raw === 'default') return raw;
   } catch {
     /* ignore */
   }
@@ -72,6 +73,7 @@ interface TryOnWidgetProps {
   tryonEnabled?: boolean;
   /** Força layout do iframe (ex. query na WidgetPage); se omitido, usa Supabase `tryon_layout`. */
   tryonLayoutOverride?: TryonLayoutMode;
+  tryonLayoutBackgroundImage?: string;
   /** Notifica a página (ex. WidgetPage) quando o layout efetivo muda — útil para full-bleed no iframe. */
   onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
 }
@@ -397,6 +399,7 @@ export function TryOnWidget({
   selectedVariantOptions: initialSelectedVariantOptions = {},
   tryonEnabled: tryonEnabledProp,
   tryonLayoutOverride,
+  tryonLayoutBackgroundImage,
   onTryonLayoutChange,
 }: TryOnWidgetProps) {
 
@@ -496,7 +499,7 @@ export function TryOnWidget({
   const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromUrl(), []);
   const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutState>(() => {
     if (layoutFromUrl !== undefined) return layoutFromUrl;
-    if (tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') return tryonLayoutOverride;
+    if (tryonLayoutOverride === 'hero' || tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') return tryonLayoutOverride;
     const sd = (shopDomain || '').trim();
     if (sd) {
       const cached = readTryonLayoutFromSession(sd);
@@ -508,7 +511,7 @@ export function TryOnWidget({
 
   React.useEffect(() => {
     if (layoutFromUrl !== undefined) return;
-    if (tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') {
+    if (tryonLayoutOverride === 'hero' || tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') {
       setTryonLayout(tryonLayoutOverride);
     }
   }, [tryonLayoutOverride, layoutFromUrl]);
@@ -600,6 +603,7 @@ export function TryOnWidget({
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
+  const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
 
   /** Quando `shopDomain` / `localShopDomain` fica disponível, aplicar cache e sair de `pending` sem flash. */
@@ -986,6 +990,12 @@ export function TryOnWidget({
   }, [primaryColor]);
 
   useEffect(() => {
+    if (tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== '') {
+      setLocalHeroBackgroundImage(tryonLayoutBackgroundImage.trim());
+    }
+  }, [tryonLayoutBackgroundImage]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const updateSelectedColor = async () => {
@@ -1128,7 +1138,7 @@ export function TryOnWidget({
 
         if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
           const tl = event.data.tryon_layout ?? event.data.tryonLayout;
-          if (tl === 'sidebar' || tl === 'default') {
+          if (tl === 'hero' || tl === 'sidebar' || tl === 'default') {
             setTryonLayout(tl);
             const sd = (
               (event.data.shopDomain as string | undefined) ||
@@ -1138,6 +1148,11 @@ export function TryOnWidget({
             ).trim();
             if (sd) writeTryonLayoutToSession(sd, tl);
           }
+        }
+
+        const heroBg = event.data.tryon_layout_background_image ?? event.data.tryonLayoutBackgroundImage;
+        if (typeof heroBg === 'string') {
+          setLocalHeroBackgroundImage(heroBg.trim());
         }
 
         if (event.data.storeName) {
@@ -1239,7 +1254,7 @@ export function TryOnWidget({
       try {
         const { data: configs, error } = await supabase
           .from('widget_configurations')
-          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at, tryon_enabled, tryon_layout')
+          .select('link_text, store_logo, primary_color, title, subtitle, admin_locale, updated_at, tryon_enabled, tryon_layout, tryon_layout_background_image')
           .eq('shop_domain', effectiveShopDomain)
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -1274,9 +1289,14 @@ export function TryOnWidget({
 
           if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
             const rawLayout = (config as { tryon_layout?: string }).tryon_layout;
-            const resolved: TryonLayoutMode = rawLayout === 'sidebar' ? 'sidebar' : 'default';
+            const resolved: TryonLayoutMode = rawLayout === 'hero' ? 'hero' : rawLayout === 'sidebar' ? 'sidebar' : 'default';
             setTryonLayout(resolved);
             writeTryonLayoutToSession(effectiveShopDomain, resolved);
+          }
+
+          const heroBg = (config as { tryon_layout_background_image?: string }).tryon_layout_background_image;
+          if (typeof heroBg === 'string') {
+            setLocalHeroBackgroundImage(heroBg.trim());
           }
 
           // Fonte de verdade do idioma: admin_locale salvo no Supabase.
@@ -3322,7 +3342,9 @@ const handleSubmit = async () => {
 
   console.log('🎨 Estilos aplicados no widget:', { fontFamily });
 
-  const embed = tryonLayout === 'sidebar';
+  const isSidebarLayout = tryonLayout === 'sidebar';
+  const isHeroLayout = tryonLayout === 'hero';
+  const embed = isSidebarLayout || isHeroLayout;
 
   return (
     <div
@@ -3346,9 +3368,9 @@ const handleSubmit = async () => {
         .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
       `}</style>
 
-      {/* Full Screen — com layout sidebar: painel + conteúdo; `contents` evita wrapper extra no layout default */}
+      {/* Full Screen — layouts avançados usam chrome externo; `contents` evita wrapper extra no layout default */}
       <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
-        {embed && (
+        {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={localPrimaryColor}
             storeName={localStoreName || storeName || ''}
@@ -4374,6 +4396,14 @@ const handleSubmit = async () => {
         )}
 
         </div>
+        {isHeroLayout && (
+          <TryOnLayoutShellHero
+            primaryColor={localPrimaryColor}
+            storeName={localStoreName || storeName || ''}
+            logoUrl={localStoreLogo || ''}
+            backgroundImage={localHeroBackgroundImage || displayImage}
+          />
+        )}
       </div>
     </div>
       )}

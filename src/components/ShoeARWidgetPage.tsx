@@ -52,7 +52,7 @@ type ProductCatalog = {
 export function ShoeARWidgetPage() {
   const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
-    setTryonSidebarChrome(layout === 'sidebar');
+    setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
@@ -80,6 +80,7 @@ export function ShoeARWidgetPage() {
   });
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
+  const [tryonLayoutBackgroundImage, setTryonLayoutBackgroundImage] = useState<string>('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -105,6 +106,7 @@ export function ShoeARWidgetPage() {
       params.get('storeLanguage');
     const shoeModelParam = params.get('shoeModelUrl') || params.get('modelUrl') || params.get('shoeModel');
     const shoeModelIosParam = params.get('shoeModelIosUrl') || params.get('iosModelUrl');
+    const heroBackgroundParam = params.get('tryonLayoutBackgroundImage') || params.get('tryon_layout_background_image');
 
     if (image) setProductImage(image);
     if (id) setProductId(id);
@@ -132,6 +134,7 @@ export function ShoeARWidgetPage() {
     if (logoParam) setStoreLogo(logoParam);
     if (shoeModelParam) setShoeModelUrl(decodeURIComponent(shoeModelParam));
     if (shoeModelIosParam) setShoeModelIosUrl(decodeURIComponent(shoeModelIosParam));
+    if (heroBackgroundParam) setTryonLayoutBackgroundImage(decodeURIComponent(heroBackgroundParam));
 
     const normalizedLanguage = normalizeWidgetLanguage(languageParam);
     if (normalizedLanguage) setStoreLanguage(normalizedLanguage);
@@ -165,6 +168,8 @@ export function ShoeARWidgetPage() {
         }
         if (config.shoeModelUrl && !shoeModelParam) setShoeModelUrl(config.shoeModelUrl);
         if (config.shoeModelIosUrl && !shoeModelIosParam) setShoeModelIosUrl(config.shoeModelIosUrl);
+        const heroBg = config.tryonLayoutBackgroundImage || config.tryon_layout_background_image;
+        if (typeof heroBg === 'string' && !heroBackgroundParam) setTryonLayoutBackgroundImage(heroBg.trim());
 
         const configLanguage = normalizeWidgetLanguage(
           config.adminLocale || config.admin_locale || config.language
@@ -215,6 +220,8 @@ export function ShoeARWidgetPage() {
         }
         if (event.data.shoeModelUrl) setShoeModelUrl(event.data.shoeModelUrl);
         if (event.data.shoeModelIosUrl) setShoeModelIosUrl(event.data.shoeModelIosUrl);
+        const heroBg = event.data.tryon_layout_background_image ?? event.data.tryonLayoutBackgroundImage;
+        if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
         if (event.data.productCatalog && typeof event.data.productCatalog === 'object') {
           const catalog = event.data.productCatalog as Partial<ProductCatalog>;
           setProductCatalog({
@@ -246,8 +253,8 @@ export function ShoeARWidgetPage() {
         if (eventLanguage) setStoreLanguage(eventLanguage);
 
         const tl = event.data.tryon_layout ?? event.data.tryonLayout;
-        if (tl === 'sidebar' || tl === 'default') {
-          setTryonSidebarChrome(tl === 'sidebar');
+        if (tl === 'hero' || tl === 'sidebar' || tl === 'default') {
+          setTryonSidebarChrome(tl === 'sidebar' || tl === 'hero');
         }
       }
     };
@@ -300,6 +307,7 @@ export function ShoeARWidgetPage() {
             selectedVariantId={selectedVariantId}
             selectedVariantOptions={selectedVariantOptions}
             tryonLayoutOverride={undefined}
+            tryonLayoutBackgroundImage={tryonLayoutBackgroundImage}
             onTryonLayoutChange={handleTryonLayoutChange}
           />
         ) : (
