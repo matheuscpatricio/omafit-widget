@@ -1554,7 +1554,7 @@ export function ShoeARWidget({
           <div
             className={
               embed
-                ? 'flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row'
+                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${isHeroLayout ? ' relative z-10' : ''}`
                 : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
             }
             style={{ fontFamily: fontFamily || 'inherit' }}

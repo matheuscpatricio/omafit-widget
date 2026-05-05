@@ -30,8 +30,9 @@ export function TryOnLayoutShellHero({
 
   const desktopStyle: CSSProperties = bg
     ? {
+        backgroundColor: p,
         backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p} 32%, ${p}e8 44%, ${p}55 56%, ${p}00 68%), url("${bg}")`,
-        backgroundSize: 'cover, cover',
+        backgroundSize: 'cover, contain',
         backgroundPosition: 'left center, right center',
         backgroundRepeat: 'no-repeat, no-repeat',
       }
@@ -43,7 +44,7 @@ export function TryOnLayoutShellHero({
   const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-0 isolate overflow-hidden" aria-hidden="true">
       <motion.section
         className={`absolute inset-0 transition-[filter,transform] duration-200 ease-out md:hidden ${bgBlurClass}`}
         style={mobileStyle}

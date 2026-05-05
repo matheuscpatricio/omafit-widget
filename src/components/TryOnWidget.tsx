@@ -3713,9 +3713,11 @@ const handleSubmit = async () => {
           </div>
         )}
 
-        {/* Coluna do conteúdo */}
+        {/* Coluna do conteúdo — z-10 no hero para ficar acima do fundo absoluto (TryOnLayoutShellHero) */}
         <div
           className={`flex-1 transition-all duration-300 ease-in-out ${
+            embed && isHeroLayout ? 'relative z-10 ' : ''
+          }${
             embed && (step === 'info' || step === 'photo')
               ? `flex min-h-0 min-w-0 flex-col overflow-hidden overflow-y-auto p-2 sm:px-3${
                   step === 'photo' ? ' md:pt-11' : ''

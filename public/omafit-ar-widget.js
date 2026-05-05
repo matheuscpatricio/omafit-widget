@@ -6043,8 +6043,9 @@ function buildInfoModal({
         className: "omafit-ar-hero-bg-desktop",
         style: heroBg
           ? {
+              backgroundColor: primaryColor,
               backgroundImage: heroBgDesktopCss,
-              backgroundSize: "cover, cover",
+              backgroundSize: "cover, contain",
               backgroundPosition: "left center, right center",
               backgroundRepeat: "no-repeat, no-repeat",
             }
