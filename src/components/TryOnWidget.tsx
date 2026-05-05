@@ -3346,12 +3346,14 @@ const handleSubmit = async () => {
   const isSidebarLayout = tryonLayout === 'sidebar';
   const isHeroLayout = tryonLayout === 'hero';
   const embed = isSidebarLayout || isHeroLayout;
+  /** Hero visual (fundo + logos + texto claro): desligado no chat/resultado para ficar como layout default. */
+  const heroChromeActive = isHeroLayout && step !== 'result';
 
   return (
     <div
       className={`omafit-tryon-root w-full min-h-0${
         embed ? ' flex h-full min-h-0 w-full flex-1 flex-col' : ''
-      }${isHeroLayout ? ' omafit-tryon-hero' : ''}`}
+      }${heroChromeActive ? ' omafit-tryon-hero' : ''}`}
       onContextMenu={(e) => e.preventDefault()}
     >
       <style>{`
@@ -3368,7 +3370,7 @@ const handleSubmit = async () => {
         .hover\\:border-primary:hover { border-color: ${localPrimaryColor} !important; }
         .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
         ${
-          isHeroLayout
+          heroChromeActive
             ? `
         .omafit-tryon-hero .text-primary { color: #ffffff !important; }
         .omafit-tryon-hero .text-gray-400,
@@ -3416,7 +3418,7 @@ const handleSubmit = async () => {
 
       {/* Full Screen — layouts avançados usam chrome externo; `contents` evita wrapper extra no layout default */}
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
-        {isHeroLayout && (
+        {heroChromeActive && (
           <>
             <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center px-3 pt-3 md:hidden">
               <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
@@ -3469,7 +3471,7 @@ const handleSubmit = async () => {
         <motion.div
           className={
             embed
-              ? `relative flex min-h-0 flex-1 flex-col overflow-hidden ${isHeroLayout ? 'bg-transparent z-10' : 'bg-white'}`
+              ? `relative flex min-h-0 flex-1 flex-col overflow-hidden ${heroChromeActive ? 'bg-transparent z-10' : 'bg-white'}`
               : 'fixed inset-0 z-50 flex flex-col bg-white'
           }
           initial={{ opacity: 0 }}
@@ -4529,12 +4531,11 @@ const handleSubmit = async () => {
         )}
 
         </div>
-        {isHeroLayout && (
+        {heroChromeActive && (
           <TryOnLayoutShellHero
             primaryColor={localPrimaryColor}
             backgroundImage={localHeroBackgroundImage || displayImage}
             blurBackground={step !== 'info'}
-            infoStep={step === 'info'}
           />
         )}
       </div>

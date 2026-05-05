@@ -5524,8 +5524,9 @@ function buildInfoModal({
   const heroBgMobileCss = heroBg
     ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
-  const heroBgDesktopGradientOnly = `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 32%, ${primaryColor}e8 44%, ${primaryColor}55 56%, ${primaryColor}00 68%)`;
-  const heroBgDesktopSolidGradient = `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`;
+  const heroBgDesktopCss = heroBg
+    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}f2 42%, ${primaryColor}d9 58%, ${primaryColor}00 82%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
+    : `linear-gradient(90deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   // #region agent log
   __omafitArDbgLog({
     location: "omafit-ar-widget.js:buildInfoModal",
@@ -6037,65 +6038,19 @@ function buildInfoModal({
           : { backgroundImage: heroBgMobileCss, backgroundSize: "cover" },
       }),
     );
-    if (heroBg) {
-      const heroBgUrl = `url("${heroBg.replace(/"/g, "%22")}")`;
-      const desktopWrap = el("div", { className: "omafit-ar-hero-bg-desktop" });
-      desktopWrap.appendChild(
-        el("div", {
-          className: "omafit-ar-hero-bg-desktop-base",
-          style: {
-            position: "absolute",
-            inset: 0,
-            backgroundColor: primaryColor,
-            backgroundImage: heroBgUrl,
-            backgroundSize: "contain",
-            backgroundPosition: "right center",
-            backgroundRepeat: "no-repeat",
-          },
-        }),
-      );
-      desktopWrap.appendChild(
-        el("div", {
-          className: "omafit-ar-hero-bg-desktop-shade",
-          style: {
-            position: "absolute",
-            inset: 0,
-            backgroundImage: heroBgDesktopGradientOnly,
-            backgroundSize: "100% 100%",
-            backgroundRepeat: "no-repeat",
-            pointerEvents: "none",
-          },
-        }),
-      );
-      desktopWrap.appendChild(
-        el("div", {
-          className: "omafit-ar-hero-bg-desktop-seam",
-          style: {
-            position: "absolute",
-            left: "50%",
-            top: 0,
-            bottom: 0,
-            width: "min(9rem, 20vw)",
-            transform: "translateX(-50%)",
-            zIndex: 1,
-            pointerEvents: "none",
-            WebkitBackdropFilter: "blur(14px)",
-            backdropFilter: "blur(14px)",
-            background: `linear-gradient(90deg, ${primaryColor}00 0%, ${primaryColor}b3 40%, ${primaryColor}fa 50%, ${primaryColor}b3 60%, ${primaryColor}00 100%)`,
-            WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)",
-            maskImage: "linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)",
-          },
-        }),
-      );
-      bgRoot.appendChild(desktopWrap);
-    } else {
-      bgRoot.appendChild(
-        el("div", {
-          className: "omafit-ar-hero-bg-desktop",
-          style: { backgroundImage: heroBgDesktopSolidGradient, backgroundSize: "cover" },
-        }),
-      );
-    }
+    bgRoot.appendChild(
+      el("div", {
+        className: "omafit-ar-hero-bg-desktop",
+        style: heroBg
+          ? {
+              backgroundImage: heroBgDesktopCss,
+              backgroundSize: "cover, cover",
+              backgroundPosition: "center center, center center",
+              backgroundRepeat: "no-repeat, no-repeat",
+            }
+          : { backgroundImage: heroBgDesktopCss, backgroundSize: "cover" },
+      }),
+    );
     shell.appendChild(bgRoot);
     contentOuter.appendChild(mainRow);
     shell.appendChild(contentOuter);

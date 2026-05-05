@@ -1429,6 +1429,8 @@ export function ShoeARWidget({
     embed && step !== 'info' && step !== 'processing';
   const sidebarStep: 'info' | 'measure-capture' | 'processing' | 'measure-result' =
     step === 'ar-info' || step === 'ar-viewer' ? 'measure-result' : step;
+  /** Hero visual desligado no chat pós-medida — mesmo aspeto que layout default (fundo branco). */
+  const heroChromeActive = isHeroLayout && step !== 'measure-result';
 
   if (tryonLayout === 'pending' && effectiveShopDomain) {
     const loadingLabel =
@@ -1475,7 +1477,7 @@ export function ShoeARWidget({
     <div
       className={
         embed
-          ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${isHeroLayout ? 'omafit-shoe-hero bg-transparent' : 'bg-white'}`
+          ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${heroChromeActive ? 'omafit-shoe-hero bg-transparent' : 'bg-white'}`
           : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
       }
       onContextMenu={(e) => e.preventDefault()}
@@ -1488,7 +1490,7 @@ export function ShoeARWidget({
           font-family: '${fontFamily}', sans-serif !important;
         }
         ${
-          isHeroLayout
+          heroChromeActive
             ? `
         .omafit-shoe-hero .text-gray-500,
         .omafit-shoe-hero .text-gray-600,
@@ -1507,7 +1509,7 @@ export function ShoeARWidget({
       `}</style>
 
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
-        {isHeroLayout && (
+        {heroChromeActive && (
           <>
             <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center px-3 pt-3 md:hidden">
               <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
@@ -1605,7 +1607,7 @@ export function ShoeARWidget({
           <div
             className={
               embed
-                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${isHeroLayout ? ' relative z-10 md:pt-14' : ''}`
+                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${heroChromeActive ? ' relative z-10 md:pt-14' : isHeroLayout ? ' relative z-10' : ''}`
                 : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
             }
             style={{ fontFamily: fontFamily || 'inherit' }}
@@ -2020,12 +2022,11 @@ export function ShoeARWidget({
       )}
           </div>
         </div>
-        {isHeroLayout && (
+        {heroChromeActive && (
           <TryOnLayoutShellHero
             primaryColor={primaryColor}
             backgroundImage={tryonLayoutBackgroundImage || productImage || ''}
             blurBackground={step !== 'info'}
-            infoStep={step === 'info'}
           />
         )}
       </div>
