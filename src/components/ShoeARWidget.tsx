@@ -1475,7 +1475,7 @@ export function ShoeARWidget({
     <div
       className={
         embed
-          ? 'omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col bg-white animate-fade-in transition-all duration-300 ease-in-out'
+          ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${isHeroLayout ? 'bg-transparent' : 'bg-white'}`
           : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
       }
       onContextMenu={(e) => e.preventDefault()}
@@ -1489,7 +1489,7 @@ export function ShoeARWidget({
         }
       `}</style>
 
-      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
+      <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={primaryColor}
@@ -1503,7 +1503,7 @@ export function ShoeARWidget({
         <div
           className={
             embed
-              ? 'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+              ? `relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${isHeroLayout ? 'z-10' : ''}`
               : 'contents'
           }
         >
@@ -1950,9 +1950,8 @@ export function ShoeARWidget({
         {isHeroLayout && (
           <TryOnLayoutShellHero
             primaryColor={primaryColor}
-            storeName={storeName}
-            logoUrl={storeLogo || ''}
             backgroundImage={tryonLayoutBackgroundImage || productImage || ''}
+            blurBackground={step !== 'info'}
           />
         )}
       </div>

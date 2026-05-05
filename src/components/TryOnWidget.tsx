@@ -3369,7 +3369,7 @@ const handleSubmit = async () => {
       `}</style>
 
       {/* Full Screen — layouts avançados usam chrome externo; `contents` evita wrapper extra no layout default */}
-      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
+      <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={localPrimaryColor}
@@ -3385,7 +3385,7 @@ const handleSubmit = async () => {
         <motion.div
           className={
             embed
-              ? 'relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white'
+              ? `relative flex min-h-0 flex-1 flex-col overflow-hidden ${isHeroLayout ? 'bg-transparent z-10' : 'bg-white'}`
               : 'fixed inset-0 z-50 flex flex-col bg-white'
           }
           initial={{ opacity: 0 }}
@@ -3694,7 +3694,7 @@ const handleSubmit = async () => {
       <div
         className={
           embed
-            ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+            ? `flex min-h-0 flex-1 flex-col overflow-hidden ${isHeroLayout ? 'relative z-10' : ''}`
             : 'flex flex-1 flex-col overflow-hidden md:flex-row'
         }
       >
@@ -4399,9 +4399,8 @@ const handleSubmit = async () => {
         {isHeroLayout && (
           <TryOnLayoutShellHero
             primaryColor={localPrimaryColor}
-            storeName={localStoreName || storeName || ''}
-            logoUrl={localStoreLogo || ''}
             backgroundImage={localHeroBackgroundImage || displayImage}
+            blurBackground={step !== 'info'}
           />
         )}
       </div>
