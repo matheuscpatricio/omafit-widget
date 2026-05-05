@@ -355,10 +355,9 @@ export function WidgetPage() {
     parseTryonEnabledUrlParam()
   );
 
-  const tryonLayoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
-  const tryonIframeSidebar = tryonLayoutFromUrl === 'sidebar';
+  const tryonIframeSidebar = false;
   /** Sidebar ativa (URL ou config vinda do TryOnWidget) — iframe sem margens para o layout encaixar. */
-  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => tryonIframeSidebar);
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
   const [eyewearTryonLayoutFromMessage, setEyewearTryonLayoutFromMessage] = useState<TryonLayoutMode | null>(null);
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar');
@@ -571,9 +570,11 @@ export function WidgetPage() {
 
     const handleMessage = (event: MessageEvent) => {
       console.log('📨 Mensagem recebida:', event.data.type);
+      const msgType = event?.data?.type;
       const msgLayout = event?.data?.tryon_layout ?? event?.data?.tryonLayout;
-      if (msgLayout === 'sidebar' || msgLayout === 'default') {
+      if ((msgType === 'omafit-context' || msgType === 'omafit-config-update') && (msgLayout === 'sidebar' || msgLayout === 'default')) {
         setEyewearTryonLayoutFromMessage(msgLayout);
+        setTryonSidebarChrome(msgLayout === 'sidebar');
       }
 
       if (event.data.type === 'omafit-store-logo') {
@@ -770,8 +771,7 @@ export function WidgetPage() {
       setEyewearTryonLayoutFromDb(null);
       return;
     }
-    const fromUrl = parseTryonLayoutFromUrl();
-    if (fromUrl !== undefined || eyewearBootstrap.tryonLayout !== undefined || eyewearTryonLayoutFromMessage !== null) {
+    if (eyewearBootstrap.tryonLayout !== undefined || eyewearTryonLayoutFromMessage !== null) {
       setEyewearTryonLayoutFromDb(null);
       return;
     }
@@ -810,8 +810,6 @@ export function WidgetPage() {
     if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
     if (eyewearTryonLayoutFromMessage !== null) return eyewearTryonLayoutFromMessage;
     if (eyewearTryonLayoutFromDb !== null) return eyewearTryonLayoutFromDb;
-    const u = parseTryonLayoutFromUrl();
-    if (u !== undefined) return u;
     return 'default';
   }, [showEyewearArNetlify, eyewearBootstrap, eyewearTryonLayoutFromMessage, eyewearTryonLayoutFromDb]);
 
@@ -1008,7 +1006,7 @@ export function WidgetPage() {
           selectedVariantId={selectedVariantId}
           selectedVariantOptions={selectedVariantOptions}
           tryonEnabled={tryonEnabledOverride}
-          tryonLayoutOverride={tryonLayoutFromUrl}
+          tryonLayoutOverride={undefined}
           onTryonLayoutChange={handleTryonLayoutChange}
         />
       </div>

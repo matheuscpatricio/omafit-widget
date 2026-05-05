@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ShoeARWidget } from './ShoeARWidget';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
-import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -50,9 +50,7 @@ type ProductCatalog = {
 };
 
 export function ShoeARWidgetPage() {
-  const tryonLayoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
-  const tryonIframeSidebar = tryonLayoutFromUrl === 'sidebar';
-  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => tryonIframeSidebar);
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar');
   }, []);
@@ -247,18 +245,16 @@ export function ShoeARWidgetPage() {
         );
         if (eventLanguage) setStoreLanguage(eventLanguage);
 
-        if (tryonLayoutFromUrl === undefined) {
-          const tl = event.data.tryon_layout ?? event.data.tryonLayout;
-          if (tl === 'sidebar' || tl === 'default') {
-            setTryonSidebarChrome(tl === 'sidebar');
-          }
+        const tl = event.data.tryon_layout ?? event.data.tryonLayout;
+        if (tl === 'sidebar' || tl === 'default') {
+          setTryonSidebarChrome(tl === 'sidebar');
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [tryonLayoutFromUrl]);
+  }, []);
 
   return (
     <div
@@ -303,7 +299,7 @@ export function ShoeARWidgetPage() {
             productCatalog={productCatalog}
             selectedVariantId={selectedVariantId}
             selectedVariantOptions={selectedVariantOptions}
-            tryonLayoutOverride={tryonLayoutFromUrl}
+            tryonLayoutOverride={undefined}
             onTryonLayoutChange={handleTryonLayoutChange}
           />
         ) : (
