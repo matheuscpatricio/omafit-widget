@@ -5311,13 +5311,13 @@ function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
         ? `
     .omafit-ar-shell-sidebar-layout { display: flex; flex-direction: row; min-height: 100dvh; }
     .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-desktop-only {
-      width: min(290px, 32vw);
+      width: min(288px, 30vw);
       background: ${primary};
       color: ${omafitContrastOnPrimary(primary)};
       display: none;
       flex-direction: column;
       min-height: 0;
-      padding: 16px 14px;
+      padding: 24px 16px;
       border-right: 1px solid rgba(255,255,255,.14);
       box-sizing: border-box;
     }
@@ -5576,6 +5576,41 @@ function buildInfoModal({
   let sidebarMobile = null;
   if (layoutSidebar) {
     const L = omafitArSidebarStepLabels(locale);
+    const mkCloseSidebarBtn = () => {
+      const btn = el(
+        "div",
+        {
+          role: "button",
+          tabIndex: 0,
+          className: "omafit-ar-close-btn",
+          title: t.close,
+          style: {
+            width: "40px",
+            height: "40px",
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: "currentColor",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: "0",
+            borderRadius: "8px",
+            opacity: "0.92",
+          },
+        },
+        [svgX()],
+      );
+      btn.setAttribute("data-omafit-ar-close-modal", "1");
+      btn.addEventListener("click", onClose);
+      btn.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          onClose();
+        }
+      });
+      return btn;
+    };
     const mobFill = el("div", { className: "omafit-ar-sbar-progress-fill" });
     mobFill.style.width = "50%";
     const deskFill = el("div", { className: "omafit-ar-sbar-progress-fill" });
@@ -5589,14 +5624,40 @@ function buildInfoModal({
       style: { marginTop: "14px", fontSize: "12px", opacity: "0.8" },
       textContent: L.step1,
     });
-    const deskNav1 = el("div", {
-      style: { padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,.2)", fontWeight: "600", marginBottom: "8px" },
-      textContent: `1. ${L.step1}`,
-    });
-    const deskNav2 = el("div", {
-      style: { padding: "10px 12px", borderRadius: "10px", opacity: "0.55" },
-      textContent: `2. ${L.step2}`,
-    });
+    const mkNav = (n, label) => {
+      const item = el("div", {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "8px",
+          padding: "10px 12px",
+          borderRadius: "10px",
+          fontSize: "13px",
+          marginBottom: "8px",
+        },
+      });
+      item.appendChild(
+        el("span", {
+          textContent: String(n),
+          style: {
+            marginTop: "1px",
+            display: "inline-flex",
+            width: "20px",
+            height: "20px",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "999px",
+            border: "1px solid currentColor",
+            fontSize: "10px",
+            flexShrink: "0",
+          },
+        }),
+      );
+      item.appendChild(el("span", { textContent: label, style: { minWidth: "0", flex: "1" } }));
+      return item;
+    };
+    const deskNav1 = mkNav(1, L.step1);
+    const deskNav2 = mkNav(2, L.step2);
     const applySidebarStep = (key) => {
       const isAr = key === "ar";
       mobFill.style.width = isAr ? "100%" : "50%";
@@ -5611,8 +5672,19 @@ function buildInfoModal({
     };
 
     sidebarMobile = el("div", { className: "omafit-ar-sbar-mobile-only" });
-    const mobTop = el("div", { style: { display: "flex", justifyContent: "center", padding: "8px 12px 2px" } });
-    if (logoUrl) mobTop.appendChild(el("img", { src: logoUrl, alt: shopName || "", style: { maxHeight: "40px", width: "auto", maxWidth: "70vw", objectFit: "contain" } }));
+    const mobTopBar = el("div", {
+      style: { display: "flex", justifyContent: "flex-end", alignItems: "center", padding: "8px 10px 0" },
+    });
+    mobTopBar.appendChild(mkCloseSidebarBtn());
+    const mobTop = el("div", { style: { display: "flex", justifyContent: "center", padding: "4px 12px 8px" } });
+    if (logoUrl)
+      mobTop.appendChild(
+        el("img", {
+          src: logoUrl,
+          alt: shopName || "",
+          style: { maxHeight: "40px", width: "auto", maxWidth: "70vw", objectFit: "contain" },
+        }),
+      );
     else if (shopName) mobTop.appendChild(el("span", { textContent: shopName, style: { fontWeight: "600", fontSize: "14px" } }));
     const mobProg = el("div", { style: { padding: "8px 12px 4px", borderTop: "1px solid rgba(255,255,255,.14)" } });
     const mobProgTop = el("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } });
@@ -5620,6 +5692,7 @@ function buildInfoModal({
     mobProgTop.appendChild(mobCounter);
     mobProg.appendChild(mobProgTop);
     mobProg.appendChild(el("div", { className: "omafit-ar-sbar-progress-track" }, [mobFill]));
+    sidebarMobile.appendChild(mobTopBar);
     sidebarMobile.appendChild(mobTop);
     sidebarMobile.appendChild(mobProg);
     sidebarMobile.appendChild(mobStep);
@@ -5629,8 +5702,13 @@ function buildInfoModal({
     else if (shopName) sidebarDesktop.appendChild(el("div", { textContent: shopName, style: { fontWeight: "600", marginBottom: "14px", opacity: ".9" } }));
     sidebarDesktop.appendChild(el("p", { textContent: L.progress, style: { margin: "0 0 8px", fontSize: "10px", fontWeight: "600", letterSpacing: ".14em", textTransform: "uppercase", opacity: ".82" } }));
     sidebarDesktop.appendChild(el("div", { className: "omafit-ar-sbar-progress-track" }, [deskFill]));
-    sidebarDesktop.appendChild(el("div", { style: { marginTop: "14px" } }, [deskNav1, deskNav2]));
+    sidebarDesktop.appendChild(el("div", { style: { marginTop: "14px", flex: "1", minHeight: "0", overflowY: "auto" } }, [deskNav1, deskNav2]));
     sidebarDesktop.appendChild(deskCurrent);
+    const deskCloseWrap = el("div", {
+      style: { marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,.14)" },
+    });
+    deskCloseWrap.appendChild(mkCloseSidebarBtn());
+    sidebarDesktop.appendChild(deskCloseWrap);
     shell.__omafitArSidebarApi = { setStep: applySidebarStep };
     applySidebarStep("welcome");
     header.style.display = "none";
