@@ -51,6 +51,8 @@ export default {
         'float-medium': 'floatMedium 4s ease-in-out infinite',
         'gradient-x': 'gradientX 6s ease infinite',
         marquee: 'marquee 28s linear infinite',
+        /** Secção Solução: grid em faixa contínua */
+        'solution-marquee': 'marquee 18s linear infinite',
         'marquee-reverse': 'marqueeReverse 28s linear infinite',
         'shimmer-bg': 'shimmerBg 5s ease-in-out infinite',
       },

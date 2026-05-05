@@ -47,7 +47,8 @@ function SidebarProgressBlock({
 }
 
 /**
- * Layout sidebar: em mobile — barra superior (cor primária, logo centrado, progresso + passo atual).
+ * Layout sidebar: em mobile — só a barra superior (cor primária, logo, progresso + passo atual);
+ * o conteúdo das etapas replica o layout clássico no TryOnWidget.
  * Em md+ — painel esquerdo com lista de passos.
  */
 export function TryOnLayoutShellSidebar({
@@ -61,6 +62,11 @@ export function TryOnLayoutShellSidebar({
   const steps = getTryonSidebarSteps();
   const progressVal = tryonSidebarProgressForStep(step);
   const currentLabel = tryonSidebarLabelForStep(step, language);
+  const curIdx = steps.findIndex((x) => x.key === step);
+  const stepNum = curIdx >= 0 ? curIdx + 1 : 0;
+  const totalSteps = steps.length;
+  const progressTitle =
+    language === 'es' ? 'Progreso' : language === 'en' ? 'Progress' : 'Progresso';
 
   return (
     <>
@@ -83,16 +89,21 @@ export function TryOnLayoutShellSidebar({
             <div className="text-center text-sm font-semibold tracking-tight opacity-95">{storeName}</div>
           )}
         </div>
-        <div className="flex items-center gap-2 border-t border-white/15 px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <SidebarProgressBlock progressVal={progressVal} dense />
+        <div className="border-t border-white/15 px-3 py-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{progressTitle}</p>
+            <span className="shrink-0 text-[10px] font-semibold tabular-nums tracking-tight opacity-90">
+              {stepNum}/{totalSteps}
+            </span>
           </div>
-          <span
-            className="max-w-[46%] shrink-0 text-right text-[11px] font-semibold leading-tight tracking-tight sm:text-xs"
-            title={currentLabel}
+          <SidebarProgressBlock progressVal={progressVal} dense />
+          <p
+            className="mt-2 text-center text-[11px] font-semibold leading-tight tracking-tight sm:text-xs"
+            title={`${stepNum}. ${currentLabel}`}
           >
-            {currentLabel}
-          </span>
+            <span className="tabular-nums opacity-95">{stepNum}. </span>
+            <span className="break-words">{currentLabel}</span>
+          </p>
         </div>
       </motion.header>
 

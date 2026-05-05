@@ -14,6 +14,31 @@ import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 
+/** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
+type TryonLayoutState = TryonLayoutMode | 'pending';
+
+const TRYON_LAYOUT_SESSION_PREFIX = 'omafit_tryon_layout:';
+
+function readTryonLayoutFromSession(shopDomain: string): TryonLayoutMode | null {
+  if (typeof window === 'undefined' || !shopDomain) return null;
+  try {
+    const raw = window.sessionStorage.getItem(`${TRYON_LAYOUT_SESSION_PREFIX}${shopDomain}`);
+    if (raw === 'sidebar' || raw === 'default') return raw;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeTryonLayoutToSession(shopDomain: string, layout: TryonLayoutMode) {
+  if (!shopDomain) return;
+  try {
+    window.sessionStorage.setItem(`${TRYON_LAYOUT_SESSION_PREFIX}${shopDomain}`, layout);
+  } catch {
+    /* ignore */
+  }
+}
+
 interface TryOnWidgetProps {
   garmentImage: string;
   productId?: string;
@@ -468,9 +493,15 @@ export function TryOnWidget({
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
 
   const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromUrl(), []);
-  const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutMode>(() => {
+  const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutState>(() => {
     if (layoutFromUrl !== undefined) return layoutFromUrl;
     if (tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') return tryonLayoutOverride;
+    const sd = (shopDomain || '').trim();
+    if (sd) {
+      const cached = readTryonLayoutFromSession(sd);
+      if (cached !== null) return cached;
+      return 'pending';
+    }
     return 'default';
   });
 
@@ -482,6 +513,7 @@ export function TryOnWidget({
   }, [tryonLayoutOverride, layoutFromUrl]);
 
   useEffect(() => {
+    if (tryonLayout === 'pending') return;
     onTryonLayoutChange?.(tryonLayout);
   }, [tryonLayout, onTryonLayoutChange]);
 
@@ -568,6 +600,18 @@ export function TryOnWidget({
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
+
+  /** Quando `shopDomain` / `localShopDomain` fica disponível, aplicar cache e sair de `pending` sem flash. */
+  React.useEffect(() => {
+    if (layoutFromUrl !== undefined || tryonLayoutOverride !== undefined) return;
+    setTryonLayout((prev) => {
+      if (prev !== 'pending') return prev;
+      const sd = (localShopDomain || shopDomain || '').trim();
+      if (!sd) return 'default';
+      const cached = readTryonLayoutFromSession(sd);
+      return cached ?? 'pending';
+    });
+  }, [shopDomain, localShopDomain, layoutFromUrl, tryonLayoutOverride]);
 
   const revokePreparedPreview = (preparedImage: OptimizedModelImage | null) => {
     if (preparedImage?.previewUrl) {
@@ -1085,6 +1129,13 @@ export function TryOnWidget({
           const tl = event.data.tryon_layout ?? event.data.tryonLayout;
           if (tl === 'sidebar' || tl === 'default') {
             setTryonLayout(tl);
+            const sd = (
+              (event.data.shopDomain as string | undefined) ||
+              localShopDomain ||
+              shopDomain ||
+              ''
+            ).trim();
+            if (sd) writeTryonLayoutToSession(sd, tl);
           }
         }
 
@@ -1178,6 +1229,9 @@ export function TryOnWidget({
     const fetchWidgetConfig = async () => {
       if (!effectiveShopDomain) {
         console.log('⚠️ Não há shopDomain para buscar configurações');
+        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+          setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+        }
         return;
       }
 
@@ -1191,6 +1245,9 @@ export function TryOnWidget({
 
         if (error) {
           console.error('❌ Erro ao buscar configurações do widget:', error);
+          if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+            setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+          }
           return;
         }
 
@@ -1216,7 +1273,9 @@ export function TryOnWidget({
 
           if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
             const rawLayout = (config as { tryon_layout?: string }).tryon_layout;
-            setTryonLayout(rawLayout === 'sidebar' ? 'sidebar' : 'default');
+            const resolved: TryonLayoutMode = rawLayout === 'sidebar' ? 'sidebar' : 'default';
+            setTryonLayout(resolved);
+            writeTryonLayoutToSession(effectiveShopDomain, resolved);
           }
 
           // Fonte de verdade do idioma: admin_locale salvo no Supabase.
@@ -1225,9 +1284,15 @@ export function TryOnWidget({
             console.log('🌍 Idioma definido via widget_configurations.admin_locale:', adminLocale);
             setCurrentLanguage(adminLocale);
           }
+        } else if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+          setTryonLayout('default');
+          writeTryonLayoutToSession(effectiveShopDomain, 'default');
         }
       } catch (error) {
         console.error('❌ Erro ao buscar configurações:', error);
+        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+          setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+        }
       }
     };
 
@@ -3205,6 +3270,53 @@ const handleSubmit = async () => {
     );
   }
 
+  /** Evita 1 frame do layout default antes do fetch ao Supabase (ou cache). */
+  if (tryonLayout === 'pending') {
+    return (
+      <div
+        className="omafit-tryon-root flex h-full min-h-0 w-full flex-1 items-center justify-center bg-white"
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <motion.div
+          className="text-center"
+          variants={tryonTextStaggerParent}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.div variants={tryonTextStaggerChild} className="mb-4 flex items-center justify-center gap-1">
+            <span
+              className="inline-block h-2 w-2 animate-bounce rounded-full"
+              style={{
+                backgroundColor: localPrimaryColor,
+                animationDelay: '0ms',
+                animationDuration: '1.4s',
+              }}
+            />
+            <span
+              className="inline-block h-2 w-2 animate-bounce rounded-full"
+              style={{
+                backgroundColor: localPrimaryColor,
+                animationDelay: '200ms',
+                animationDuration: '1.4s',
+              }}
+            />
+            <span
+              className="inline-block h-2 w-2 animate-bounce rounded-full"
+              style={{
+                backgroundColor: localPrimaryColor,
+                animationDelay: '400ms',
+                animationDuration: '1.4s',
+              }}
+            />
+          </motion.div>
+          <motion.p variants={tryonTextStaggerChild} className="text-base text-gray-700">
+            {t('loadingProduct')}
+          </motion.p>
+        </motion.div>
+      </div>
+    );
+  }
+
   const displayImage = step === 'photo' ? selectedProductImage : product.garment_image;
 
   console.log('🎨 Estilos aplicados no widget:', { fontFamily });
@@ -3288,7 +3400,11 @@ const handleSubmit = async () => {
           )}
 
           {/* Chat Messages */}
-          <div className={`flex-1 space-y-4 overflow-y-auto ${embed ? 'px-2 pb-2 pt-12 sm:px-3' : 'p-4'}`}>
+          <div
+            className={`flex-1 space-y-4 overflow-y-auto ${
+              embed ? 'p-4 md:px-3 md:pb-2 md:pt-12' : 'p-4'
+            }`}
+          >
             {/* Initial Try-On Result Image - Left aligned like assistant message */}
             <motion.div
               className="flex justify-start"
@@ -3502,7 +3618,7 @@ const handleSubmit = async () => {
               : `fixed inset-0 z-50 flex flex-col bg-white animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'}`
           }
         >
-      {/* Embed sidebar: sem barra superior — só botão voltar flutuante (como resultado), nas etapas que precisam */}
+      {/* Embed sidebar: sem barra branca com voltar — botão flutuante (barra colorida do shell não inclui voltar). */}
       {embed && (step === 'calculator' || step === 'photo' || step === 'confirm') && (
         <button
           type="button"
@@ -3577,7 +3693,9 @@ const handleSubmit = async () => {
         <div
           className={`flex-1 transition-all duration-300 ease-in-out ${
             embed && (step === 'info' || step === 'photo')
-              ? `flex min-h-0 min-w-0 flex-col overflow-hidden px-2 py-2 sm:px-3${step === 'photo' ? ' pt-11' : ''}`
+              ? `flex min-h-0 min-w-0 flex-col overflow-hidden overflow-y-auto p-2 sm:px-3${
+                  step === 'photo' ? ' md:pt-11' : ''
+                }`
               : embed
                 ? `min-h-0 overflow-y-auto px-2 py-2 sm:px-3${
                     step === 'calculator' || step === 'confirm' ? ' pt-11' : ''
@@ -3592,50 +3710,10 @@ const handleSubmit = async () => {
             </div>
           )}
 
-        {/* Step 1: Info — embed: imagem acima do texto, tamanho moderado */}
-        {step === 'info' && embed && (
-          <motion.div
-            className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4"
-            variants={tryonTextStaggerParent}
-            initial="hidden"
-            animate="show"
-          >
-            <motion.div variants={tryonTextStaggerChild} className="flex w-full shrink-0 justify-center">
-              <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
-                <img
-                  src={displayImage}
-                  alt={product.name}
-                  className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
-                />
-              </div>
-            </motion.div>
-            <motion.div
-              variants={tryonTextStaggerChild}
-              className="flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4"
-            >
-              <div>
-                <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
-                  {t('visualExperience')}
-                </h3>
-                <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
-              </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
-                <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t('howItWorks')}</h4>
-                <p className="text-center text-xs text-blue-700 sm:text-sm">{t('howItWorksDesc')}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStep('calculator')}
-                className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium text-white transition-all duration-300 hover:bg-primary-dark sm:py-3.5 sm:text-lg"
-              >
-                {t('startNow')}
-                <ArrowRight className="h-5 w-5" />
-              </button>
-              <p className="text-center text-xs text-gray-500 sm:text-sm">{t('privacyNote')}</p>
-            </motion.div>
-          </motion.div>
-        )}
-        {step === 'info' && !embed && (
+        {/* Step 1: Info — mobile igual ao layout clássico; desktop+embed = coluna compacta */}
+        {step === 'info' && (
+          <>
+            <div className={embed ? 'md:hidden' : 'contents'}>
           <motion.div
             className="space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4"
             variants={tryonTextStaggerParent}
@@ -3677,6 +3755,50 @@ const handleSubmit = async () => {
               {t('privacyNote')}
             </motion.p>
           </motion.div>
+            </div>
+            {embed && (
+              <motion.div
+                className="mx-auto hidden min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4 md:flex"
+                variants={tryonTextStaggerParent}
+                initial="hidden"
+                animate="show"
+              >
+                <motion.div variants={tryonTextStaggerChild} className="flex w-full shrink-0 justify-center">
+                  <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
+                    <img
+                      src={displayImage}
+                      alt={product.name}
+                      className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
+                    />
+                  </div>
+                </motion.div>
+                <motion.div
+                  variants={tryonTextStaggerChild}
+                  className="flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4"
+                >
+                  <div>
+                    <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
+                      {t('visualExperience')}
+                    </h3>
+                    <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
+                  </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+                    <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t('howItWorks')}</h4>
+                    <p className="text-center text-xs text-blue-700 sm:text-sm">{t('howItWorksDesc')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep('calculator')}
+                    className="bg-primary flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium text-white transition-all duration-300 hover:bg-primary-dark sm:py-3.5 sm:text-lg"
+                  >
+                    {t('startNow')}
+                    <ArrowRight className="h-5 w-5" />
+                  </button>
+                  <p className="text-center text-xs text-gray-500 sm:text-sm">{t('privacyNote')}</p>
+                </motion.div>
+              </motion.div>
+            )}
+          </>
         )}
 
         {/* Step 2: Size Calculator */}
@@ -3722,129 +3844,8 @@ const handleSubmit = async () => {
           </motion.div>
         )}
 
-        {/* Step 3: Photo — embed: imagem do produto maior à esquerda; direita mais estreita e compacta */}
-        {step === 'photo' && embed && (
-          <motion.div
-            className="flex min-h-0 flex-1 flex-row gap-2 overflow-hidden sm:gap-3"
-            initial={tryonFadeUp.initial}
-            animate={tryonFadeUp.animate}
-            transition={tryonFadeUp.transition}
-          >
-            <div className="flex min-h-0 w-[min(56%,15.5rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(54%,18rem)] sm:pr-3">
-              <p className="mb-0.5 text-center text-[11px] font-semibold leading-tight text-gray-900 sm:text-xs">
-                {t('productImage')}
-              </p>
-              {availableImages.length > 1 && (
-                <p className="mb-1 text-center text-[10px] leading-tight text-gray-600 sm:text-[11px]">
-                  {t('chooseImageNote')}
-                </p>
-              )}
-              <div className="relative mx-auto mt-1 w-full max-w-[14rem] sm:max-w-[17rem]">
-                <div
-                  className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                >
-                  <img
-                    src={selectedProductImage}
-                    alt="Produto"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                {availableImages.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={prevImage}
-                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={nextImage}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                    <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-                      {availableImages.map((_, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => setCurrentImageIndex(index)}
-                          className={`h-1.5 rounded-full transition-all ${
-                            index === currentImageIndex ? 'bg-primary w-5' : 'w-1.5 bg-white/80 hover:bg-white'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto py-0.5">
-              <div className="flex w-full max-w-[9.75rem] flex-col gap-1.5 sm:max-w-[10.75rem] sm:gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-primary sm:text-base">{t('yourPhoto')}</h3>
-                <p className="text-[10px] leading-snug text-gray-700 sm:text-[11px]">{t('betterResults')}</p>
-              </div>
-              <div className="rounded-md border border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-1.5 shadow-sm sm:p-2">
-                <h4 className="mb-0.5 flex flex-wrap items-center gap-0.5 text-[10px] font-bold leading-tight text-blue-900 sm:text-[11px]">
-                  {t('photoInstructions')}
-                  <span className="rounded-full bg-blue-800 px-1 py-0.5 text-[8px] font-semibold text-white sm:text-[9px]">
-                    {t('importantBadge')}
-                  </span>
-                </h4>
-                <ul className="mb-0.5 space-y-0.5 text-[9px] leading-snug text-blue-900 sm:text-[10px]">
-                  <li>
-                    • <strong>{t('fullBody')}</strong> — {t('fullBodyDesc')}
-                  </li>
-                  <li>
-                    • <strong>{t('frontFacing')}</strong> — {t('frontFacingDesc')}
-                  </li>
-                  <li>
-                    • <strong>{t('noObstacles')}</strong> — {t('noObstaclesDesc')}
-                  </li>
-                  <li>
-                    • <strong>{t('goodLighting')}</strong> — {t('goodLightingDesc')}
-                  </li>
-                  <li>
-                    • <strong>{t('neutralBackground')}</strong> — {t('neutralBackgroundDesc')}
-                  </li>
-                </ul>
-                <div className="rounded border-l-2 border-blue-700 bg-blue-100 p-1">
-                  <p className="text-[9px] font-semibold leading-snug text-blue-900 sm:text-[10px]">
-                    {t('photoInstructionWarning')}
-                  </p>
-                </div>
-              </div>
-              <motion.div
-                onClick={() => fileInputRef.current?.click()}
-                className="cursor-pointer rounded-md border-2 border-dashed border-gray-300 p-2 text-center transition-all duration-300 hover:border-primary sm:p-2.5"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <Camera className="mx-auto mb-1 h-6 w-6 text-gray-400 sm:mb-1.5 sm:h-7 sm:w-7" />
-                <p className="mb-0.5 text-[11px] font-medium leading-tight text-gray-800 sm:text-xs">{t('clickToUpload')}</p>
-                <p className="text-[9px] leading-tight text-gray-500 sm:text-[10px]">{t('imageFormats')}</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </motion.div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 3: Photo Upload (layout clássico) */}
-        {step === 'photo' && !embed && (
+        {/* Step 3: foto — mobile igual ao layout clássico; desktop !embed = split; desktop embed = duas colunas compactas */}
+        {step === 'photo' && (
           <motion.div
             className="space-y-4"
             initial={tryonFadeUp.initial}
@@ -3986,7 +3987,7 @@ const handleSubmit = async () => {
               </motion.div>
             </div>
 
-            {/* Desktop Layout */}
+            {!embed && (
             <div className="hidden md:flex md:gap-6">
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
@@ -4121,6 +4122,122 @@ const handleSubmit = async () => {
                 </motion.div>
               </div>
             </div>
+            )}
+
+            {embed && (
+              <div className="hidden min-h-0 w-full flex-1 flex-row gap-2 overflow-hidden sm:gap-3 md:flex">
+                <div className="flex min-h-0 w-[min(56%,15.5rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(54%,18rem)] sm:pr-3">
+                  <p className="mb-0.5 text-center text-[11px] font-semibold leading-tight text-gray-900 sm:text-xs">
+                    {t('productImage')}
+                  </p>
+                  {availableImages.length > 1 && (
+                    <p className="mb-1 text-center text-[10px] leading-tight text-gray-600 sm:text-[11px]">
+                      {t('chooseImageNote')}
+                    </p>
+                  )}
+                  <div className="relative mx-auto mt-1 w-full max-w-[14rem] sm:max-w-[17rem]">
+                    <div
+                      className="aspect-[2/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      <img
+                        src={selectedProductImage}
+                        alt="Produto"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    {availableImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={prevImage}
+                          className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={nextImage}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                        <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+                          {availableImages.map((_, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => setCurrentImageIndex(index)}
+                              className={`h-1.5 rounded-full transition-all ${
+                                index === currentImageIndex ? 'bg-primary w-5' : 'w-1.5 bg-white/80 hover:bg-white'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto py-0.5">
+                  <div className="flex w-full max-w-[9.75rem] flex-col gap-1.5 sm:max-w-[10.75rem] sm:gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-primary sm:text-base">{t('yourPhoto')}</h3>
+                      <p className="text-[10px] leading-snug text-gray-700 sm:text-[11px]">{t('betterResults')}</p>
+                    </div>
+                    <div className="rounded-md border border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100 p-1.5 shadow-sm sm:p-2">
+                      <h4 className="mb-0.5 flex flex-wrap items-center gap-0.5 text-[10px] font-bold leading-tight text-blue-900 sm:text-[11px]">
+                        {t('photoInstructions')}
+                        <span className="rounded-full bg-blue-800 px-1 py-0.5 text-[8px] font-semibold text-white sm:text-[9px]">
+                          {t('importantBadge')}
+                        </span>
+                      </h4>
+                      <ul className="mb-0.5 space-y-0.5 text-[9px] leading-snug text-blue-900 sm:text-[10px]">
+                        <li>
+                          • <strong>{t('fullBody')}</strong> — {t('fullBodyDesc')}
+                        </li>
+                        <li>
+                          • <strong>{t('frontFacing')}</strong> — {t('frontFacingDesc')}
+                        </li>
+                        <li>
+                          • <strong>{t('noObstacles')}</strong> — {t('noObstaclesDesc')}
+                        </li>
+                        <li>
+                          • <strong>{t('goodLighting')}</strong> — {t('goodLightingDesc')}
+                        </li>
+                        <li>
+                          • <strong>{t('neutralBackground')}</strong> — {t('neutralBackgroundDesc')}
+                        </li>
+                      </ul>
+                      <div className="rounded border-l-2 border-blue-700 bg-blue-100 p-1">
+                        <p className="text-[9px] font-semibold leading-snug text-blue-900 sm:text-[10px]">
+                          {t('photoInstructionWarning')}
+                        </p>
+                      </div>
+                    </div>
+                    <motion.div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="cursor-pointer rounded-md border-2 border-dashed border-gray-300 p-2 text-center transition-all duration-300 hover:border-primary sm:p-2.5"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <Camera className="mx-auto mb-1 h-6 w-6 text-gray-400 sm:mb-1.5 sm:h-7 sm:w-7" />
+                      <p className="mb-0.5 text-[11px] font-medium leading-tight text-gray-800 sm:text-xs">{t('clickToUpload')}</p>
+                      <p className="text-[9px] leading-tight text-gray-500 sm:text-[10px]">{t('imageFormats')}</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

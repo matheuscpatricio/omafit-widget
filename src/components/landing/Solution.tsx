@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import type { CarouselApi } from '../ui/carousel';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 import { cn } from '../../lib/utils';
 
 interface Feature {
@@ -69,22 +67,20 @@ const itemVariants: Variants = {
   },
 };
 
-/** Avanço automático entre slides (rápido). */
-const AUTO_MS = 2800;
-
-function FeatureInfoCard({ feature }: { feature: Feature }) {
+function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boolean }) {
   const highlight = Boolean(feature.accent);
 
   return (
     <div
       className={cn(
-        'mx-auto flex h-full min-h-[min(52vh,420px)] max-w-3xl flex-col rounded-2xl border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 p-6 shadow-elegant sm:min-h-[min(48vh,440px)] sm:rounded-3xl sm:p-8',
+        'flex h-full min-h-0 flex-col rounded-xl border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 shadow-elegant sm:rounded-2xl',
         highlight && 'ring-1 ring-oma-accent/30',
+        compact ? 'p-3.5 sm:p-4' : 'p-6 sm:p-8',
       )}
     >
       <span
         className={cn(
-          'inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-widest sm:text-xs',
+          'inline-flex w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest sm:text-[11px]',
           highlight
             ? 'border-oma-accent/45 bg-oma-accent/15 text-oma-cream'
             : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/85',
@@ -93,20 +89,27 @@ function FeatureInfoCard({ feature }: { feature: Feature }) {
         {highlight ? 'Destaque' : 'Recurso'}
       </span>
       <h3
-        className="mt-3 text-xl font-semibold leading-snug tracking-tight text-oma-cream sm:mt-4 sm:text-2xl md:text-[1.65rem]"
+        className={cn(
+          'mt-2 font-semibold leading-snug tracking-tight text-oma-cream sm:mt-2.5',
+          compact ? 'text-sm sm:text-base' : 'text-xl sm:text-2xl',
+        )}
         style={{ letterSpacing: '-0.02em' }}
       >
         {feature.title}
       </h3>
-      <p className="mt-3 flex-1 text-sm leading-relaxed text-oma-cream/80 sm:text-base">{feature.description}</p>
-      <ul className="mt-4 space-y-2.5 text-sm text-oma-cream/90 sm:mt-5 sm:text-[15px]">
+      <p
+        className={cn(
+          'mt-2 flex-1 leading-relaxed text-oma-cream/80',
+          compact ? 'line-clamp-4 text-[11px] sm:text-xs' : 'text-sm sm:text-base',
+        )}
+      >
+        {feature.description}
+      </p>
+      <ul className={cn('mt-2.5 space-y-1.5 text-oma-cream/90 sm:mt-3', compact ? 'text-[10px] sm:text-[11px]' : 'text-sm sm:text-[15px]')}>
         {feature.bullets.map((b) => (
-          <li key={b} className="flex gap-2.5 leading-snug">
-            <span
-              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-oma-accent"
-              aria-hidden
-            />
-            <span>{b}</span>
+          <li key={b} className="flex gap-1.5 leading-snug">
+            <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-oma-accent" aria-hidden />
+            <span className={compact ? 'line-clamp-2' : ''}>{b}</span>
           </li>
         ))}
       </ul>
@@ -114,103 +117,55 @@ function FeatureInfoCard({ feature }: { feature: Feature }) {
   );
 }
 
-function SolutionCardsCarousel() {
-  const [api, setApi] = useState<CarouselApi>();
-  const [selected, setSelected] = useState(0);
+function FeatureGridBlock({ features: list }: { features: Feature[] }) {
+  return (
+    <div className="grid w-full shrink-0 grid-cols-2 gap-2.5 px-3 sm:grid-cols-3 sm:gap-4 sm:px-4 md:px-5 lg:gap-5">
+      {list.map((feature) => (
+        <FeatureInfoCard key={feature.title} feature={feature} compact />
+      ))}
+    </div>
+  );
+}
+
+/** Faixa com dois blocos 2×3 idênticos; animação `marquee` desloca -50% (loop). Pausa com hover (rato). */
+function SolutionAutoMarqueeGrid() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
 
-  const emblaOpts = useMemo(
-    () => ({
-      align: 'center' as const,
-      loop: true,
-      duration: reduceMotion ? 14 : 18,
-      skipSnaps: false,
-      dragFree: false,
-    }),
-    [reduceMotion],
-  );
-
-  const onSelect = useCallback((carouselApi: CarouselApi) => {
-    if (!carouselApi) return;
-    setSelected(carouselApi.selectedScrollSnap());
-  }, []);
-
-  useEffect(() => {
-    if (!api) return;
-    onSelect(api);
-    api.on('reInit', onSelect);
-    api.on('select', onSelect);
-    return () => {
-      api.off('select', onSelect);
-      api.off('reInit', onSelect);
-    };
-  }, [api, onSelect]);
-
-  useEffect(() => {
-    if (!api || reduceMotion || paused) return;
-    const id = window.setInterval(() => api.scrollNext(), AUTO_MS);
-    return () => window.clearInterval(id);
-  }, [api, reduceMotion, paused]);
+  if (reduceMotion) {
+    return (
+      <div className="mx-auto max-w-6xl px-3 sm:px-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:gap-5">
+          {features.map((feature) => (
+            <FeatureInfoCard key={feature.title} feature={feature} compact />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      className="relative w-full min-w-0 touch-pan-x"
+      className="overflow-hidden py-1"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      aria-roledescription="carousel"
     >
-      <Carousel setApi={setApi} opts={emblaOpts} className="w-full min-w-0">
-        <CarouselContent className="-ml-3 sm:-ml-4 md:-ml-5">
-          {features.map((feature) => (
-            <CarouselItem key={feature.title} className="basis-full pl-3 sm:basis-full sm:pl-4 md:pl-5">
-              <FeatureInfoCard feature={feature} />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious
-          type="button"
-          className={cn(
-            'z-20 h-10 w-10 border border-oma-line/50 bg-oma-elevated/95 text-oma-cream shadow-lg backdrop-blur-sm',
-            'hover:bg-oma-elevated hover:text-oma-cream',
-            'hidden md:flex',
-            'left-0 top-1/2 -translate-y-1/2 sm:left-1',
-          )}
-        />
-        <CarouselNext
-          type="button"
-          className={cn(
-            'z-20 h-10 w-10 border border-oma-line/50 bg-oma-elevated/95 text-oma-cream shadow-lg backdrop-blur-sm',
-            'hover:bg-oma-elevated hover:text-oma-cream',
-            'hidden md:flex',
-            'right-0 top-1/2 -translate-y-1/2 sm:right-1',
-          )}
-        />
-      </Carousel>
-
-      <div className="mt-5 flex justify-center gap-2 md:mt-6" role="tablist" aria-label="Indicador de recursos">
-        {features.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === selected}
-            aria-label={`Ir para recurso ${i + 1}`}
-            className={cn(
-              'h-2 rounded-full transition-all duration-300',
-              i === selected ? 'w-8 bg-oma-accent' : 'w-2 bg-oma-line hover:bg-oma-muted/80',
-            )}
-            onClick={() => api?.scrollTo(i)}
-          />
-        ))}
+      <div
+        className="flex w-[200%] animate-solution-marquee will-change-transform"
+        style={{ animationPlayState: paused ? 'paused' : 'running' }}
+      >
+        <div className="w-1/2 shrink-0">
+          <FeatureGridBlock features={features} />
+        </div>
+        <div className="w-1/2 shrink-0">
+          <FeatureGridBlock features={features} />
+        </div>
       </div>
     </div>
   );
 }
 
 export function Solution() {
-  const reduceMotion = useReducedMotion();
-
   return (
     <section id="solucao" className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="relative z-[1] mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
@@ -250,18 +205,15 @@ export function Solution() {
           variants={containerVariants}
           className="mt-14 sm:mt-16"
         >
-          <motion.div variants={itemVariants} className="mx-auto max-w-6xl">
-            <div className="relative rounded-2xl border border-oma-line/40 bg-oma-elevated/25 px-1 py-6 shadow-elegant-lg sm:rounded-3xl sm:px-6 sm:py-8 md:px-10 md:py-10">
-              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(217,104,69,0.1),transparent)] sm:rounded-3xl" />
-              <div className="relative z-[1]">
-                <SolutionCardsCarousel />
+          <motion.div variants={itemVariants} className="sm:mx-auto sm:max-w-6xl">
+            <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 sm:left-auto sm:mx-auto sm:w-full sm:max-w-6xl sm:translate-x-0">
+              <div className="border-y border-oma-line/35 bg-oma-elevated/20 py-6 sm:rounded-2xl sm:border sm:shadow-elegant-lg sm:py-8 md:rounded-3xl md:py-10">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_50%_30%,rgba(217,104,69,0.08),transparent)] sm:rounded-2xl md:rounded-3xl" />
+                <div className="relative z-[1]">
+                  <SolutionAutoMarqueeGrid />
+                </div>
               </div>
             </div>
-            <p className="mt-4 text-center text-xs text-oma-muted sm:text-sm">
-              {reduceMotion
-                ? 'Use os pontos abaixo para mudar de recurso.'
-                : 'No telemóvel, deslize com o dedo; no computador, use as setas ou os pontos.'}
-            </p>
           </motion.div>
         </motion.div>
       </div>
