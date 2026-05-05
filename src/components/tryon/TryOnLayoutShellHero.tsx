@@ -9,7 +9,7 @@ type Props = {
   infoStep?: boolean;
 };
 
-/** Hero: imagem de fundo + cor primária com degradê na junção (desktop: esq. primária / dir. imagem; mobile: cima imagem / baixo primária). */
+/** Hero: imagem de fundo + cor primária com degradê na junção (desktop: camada base com imagem em contain + overlay só com gradiente; mobile: gradiente+URL na mesma pilha). */
 export function TryOnLayoutShellHero({
   primaryColor,
   backgroundImage,
@@ -31,22 +31,28 @@ export function TryOnLayoutShellHero({
         backgroundSize: 'cover',
       };
 
-  /** Transição longa e contínua (sem “linha”): muitas paradas + sem fundo sólido por baixo; imagem em cover alinhada à direita. */
   const desktopGradient = infoStep
     ? `linear-gradient(90deg, ${p} 0%, ${p} 14%, ${p}fc 20%, ${p}f4 28%, ${p}e6 36%, ${p}d2 44%, ${p}b8 52%, ${p}98 60%, ${p}74 67%, ${p}54 74%, ${p}38 80%, ${p}24 86%, ${p}14 90%, ${p}0a 94%, ${p}03 97%, ${p}00 100%)`
     : `linear-gradient(90deg, ${p} 0%, ${p}fa 10%, ${p}ee 22%, ${p}dc 34%, ${p}c4 44%, ${p}a5 54%, ${p}82 63%, ${p}62 71%, ${p}44 78%, ${p}2c 84%, ${p}1a 89%, ${p}0c 93%, ${p}04 97%, ${p}00 100%)`;
 
-  const desktopStyle: CSSProperties = bg
-    ? {
-        backgroundImage: `${desktopGradient}, url("${bg}")`,
-        backgroundSize: 'cover, contain',
-        backgroundPosition: 'left center, right center',
-        backgroundRepeat: 'no-repeat, no-repeat',
-      }
-    : {
-        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p}dd 100%)`,
-        backgroundSize: 'cover',
-      };
+  const desktopNoImageStyle: CSSProperties = {
+    backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p}dd 100%)`,
+    backgroundSize: 'cover',
+  };
+
+  const desktopBaseWithImageStyle: CSSProperties = {
+    backgroundColor: p,
+    backgroundImage: `url("${bg}")`,
+    backgroundSize: 'contain',
+    backgroundPosition: 'right center',
+    backgroundRepeat: 'no-repeat',
+  };
+
+  const desktopGradientOverlayStyle: CSSProperties = {
+    backgroundImage: desktopGradient,
+    backgroundSize: '100% 100%',
+    backgroundRepeat: 'no-repeat',
+  };
 
   const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
@@ -60,13 +66,25 @@ export function TryOnLayoutShellHero({
         transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <motion.aside
-        className={`absolute inset-0 hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
-        style={desktopStyle}
-        initial={{ opacity: 0.96, x: 10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      />
+      {bg ? (
+        <motion.div
+          className={`absolute inset-0 hidden overflow-hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
+          initial={{ opacity: 0.96, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="absolute inset-0" style={desktopBaseWithImageStyle} />
+          <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
+        </motion.div>
+      ) : (
+        <motion.aside
+          className={`absolute inset-0 hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
+          style={desktopNoImageStyle}
+          initial={{ opacity: 0.96, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        />
+      )}
     </div>
   );
 }
