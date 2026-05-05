@@ -5704,11 +5704,6 @@ function buildInfoModal({
     sidebarDesktop.appendChild(el("div", { className: "omafit-ar-sbar-progress-track" }, [deskFill]));
     sidebarDesktop.appendChild(el("div", { style: { marginTop: "14px", flex: "1", minHeight: "0", overflowY: "auto" } }, [deskNav1, deskNav2]));
     sidebarDesktop.appendChild(deskCurrent);
-    const deskCloseWrap = el("div", {
-      style: { marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,.14)" },
-    });
-    deskCloseWrap.appendChild(mkCloseSidebarBtn());
-    sidebarDesktop.appendChild(deskCloseWrap);
     shell.__omafitArSidebarApi = { setStep: applySidebarStep };
     applySidebarStep("welcome");
     header.style.display = "none";
@@ -5740,7 +5735,7 @@ function buildInfoModal({
   const imgBox = el("div", {
     style: {
       width: "100%",
-      maxWidth: "28rem",
+      maxWidth: layoutSidebar ? "20rem" : "28rem",
       borderRadius: "16px",
       overflow: "hidden",
       background: "#f3f4f6",
@@ -5759,7 +5754,7 @@ function buildInfoModal({
   const colContent = el("div", {
     style: {
       flex: "1",
-      padding: "12px 16px 24px",
+      padding: layoutSidebar ? "8px 14px 12px" : "12px 16px 24px",
       overflowY: "auto",
       boxSizing: "border-box",
     },
@@ -5770,8 +5765,8 @@ function buildInfoModal({
       display: "block",
       background: "#f9fafb",
       borderRadius: "12px",
-      padding: "12px",
-      marginBottom: "16px",
+      padding: layoutSidebar ? "8px" : "12px",
+      marginBottom: layoutSidebar ? "10px" : "16px",
     },
     className: "omafit-ar-mobile-img",
   });
@@ -5794,8 +5789,8 @@ function buildInfoModal({
     el("h3", {
       textContent: t.title,
       style: {
-        margin: "0 0 8px 0",
-        fontSize: "clamp(1.35rem, 4vw, 1.85rem)",
+        margin: "0 0 6px 0",
+        fontSize: layoutSidebar ? "clamp(1.05rem, 2.2vw, 1.25rem)" : "clamp(1.35rem, 4vw, 1.85rem)",
         fontWeight: "600",
         color: primaryColor,
       },
@@ -5804,7 +5799,12 @@ function buildInfoModal({
   titleBlock.appendChild(
     el("p", {
       textContent: t.desc,
-      style: { margin: 0, color: "#374151", fontSize: "clamp(1rem, 3vw, 1.2rem)", lineHeight: "1.45" },
+      style: {
+        margin: 0,
+        color: "#374151",
+        fontSize: layoutSidebar ? "clamp(0.88rem, 1.8vw, 0.98rem)" : "clamp(1rem, 3vw, 1.2rem)",
+        lineHeight: layoutSidebar ? "1.35" : "1.45",
+      },
     }),
   );
 
@@ -5813,21 +5813,31 @@ function buildInfoModal({
       background: "#eff6ff",
       border: "1px solid #bfdbfe",
       borderRadius: "8px",
-      padding: "16px",
-      marginBottom: "20px",
+      padding: layoutSidebar ? "12px" : "16px",
+      marginBottom: layoutSidebar ? "12px" : "20px",
     },
   });
   const blueInner = el("div", { style: { textAlign: "center" } });
   blueInner.appendChild(
     el("h4", {
       textContent: t.howTitle,
-      style: { margin: "0 0 8px 0", fontWeight: "600", color: "#1e40af", fontSize: "1.05rem" },
+      style: {
+        margin: "0 0 6px 0",
+        fontWeight: "600",
+        color: "#1e40af",
+        fontSize: layoutSidebar ? "0.95rem" : "1.05rem",
+      },
     }),
   );
   blueInner.appendChild(
     el("p", {
       textContent: t.howBody,
-      style: { margin: 0, color: "#1d4ed8", fontSize: "clamp(0.95rem, 2.8vw, 1.05rem)", lineHeight: "1.5" },
+      style: {
+        margin: 0,
+        color: "#1d4ed8",
+        fontSize: layoutSidebar ? "clamp(0.82rem, 1.7vw, 0.92rem)" : "clamp(0.95rem, 2.8vw, 1.05rem)",
+        lineHeight: layoutSidebar ? "1.4" : "1.5",
+      },
     }),
   );
   blueBox.appendChild(blueInner);
@@ -5841,9 +5851,9 @@ function buildInfoModal({
         background: primaryColor,
         color: "#fff",
         border: "none",
-        padding: "14px 20px",
+        padding: layoutSidebar ? "11px 14px" : "14px 20px",
         borderRadius: "8px",
-        fontSize: "clamp(1rem, 3vw, 1.15rem)",
+        fontSize: layoutSidebar ? "clamp(0.9rem, 1.8vw, 1rem)" : "clamp(1rem, 3vw, 1.15rem)",
         fontWeight: "600",
         cursor: "pointer",
         display: "flex",
@@ -5852,7 +5862,7 @@ function buildInfoModal({
         gap: "8px",
         fontFamily: "inherit",
         transition: "filter 0.2s ease, box-shadow 0.2s ease",
-        marginBottom: "12px",
+        marginBottom: layoutSidebar ? "8px" : "12px",
       },
     },
     [],
@@ -5879,7 +5889,13 @@ function buildInfoModal({
 
   const privacy = el("p", {
     textContent: t.privacy,
-    style: { margin: 0, textAlign: "center", color: "#6b7280", fontSize: "0.875rem", lineHeight: "1.4" },
+    style: {
+      margin: 0,
+      textAlign: "center",
+      color: "#6b7280",
+      fontSize: layoutSidebar ? "0.78rem" : "0.875rem",
+      lineHeight: layoutSidebar ? "1.3" : "1.4",
+    },
   });
 
   try {

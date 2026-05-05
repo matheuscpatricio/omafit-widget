@@ -807,11 +807,12 @@ export function WidgetPage() {
 
   const eyewearResolvedTryonLayout = useMemo((): TryonLayoutMode | null => {
     if (!showEyewearArNetlify || !eyewearBootstrap) return null;
-    const u = parseTryonLayoutFromUrl();
-    if (u !== undefined) return u;
     if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
     if (eyewearTryonLayoutFromMessage !== null) return eyewearTryonLayoutFromMessage;
-    return eyewearTryonLayoutFromDb;
+    if (eyewearTryonLayoutFromDb !== null) return eyewearTryonLayoutFromDb;
+    const u = parseTryonLayoutFromUrl();
+    if (u !== undefined) return u;
+    return 'default';
   }, [showEyewearArNetlify, eyewearBootstrap, eyewearTryonLayoutFromMessage, eyewearTryonLayoutFromDb]);
 
   const [arModuleBootError, setArModuleBootError] = useState<string | null>(null);
