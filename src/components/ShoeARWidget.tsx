@@ -1492,16 +1492,31 @@ export function ShoeARWidget({
         ${
           heroChromeActive
             ? `
+        .omafit-shoe-hero .text-gray-400,
         .omafit-shoe-hero .text-gray-500,
         .omafit-shoe-hero .text-gray-600,
         .omafit-shoe-hero .text-gray-700,
         .omafit-shoe-hero .text-gray-800,
         .omafit-shoe-hero .text-gray-900 { color: rgb(255 255 255 / 0.92) !important; }
+        .omafit-shoe-hero .text-gray-300 { color: rgb(255 255 255 / 0.82) !important; }
+        .omafit-shoe-hero .text-slate-500,
+        .omafit-shoe-hero .text-slate-600,
+        .omafit-shoe-hero .text-slate-700,
+        .omafit-shoe-hero .text-slate-800,
+        .omafit-shoe-hero .text-slate-900 { color: rgb(255 255 255 / 0.92) !important; }
         .omafit-shoe-hero .text-blue-700,
         .omafit-shoe-hero .text-blue-800,
         .omafit-shoe-hero .text-blue-900 { color: rgb(255 255 255 / 0.95) !important; }
-        .omafit-shoe-hero .border-gray-200 { border-color: rgb(255 255 255 / 0.28) !important; }
+        .omafit-shoe-hero .border-blue-400 { border-color: rgb(255 255 255 / 0.4) !important; }
+        .omafit-shoe-hero .border-blue-700 { border-color: rgb(255 255 255 / 0.45) !important; }
+        .omafit-shoe-hero .from-blue-50 { --tw-gradient-from: rgb(255 255 255 / 0.14) var(--tw-gradient-from-position) !important; }
+        .omafit-shoe-hero .to-blue-100 { --tw-gradient-to: rgb(255 255 255 / 0.08) var(--tw-gradient-to-position) !important; }
+        .omafit-shoe-hero .bg-blue-50 { background-color: rgb(255 255 255 / 0.12) !important; }
+        .omafit-shoe-hero .bg-blue-100 { background-color: rgb(255 255 255 / 0.1) !important; }
+        .omafit-shoe-hero .border-gray-200,
+        .omafit-shoe-hero .border-gray-300 { border-color: rgb(255 255 255 / 0.35) !important; }
         .omafit-shoe-hero .bg-gray-50 { background-color: rgb(0 0 0 / 0.22) !important; }
+        .omafit-shoe-hero .hover\\:bg-slate-50:hover { background-color: rgb(255 255 255 / 0.08) !important; }
         .omafit-shoe-hero h3 { color: #ffffff !important; }
         `
             : ''
@@ -1709,7 +1724,10 @@ export function ShoeARWidget({
         <div className="flex-1 p-2 md:p-4 overflow-y-auto">
           <div className="mx-auto max-w-5xl animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="order-1 md:order-1 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+              <div
+                className={`order-1 md:order-1 rounded-[28px] border p-6 ${isHeroLayout ? 'border-white/35 bg-black/25 backdrop-blur-sm' : ''}`}
+                style={!isHeroLayout ? { borderColor: borderTint } : undefined}
+              >
                 <motion.div
                   className="text-center mb-3"
                   initial={{ opacity: 0, y: 8 }}
@@ -1722,7 +1740,11 @@ export function ShoeARWidget({
                 </motion.div>
 
                 <motion.div
-                  className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg p-4 mb-3 shadow-md"
+                  className={`rounded-lg border-2 p-4 mb-3 shadow-md ${
+                    isHeroLayout
+                      ? 'border-white/40 bg-white/10 backdrop-blur-sm'
+                      : 'border-blue-400 bg-gradient-to-r from-blue-50 to-blue-100'
+                  }`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.34, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
@@ -1749,13 +1771,21 @@ export function ShoeARWidget({
                 </motion.div>
 
                 {isAnalyzing && (
-                  <div className="mt-6 rounded-2xl p-4 text-sm font-medium text-slate-700" style={{ backgroundColor: surfaceTint }}>
+                  <div
+                    className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${
+                      isHeroLayout ? 'border-white/25 bg-black/35 text-white' : 'text-slate-700'
+                    }`}
+                    style={!isHeroLayout ? { backgroundColor: surfaceTint } : undefined}
+                  >
                     {t.analyzing}
                   </div>
                 )}
               </div>
 
-              <div className="order-2 md:order-2 rounded-[28px] border p-6" style={{ borderColor: borderTint }}>
+              <div
+                className={`order-2 md:order-2 rounded-[28px] border p-6 ${isHeroLayout ? 'border-white/35 bg-black/25 backdrop-blur-sm' : ''}`}
+                style={!isHeroLayout ? { borderColor: borderTint } : undefined}
+              >
                 <motion.h3
                   className="text-2xl font-semibold text-slate-900"
                   initial={{ opacity: 0, y: 8 }}
@@ -1770,8 +1800,10 @@ export function ShoeARWidget({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full overflow-hidden rounded-[28px] border transition-colors hover:bg-slate-50"
-                      style={{ borderColor: borderTint }}
+                      className={`w-full overflow-hidden rounded-[28px] border transition-colors ${
+                        isHeroLayout ? 'border-white/35 hover:bg-white/10' : 'hover:bg-slate-50'
+                      }`}
+                      style={!isHeroLayout ? { borderColor: borderTint } : undefined}
                     >
                       <img src={footPhotoPreview} alt={t.footPhotoLabel} className="h-[360px] w-full object-cover" />
                     </button>
@@ -1779,11 +1811,15 @@ export function ShoeARWidget({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-center cursor-pointer transition-all duration-300 ease-in-out hover:bg-slate-50"
+                      className={`flex min-h-[320px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed text-center cursor-pointer transition-all duration-300 ease-in-out ${
+                        isHeroLayout
+                          ? 'border-white/45 hover:bg-white/10 text-white'
+                          : 'border-gray-300 hover:bg-slate-50 text-gray-700'
+                      }`}
                     >
-                      <Camera className="mb-3 h-10 w-10" />
-                      <span className="text-gray-700 mb-2 text-lg">{t.captureButton}</span>
-                      <span className="text-base text-gray-500">{t.imageFormats}</span>
+                      <Camera className={`mb-3 h-10 w-10 ${isHeroLayout ? 'text-white/85' : 'text-gray-400'}`} />
+                      <span className={`mb-2 text-lg ${isHeroLayout ? 'text-white' : 'text-gray-700'}`}>{t.captureButton}</span>
+                      <span className={`text-base ${isHeroLayout ? 'text-white/85' : 'text-gray-500'}`}>{t.imageFormats}</span>
                     </button>
                   )}
 

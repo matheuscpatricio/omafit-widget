@@ -5513,30 +5513,58 @@ function omafitHeroContainImageLeftPercent(w, h, iw, ih) {
   return omafitHeroClampPct(((w - dispW) / w) * 100);
 }
 
-/** Degradê overlay desktop: reforço em volta de seam (% da largura) = borda esquerda da imagem em contain + right. */
+/** Degradê overlay desktop: reforço forte em volta de seam (% da largura) = borda esquerda da imagem em contain + right. */
 function omafitHeroDesktopShadeGradient(primaryColor, seam) {
   const p = primaryColor;
   if (seam == null || Number.isNaN(seam)) {
     return `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%)`;
   }
   const s = omafitHeroClampPct(seam);
-  let t1 = omafitHeroClampPct(s - 18);
-  let t2 = omafitHeroClampPct(s - 10);
-  let t3 = omafitHeroClampPct(s - 4);
-  let t4 = s;
-  let t5 = omafitHeroClampPct(s + 5);
-  let t6 = omafitHeroClampPct(s + 14);
-  let t7 = Math.min(100, Math.max(t6 + 0.5, s + 24));
-  if (t2 <= t1) t2 = Math.min(100, t1 + 0.5);
-  if (t3 <= t2) t3 = Math.min(100, t2 + 0.5);
-  if (t4 <= t3) t4 = Math.min(100, t3 + 0.5);
-  if (t5 <= t4) t5 = Math.min(100, t4 + 0.5);
-  if (t6 <= t5) t6 = Math.min(100, t5 + 0.5);
-  if (t7 <= t6) t7 = Math.min(100, t6 + 0.5);
-  return `linear-gradient(90deg, ${p} 0%, ${p} ${t1}%, ${p}fc ${t2}%, ${p}f7 ${t3}%, ${p}ee ${t4}%, ${p}8a ${t5}%, ${p}32 ${t6}%, ${p}00 ${t7}%, ${p}00 100%)`;
+  let t1 = omafitHeroClampPct(s - 26);
+  let t2 = omafitHeroClampPct(s - 16);
+  let t3 = omafitHeroClampPct(s - 8);
+  let t4 = omafitHeroClampPct(s - 2);
+  let t5 = s;
+  let t6 = omafitHeroClampPct(s + 4);
+  let t7 = omafitHeroClampPct(s + 10);
+  let t8 = omafitHeroClampPct(s + 18);
+  let t9 = Math.min(100, Math.max(t8 + 0.5, s + 30));
+  if (t2 <= t1) t2 = Math.min(100, t1 + 0.35);
+  if (t3 <= t2) t3 = Math.min(100, t2 + 0.35);
+  if (t4 <= t3) t4 = Math.min(100, t3 + 0.35);
+  if (t5 <= t4) t5 = Math.min(100, t4 + 0.35);
+  if (t6 <= t5) t6 = Math.min(100, t5 + 0.35);
+  if (t7 <= t6) t7 = Math.min(100, t6 + 0.35);
+  if (t8 <= t7) t8 = Math.min(100, t7 + 0.35);
+  if (t9 <= t8) t9 = Math.min(100, t8 + 0.35);
+  return `linear-gradient(90deg, ${p} 0%, ${p} ${t1}%, ${p}fe ${t2}%, ${p}fc ${t3}%, ${p}fa ${t4}%, ${p}f5 ${t5}%, ${p}d5 ${t6}%, ${p}88 ${t7}%, ${p}38 ${t8}%, ${p}00 ${t9}%, ${p}00 100%)`;
 }
 
-function omafitBindHeroDesktopShadeFromContain(shadeEl, measureEl, primaryColor, heroBgSrc) {
+function omafitHeroDesktopFeatherStyle(featherEl, seam, primaryColor) {
+  if (!featherEl) return;
+  const p = primaryColor;
+  if (seam == null || Number.isNaN(seam)) {
+    featherEl.style.display = "none";
+    return;
+  }
+  const s = omafitHeroClampPct(seam);
+  featherEl.style.display = "block";
+  featherEl.style.position = "absolute";
+  featherEl.style.left = `${s}%`;
+  featherEl.style.top = "0";
+  featherEl.style.bottom = "0";
+  featherEl.style.width = "min(2.75rem, 7vw)";
+  featherEl.style.transform = "translateX(-50%)";
+  featherEl.style.zIndex = "2";
+  featherEl.style.pointerEvents = "none";
+  featherEl.style.backdropFilter = "blur(10px)";
+  featherEl.style.webkitBackdropFilter = "blur(10px)";
+  featherEl.style.background = `linear-gradient(90deg, ${p}aa 0%, ${p}55 35%, transparent 100%)`;
+  featherEl.style.webkitMaskImage = "linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)";
+  featherEl.style.maskImage = "linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)";
+}
+
+function omafitBindHeroDesktopShadeFromContain(shadeEl, featherEl, measureEl, primaryColor, heroBgSrc) {
   const img = new Image();
   function apply() {
     const w = measureEl.clientWidth;
@@ -5547,9 +5575,11 @@ function omafitBindHeroDesktopShadeFromContain(shadeEl, measureEl, primaryColor,
     if (iw <= 0 || ih <= 0) return;
     const seam = omafitHeroContainImageLeftPercent(w, h, iw, ih);
     shadeEl.style.backgroundImage = omafitHeroDesktopShadeGradient(primaryColor, seam);
+    omafitHeroDesktopFeatherStyle(featherEl, seam, primaryColor);
   }
   function fallback() {
     shadeEl.style.backgroundImage = omafitHeroDesktopShadeGradient(primaryColor, null);
+    omafitHeroDesktopFeatherStyle(featherEl, null, primaryColor);
   }
   img.onload = apply;
   img.onerror = fallback;
@@ -5886,9 +5916,19 @@ function buildInfoModal({
   const colContent = el("div", {
     style: {
       flex: "1",
-      padding: isSidebar || isHero ? "8px 14px 12px" : "12px 16px 24px",
       overflowY: "auto",
       boxSizing: "border-box",
+      ...(isHero
+        ? {
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            minHeight: "0",
+            padding: "8px 14px max(18px, env(safe-area-inset-bottom, 0px))",
+          }
+        : {
+            padding: isSidebar ? "8px 14px 12px" : "12px 16px 24px",
+          }),
     },
   });
 
@@ -5916,6 +5956,13 @@ function buildInfoModal({
     mobileImgWrap.appendChild(mimg);
   }
 
+  /** Mesmo contraste que TryOnWidget hero step 1 (textos claros + CTA branco). */
+  const heroInfoFg = "#ffffff";
+  const heroInfoMuted = "rgba(255, 255, 255, 0.92)";
+  const heroInfoAccent = "rgba(255, 255, 255, 0.95)";
+  const heroInfoPanelBg = "rgba(255, 255, 255, 0.12)";
+  const heroInfoPanelBorder = "rgba(255, 255, 255, 0.35)";
+
   const titleBlock = el("div", { style: { textAlign: "center", marginBottom: "16px" } });
   titleBlock.appendChild(
     el("h3", {
@@ -5924,7 +5971,7 @@ function buildInfoModal({
         margin: "0 0 6px 0",
         fontSize: isSidebar || isHero ? "clamp(1.05rem, 2.2vw, 1.25rem)" : "clamp(1.35rem, 4vw, 1.85rem)",
         fontWeight: "600",
-        color: primaryColor,
+        color: isHero ? heroInfoFg : primaryColor,
       },
     }),
   );
@@ -5933,7 +5980,7 @@ function buildInfoModal({
       textContent: t.desc,
       style: {
         margin: 0,
-        color: "#374151",
+        color: isHero ? heroInfoMuted : "#374151",
         fontSize: isSidebar || isHero ? "clamp(0.88rem, 1.8vw, 0.98rem)" : "clamp(1rem, 3vw, 1.2rem)",
         lineHeight: isSidebar || isHero ? "1.35" : "1.45",
       },
@@ -5942,8 +5989,8 @@ function buildInfoModal({
 
   const blueBox = el("div", {
     style: {
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
+      background: isHero ? heroInfoPanelBg : "#eff6ff",
+      border: isHero ? `1px solid ${heroInfoPanelBorder}` : "1px solid #bfdbfe",
       borderRadius: "8px",
       padding: isSidebar || isHero ? "12px" : "16px",
       marginBottom: isSidebar || isHero ? "12px" : "20px",
@@ -5953,7 +6000,12 @@ function buildInfoModal({
   blueInner.appendChild(
     el("h4", {
       textContent: t.howTitle,
-      style: { margin: "0 0 6px 0", fontWeight: "600", color: "#1e40af", fontSize: isSidebar || isHero ? "0.95rem" : "1.05rem" },
+      style: {
+        margin: "0 0 6px 0",
+        fontWeight: "600",
+        color: isHero ? heroInfoAccent : "#1e40af",
+        fontSize: isSidebar || isHero ? "0.95rem" : "1.05rem",
+      },
     }),
   );
   blueInner.appendChild(
@@ -5961,7 +6013,7 @@ function buildInfoModal({
       textContent: t.howBody,
       style: {
         margin: 0,
-        color: "#1d4ed8",
+        color: isHero ? heroInfoAccent : "#1d4ed8",
         fontSize: isSidebar || isHero ? "clamp(0.82rem, 1.7vw, 0.92rem)" : "clamp(0.95rem, 2.8vw, 1.05rem)",
         lineHeight: isSidebar || isHero ? "1.4" : "1.5",
       },
@@ -5975,9 +6027,9 @@ function buildInfoModal({
       type: "button",
       style: {
         width: "100%",
-        background: primaryColor,
-        color: "#fff",
-        border: "none",
+        background: isHero ? "#ffffff" : primaryColor,
+        color: isHero ? primaryColor : "#fff",
+        border: isHero ? "2px solid rgba(255, 255, 255, 0.95)" : "none",
         padding: isSidebar || isHero ? "11px 14px" : "14px 20px",
         borderRadius: "8px",
         fontSize: isSidebar || isHero ? "clamp(0.9rem, 1.8vw, 1rem)" : "clamp(1rem, 3vw, 1.15rem)",
@@ -5996,15 +6048,24 @@ function buildInfoModal({
   );
   cta.appendChild(document.createTextNode(t.cta + " "));
   const arw = svgArrowRight();
-  arw.style.color = "#fff";
+  arw.style.color = isHero ? primaryColor : "#fff";
   cta.appendChild(arw);
   cta.addEventListener("mouseenter", () => {
-    cta.style.filter = "brightness(0.92)";
-    cta.style.boxShadow = `0 4px 14px ${primaryColor}44`;
+    if (isHero) {
+      cta.style.filter = "brightness(0.98)";
+      cta.style.boxShadow = "0 4px 14px rgba(0,0,0,0.2)";
+      cta.style.background = "rgba(255, 255, 255, 0.92)";
+    } else {
+      cta.style.filter = "brightness(0.92)";
+      cta.style.boxShadow = `0 4px 14px ${primaryColor}44`;
+    }
   });
   cta.addEventListener("mouseleave", () => {
     cta.style.filter = "none";
     cta.style.boxShadow = "none";
+    if (isHero) {
+      cta.style.background = "#ffffff";
+    }
   });
   cta.addEventListener("click", () => {
     if (!omafitArDocumentAllowsCamera()) {
@@ -6019,7 +6080,7 @@ function buildInfoModal({
     style: {
       margin: 0,
       textAlign: "center",
-      color: "#6b7280",
+      color: isHero ? heroInfoMuted : "#6b7280",
       fontSize: isSidebar || isHero ? "0.78rem" : "0.875rem",
       lineHeight: isSidebar || isHero ? "1.3" : "1.4",
     },
@@ -6122,8 +6183,11 @@ function buildInfoModal({
         },
       });
       desktopWrap.appendChild(shadeEl);
+      const featherEl = el("div", { className: "omafit-ar-hero-bg-desktop-feather" });
+      featherEl.style.display = "none";
+      desktopWrap.appendChild(featherEl);
       bgRoot.appendChild(desktopWrap);
-      omafitBindHeroDesktopShadeFromContain(shadeEl, bgRoot, primaryColor, heroBg);
+      omafitBindHeroDesktopShadeFromContain(shadeEl, featherEl, bgRoot, primaryColor, heroBg);
     } else {
       bgRoot.appendChild(
         el("div", {

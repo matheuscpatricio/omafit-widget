@@ -20,27 +20,31 @@ function containImageLeftPercent(w: number, h: number, iw: number, ih: number): 
   return clampPct(((w - dispW) / w) * 100);
 }
 
-/** Degradê desktop: espelho do mobile fora da junção; paragens mais opacas em volta de `seam` (%). */
+/** Degradê desktop: paragens muito opacas em volta de `seam` (%), com cauda suave para transparente. */
 function buildDesktopOverlayGradient(primaryHex: string, seamPct: number | null): string {
   const p = primaryHex;
   if (seamPct == null) {
     return `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%)`;
   }
   const s = clampPct(seamPct);
-  let t1 = clampPct(s - 18);
-  let t2 = clampPct(s - 10);
-  let t3 = clampPct(s - 4);
-  let t4 = s;
-  let t5 = clampPct(s + 5);
-  let t6 = clampPct(s + 14);
-  let t7 = Math.min(100, Math.max(t6 + 0.5, s + 24));
-  if (t2 <= t1) t2 = Math.min(100, t1 + 0.5);
-  if (t3 <= t2) t3 = Math.min(100, t2 + 0.5);
-  if (t4 <= t3) t4 = Math.min(100, t3 + 0.5);
-  if (t5 <= t4) t5 = Math.min(100, t4 + 0.5);
-  if (t6 <= t5) t6 = Math.min(100, t5 + 0.5);
-  if (t7 <= t6) t7 = Math.min(100, t6 + 0.5);
-  return `linear-gradient(90deg, ${p} 0%, ${p} ${t1}%, ${p}fc ${t2}%, ${p}f7 ${t3}%, ${p}ee ${t4}%, ${p}8a ${t5}%, ${p}32 ${t6}%, ${p}00 ${t7}%, ${p}00 100%)`;
+  let t1 = clampPct(s - 26);
+  let t2 = clampPct(s - 16);
+  let t3 = clampPct(s - 8);
+  let t4 = clampPct(s - 2);
+  let t5 = s;
+  let t6 = clampPct(s + 4);
+  let t7 = clampPct(s + 10);
+  let t8 = clampPct(s + 18);
+  let t9 = Math.min(100, Math.max(t8 + 0.5, s + 30));
+  if (t2 <= t1) t2 = Math.min(100, t1 + 0.35);
+  if (t3 <= t2) t3 = Math.min(100, t2 + 0.35);
+  if (t4 <= t3) t4 = Math.min(100, t3 + 0.35);
+  if (t5 <= t4) t5 = Math.min(100, t4 + 0.35);
+  if (t6 <= t5) t6 = Math.min(100, t5 + 0.35);
+  if (t7 <= t6) t7 = Math.min(100, t6 + 0.35);
+  if (t8 <= t7) t8 = Math.min(100, t7 + 0.35);
+  if (t9 <= t8) t9 = Math.min(100, t8 + 0.35);
+  return `linear-gradient(90deg, ${p} 0%, ${p} ${t1}%, ${p}fe ${t2}%, ${p}fc ${t3}%, ${p}fa ${t4}%, ${p}f5 ${t5}%, ${p}d5 ${t6}%, ${p}88 ${t7}%, ${p}38 ${t8}%, ${p}00 ${t9}%, ${p}00 100%)`;
 }
 
 /**
@@ -56,6 +60,27 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
   const gradientVertical = `linear-gradient(180deg, ${p}00 0%, ${p}00 18%, ${p}d9 42%, ${p}f2 58%, ${p} 100%)`;
 
   const desktopOverlayImage = useMemo(() => buildDesktopOverlayGradient(p, seamPercent), [p, seamPercent]);
+
+  /** Faixa na junção contain/primária: blur leve + névoa da cor para esconder o corte. */
+  const desktopSeamFeatherStyle = useMemo((): CSSProperties | null => {
+    if (!bg || seamPercent == null) return null;
+    const s = clampPct(seamPercent);
+    return {
+      position: 'absolute',
+      left: `${s}%`,
+      top: 0,
+      bottom: 0,
+      width: 'min(2.75rem, 7vw)',
+      transform: 'translateX(-50%)',
+      zIndex: 2,
+      pointerEvents: 'none',
+      WebkitBackdropFilter: 'blur(10px)',
+      backdropFilter: 'blur(10px)',
+      background: `linear-gradient(90deg, ${p}aa 0%, ${p}55 35%, transparent 100%)`,
+      WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)',
+      maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)',
+    };
+  }, [bg, seamPercent, p]);
 
   useLayoutEffect(() => {
     if (!bg) {
@@ -155,6 +180,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
         >
           <div className="absolute inset-0" style={desktopImageLayerStyle} />
           <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
+          {desktopSeamFeatherStyle ? <div style={desktopSeamFeatherStyle} /> : null}
         </motion.div>
       ) : (
         <motion.aside
