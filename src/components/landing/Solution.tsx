@@ -199,15 +199,15 @@ function SolutionAutoMarqueeGrid() {
   return (
     <div ref={viewportRef} className="w-full overflow-hidden py-1">
       <div
-        className="flex w-[200%] animate-solution-marquee will-change-transform"
+        className="flex w-max max-w-none animate-solution-marquee will-change-transform"
         style={{ animationPlayState: paused ? 'paused' : 'running' }}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        <div className="flex w-1/2 shrink-0 items-stretch justify-start overflow-visible">
+        <div className="shrink-0">
           <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
         </div>
-        <div className="flex w-1/2 shrink-0 items-stretch justify-start overflow-visible">
+        <div className="shrink-0">
           <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
         </div>
       </div>

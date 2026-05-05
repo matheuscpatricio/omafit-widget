@@ -1406,6 +1406,8 @@ export function ShoeARWidget({
 
   const showFloatingBackEmbed =
     embed && step !== 'info' && step !== 'processing';
+  const sidebarStep: 'info' | 'measure-capture' | 'processing' | 'measure-result' =
+    step === 'ar-info' || step === 'ar-viewer' ? 'measure-result' : step;
 
   if (tryonLayout === 'pending' && effectiveShopDomain) {
     const loadingLabel =
@@ -1466,7 +1468,7 @@ export function ShoeARWidget({
             storeName={storeName}
             logoUrl={storeLogo || ''}
             language={language}
-            step={step}
+            step={sidebarStep}
             steps={SHOE_SIDEBAR_STEPS}
           />
         )}
