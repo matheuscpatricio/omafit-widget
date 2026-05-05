@@ -17,6 +17,7 @@ import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
 import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
+import { contrastTextOnHex } from '../utils/contrastText';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { SHOE_SIDEBAR_STEPS } from './tryon/shoeSidebarStepMeta';
 
@@ -1475,7 +1476,7 @@ export function ShoeARWidget({
     <div
       className={
         embed
-          ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${isHeroLayout ? 'bg-transparent' : 'bg-white'}`
+          ? `omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col animate-fade-in transition-all duration-300 ease-in-out ${isHeroLayout ? 'omafit-shoe-hero bg-transparent' : 'bg-white'}`
           : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
       }
       onContextMenu={(e) => e.preventDefault()}
@@ -1487,9 +1488,67 @@ export function ShoeARWidget({
         .omafit-shoe-widget-root * {
           font-family: '${fontFamily}', sans-serif !important;
         }
+        ${
+          isHeroLayout
+            ? `
+        .omafit-shoe-hero .text-gray-500,
+        .omafit-shoe-hero .text-gray-600,
+        .omafit-shoe-hero .text-gray-700,
+        .omafit-shoe-hero .text-gray-800,
+        .omafit-shoe-hero .text-gray-900 { color: rgb(255 255 255 / 0.92) !important; }
+        .omafit-shoe-hero .text-blue-700,
+        .omafit-shoe-hero .text-blue-800,
+        .omafit-shoe-hero .text-blue-900 { color: rgb(255 255 255 / 0.95) !important; }
+        .omafit-shoe-hero .border-gray-200 { border-color: rgb(255 255 255 / 0.28) !important; }
+        .omafit-shoe-hero .bg-gray-50 { background-color: rgb(0 0 0 / 0.22) !important; }
+        .omafit-shoe-hero h3 { color: #ffffff !important; }
+        `
+            : ''
+        }
       `}</style>
 
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
+        {isHeroLayout && (
+          <>
+            <motion.header
+              className="w-full shrink-0 md:hidden"
+              style={{
+                backgroundColor: primaryColor,
+                color: contrastTextOnHex(primaryColor),
+              }}
+              initial={{ opacity: 0.94, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex justify-center px-3 pb-2 pt-2.5">
+                {storeLogo && storeLogo.trim() !== '' ? (
+                  <img
+                    src={storeLogo}
+                    alt={storeName}
+                    className="max-h-10 w-auto max-w-[min(220px,72vw)] object-contain object-center"
+                  />
+                ) : (
+                  <div className="text-center text-sm font-semibold tracking-tight opacity-95">{storeName}</div>
+                )}
+              </div>
+            </motion.header>
+            <div
+              className={`pointer-events-none absolute z-30 hidden md:block ${showFloatingBackEmbed ? 'left-14 top-3' : 'left-4 top-3'}`}
+            >
+              <div className="pointer-events-auto">
+                {storeLogo && storeLogo.trim() !== '' ? (
+                  <img
+                    src={storeLogo}
+                    alt={storeName}
+                    className="h-11 w-auto max-w-[min(280px,40vw)] object-contain object-left"
+                  />
+                ) : storeName ? (
+                  <span className="text-sm font-semibold tracking-tight text-white drop-shadow-md">{storeName}</span>
+                ) : null}
+              </div>
+            </div>
+          </>
+        )}
         {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={primaryColor}
@@ -1554,7 +1613,7 @@ export function ShoeARWidget({
           <div
             className={
               embed
-                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${isHeroLayout ? ' relative z-10' : ''}`
+                ? `flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row${isHeroLayout ? ' relative z-10 md:pt-14' : ''}`
                 : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
             }
             style={{ fontFamily: fontFamily || 'inherit' }}
@@ -1578,8 +1637,16 @@ export function ShoeARWidget({
             </div>
           )}
 
-          <div className="flex-1 p-2 md:p-4 overflow-y-auto">
-            <div className="space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in">
+          <div
+            className={`flex-1 p-2 md:p-4 overflow-y-auto${isHeroLayout ? ' flex min-h-0 flex-col' : ''}`}
+          >
+            <div
+              className={
+                isHeroLayout
+                  ? 'flex flex-1 flex-col justify-end space-y-4 pb-4 animate-fade-in md:flex md:h-full md:justify-center md:pb-0'
+                  : 'space-y-4 md:flex md:flex-col md:justify-center md:h-full animate-fade-in'
+              }
+            >
               {!isHeroLayout && (
                 <div className="md:hidden bg-gray-50 rounded-xl p-3">
                   <div className="w-full rounded-2xl overflow-hidden bg-gray-100">
@@ -1595,7 +1662,7 @@ export function ShoeARWidget({
               )}
 
               <motion.div
-                className="text-center"
+                className={isHeroLayout ? 'text-left md:max-w-xl' : 'text-center'}
                 initial="hidden"
                 animate="show"
                 variants={textStaggerParent}

@@ -15,6 +15,7 @@ import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTry
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
+import { contrastTextOnHex } from '../utils/contrastText';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -3350,7 +3351,7 @@ const handleSubmit = async () => {
     <div
       className={`omafit-tryon-root w-full min-h-0${
         embed ? ' flex h-full min-h-0 w-full flex-1 flex-col' : ''
-      }`}
+      }${isHeroLayout ? ' omafit-tryon-hero' : ''}`}
       onContextMenu={(e) => e.preventDefault()}
     >
       <style>{`
@@ -3366,10 +3367,86 @@ const handleSubmit = async () => {
         .hover\\:bg-primary-dark:hover { background-color: ${hoverColor} !important; }
         .hover\\:border-primary:hover { border-color: ${localPrimaryColor} !important; }
         .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
+        ${
+          isHeroLayout
+            ? `
+        .omafit-tryon-hero .text-primary { color: #ffffff !important; }
+        .omafit-tryon-hero .text-gray-400,
+        .omafit-tryon-hero .text-gray-500,
+        .omafit-tryon-hero .text-gray-600,
+        .omafit-tryon-hero .text-gray-700,
+        .omafit-tryon-hero .text-gray-800,
+        .omafit-tryon-hero .text-gray-900 { color: rgb(255 255 255 / 0.92) !important; }
+        .omafit-tryon-hero .text-blue-700,
+        .omafit-tryon-hero .text-blue-800,
+        .omafit-tryon-hero .text-blue-900 { color: rgb(255 255 255 / 0.95) !important; }
+        .omafit-tryon-hero .border-blue-200 { border-color: rgb(255 255 255 / 0.35) !important; }
+        .omafit-tryon-hero .border-blue-400 { border-color: rgb(255 255 255 / 0.4) !important; }
+        .omafit-tryon-hero .border-blue-700 { border-color: rgb(255 255 255 / 0.45) !important; }
+        .omafit-tryon-hero .bg-blue-50,
+        .omafit-tryon-hero .from-blue-50 { --tw-gradient-from: rgb(255 255 255 / 0.12) var(--tw-gradient-from-position) !important; }
+        .omafit-tryon-hero .to-blue-100 { --tw-gradient-to: rgb(255 255 255 / 0.08) var(--tw-gradient-to-position) !important; }
+        .omafit-tryon-hero .bg-blue-50 { background-color: rgb(255 255 255 / 0.12) !important; }
+        .omafit-tryon-hero .bg-blue-100 { background-color: rgb(255 255 255 / 0.1) !important; }
+        .omafit-tryon-hero .bg-gray-50 { background-color: rgb(0 0 0 / 0.22) !important; }
+        .omafit-tryon-hero .border-gray-200 { border-color: rgb(255 255 255 / 0.28) !important; }
+        .omafit-tryon-hero .border-gray-300 { border-color: rgb(255 255 255 / 0.35) !important; }
+        .omafit-tryon-hero h3 { color: #ffffff !important; }
+        .omafit-tryon-hero h4 { color: rgb(255 255 255 / 0.96) !important; }
+        `
+            : ''
+        }
       `}</style>
 
       {/* Full Screen — layouts avançados usam chrome externo; `contents` evita wrapper extra no layout default */}
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
+        {isHeroLayout && (
+          <>
+            <motion.header
+              className="w-full shrink-0 md:hidden"
+              style={{
+                backgroundColor: localPrimaryColor,
+                color: contrastTextOnHex(localPrimaryColor),
+              }}
+              initial={{ opacity: 0.94, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex justify-center px-3 pb-2 pt-2.5">
+                {localStoreLogo && localStoreLogo.trim() !== '' ? (
+                  <img
+                    src={localStoreLogo}
+                    alt={localStoreName || storeName || t('storeLogoAlt')}
+                    className="max-h-10 w-auto max-w-[min(220px,72vw)] object-contain object-center"
+                  />
+                ) : (
+                  <div className="text-center text-sm font-semibold tracking-tight opacity-95">
+                    {localStoreName || storeName || ''}
+                  </div>
+                )}
+              </div>
+            </motion.header>
+            <div
+              className={`pointer-events-none absolute z-30 hidden md:block ${
+                step === 'calculator' || step === 'photo' || step === 'confirm' ? 'left-14 top-3' : 'left-4 top-3'
+              }`}
+            >
+              <div className="pointer-events-auto">
+                {localStoreLogo && localStoreLogo.trim() !== '' ? (
+                  <img
+                    src={localStoreLogo}
+                    alt={localStoreName || storeName || t('storeLogoAlt')}
+                    className="h-11 w-auto max-w-[min(280px,40vw)] object-contain object-left"
+                  />
+                ) : (localStoreName || storeName) ? (
+                  <span className="text-sm font-semibold tracking-tight text-white drop-shadow-md">
+                    {localStoreName || storeName}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </>
+        )}
         {isSidebarLayout && (
           <TryOnLayoutShellSidebar
             primaryColor={localPrimaryColor}
@@ -3716,7 +3793,7 @@ const handleSubmit = async () => {
         {/* Coluna do conteúdo — z-10 no hero para ficar acima do fundo absoluto (TryOnLayoutShellHero) */}
         <div
           className={`flex-1 transition-all duration-300 ease-in-out ${
-            embed && isHeroLayout ? 'relative z-10 ' : ''
+            embed && isHeroLayout ? 'relative z-10 md:pt-14 ' : ''
           }${
             embed && (step === 'info' || step === 'photo')
               ? `flex min-h-0 min-w-0 flex-col overflow-hidden overflow-y-auto p-2 sm:px-3${
@@ -3739,9 +3816,21 @@ const handleSubmit = async () => {
         {/* Step 1: Info — mobile igual ao layout clássico; desktop+embed = coluna compacta */}
         {step === 'info' && (
           <>
-            <div className={embed ? 'md:hidden' : 'contents'}>
+            <div
+              className={
+                embed
+                  ? isHeroLayout
+                    ? 'flex min-h-0 flex-1 flex-col md:hidden'
+                    : 'md:hidden'
+                  : 'contents'
+              }
+            >
           <motion.div
-            className="space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4"
+            className={
+              embed && isHeroLayout
+                ? 'flex flex-1 flex-col justify-end space-y-4 pb-5 pt-2'
+                : 'space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4'
+            }
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
@@ -3754,7 +3843,10 @@ const handleSubmit = async () => {
               </motion.div>
             )}
 
-            <motion.div variants={tryonTextStaggerChild} className="w-full text-center">
+            <motion.div
+              variants={tryonTextStaggerChild}
+              className={`w-full ${embed && isHeroLayout ? 'text-left' : 'text-center'}`}
+            >
               <h3 className="mb-2 text-2xl font-semibold md:text-3xl" style={{ color: primaryColor }}>
                 {t('visualExperience')}
               </h3>
@@ -3762,7 +3854,7 @@ const handleSubmit = async () => {
             </motion.div>
 
             <motion.div variants={tryonTextStaggerChild} className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:p-4">
-              <div className="text-center">
+              <div className={embed && isHeroLayout ? 'text-left' : 'text-center'}>
                 <h4 className="mb-2 text-base font-medium text-blue-800 md:text-lg">{t('howItWorks')}</h4>
                 <p className="text-base text-blue-700 md:text-lg">{t('howItWorksDesc')}</p>
               </div>
@@ -3779,14 +3871,21 @@ const handleSubmit = async () => {
               </button>
             </motion.div>
 
-            <motion.p variants={tryonTextStaggerChild} className="text-center text-sm text-gray-500 md:text-base">
+            <motion.p
+              variants={tryonTextStaggerChild}
+              className={`text-sm text-gray-500 md:text-base ${embed && isHeroLayout ? 'text-left' : 'text-center'}`}
+            >
               {t('privacyNote')}
             </motion.p>
           </motion.div>
             </div>
             {embed && (
               <motion.div
-                className="mx-auto hidden min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4 md:flex"
+                className={
+                  isHeroLayout
+                    ? 'hidden min-h-0 w-full max-w-lg flex-1 flex-col items-start justify-center gap-3 overflow-x-hidden overflow-y-auto px-3 py-2 text-left sm:gap-4 md:flex md:pl-5 md:pr-4'
+                    : 'mx-auto hidden min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4 md:flex'
+                }
                 variants={tryonTextStaggerParent}
                 initial="hidden"
                 animate="show"
@@ -3804,17 +3903,27 @@ const handleSubmit = async () => {
                 )}
                 <motion.div
                   variants={tryonTextStaggerChild}
-                  className="flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4"
+                  className={
+                    isHeroLayout
+                      ? 'flex w-full min-w-0 max-w-md flex-col items-start gap-3 sm:gap-4'
+                      : 'flex w-full max-w-sm min-w-0 flex-col items-center justify-center gap-3 sm:max-w-md sm:gap-4'
+                  }
                 >
-                  <div>
+                  <div className={isHeroLayout ? 'text-left' : ''}>
                     <h3 className="mb-1 text-xl font-semibold sm:text-2xl" style={{ color: primaryColor }}>
                       {t('visualExperience')}
                     </h3>
                     <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
                   </div>
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+                  <div
+                    className={`rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4${isHeroLayout ? ' w-full' : ''}`}
+                  >
                     <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t('howItWorks')}</h4>
-                    <p className="text-center text-xs text-blue-700 sm:text-sm">{t('howItWorksDesc')}</p>
+                    <p
+                      className={`text-xs text-blue-700 sm:text-sm${isHeroLayout ? ' text-left' : ' text-center'}`}
+                    >
+                      {t('howItWorksDesc')}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -3824,7 +3933,11 @@ const handleSubmit = async () => {
                     {t('startNow')}
                     <ArrowRight className="h-5 w-5" />
                   </button>
-                  <p className="text-center text-xs text-gray-500 sm:text-sm">{t('privacyNote')}</p>
+                  <p
+                    className={`text-xs text-gray-500 sm:text-sm${isHeroLayout ? ' text-left' : ' text-center'}`}
+                  >
+                    {t('privacyNote')}
+                  </p>
                 </motion.div>
               </motion.div>
             )}
