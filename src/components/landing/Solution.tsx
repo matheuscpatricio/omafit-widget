@@ -1,9 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import type { CarouselApi } from '../ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
 import { cn } from '../../lib/utils';
-import { LANDING_IMAGES } from '../../lib/site';
-import { useIsMdUp } from '../../hooks/useMediaQuery';
-import { CircularGallery, type CircularGalleryItem } from '../ui/circular-gallery';
 
 interface Feature {
   title: string;
@@ -43,10 +42,10 @@ const features: Feature[] = [
     description:
       'Painéis que ligam o uso do widget a resultados de negócio: estime o retorno sobre o investimento e acompanhe o perfil agregado de quem usa o provador — dados como altura, peso e biotipo médios da sua audiência, sempre anonimizados.',
     bullets: [
-        'Modelos de ROI com conversão, ticket e devoluções',
-        'Médias de altura, peso e biotipo dos usuários',
-        'Funil de engajamento e sessões de try-on',
-      ],
+      'Modelos de ROI com conversão, ticket e devoluções',
+      'Médias de altura, peso e biotipo dos usuários',
+      'Funil de engajamento e sessões de try-on',
+    ],
   },
   {
     title: 'Widget Personalizável',
@@ -70,29 +69,147 @@ const itemVariants: Variants = {
   },
 };
 
-const galleryImageCycle = [
-  LANDING_IMAGES.heroLifestyleRiver,
-  LANDING_IMAGES.heroLifestyleBeach,
-  LANDING_IMAGES.heroLifestyleBoardwalk,
-  LANDING_IMAGES.midBanner,
-] as const;
+/** Avanço automático entre slides (rápido). */
+const AUTO_MS = 2800;
 
-const objectPositions = ['48% 32%', '52% 42%', '45% 28%', '50% 35%'] as const;
+function FeatureInfoCard({ feature }: { feature: Feature }) {
+  const highlight = Boolean(feature.accent);
 
-function buildGalleryItems(): CircularGalleryItem[] {
-  return features.map((f, i) => ({
-    title: f.title,
-    subtitle: f.bullets[0] ?? f.description.slice(0, 96).trim(),
-    imageUrl: galleryImageCycle[i % galleryImageCycle.length],
-    imageAlt: f.title,
-    objectPosition: objectPositions[i % objectPositions.length],
-  }));
+  return (
+    <div
+      className={cn(
+        'mx-auto flex h-full min-h-[min(52vh,420px)] max-w-3xl flex-col rounded-2xl border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 p-6 shadow-elegant sm:min-h-[min(48vh,440px)] sm:rounded-3xl sm:p-8',
+        highlight && 'ring-1 ring-oma-accent/30',
+      )}
+    >
+      <span
+        className={cn(
+          'inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-widest sm:text-xs',
+          highlight
+            ? 'border-oma-accent/45 bg-oma-accent/15 text-oma-cream'
+            : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/85',
+        )}
+      >
+        {highlight ? 'Destaque' : 'Recurso'}
+      </span>
+      <h3
+        className="mt-3 text-xl font-semibold leading-snug tracking-tight text-oma-cream sm:mt-4 sm:text-2xl md:text-[1.65rem]"
+        style={{ letterSpacing: '-0.02em' }}
+      >
+        {feature.title}
+      </h3>
+      <p className="mt-3 flex-1 text-sm leading-relaxed text-oma-cream/80 sm:text-base">{feature.description}</p>
+      <ul className="mt-4 space-y-2.5 text-sm text-oma-cream/90 sm:mt-5 sm:text-[15px]">
+        {feature.bullets.map((b) => (
+          <li key={b} className="flex gap-2.5 leading-snug">
+            <span
+              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-oma-accent"
+              aria-hidden
+            />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SolutionCardsCarousel() {
+  const [api, setApi] = useState<CarouselApi>();
+  const [selected, setSelected] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
+
+  const emblaOpts = useMemo(
+    () => ({
+      align: 'center' as const,
+      loop: true,
+      duration: reduceMotion ? 14 : 18,
+      skipSnaps: false,
+      dragFree: false,
+    }),
+    [reduceMotion],
+  );
+
+  const onSelect = useCallback((carouselApi: CarouselApi) => {
+    if (!carouselApi) return;
+    setSelected(carouselApi.selectedScrollSnap());
+  }, []);
+
+  useEffect(() => {
+    if (!api) return;
+    onSelect(api);
+    api.on('reInit', onSelect);
+    api.on('select', onSelect);
+    return () => {
+      api.off('select', onSelect);
+      api.off('reInit', onSelect);
+    };
+  }, [api, onSelect]);
+
+  useEffect(() => {
+    if (!api || reduceMotion || paused) return;
+    const id = window.setInterval(() => api.scrollNext(), AUTO_MS);
+    return () => window.clearInterval(id);
+  }, [api, reduceMotion, paused]);
+
+  return (
+    <div
+      className="relative w-full min-w-0 touch-pan-x"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      aria-roledescription="carousel"
+    >
+      <Carousel setApi={setApi} opts={emblaOpts} className="w-full min-w-0">
+        <CarouselContent className="-ml-3 sm:-ml-4 md:-ml-5">
+          {features.map((feature) => (
+            <CarouselItem key={feature.title} className="basis-full pl-3 sm:basis-full sm:pl-4 md:pl-5">
+              <FeatureInfoCard feature={feature} />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious
+          type="button"
+          className={cn(
+            'z-20 h-10 w-10 border border-oma-line/50 bg-oma-elevated/95 text-oma-cream shadow-lg backdrop-blur-sm',
+            'hover:bg-oma-elevated hover:text-oma-cream',
+            'hidden md:flex',
+            'left-0 top-1/2 -translate-y-1/2 sm:left-1',
+          )}
+        />
+        <CarouselNext
+          type="button"
+          className={cn(
+            'z-20 h-10 w-10 border border-oma-line/50 bg-oma-elevated/95 text-oma-cream shadow-lg backdrop-blur-sm',
+            'hover:bg-oma-elevated hover:text-oma-cream',
+            'hidden md:flex',
+            'right-0 top-1/2 -translate-y-1/2 sm:right-1',
+          )}
+        />
+      </Carousel>
+
+      <div className="mt-5 flex justify-center gap-2 md:mt-6" role="tablist" aria-label="Indicador de recursos">
+        {features.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            role="tab"
+            aria-selected={i === selected}
+            aria-label={`Ir para recurso ${i + 1}`}
+            className={cn(
+              'h-2 rounded-full transition-all duration-300',
+              i === selected ? 'w-8 bg-oma-accent' : 'w-2 bg-oma-line hover:bg-oma-muted/80',
+            )}
+            onClick={() => api?.scrollTo(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function Solution() {
-  const isMdUp = useIsMdUp();
   const reduceMotion = useReducedMotion();
-  const galleryItems = useMemo(() => buildGalleryItems(), []);
 
   return (
     <section id="solucao" className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
@@ -134,24 +251,16 @@ export function Solution() {
           className="mt-14 sm:mt-16"
         >
           <motion.div variants={itemVariants} className="mx-auto max-w-6xl">
-            <div
-              className={cn(
-                'relative w-full overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated/40 shadow-elegant-lg sm:rounded-3xl',
-                'min-h-[min(68vh,520px)] sm:min-h-[min(72vh,580px)] md:min-h-[min(76vh,620px)]',
-              )}
-            >
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_80%,rgba(217,104,69,0.12),transparent)] pointer-events-none" />
-              <CircularGallery
-                items={galleryItems}
-                radius={isMdUp ? 400 : 228}
-                autoRotateSpeed={reduceMotion ? 0 : 0.011}
-                className="relative z-[1] h-[min(68vh,520px)] sm:h-[min(72vh,580px)] md:h-[min(76vh,620px)]"
-              />
+            <div className="relative rounded-2xl border border-oma-line/40 bg-oma-elevated/25 px-1 py-6 shadow-elegant-lg sm:rounded-3xl sm:px-6 sm:py-8 md:px-10 md:py-10">
+              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(217,104,69,0.1),transparent)] sm:rounded-3xl" />
+              <div className="relative z-[1]">
+                <SolutionCardsCarousel />
+              </div>
             </div>
             <p className="mt-4 text-center text-xs text-oma-muted sm:text-sm">
               {reduceMotion
-                ? 'Deslize para ver cada recurso.'
-                : 'Galeria em rotação suave — aproxime-se do centro para ler o destaque.'}
+                ? 'Use os pontos abaixo para mudar de recurso.'
+                : 'No telemóvel, deslize com o dedo; no computador, use as setas ou os pontos.'}
             </p>
           </motion.div>
         </motion.div>
