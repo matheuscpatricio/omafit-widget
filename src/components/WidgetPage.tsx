@@ -831,6 +831,7 @@ export function WidgetPage() {
         ) : null}
         <div
           id="omafit-ar-root"
+          data-tryon-layout={tryonIframeSidebar ? 'sidebar' : 'default'}
           data-glb-url={eyewearBootstrap.glbUrl}
           data-primary-color={eyewearBootstrap.primaryColor}
           data-product-title={eyewearBootstrap.productTitle}

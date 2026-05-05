@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -122,11 +122,48 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
   );
 }
 
-function FeatureGridBlock({ features: list }: { features: Feature[] }) {
+/** Largura de cada cartão para caber exatamente 2 por vista (mobile) ou 4 (md+), numa única linha. */
+function useMarqueeViewportCardWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [cardWidth, setCardWidth] = useState(280);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const compute = () => {
+      const cw = el.getBoundingClientRect().width;
+      if (cw <= 0) return;
+      const md = window.matchMedia('(min-width: 768px)').matches;
+      const gapPx = md ? 16 : 8;
+      const cols = md ? 4 : 2;
+      const gapsTotal = (cols - 1) * gapPx;
+      setCardWidth(Math.max(168, (cw - gapsTotal) / cols));
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    const mq = window.matchMedia('(min-width: 768px)');
+    mq.addEventListener('change', compute);
+    return () => {
+      ro.disconnect();
+      mq.removeEventListener('change', compute);
+    };
+  }, []);
+
+  return [ref, cardWidth] as const;
+}
+
+function FeatureMarqueeStrip({ features: list, cardWidth }: { features: Feature[]; cardWidth: number }) {
   return (
-    <div className="grid w-full shrink-0 grid-cols-2 gap-2 px-2 sm:gap-3 sm:px-3 md:grid-cols-4 md:gap-4 md:px-4">
+    <div className="flex w-max max-w-none flex-nowrap gap-2 md:gap-4">
       {list.map((feature) => (
-        <div key={feature.title} className="min-w-0">
+        <div
+          key={feature.title}
+          className="min-h-[min(52vh,380px)] min-w-0 shrink-0 md:min-h-[min(48vh,420px)]"
+          style={{ width: cardWidth, flexBasis: cardWidth }}
+        >
           <FeatureInfoCard feature={feature} compact />
         </div>
       ))}
@@ -134,40 +171,33 @@ function FeatureGridBlock({ features: list }: { features: Feature[] }) {
   );
 }
 
-/** Dois blocos idênticos (2 cols mobile, 4 cols desde md); marquee translate -50%. Pausa com hover. */
+/** Uma fileira horizontal; 2 cartões visíveis no mobile e 4 no desktop (larguras via ResizeObserver). Marquee duplicado. */
 function SolutionAutoMarqueeGrid() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
+  const [viewportRef, cardWidth] = useMarqueeViewportCardWidth();
 
   if (reduceMotion) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-2 sm:px-3">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-          {features.map((feature) => (
-            <div key={feature.title} className="min-w-0">
-              <FeatureInfoCard feature={feature} compact />
-            </div>
-          ))}
-        </div>
+      <div ref={viewportRef} className="mx-auto w-full max-w-6xl overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
       </div>
     );
   }
 
   return (
-    <div
-      className="overflow-hidden py-1"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
+    <div ref={viewportRef} className="w-full overflow-hidden py-1">
       <div
         className="flex w-[200%] animate-solution-marquee will-change-transform"
         style={{ animationPlayState: paused ? 'paused' : 'running' }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
       >
-        <div className="w-1/2 shrink-0">
-          <FeatureGridBlock features={features} />
+        <div className="flex w-1/2 shrink-0 items-stretch justify-start overflow-visible">
+          <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
         </div>
-        <div className="w-1/2 shrink-0">
-          <FeatureGridBlock features={features} />
+        <div className="flex w-1/2 shrink-0 items-stretch justify-start overflow-visible">
+          <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
         </div>
       </div>
     </div>
