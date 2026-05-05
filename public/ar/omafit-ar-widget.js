@@ -5166,7 +5166,43 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
   });
 }
 
-function injectGlobalStyles(root, primaryOverride) {
+function omafitResolveTryonLayout(root) {
+  try {
+    const ds = String(
+      root?.dataset?.tryonLayout ?? root?.getAttribute?.("data-tryon-layout") ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    if (ds === "sidebar") return true;
+    const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+    if ((q.get("tryonLayout") || q.get("tryon_layout") || "").trim().toLowerCase() === "sidebar")
+      return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+function omafitContrastOnPrimary(hex) {
+  const h = String(hex || "").replace("#", "").trim();
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (full.length !== 6) return "#ffffff";
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.55 ? "#111827" : "#ffffff";
+}
+
+function omafitArSidebarStepLabels(lang) {
+  const base = String(lang || "pt").toLowerCase().split("-")[0];
+  if (base === "es")
+    return { progress: "Progreso", step1: "Bienvenida", step2: "Probador AR" };
+  if (base === "en") return { progress: "Progress", step1: "Welcome", step2: "AR try-on" };
+  return { progress: "Progresso", step1: "Boas-vindas", step2: "Provador AR" };
+}
+
+function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
   const old = document.getElementById("omafit-ar-styles");
   if (old) old.remove();
 
@@ -5270,6 +5306,39 @@ function injectGlobalStyles(root, primaryOverride) {
     /* Se forcarmos width/height:100% no canvas por CSS, o canvas "estica"   */
     /* ao container mas as projecoes 3D continuam calculadas para o aspect   */
     /* do video -> oculos aparecem rodados/offset ("virado pro lado").       */
+    ${
+      tryonLayoutSidebar
+        ? `
+    .omafit-ar-shell-sidebar-layout { display: flex; flex-direction: row; min-height: 100dvh; }
+    .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-desktop-only {
+      width: min(290px, 32vw);
+      background: ${primary};
+      color: ${omafitContrastOnPrimary(primary)};
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+      padding: 16px 14px;
+      border-right: 1px solid rgba(255,255,255,.14);
+      box-sizing: border-box;
+    }
+    .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-mobile-only {
+      display: block;
+      background: ${primary};
+      color: ${omafitContrastOnPrimary(primary)};
+      border-bottom: 1px solid rgba(255,255,255,.14);
+    }
+    .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-progress-track {
+      height: 8px; border-radius: 999px; background: rgba(255,255,255,.24); overflow: hidden;
+    }
+    .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-progress-fill {
+      height: 100%; border-radius: 999px; background: rgba(255,255,255,.88); transition: width .28s ease;
+    }
+    @media (min-width: 768px) {
+      .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-desktop-only { display: flex; }
+      .omafit-ar-shell-sidebar-layout .omafit-ar-sbar-mobile-only { display: none; }
+    }`
+        : ""
+    }
   `;
   document.head.appendChild(s);
   const hasThemeFontFace = document.getElementById("omafit-ar-theme-font-face");
@@ -5375,6 +5444,8 @@ function buildInfoModal({
   t,
   onClose,
   onStartAr,
+  layoutSidebar = false,
+  locale = "pt",
 }) {
   const productImgHttps = omafitUpgradeShopifyMediaToHttps(productImage);
   // #region agent log
@@ -5390,7 +5461,9 @@ function buildInfoModal({
   });
   // #endregion
 
-  const shell = el("div", { className: "omafit-ar-shell" });
+  const shell = el("div", {
+    className: layoutSidebar ? "omafit-ar-shell omafit-ar-shell-sidebar-layout" : "omafit-ar-shell",
+  });
   shell.style.cssText = [
     "position: fixed",
     "inset: 0",
@@ -5498,6 +5571,70 @@ function buildInfoModal({
   header.appendChild(leftPad);
   header.appendChild(logoWrap);
   header.appendChild(closeBtn);
+
+  let sidebarDesktop = null;
+  let sidebarMobile = null;
+  if (layoutSidebar) {
+    const L = omafitArSidebarStepLabels(locale);
+    const mobFill = el("div", { className: "omafit-ar-sbar-progress-fill" });
+    mobFill.style.width = "50%";
+    const deskFill = el("div", { className: "omafit-ar-sbar-progress-fill" });
+    deskFill.style.width = "50%";
+    const mobCounter = el("span", { textContent: "1/2", style: { fontSize: "10px", fontWeight: "600" } });
+    const mobStep = el("p", {
+      style: { margin: "8px 14px 12px", textAlign: "center", fontSize: "11px", fontWeight: "600" },
+      textContent: `1. ${L.step1}`,
+    });
+    const deskCurrent = el("p", {
+      style: { marginTop: "14px", fontSize: "12px", opacity: "0.8" },
+      textContent: L.step1,
+    });
+    const deskNav1 = el("div", {
+      style: { padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,.2)", fontWeight: "600", marginBottom: "8px" },
+      textContent: `1. ${L.step1}`,
+    });
+    const deskNav2 = el("div", {
+      style: { padding: "10px 12px", borderRadius: "10px", opacity: "0.55" },
+      textContent: `2. ${L.step2}`,
+    });
+    const applySidebarStep = (key) => {
+      const isAr = key === "ar";
+      mobFill.style.width = isAr ? "100%" : "50%";
+      deskFill.style.width = isAr ? "100%" : "50%";
+      mobCounter.textContent = isAr ? "2/2" : "1/2";
+      mobStep.textContent = `${isAr ? 2 : 1}. ${isAr ? L.step2 : L.step1}`;
+      deskCurrent.textContent = isAr ? L.step2 : L.step1;
+      deskNav1.style.opacity = isAr ? "0.55" : "1";
+      deskNav1.style.fontWeight = isAr ? "400" : "600";
+      deskNav2.style.opacity = isAr ? "1" : "0.55";
+      deskNav2.style.fontWeight = isAr ? "600" : "400";
+    };
+
+    sidebarMobile = el("div", { className: "omafit-ar-sbar-mobile-only" });
+    const mobTop = el("div", { style: { display: "flex", justifyContent: "center", padding: "8px 12px 2px" } });
+    if (logoUrl) mobTop.appendChild(el("img", { src: logoUrl, alt: shopName || "", style: { maxHeight: "40px", width: "auto", maxWidth: "70vw", objectFit: "contain" } }));
+    else if (shopName) mobTop.appendChild(el("span", { textContent: shopName, style: { fontWeight: "600", fontSize: "14px" } }));
+    const mobProg = el("div", { style: { padding: "8px 12px 4px", borderTop: "1px solid rgba(255,255,255,.14)" } });
+    const mobProgTop = el("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } });
+    mobProgTop.appendChild(el("span", { textContent: L.progress, style: { fontSize: "10px", fontWeight: "600", letterSpacing: ".14em", textTransform: "uppercase", opacity: ".86" } }));
+    mobProgTop.appendChild(mobCounter);
+    mobProg.appendChild(mobProgTop);
+    mobProg.appendChild(el("div", { className: "omafit-ar-sbar-progress-track" }, [mobFill]));
+    sidebarMobile.appendChild(mobTop);
+    sidebarMobile.appendChild(mobProg);
+    sidebarMobile.appendChild(mobStep);
+
+    sidebarDesktop = el("aside", { className: "omafit-ar-sbar-desktop-only" });
+    if (logoUrl) sidebarDesktop.appendChild(el("img", { src: logoUrl, alt: shopName || "", style: { maxHeight: "48px", width: "auto", maxWidth: "100%", objectFit: "contain", objectPosition: "left", marginBottom: "16px" } }));
+    else if (shopName) sidebarDesktop.appendChild(el("div", { textContent: shopName, style: { fontWeight: "600", marginBottom: "14px", opacity: ".9" } }));
+    sidebarDesktop.appendChild(el("p", { textContent: L.progress, style: { margin: "0 0 8px", fontSize: "10px", fontWeight: "600", letterSpacing: ".14em", textTransform: "uppercase", opacity: ".82" } }));
+    sidebarDesktop.appendChild(el("div", { className: "omafit-ar-sbar-progress-track" }, [deskFill]));
+    sidebarDesktop.appendChild(el("div", { style: { marginTop: "14px" } }, [deskNav1, deskNav2]));
+    sidebarDesktop.appendChild(deskCurrent);
+    shell.__omafitArSidebarApi = { setStep: applySidebarStep };
+    applySidebarStep("welcome");
+    header.style.display = "none";
+  }
 
   const mainRow = el("div", {
     style: {
@@ -5701,8 +5838,18 @@ function buildInfoModal({
   mainRow.appendChild(colImg);
   mainRow.appendChild(colContent);
 
-  shell.appendChild(header);
-  shell.appendChild(mainRow);
+  if (layoutSidebar) {
+    const contentOuter = el("div", {
+      style: { flex: "1", display: "flex", flexDirection: "column", minHeight: "0", overflow: "hidden" },
+    });
+    if (sidebarMobile) contentOuter.appendChild(sidebarMobile);
+    contentOuter.appendChild(mainRow);
+    if (sidebarDesktop) shell.appendChild(sidebarDesktop);
+    shell.appendChild(contentOuter);
+  } else {
+    shell.appendChild(header);
+    shell.appendChild(mainRow);
+  }
 
   const mq = window.matchMedia("(min-width: 768px)");
   function applyMq() {
@@ -6254,6 +6401,11 @@ async function runArSession({
   productId,
 }) {
   colContent.innerHTML = "";
+  try {
+    shell.__omafitArSidebarApi?.setStep?.("ar");
+  } catch {
+    /* ignore */
+  }
   const desktopCol = shell.querySelector(".omafit-ar-col-desktop");
   if (desktopCol) desktopCol.style.display = "none";
 
@@ -6706,8 +6858,9 @@ async function runArSession({
     }
   };
 
-  const headerClose = header.querySelector("[data-omafit-ar-close-modal]");
-  if (headerClose && headerClose.dataset.omafitArSessionClose !== "1") {
+  const closeTargets = shell.querySelectorAll("[data-omafit-ar-close-modal]");
+  for (const headerClose of closeTargets) {
+    if (headerClose?.dataset?.omafitArSessionClose === "1") continue;
     headerClose.dataset.omafitArSessionClose = "1";
     headerClose.addEventListener(
       "click",
@@ -14920,7 +15073,7 @@ async function main() {
   // #endregion
 
   try {
-  injectGlobalStyles(root, primaryColor);
+  injectGlobalStyles(root, primaryColor, omafitResolveTryonLayout(root));
   {
     const deferPreload =
       String(root?.dataset?.arDeferModulePreload ?? root?.getAttribute?.("data-ar-defer-module-preload") ?? "")
@@ -14950,6 +15103,8 @@ async function main() {
       productTitle,
       productImage,
       t,
+      layoutSidebar: omafitResolveTryonLayout(root),
+      locale: lang,
       onClose: closeModal,
       onStartAr: (shell, mainRow, colContent, header) => {
         const freshVariants = Array.isArray(window.__OMAFIT_AR_VARIANTS__)
