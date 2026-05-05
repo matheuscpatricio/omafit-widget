@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ShoeARWidget } from './ShoeARWidget';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
+import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -49,6 +50,12 @@ type ProductCatalog = {
 };
 
 export function ShoeARWidgetPage() {
+  const tryonLayoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
+  const tryonIframeSidebar = tryonLayoutFromUrl === 'sidebar';
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => tryonIframeSidebar);
+  const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
+    setTryonSidebarChrome(layout === 'sidebar');
+  }, []);
   const [productImage, setProductImage] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
   const [productName, setProductName] = useState<string>('Calçado em destaque');
@@ -239,20 +246,37 @@ export function ShoeARWidgetPage() {
           event.data.adminLocale || event.data.admin_locale || event.data.language
         );
         if (eventLanguage) setStoreLanguage(eventLanguage);
+
+        if (tryonLayoutFromUrl === undefined) {
+          const tl = event.data.tryon_layout ?? event.data.tryonLayout;
+          if (tl === 'sidebar' || tl === 'default') {
+            setTryonSidebarChrome(tl === 'sidebar');
+          }
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [tryonLayoutFromUrl]);
 
   return (
     <div
-      className="min-h-screen bg-transparent flex items-center justify-center px-2 py-4 sm:p-4"
+      className={
+        tryonSidebarChrome
+          ? 'flex h-dvh min-h-0 flex-col overflow-hidden bg-transparent p-0'
+          : 'flex min-h-screen items-center justify-center bg-transparent px-2 py-4 sm:p-4'
+      }
       style={{ fontFamily: fontFamily || 'inherit' }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="w-full sm:max-w-6xl max-h-[92vh] overflow-auto">
+      <div
+        className={
+          tryonSidebarChrome
+            ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden'
+            : 'max-h-[92vh] w-full overflow-auto sm:max-w-6xl'
+        }
+      >
         {!collectionTypeResolved ? (
           <div className="min-h-[240px] flex items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-[#810707]" />
@@ -279,6 +303,8 @@ export function ShoeARWidgetPage() {
             productCatalog={productCatalog}
             selectedVariantId={selectedVariantId}
             selectedVariantOptions={selectedVariantOptions}
+            tryonLayoutOverride={tryonLayoutFromUrl}
+            onTryonLayoutChange={handleTryonLayoutChange}
           />
         ) : (
           <div className="rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">

@@ -13,6 +13,7 @@ import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
+import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -3354,6 +3355,7 @@ const handleSubmit = async () => {
             logoUrl={localStoreLogo || ''}
             language={currentLanguage}
             step={step}
+            steps={TRYON_CLOTHING_SIDEBAR_STEPS}
           />
         )}
         <div className={embed ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'contents'}>

@@ -5166,7 +5166,7 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
   });
 }
 
-function injectGlobalStyles(root, primaryOverride) {
+function injectGlobalStyles(root, primaryOverride, tryonLayoutSidebar) {
   const old = document.getElementById("omafit-ar-styles");
   if (old) old.remove();
 

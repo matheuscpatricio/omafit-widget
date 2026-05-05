@@ -13,6 +13,10 @@ import {
   sortHandlesBySpecificityDesc,
 } from '../utils/pickPreferredCollectionHandle';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
+import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
+import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
+import { SHOE_SIDEBAR_STEPS } from './tryon/shoeSidebarStepMeta';
 
 interface ShoeARWidgetProps {
   productImage?: string;
@@ -35,6 +39,8 @@ interface ShoeARWidgetProps {
   productCatalog?: ProductCatalog;
   selectedVariantId?: string;
   selectedVariantOptions?: Record<string, string>;
+  tryonLayoutOverride?: TryonLayoutMode;
+  onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
 }
 
 interface ShoeSizeChartEntry {
@@ -643,8 +649,16 @@ export function ShoeARWidget({
   productCatalog = { sizes: [], colors: [], variants: [] },
   selectedVariantId = '',
   selectedVariantOptions = {},
+  tryonLayoutOverride,
+  onTryonLayoutChange,
 }: ShoeARWidgetProps) {
   const t: ShoeWidgetCopy = copy[language] ?? copy.pt;
+  const effectiveShopDomain = (shopDomain || '').trim();
+  const { tryonLayout, embed } = useTryonLayoutPreference({
+    shopDomain: effectiveShopDomain,
+    layoutOverride: tryonLayoutOverride,
+    onLayoutResolved: onTryonLayoutChange,
+  });
   const [step, setStep] = useState<Step>('info');
   const [footPhotoPreview, setFootPhotoPreview] = useState<string>('');
   const [recommendedSize, setRecommendedSize] = useState<number | null>(null);
@@ -1390,9 +1404,50 @@ export function ShoeARWidget({
     else if (step === 'ar-viewer') setStep('ar-info');
   };
 
+  const showFloatingBackEmbed =
+    embed && step !== 'info' && step !== 'processing';
+
+  if (tryonLayout === 'pending' && effectiveShopDomain) {
+    const loadingLabel =
+      language === 'es' ? 'Cargando…' : language === 'en' ? 'Loading…' : 'A carregar…';
+    return (
+      <div
+        className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-white"
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
+          .omafit-shoe-pending, .omafit-shoe-pending * {
+            font-family: '${fontFamily}', sans-serif !important;
+          }
+        `}</style>
+        <div className="omafit-shoe-pending text-center px-4">
+          <div className="mb-4 flex justify-center gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="inline-block h-2 w-2 animate-bounce rounded-full"
+                style={{
+                  backgroundColor: primaryColor,
+                  animationDelay: `${i * 200}ms`,
+                  animationDuration: '1.4s',
+                }}
+              />
+            ))}
+          </div>
+          <p className="text-base text-gray-700">{loadingLabel}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out"
+      className={
+        embed
+          ? 'omafit-shoe-widget-root relative flex h-full min-h-0 w-full flex-1 flex-col bg-white animate-fade-in transition-all duration-300 ease-in-out'
+          : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
+      }
       onContextMenu={(e) => e.preventDefault()}
     >
       <style>{`
@@ -1404,41 +1459,76 @@ export function ShoeARWidget({
         }
       `}</style>
 
-      <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: primaryColor }}>
-        {step !== 'info' && step !== 'processing' ? (
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-        ) : (
-          <div className="w-6" />
+      <div className={embed ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row' : 'contents'}>
+        {embed && (
+          <TryOnLayoutShellSidebar
+            primaryColor={primaryColor}
+            storeName={storeName}
+            logoUrl={storeLogo || ''}
+            language={language}
+            step={step}
+            steps={SHOE_SIDEBAR_STEPS}
+          />
         )}
+        <div
+          className={
+            embed
+              ? 'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+              : 'contents'
+          }
+        >
+          {!embed && (
+            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: primaryColor }}>
+              {step !== 'info' && step !== 'processing' ? (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+              ) : (
+                <div className="w-6" />
+              )}
 
-        <div className="flex-1 flex justify-center">
-          {storeLogo ? (
-            <img src={storeLogo} alt={storeName} className="h-12 w-auto object-contain" />
-          ) : showHeaderLogoFallback ? (
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <Footprints className="h-5 w-5" />
+              <div className="flex-1 flex justify-center">
+                {storeLogo ? (
+                  <img src={storeLogo} alt={storeName} className="h-12 w-auto object-contain" />
+                ) : showHeaderLogoFallback ? (
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Footprints className="h-5 w-5" />
+                  </div>
+                ) : (
+                  <div className="h-12 w-12" aria-hidden="true" />
+                )}
+              </div>
+
+              <div className="w-6" />
             </div>
-          ) : (
-            <div className="h-12 w-12" aria-hidden="true" />
           )}
-        </div>
 
-        <div className="w-6" />
-      </div>
+          {showFloatingBackEmbed && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-600 shadow-md transition-colors hover:bg-white hover:text-gray-800 md:flex"
+              aria-label={t.back}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
 
-      <div
-        className="omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden"
-        style={{ fontFamily: fontFamily || 'inherit' }}
-      >
+          <div
+            className={
+              embed
+                ? 'flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row'
+                : 'omafit-shoe-widget-root flex-1 flex flex-col md:flex-row overflow-hidden'
+            }
+            style={{ fontFamily: fontFamily || 'inherit' }}
+          >
 
       {step === 'info' && (
         <>
@@ -1769,6 +1859,8 @@ export function ShoeARWidget({
         </div>
         </div>
       )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2,19 +2,18 @@ import { motion } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 import { TryOnProgressShimmer } from '@/components/magic/TryOnProgressShimmer';
 import { contrastTextOnHex } from '@/utils/contrastText';
-import {
-  getTryonSidebarSteps,
-  tryonSidebarLabelForStep,
-  tryonSidebarProgressForStep,
-  type TryOnFlowStep,
-} from './tryonSidebarStepMeta';
+import type { SidebarShellStep } from './sidebarShellTypes';
+import { sidebarShellLabelForStep, sidebarShellProgressForStep } from './sidebarShellTypes';
 
 type Props = {
   primaryColor: string;
   storeName: string;
   logoUrl: string;
   language: 'pt' | 'es' | 'en';
-  step: TryOnFlowStep;
+  /** Passo actual (chave entre `steps`). */
+  step: string;
+  /** Lista de passos (try-on roupa, calçados, …). */
+  steps: SidebarShellStep[];
 };
 
 function SidebarProgressBlock({
@@ -57,11 +56,11 @@ export function TryOnLayoutShellSidebar({
   logoUrl,
   language,
   step,
+  steps,
 }: Props) {
   const fg = contrastTextOnHex(primaryColor);
-  const steps = getTryonSidebarSteps();
-  const progressVal = tryonSidebarProgressForStep(step);
-  const currentLabel = tryonSidebarLabelForStep(step, language);
+  const progressVal = sidebarShellProgressForStep(step, steps);
+  const currentLabel = sidebarShellLabelForStep(step, language, steps);
   const curIdx = steps.findIndex((x) => x.key === step);
   const stepNum = curIdx >= 0 ? curIdx + 1 : 0;
   const totalSteps = steps.length;

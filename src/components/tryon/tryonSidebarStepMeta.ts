@@ -1,3 +1,5 @@
+import type { SidebarShellStep } from './sidebarShellTypes';
+
 export type TryOnFlowStep = 'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result';
 
 export type TryOnSidebarStepDef = {
@@ -17,6 +19,8 @@ const STEPS: TryOnSidebarStepDef[] = [
   { key: 'processing', progress: null, labelPt: 'A processar', labelEs: 'Procesando', labelEn: 'Processing' },
   { key: 'result', progress: 100, labelPt: 'Resultado', labelEs: 'Resultado', labelEn: 'Result' },
 ];
+
+const STEPS = TRYON_CLOTHING_SIDEBAR_STEPS as TryOnSidebarStepDef[];
 
 export function getTryonSidebarSteps(): TryOnSidebarStepDef[] {
   return STEPS;
