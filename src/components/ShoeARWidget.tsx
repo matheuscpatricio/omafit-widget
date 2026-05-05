@@ -17,7 +17,6 @@ import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
 import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
-import { contrastTextOnHex } from '../utils/contrastText';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { SHOE_SIDEBAR_STEPS } from './tryon/shoeSidebarStepMeta';
 
@@ -1510,28 +1509,21 @@ export function ShoeARWidget({
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isHeroLayout && (
           <>
-            <motion.header
-              className="w-full shrink-0 md:hidden"
-              style={{
-                backgroundColor: primaryColor,
-                color: contrastTextOnHex(primaryColor),
-              }}
-              initial={{ opacity: 0.94, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex justify-center px-3 pb-2 pt-2.5">
+            <div className="pointer-events-none relative z-30 flex w-full shrink-0 justify-center px-3 pb-1 pt-3 md:hidden">
+              <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
                 {storeLogo && storeLogo.trim() !== '' ? (
                   <img
                     src={storeLogo}
                     alt={storeName}
                     className="max-h-10 w-auto max-w-[min(220px,72vw)] object-contain object-center"
                   />
-                ) : (
-                  <div className="text-center text-sm font-semibold tracking-tight opacity-95">{storeName}</div>
-                )}
+                ) : storeName ? (
+                  <div className="text-center text-sm font-semibold tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
+                    {storeName}
+                  </div>
+                ) : null}
               </div>
-            </motion.header>
+            </div>
             <div
               className={`pointer-events-none absolute z-30 hidden md:block ${showFloatingBackEmbed ? 'left-14 top-3' : 'left-4 top-3'}`}
             >

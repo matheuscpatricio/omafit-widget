@@ -28,10 +28,11 @@ export function TryOnLayoutShellHero({
         backgroundSize: 'cover',
       };
 
+  /** Mesma “curva” do mobile (transparente → primária), espelhada no eixo horizontal: esq. primária → dir. imagem. */
   const desktopStyle: CSSProperties = bg
     ? {
         backgroundColor: p,
-        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p} 24%, ${p}f7 36%, ${p}d9 46%, ${p}a0 56%, ${p}55 66%, ${p}1a 74%, ${p}00 82%), url("${bg}")`,
+        backgroundImage: `linear-gradient(90deg, ${p} 0%, ${p}f2 42%, ${p}d9 58%, ${p}00 82%, ${p}00 100%), url("${bg}")`,
         backgroundSize: 'cover, contain',
         backgroundPosition: 'left center, right center',
         backgroundRepeat: 'no-repeat, no-repeat',

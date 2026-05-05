@@ -5405,6 +5405,13 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
         justify-content: flex-end;
         padding-bottom: 18px !important;
       }
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-brand {
+        background: transparent !important;
+        padding: 12px 12px 6px !important;
+      }
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-brand-inner img {
+        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+      }
     }
     .omafit-ar-shell-hero-layout .omafit-ar-hero-brand {
       position: relative;
@@ -5582,7 +5589,7 @@ function buildInfoModal({
     ? `linear-gradient(180deg, ${primaryColor}00 0%, ${primaryColor}00 18%, ${primaryColor}d9 42%, ${primaryColor}f2 58%, ${primaryColor} 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(180deg, ${primaryColor}cc 0%, ${primaryColor} 100%)`;
   const heroBgDesktopCss = heroBg
-    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor} 24%, ${primaryColor}f7 36%, ${primaryColor}d9 46%, ${primaryColor}a0 56%, ${primaryColor}55 66%, ${primaryColor}1a 74%, ${primaryColor}00 82%), url("${heroBg.replace(/"/g, "%22")}")`
+    ? `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}f2 42%, ${primaryColor}d9 58%, ${primaryColor}00 82%, ${primaryColor}00 100%), url("${heroBg.replace(/"/g, "%22")}")`
     : `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`;
   // #region agent log
   __omafitArDbgLog({
@@ -5988,7 +5995,7 @@ function buildInfoModal({
       style: {
         width: "100%",
         background: primaryColor,
-        color: "#fff",
+        color: omafitContrastOnPrimary(primaryColor),
         border: "none",
         padding: isSidebar || isHero ? "11px 14px" : "14px 20px",
         borderRadius: "8px",
@@ -6008,7 +6015,7 @@ function buildInfoModal({
   );
   cta.appendChild(document.createTextNode(t.cta + " "));
   const arw = svgArrowRight();
-  arw.style.color = "#fff";
+  arw.style.color = omafitContrastOnPrimary(primaryColor);
   cta.appendChild(arw);
   cta.addEventListener("mouseenter", () => {
     cta.style.filter = "brightness(0.92)";
@@ -6092,7 +6099,6 @@ function buildInfoModal({
       },
     });
     const heroBrand = el("div", { className: "omafit-ar-hero-brand" });
-    heroBrand.style.background = primaryColor;
     heroBrand.style.padding = "10px 12px 8px";
     const heroBrandInner = el("div", { className: "omafit-ar-hero-brand-inner" });
     if (logoUrl) {
@@ -6114,7 +6120,14 @@ function buildInfoModal({
       heroBrandInner.appendChild(
         el("div", {
           textContent: shopName,
-          style: { fontSize: "14px", fontWeight: "600", color: "#ffffff", textAlign: "center", lineHeight: "1.2" },
+          style: {
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#ffffff",
+            textAlign: "center",
+            lineHeight: "1.2",
+            textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+          },
         }),
       );
     }

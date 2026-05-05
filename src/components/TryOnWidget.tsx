@@ -3393,6 +3393,13 @@ const handleSubmit = async () => {
         .omafit-tryon-hero .border-gray-300 { border-color: rgb(255 255 255 / 0.35) !important; }
         .omafit-tryon-hero h3 { color: #ffffff !important; }
         .omafit-tryon-hero h4 { color: rgb(255 255 255 / 0.96) !important; }
+        .omafit-tryon-hero .bg-primary,
+        .omafit-tryon-hero button.bg-primary { color: ${contrastTextOnHex(localPrimaryColor)} !important; }
+        .omafit-tryon-hero .hover\\:bg-primary-dark:hover { color: ${contrastTextOnHex(hoverColor)} !important; }
+        .omafit-tryon-hero .bg-gray-100 { background-color: rgb(243 244 246) !important; }
+        .omafit-tryon-hero .bg-gray-100.text-gray-700,
+        .omafit-tryon-hero .hover\\:bg-gray-200:hover { color: #374151 !important; }
+        .omafit-tryon-hero .hover\\:bg-gray-200:hover { background-color: rgb(229 231 235) !important; }
         `
             : ''
         }
@@ -3402,30 +3409,21 @@ const handleSubmit = async () => {
       <div className={embed ? `flex h-full min-h-0 w-full min-w-0 flex-1 flex-col md:flex-row ${isHeroLayout ? 'relative' : ''}` : 'contents'}>
         {isHeroLayout && (
           <>
-            <motion.header
-              className="w-full shrink-0 md:hidden"
-              style={{
-                backgroundColor: localPrimaryColor,
-                color: contrastTextOnHex(localPrimaryColor),
-              }}
-              initial={{ opacity: 0.94, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex justify-center px-3 pb-2 pt-2.5">
+            <div className="pointer-events-none relative z-30 flex w-full shrink-0 justify-center px-3 pb-1 pt-3 md:hidden">
+              <div className="pointer-events-auto [filter:drop-shadow(0_1px_3px_rgba(0,0,0,0.55))]">
                 {localStoreLogo && localStoreLogo.trim() !== '' ? (
                   <img
                     src={localStoreLogo}
                     alt={localStoreName || storeName || t('storeLogoAlt')}
                     className="max-h-10 w-auto max-w-[min(220px,72vw)] object-contain object-center"
                   />
-                ) : (
-                  <div className="text-center text-sm font-semibold tracking-tight opacity-95">
-                    {localStoreName || storeName || ''}
+                ) : (localStoreName || storeName) ? (
+                  <div className="text-center text-sm font-semibold tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
+                    {localStoreName || storeName}
                   </div>
-                )}
+                ) : null}
               </div>
-            </motion.header>
+            </div>
             <div
               className={`pointer-events-none absolute z-30 hidden md:block ${
                 step === 'calculator' || step === 'photo' || step === 'confirm' ? 'left-14 top-3' : 'left-4 top-3'
@@ -4459,8 +4457,7 @@ const handleSubmit = async () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex-1 text-white py-3 md:py-3.5 text-lg md:text-xl rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 font-medium"
-                style={{ backgroundColor: primaryColor }}
+                className="bg-primary hover:bg-primary-dark flex-1 py-3 md:py-3.5 text-lg md:text-xl rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 font-medium"
               >
                 <Sparkles className="w-5 h-5" />
                 {t('process')}
