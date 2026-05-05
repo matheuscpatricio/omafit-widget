@@ -6067,6 +6067,26 @@ function buildInfoModal({
           },
         }),
       );
+      desktopWrap.appendChild(
+        el("div", {
+          className: "omafit-ar-hero-bg-desktop-seam",
+          style: {
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            bottom: 0,
+            width: "min(9rem, 20vw)",
+            transform: "translateX(-50%)",
+            zIndex: 1,
+            pointerEvents: "none",
+            WebkitBackdropFilter: "blur(14px)",
+            backdropFilter: "blur(14px)",
+            background: `linear-gradient(90deg, ${primaryColor}00 0%, ${primaryColor}b3 40%, ${primaryColor}fa 50%, ${primaryColor}b3 60%, ${primaryColor}00 100%)`,
+            WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)",
+            maskImage: "linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)",
+          },
+        }),
+      );
       bgRoot.appendChild(desktopWrap);
     } else {
       bgRoot.appendChild(

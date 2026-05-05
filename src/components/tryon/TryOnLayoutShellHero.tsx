@@ -9,7 +9,7 @@ type Props = {
   infoStep?: boolean;
 };
 
-/** Hero: imagem de fundo + cor primária com degradê na junção (desktop: camada base com imagem em contain + overlay só com gradiente; mobile: gradiente+URL na mesma pilha). */
+/** Hero: desktop com imagem = base + overlay de gradiente + faixa central (degradê + blur) para suavizar a junção; mobile = gradiente+URL na mesma pilha. */
 export function TryOnLayoutShellHero({
   primaryColor,
   backgroundImage,
@@ -54,6 +54,23 @@ export function TryOnLayoutShellHero({
     backgroundRepeat: 'no-repeat',
   };
 
+  /** Desktop + imagem: faixa estreita centrada (degradê forte + blur) para esconder a junção primária/imagem. */
+  const desktopSeamBlendStyle: CSSProperties = {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 'min(9rem, 20vw)',
+    transform: 'translateX(-50%)',
+    zIndex: 1,
+    pointerEvents: 'none',
+    WebkitBackdropFilter: 'blur(14px)',
+    backdropFilter: 'blur(14px)',
+    background: `linear-gradient(90deg, ${p}00 0%, ${p}b3 40%, ${p}fa 50%, ${p}b3 60%, ${p}00 100%)`,
+    WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)',
+    maskImage: 'linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%)',
+  };
+
   const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
   return (
@@ -75,6 +92,7 @@ export function TryOnLayoutShellHero({
         >
           <div className="absolute inset-0" style={desktopBaseWithImageStyle} />
           <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
+          <div style={desktopSeamBlendStyle} />
         </motion.div>
       ) : (
         <motion.aside
