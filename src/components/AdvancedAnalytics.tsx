@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { MANNEQUIN_URLS_FEMALE, MANNEQUIN_URLS_MALE } from '../utils/mannequinAssets';
 import {
   DollarSign,
   Users,
@@ -71,19 +72,19 @@ interface AdvancedMetrics {
 }
 
 const bodyTypesMale = [
-  { label: 'Ectomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg' },
-  { label: 'Atlético magro', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg' },
-  { label: 'Médio', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg' },
-  { label: 'Mesomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg' },
-  { label: 'Endomorfo', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg' }
+  { label: 'Ectomorfo', image: MANNEQUIN_URLS_MALE[0] },
+  { label: 'Atlético magro', image: MANNEQUIN_URLS_MALE[1] },
+  { label: 'Médio', image: MANNEQUIN_URLS_MALE[2] },
+  { label: 'Mesomorfo', image: MANNEQUIN_URLS_MALE[3] },
+  { label: 'Endomorfo', image: MANNEQUIN_URLS_MALE[4] },
 ];
 
 const bodyTypesFemale = [
-  { label: 'Muito magra', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg' },
-  { label: 'Magra', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg' },
-  { label: 'Média', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg' },
-  { label: 'Curvilínea', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg' },
-  { label: 'Plus', image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg' }
+  { label: 'Muito magra', image: MANNEQUIN_URLS_FEMALE[0] },
+  { label: 'Magra', image: MANNEQUIN_URLS_FEMALE[1] },
+  { label: 'Média', image: MANNEQUIN_URLS_FEMALE[2] },
+  { label: 'Curvilínea', image: MANNEQUIN_URLS_FEMALE[3] },
+  { label: 'Plus', image: MANNEQUIN_URLS_FEMALE[4] },
 ];
 
 const fitOptions = [

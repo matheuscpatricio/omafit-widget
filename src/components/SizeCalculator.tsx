@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { User, Ruler, Weight } from 'lucide-react';
 import { widgetTranslations, type WidgetTranslationKey } from '../locales/widget-translations';
+import { MANNEQUIN_URLS_FEMALE, MANNEQUIN_URLS_MALE, preloadMannequinsForGender } from '../utils/mannequinAssets';
 
 interface SizeCalculatorProps {
   onComplete: (data: SizeCalculatorData) => void;
@@ -22,19 +23,19 @@ export interface SizeCalculatorData {
 }
 
 const bodyTypesMale = [
-  { labelKey: 'bodyTypeLabelBalanced', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/Manequim%20Levemente%20Magro.jpg', descriptionKey: 'bodyTypeDescBalanced' },
-  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasatletico.jpg', descriptionKey: 'bodyTypeDescWiderChest' },
-  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordinho.jpg', descriptionKey: 'bodyTypeDescWideTorso' },
-  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasforte.jpg', descriptionKey: 'bodyTypeDescVeryWideChest' },
-  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimmasgordo.jpg', descriptionKey: 'bodyTypeDescWideWaist' }
+  { labelKey: 'bodyTypeLabelBalanced', factor: 1.0, image: MANNEQUIN_URLS_MALE[0], descriptionKey: 'bodyTypeDescBalanced' },
+  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: MANNEQUIN_URLS_MALE[1], descriptionKey: 'bodyTypeDescWiderChest' },
+  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: MANNEQUIN_URLS_MALE[2], descriptionKey: 'bodyTypeDescWideTorso' },
+  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.1, image: MANNEQUIN_URLS_MALE[3], descriptionKey: 'bodyTypeDescVeryWideChest' },
+  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: MANNEQUIN_URLS_MALE[4], descriptionKey: 'bodyTypeDescWideWaist' },
 ];
 
 const bodyTypesFemale = [
-  { labelKey: 'bodyTypeLabelBalanced', factor: 1.00, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemmagra.jpg', descriptionKey: 'bodyTypeDescBalanced' },
-  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemombrolargo.jpg', descriptionKey: 'bodyTypeDescWiderChest' },
-  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemquadrillargo.jpg', descriptionKey: 'bodyTypeDescWideTorso' },
-  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.10, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfemcinturalarga.jpg', descriptionKey: 'bodyTypeDescVeryWideChest' },
-  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: 'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Manequins/manequimfembustolargo.jpg', descriptionKey: 'bodyTypeDescWideWaist' }
+  { labelKey: 'bodyTypeLabelBalanced', factor: 1.0, image: MANNEQUIN_URLS_FEMALE[0], descriptionKey: 'bodyTypeDescBalanced' },
+  { labelKey: 'bodyTypeLabelWiderChest', factor: 1.04, image: MANNEQUIN_URLS_FEMALE[1], descriptionKey: 'bodyTypeDescWiderChest' },
+  { labelKey: 'bodyTypeLabelWideTorso', factor: 1.06, image: MANNEQUIN_URLS_FEMALE[2], descriptionKey: 'bodyTypeDescWideTorso' },
+  { labelKey: 'bodyTypeLabelVeryWideChest', factor: 1.1, image: MANNEQUIN_URLS_FEMALE[3], descriptionKey: 'bodyTypeDescVeryWideChest' },
+  { labelKey: 'bodyTypeLabelWideWaist', factor: 1.15, image: MANNEQUIN_URLS_FEMALE[4], descriptionKey: 'bodyTypeDescWideWaist' },
 ];
 
 const fitOptions = [
@@ -46,18 +47,16 @@ const fitOptions = [
 const bodyTypeEase = [0.22, 1, 0.36, 1] as const;
 
 const bodyTypeGalleryMotion = {
-  initial: { opacity: 0, y: 14, filter: 'blur(8px)' },
+  initial: { opacity: 0, y: 10 },
   animate: {
     opacity: 1,
     y: 0,
-    filter: 'blur(0px)',
-    transition: { duration: 0.4, ease: bodyTypeEase },
+    transition: { duration: 0.32, ease: bodyTypeEase },
   },
   exit: {
     opacity: 0,
-    y: -10,
-    filter: 'blur(6px)',
-    transition: { duration: 0.28, ease: bodyTypeEase },
+    y: -8,
+    transition: { duration: 0.22, ease: bodyTypeEase },
   },
 };
 
@@ -73,6 +72,17 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
 
   const t = (key: WidgetTranslationKey) => widgetTranslations[language][key] || widgetTranslations.en[key] || key;
   const bodyTypes = gender === 'male' ? bodyTypesMale : bodyTypesFemale;
+
+  useEffect(() => {
+    preloadMannequinsForGender(gender);
+    const other: 'male' | 'female' = gender === 'male' ? 'female' : 'male';
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(() => preloadMannequinsForGender(other), { timeout: 2000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(() => preloadMannequinsForGender(other), 350);
+    return () => clearTimeout(t);
+  }, [gender]);
 
   const handleSubmit = () => {
     if (!height || !weight || bodyTypeIndex === null) {
@@ -229,12 +239,13 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                         <motion.img
                           src={type.image}
                           alt={t(type.labelKey as WidgetTranslationKey)}
-                          className="w-full h-full object-cover object-top"
-                          loading="lazy"
+                          className="h-full w-full object-cover object-top"
+                          width={240}
+                          height={320}
+                          loading="eager"
                           decoding="async"
-                          initial={{ opacity: 0.85, scale: 1.02 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                          fetchPriority={index < 2 ? 'high' : 'auto'}
+                          initial={false}
                         />
                       </button>
                     ))}
@@ -289,12 +300,13 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
                         <motion.img
                           src={type.image}
                           alt={t(type.labelKey as WidgetTranslationKey)}
-                          className="w-full h-full object-cover object-top"
-                          loading="lazy"
+                          className="h-full w-full object-cover object-top"
+                          width={240}
+                          height={320}
+                          loading={index < 3 ? 'eager' : 'lazy'}
                           decoding="async"
-                          initial={{ opacity: 0.85, scale: 1.02 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.32, delay: index * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                          fetchPriority={index === 0 ? 'high' : index < 3 ? 'auto' : 'low'}
+                          initial={false}
                         />
                       </button>
                     ))}

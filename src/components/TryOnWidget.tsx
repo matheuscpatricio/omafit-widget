@@ -18,6 +18,7 @@ import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
 import { contrastTextOnHex } from '../utils/contrastText';
+import { ensureMannequinPreconnect, preloadAllMannequinSilhouettes } from '../utils/mannequinAssets';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -498,6 +499,30 @@ export function TryOnWidget({
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
+
+  useEffect(() => {
+    if (step === 'calculator') {
+      ensureMannequinPreconnect();
+      preloadAllMannequinSilhouettes();
+      return;
+    }
+    if (step !== 'info') return;
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(
+        () => {
+          ensureMannequinPreconnect();
+          preloadAllMannequinSilhouettes();
+        },
+        { timeout: 2500 }
+      );
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(() => {
+      ensureMannequinPreconnect();
+      preloadAllMannequinSilhouettes();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [step]);
 
   const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromLocation(), []);
   const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutState>(() => {
