@@ -50,25 +50,28 @@ function buildDesktopOverlayGradient(primaryHex: string, seamPct: number | null)
 /**
  * Hero: mobile = degradê vertical + imagem (cover, cover).
  * Desktop = imagem contain à direita + degradê calculado com pico de opacidade na junção primária/imagem.
+ *
+ * Até a imagem estar decodificada e a costura medida, mostra só gradiente da marca (sem foto) para evitar
+ * “piscar” vermelho + produto antes do layout final.
  */
 export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackground = false }: Props) {
   const p = primaryColor || '#810707';
   const bg = backgroundImage || '';
   const desktopMeasureRef = useRef<HTMLDivElement>(null);
   const [seamPercent, setSeamPercent] = useState<number | null>(null);
+  /** Superfície completa (foto + overlay alinhados) — um único commit após decode + measure. */
+  const [surfaceReady, setSurfaceReady] = useState(() => !bg);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const gradientVertical = `linear-gradient(180deg, ${p}00 0%, ${p}00 18%, ${p}d9 42%, ${p}f2 58%, ${p} 100%)`;
 
-  /** Até medir a imagem, usar costura por defeito (evita 1 frame com overlay genérico + salto). */
-  const overlaySeam = seamPercent ?? (bg ? 58 : null);
-  const desktopOverlayImage = useMemo(() => buildDesktopOverlayGradient(p, overlaySeam), [p, overlaySeam]);
+  const desktopOverlayImage = useMemo(
+    () => buildDesktopOverlayGradient(p, seamPercent ?? (bg && surfaceReady ? 58 : null)),
+    [p, seamPercent, bg, surfaceReady]
+  );
 
-  /**
-   * Suavização na junção — só gradiente (sem backdrop-filter: borrão vermelho sobre a foto).
-   * Só após `seamPercent` medido, para não deslocar a faixa no primeiro paint.
-   */
   const desktopSeamFeatherStyle = useMemo((): CSSProperties | null => {
-    if (!bg || seamPercent == null) return null;
+    if (!bg || !surfaceReady || seamPercent == null) return null;
     const s = clampPct(seamPercent);
     return {
       position: 'absolute',
@@ -83,20 +86,28 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
       WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)',
       maskImage: 'linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)',
     };
-  }, [bg, seamPercent, p]);
+  }, [bg, seamPercent, p, surfaceReady]);
 
   useLayoutEffect(() => {
     if (!bg) {
       setSeamPercent(null);
+      setSurfaceReady(true);
+      setImgFailed(false);
       return;
     }
 
+    setImgFailed(false);
+    setSurfaceReady(false);
+    setSeamPercent(null);
+
     let cancelled = false;
+    let revealStarted = false;
     const img = new Image();
 
     const measure = () => {
+      if (cancelled) return;
       const el = desktopMeasureRef.current;
-      if (!el || cancelled) return;
+      if (!el) return;
       const w = el.clientWidth;
       const h = el.clientHeight;
       if (w <= 0 || h <= 0) return;
@@ -106,17 +117,46 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
       setSeamPercent(containImageLeftPercent(w, h, iw, ih));
     };
 
-    img.onload = measure;
-    img.onerror = () => {
-      if (!cancelled) setSeamPercent(null);
+    const runReveal = () => {
+      if (cancelled || revealStarted) return;
+      revealStarted = true;
+      void (async () => {
+        try {
+          await img.decode();
+        } catch {
+          /* decode opcional */
+        }
+        if (cancelled) return;
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          measure();
+          setSurfaceReady(true);
+        });
+      })();
     };
+
+    img.onload = () => runReveal();
+
+    img.onerror = () => {
+      if (!cancelled) {
+        setSeamPercent(null);
+        setSurfaceReady(true);
+        setImgFailed(true);
+      }
+    };
+
     img.src = bg;
+    if (img.complete && img.naturalWidth > 0) {
+      queueMicrotask(runReveal);
+    }
 
     const el = desktopMeasureRef.current;
     const ro =
       el && typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(() => {
-            measure();
+            if (!cancelled && img.complete && img.naturalWidth > 0) {
+              measure();
+            }
           })
         : null;
     ro?.observe(el as Element);
@@ -127,17 +167,24 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
     };
   }, [bg]);
 
-  const mobileStyle: CSSProperties = bg
-    ? {
-        backgroundImage: `${gradientVertical}, url("${bg}")`,
-        backgroundSize: 'cover, cover',
-        backgroundPosition: 'center top, center top',
-        backgroundRepeat: 'no-repeat, no-repeat',
-      }
-    : {
-        backgroundImage: `linear-gradient(180deg, ${p}cc 0%, ${p} 100%)`,
-        backgroundSize: 'cover',
-      };
+  const mobileStyleFull: CSSProperties =
+    !imgFailed && bg
+      ? {
+          backgroundImage: `${gradientVertical}, url("${bg}")`,
+          backgroundSize: 'cover, cover',
+          backgroundPosition: 'center top, center top',
+          backgroundRepeat: 'no-repeat, no-repeat',
+        }
+      : {
+          backgroundImage: `linear-gradient(180deg, ${p}cc 0%, ${p} 100%)`,
+          backgroundSize: 'cover',
+        };
+
+  /** Placeholder alinhado ao hero sem foto (evita flash da imagem a carregar). */
+  const mobileStylePlaceholder: CSSProperties = {
+    backgroundImage: `linear-gradient(180deg, ${p}d9 0%, ${p}f0 45%, ${p} 100%)`,
+    backgroundSize: 'cover',
+  };
 
   const desktopGradientOverlayStyle: CSSProperties = {
     backgroundImage: desktopOverlayImage,
@@ -160,6 +207,8 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
 
   const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
+  const showPhoto = Boolean(bg && surfaceReady && !imgFailed);
+
   return (
     <div
       ref={desktopMeasureRef}
@@ -168,18 +217,26 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
     >
       <motion.section
         className={`absolute inset-0 transition-[filter,transform] duration-200 ease-out md:hidden ${bgBlurClass}`}
-        style={mobileStyle}
+        style={
+          showPhoto ? mobileStyleFull : bg && imgFailed ? mobileStyleFull : mobileStylePlaceholder
+        }
         initial={false}
       />
 
-      {bg ? (
+      {bg && !imgFailed ? (
         <motion.div
           className={`absolute inset-0 hidden overflow-hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
           initial={false}
         >
-          <div className="absolute inset-0" style={desktopImageLayerStyle} />
-          <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
-          {desktopSeamFeatherStyle ? <div style={desktopSeamFeatherStyle} /> : null}
+          {showPhoto ? (
+            <>
+              <div className="absolute inset-0" style={desktopImageLayerStyle} />
+              <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
+              {desktopSeamFeatherStyle ? <div style={desktopSeamFeatherStyle} /> : null}
+            </>
+          ) : (
+            <div className="absolute inset-0" style={desktopNoImageStyle} />
+          )}
         </motion.div>
       ) : (
         <motion.aside
