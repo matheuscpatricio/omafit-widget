@@ -13977,14 +13977,15 @@ async function runHandArSession({
       );
     }
     if (accessoryType === "bracelet") {
+      /**
+       * Mantém o centro no punho e aplica apenas um inset pequeno/estável na
+       * normal local já calibrada (tmpY). O bloco anterior recalculava uma
+       * normal alternativa (palmNormal) por frame e sobrescrevia `tmpPos`,
+       * causando desencaixe lateral no pulso.
+       */
       const wristWidth = w5.distanceTo(w17);
-      const braceletRadius = wristWidth * 0.5 * 1.05;
-      const palmNormal = handNAltScratch
-        .subVectors(w5, w0)
-        .cross(handToMcpRawScratch.subVectors(w17, w0));
-      if (palmNormal.lengthSq() > 1e-12) palmNormal.normalize();
-      else palmNormal.copy(tmpY);
-      tmpPos.copy(w0).addScaledVector(palmNormal, -braceletRadius * 0.15);
+      const dynamicInset = THREE.MathUtils.clamp(wristWidth * 0.065, 0.003, 0.007);
+      tmpPos.copy(w0).addScaledVector(tmpY, -dynamicInset);
     }
 
     /**
@@ -14500,17 +14501,13 @@ async function runHandArSession({
         perspMul *
         wristSpanScaleMul *
         (accessoryType === "bracelet" ? OMAFIT_BRACELET_SCALE_BOOST : 1);
-      if (accessoryType === "bracelet" && localInnerR > 1e-6) {
-        const wristWidthNow = w5.distanceTo(w17);
-        const targetCircumference = wristWidthNow * Math.PI;
-        const modelCircumference = 2 * Math.PI * localInnerR;
-        const circMul = targetCircumference / Math.max(1e-6, modelCircumference);
-        suBase =
-          circMul *
-          userMul *
-          perspMul *
-          wristSpanScaleMul *
-          OMAFIT_BRACELET_SCALE_BOOST;
+      if (accessoryType === "bracelet") {
+        /**
+         * Proteção hard para pulseira: limita escala base a um intervalo
+         * anatómico plausível. O cálculo antigo por circunferência podia
+         * inflar muito quando `localInnerR` vinha subestimado no GLB.
+         */
+        suBase = THREE.MathUtils.clamp(suBase, baseScale * 0.72, baseScale * 1.55);
       }
       const Wb = wristExpandMul;
       if (accessoryType === "bracelet" && braceletPlaceState) {
