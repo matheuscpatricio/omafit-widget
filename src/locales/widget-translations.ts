@@ -5,9 +5,8 @@ export const widgetTranslations = {
 
     // Step 1: Info
     visualExperience: 'Olá, sou o assistente inteligente da {storeName}!',
-    visualExperienceDesc: 'Iremos te ajudar com qualquer dúvida sobre esta roupa',
-    howItWorks: 'Como funciona?',
-    howItWorksDesc: 'Insira seus dados de altura, peso e biotipo e envie uma foto que nós iremos calcular o melhor tamanho e tirar suas dúvidas.',
+    visualExperienceDesc:
+      'Irei te ajudar com qualquer dúvida sobre esta roupa. Insira seus dados de altura, peso e biotipo e envie uma foto que nós iremos calcular o melhor tamanho para você.',
     startNow: 'Começar Agora',
     privacyNote: 'Suas fotos são processadas de forma segura e não são compartilhadas.',
 
@@ -111,9 +110,8 @@ export const widgetTranslations = {
 
     // Step 1: Info
     visualExperience: 'Bienvenido al asistente inteligente de ventas de {storeName}!',
-    visualExperienceDesc: 'Te ayudaremos con cualquier duda sobre esta prenda',
-    howItWorks: '¿Cómo funciona?',
-    howItWorksDesc: 'Ingresa tus datos de altura, peso y biotipo y envía una foto; calcularemos la mejor talla y resolveremos tus dudas.',
+    visualExperienceDesc:
+      'Te ayudaré con cualquier duda sobre esta prenda. Introduce tu altura, peso y biotipo y envía una foto; calcularemos la mejor talla para ti.',
     startNow: 'Empezar Ahora',
     privacyNote: 'Tus fotos se procesan de forma segura y no se comparten.',
 
@@ -217,9 +215,8 @@ export const widgetTranslations = {
 
     // Step 1: Info
     visualExperience: 'Welcome to {storeName}\'s intelligent sales assistant!',
-    visualExperienceDesc: 'We will help you with any questions about this garment',
-    howItWorks: 'How does it work?',
-    howItWorksDesc: 'Enter your height, weight, and body type data and upload a photo. We will calculate the best size and answer your questions.',
+    visualExperienceDesc:
+      'I\'ll help you with any questions about this garment. Enter your height, weight, and body type, and send a photo — we\'ll calculate the best size for you.',
     startNow: 'Start Now',
     privacyNote: 'Your photos are securely processed and not shared.',
 

@@ -3823,7 +3823,7 @@ const handleSubmit = async () => {
                 : 'space-y-4 md:flex md:h-full md:flex-col md:justify-center md:space-y-4'
             }
             variants={tryonTextStaggerParent}
-            initial="hidden"
+            initial={embed && isHeroLayout ? 'show' : 'hidden'}
             animate="show"
           >
             {!isHeroLayout && (
@@ -3847,22 +3847,6 @@ const handleSubmit = async () => {
               <p className={`text-gray-700 ${isHeroLayout ? 'text-base leading-snug' : 'text-lg md:text-xl'}`}>
                 {t('visualExperienceDesc')}
               </p>
-            </motion.div>
-
-            <motion.div
-              variants={tryonTextStaggerChild}
-              className={`rounded-lg border border-blue-200 bg-blue-50 ${isHeroLayout ? 'w-full max-w-sm p-3' : 'p-4 md:p-4'}`}
-            >
-              <div className="text-center">
-                <h4
-                  className={`mb-1.5 font-medium text-blue-800 ${isHeroLayout ? 'text-sm' : 'text-base md:text-lg'}`}
-                >
-                  {t('howItWorks')}
-                </h4>
-                <p className={`text-blue-700 ${isHeroLayout ? 'text-sm leading-snug' : 'text-base md:text-lg'}`}>
-                  {t('howItWorksDesc')}
-                </p>
-              </div>
             </motion.div>
 
             <motion.div variants={tryonTextStaggerChild} className={isHeroLayout ? 'w-full max-w-sm' : ''}>
@@ -3896,7 +3880,7 @@ const handleSubmit = async () => {
                     : 'mx-auto hidden min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-3 overflow-x-hidden overflow-y-auto px-1 py-1 text-center sm:gap-4 md:flex'
                 }
                 variants={tryonTextStaggerParent}
-                initial="hidden"
+                initial={isHeroLayout ? 'show' : 'hidden'}
                 animate="show"
               >
                 {!isHeroLayout && (
@@ -3923,16 +3907,6 @@ const handleSubmit = async () => {
                       {t('visualExperience')}
                     </h3>
                     <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
-                  </div>
-                  <div
-                    className={`rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4${isHeroLayout ? ' w-full' : ''}`}
-                  >
-                    <h4 className="mb-1 text-sm font-medium text-blue-800 sm:text-base">{t('howItWorks')}</h4>
-                    <p
-                      className={`text-xs text-blue-700 sm:text-sm${isHeroLayout ? ' text-left' : ' text-center'}`}
-                    >
-                      {t('howItWorksDesc')}
-                    </p>
                   </div>
                   <button
                     type="button"

@@ -1640,7 +1640,7 @@ export function ShoeARWidget({
                   <motion.div
                     className="flex flex-1 flex-col items-center justify-end space-y-3 pb-5 pt-2 text-center"
                     variants={textStaggerParent}
-                    initial="hidden"
+                    initial="show"
                     animate="show"
                   >
                     <motion.div variants={textStaggerChild} className="w-full max-w-sm text-center">
@@ -1683,7 +1683,7 @@ export function ShoeARWidget({
                 <motion.div
                   className="hidden min-h-0 w-full max-w-lg flex-1 flex-col items-start justify-center gap-3 overflow-x-hidden overflow-y-auto px-3 py-2 text-left sm:gap-4 md:flex md:pl-5 md:pr-4"
                   variants={textStaggerParent}
-                  initial="hidden"
+                  initial="show"
                   animate="show"
                 >
                   <motion.div
@@ -1764,7 +1764,7 @@ export function ShoeARWidget({
 
                       <motion.div
                         className={isHeroLayout ? 'w-full max-w-sm md:max-w-xl' : 'text-center'}
-                        initial="hidden"
+                        initial={isHeroLayout ? 'show' : 'hidden'}
                         animate="show"
                         variants={textStaggerParent}
                       >

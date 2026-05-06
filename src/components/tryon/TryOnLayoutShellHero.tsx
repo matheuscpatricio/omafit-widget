@@ -59,9 +59,14 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
 
   const gradientVertical = `linear-gradient(180deg, ${p}00 0%, ${p}00 18%, ${p}d9 42%, ${p}f2 58%, ${p} 100%)`;
 
-  const desktopOverlayImage = useMemo(() => buildDesktopOverlayGradient(p, seamPercent), [p, seamPercent]);
+  /** Até medir a imagem, usar costura por defeito (evita 1 frame com overlay genérico + salto). */
+  const overlaySeam = seamPercent ?? (bg ? 58 : null);
+  const desktopOverlayImage = useMemo(() => buildDesktopOverlayGradient(p, overlaySeam), [p, overlaySeam]);
 
-  /** Faixa na junção contain/primária: blur leve + névoa da cor para esconder o corte. */
+  /**
+   * Suavização na junção — só gradiente (sem backdrop-filter: borrão vermelho sobre a foto).
+   * Só após `seamPercent` medido, para não deslocar a faixa no primeiro paint.
+   */
   const desktopSeamFeatherStyle = useMemo((): CSSProperties | null => {
     if (!bg || seamPercent == null) return null;
     const s = clampPct(seamPercent);
@@ -70,15 +75,13 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
       left: `${s}%`,
       top: 0,
       bottom: 0,
-      width: 'min(2.75rem, 7vw)',
+      width: 'min(2.25rem, 5.5vw)',
       transform: 'translateX(-50%)',
       zIndex: 2,
       pointerEvents: 'none',
-      WebkitBackdropFilter: 'blur(10px)',
-      backdropFilter: 'blur(10px)',
-      background: `linear-gradient(90deg, ${p}aa 0%, ${p}55 35%, transparent 100%)`,
-      WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)',
-      maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)',
+      background: `linear-gradient(90deg, transparent 0%, ${p}45 42%, ${p}2a 72%, transparent 100%)`,
+      WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)',
+      maskImage: 'linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)',
     };
   }, [bg, seamPercent, p]);
 
@@ -166,17 +169,13 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
       <motion.section
         className={`absolute inset-0 transition-[filter,transform] duration-200 ease-out md:hidden ${bgBlurClass}`}
         style={mobileStyle}
-        initial={{ opacity: 0.96, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
       />
 
       {bg ? (
         <motion.div
           className={`absolute inset-0 hidden overflow-hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
-          initial={{ opacity: 0.96, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          initial={false}
         >
           <div className="absolute inset-0" style={desktopImageLayerStyle} />
           <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
@@ -186,9 +185,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
         <motion.aside
           className={`absolute inset-0 hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
           style={desktopNoImageStyle}
-          initial={{ opacity: 0.96, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          initial={false}
         />
       )}
     </div>
