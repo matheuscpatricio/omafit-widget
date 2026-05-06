@@ -18,15 +18,11 @@ export function TryonLayoutPendingSplash({ primaryColor, label }: Props) {
         style={{
           background: `radial-gradient(ellipse 85% 55% at 50% 35%, ${primaryColor}40 0%, transparent 58%), linear-gradient(165deg, #fafafa 0%, #ffffff 45%, ${primaryColor}0f 100%)`,
         }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
       />
       <motion.div
         className="relative z-10 flex flex-col items-center px-6 text-center"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.48, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
       >
         <motion.div
           className="mb-5 flex h-[52px] w-[52px] items-center justify-center rounded-2xl shadow-md ring-1 ring-black/[0.06]"
@@ -43,12 +39,7 @@ export function TryonLayoutPendingSplash({ primaryColor, label }: Props) {
             transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.div>
-        <motion.div
-          className="mb-4 flex items-center justify-center gap-1.5"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.35 }}
-        >
+        <motion.div className="mb-4 flex items-center justify-center gap-1.5" initial={false}>
           {[0, 1, 2].map((i) => (
             <motion.span
               key={i}
@@ -66,12 +57,7 @@ export function TryonLayoutPendingSplash({ primaryColor, label }: Props) {
             />
           ))}
         </motion.div>
-        <motion.p
-          className="max-w-xs text-sm font-medium tracking-tight text-gray-600"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.28, duration: 0.4 }}
-        >
+        <motion.p className="max-w-xs text-sm font-medium tracking-tight text-gray-600" initial={false}>
           {label}
         </motion.p>
       </motion.div>

@@ -1471,7 +1471,7 @@ export function ShoeARWidget({
           : 'omafit-shoe-widget-root fixed inset-0 z-50 bg-white flex flex-col animate-fade-in transition-all duration-300 ease-in-out'
       }
       onContextMenu={(e) => e.preventDefault()}
-      initial={embed && isHeroLayout ? { opacity: 0, y: 14 } : false}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
     >

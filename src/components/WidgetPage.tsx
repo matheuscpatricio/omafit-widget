@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
+import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
@@ -330,8 +332,14 @@ const normalizeSelectedVariantOptions = (value: unknown): Record<string, string>
 };
 
 export function WidgetPage() {
-  const [productImage, setProductImage] = useState<string>('');
-  const [productImages, setProductImages] = useState<string[]>([]);
+  const searchBootstrapRef = useRef<ReturnType<typeof readWidgetSearchBootstrap> | null>(null);
+  if (searchBootstrapRef.current === null) {
+    searchBootstrapRef.current = readWidgetSearchBootstrap();
+  }
+  const sb = searchBootstrapRef.current;
+
+  const [productImage, setProductImage] = useState<string>(sb.productImage);
+  const [productImages, setProductImages] = useState<string[]>(sb.productImages);
   const [productId, setProductId] = useState<string>('');
   const [productName, setProductName] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('Omafit');
@@ -965,15 +973,28 @@ export function WidgetPage() {
   }
 
   if (!productImage) {
+    const layoutHint = parseTryonLayoutFromLocation();
+    const chromeEarly = layoutHint === 'hero' || layoutHint === 'sidebar';
     return (
       <div
-        className="min-h-screen bg-transparent flex items-center justify-center p-4"
+        className={
+          chromeEarly
+            ? 'flex h-dvh min-h-0 flex-col overflow-hidden bg-transparent p-0'
+            : 'flex min-h-screen items-center justify-center bg-transparent p-4'
+        }
+        style={{ fontFamily: fontFamily || 'inherit' }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-lg">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707] mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando produto...</p>
-        </div>
+        {chromeEarly ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <TryonLayoutPendingSplash primaryColor={primaryColor} label="Carregando produto..." />
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-white p-8 max-w-md text-center shadow-lg">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#810707]" />
+            <p className="text-gray-600">Carregando produto...</p>
+          </div>
+        )}
       </div>
     );
   }

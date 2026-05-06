@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ShoeARWidget } from './ShoeARWidget';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -50,6 +51,12 @@ type ProductCatalog = {
 };
 
 export function ShoeARWidgetPage() {
+  const searchBootstrapRef = useRef<ReturnType<typeof readWidgetSearchBootstrap> | null>(null);
+  if (searchBootstrapRef.current === null) {
+    searchBootstrapRef.current = readWidgetSearchBootstrap();
+  }
+  const sb = searchBootstrapRef.current;
+
   const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => {
     const m = parseTryonLayoutFromLocation();
     return m === 'hero' || m === 'sidebar';
@@ -57,7 +64,7 @@ export function ShoeARWidgetPage() {
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
-  const [productImage, setProductImage] = useState<string>('');
+  const [productImage, setProductImage] = useState<string>(sb.productImage);
   const [productId, setProductId] = useState<string>('');
   const [productName, setProductName] = useState<string>('Calçado em destaque');
   const [productDescription, setProductDescription] = useState<string>('');
@@ -83,7 +90,9 @@ export function ShoeARWidgetPage() {
   });
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
-  const [tryonLayoutBackgroundImage, setTryonLayoutBackgroundImage] = useState<string>('');
+  const [tryonLayoutBackgroundImage, setTryonLayoutBackgroundImage] = useState<string>(
+    sb.tryonLayoutBackgroundImage
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

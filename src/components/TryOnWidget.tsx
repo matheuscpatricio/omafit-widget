@@ -3327,7 +3327,7 @@ const handleSubmit = async () => {
         embed ? ' flex h-full min-h-0 w-full flex-1 flex-col' : ''
       }${heroChromeActive ? ' omafit-tryon-hero' : ''}`}
       onContextMenu={(e) => e.preventDefault()}
-      initial={embed && isHeroLayout ? { opacity: 0, y: 14 } : false}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
     >
