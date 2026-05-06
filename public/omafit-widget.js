@@ -1717,10 +1717,12 @@
 
     var storeLogoUrlForConfig = '';
     var cfgLogo = OMAFIT_CONFIG.storeLogo ? String(OMAFIT_CONFIG.storeLogo) : '';
-    if (cfgLogo && /^https?:\/\//i.test(cfgLogo)) {
-      storeLogoUrlForConfig = cfgLogo;
-    } else if (arLogoFromDom && /^https?:\/\//i.test(arLogoFromDom)) {
-      storeLogoUrlForConfig = arLogoFromDom;
+    var cfgLogoNormalized = normalizeUrl(cfgLogo);
+    var arLogoNormalized = normalizeUrl(arLogoFromDom);
+    if (cfgLogoNormalized && /^https?:\/\//i.test(cfgLogoNormalized)) {
+      storeLogoUrlForConfig = cfgLogoNormalized;
+    } else if (arLogoNormalized && /^https?:\/\//i.test(arLogoNormalized)) {
+      storeLogoUrlForConfig = arLogoNormalized;
     }
 
     // Montar configuração — inclui storeLogo só se for URL (para o provador AR no iframe ler do config)

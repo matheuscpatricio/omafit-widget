@@ -365,7 +365,7 @@ const OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL = 0.08;
 const OMAFIT_BRACELET_WRIST_OFFSET_MIN_M = 0.004;
 const OMAFIT_BRACELET_WRIST_OFFSET_MAX_M = 0.012;
 /** Compensação de escala após reduzir recuo do pulso. */
-const OMAFIT_BRACELET_SCALE_BOOST = 1.15;
+const OMAFIT_BRACELET_SCALE_BOOST = 0.94;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
@@ -14002,7 +14002,16 @@ async function runHandArSession({
        */
       const wristWidth = w5.distanceTo(w17);
       const dynamicInset = THREE.MathUtils.clamp(wristWidth * 0.065, 0.003, 0.007);
-      tmpPos.copy(w0).addScaledVector(tmpY, -dynamicInset);
+      const forearmRetreat = THREE.MathUtils.clamp(
+        OMAFIT_BRACELET_WRIST_OFFSET_BASE_M + wristWidth * OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL,
+        OMAFIT_BRACELET_WRIST_OFFSET_MIN_M,
+        OMAFIT_BRACELET_WRIST_OFFSET_MAX_M,
+      );
+      tmpPos
+        .copy(w0)
+        .addScaledVector(tmpY, -dynamicInset)
+        // Empurra levemente para o antebraço para evitar ficar "alto" na mão.
+        .addScaledVector(handToMcpScratch, -forearmRetreat);
     }
 
     /**
@@ -14524,7 +14533,7 @@ async function runHandArSession({
          * anatómico plausível. O cálculo antigo por circunferência podia
          * inflar muito quando `localInnerR` vinha subestimado no GLB.
          */
-        suBase = THREE.MathUtils.clamp(suBase, baseScale * 0.72, baseScale * 1.55);
+        suBase = THREE.MathUtils.clamp(suBase, baseScale * 0.68, baseScale * 1.24);
       }
       const Wb = wristExpandMul;
       if (accessoryType === "bracelet" && braceletPlaceState) {
@@ -15338,7 +15347,7 @@ async function main() {
   const productImage = omafitUpgradeShopifyMediaToHttps(root.dataset.productImage || "");
   const rootLogo = (root.dataset.storeLogo || root.getAttribute("data-store-logo") || "").trim();
   let logoUrl = (rootLogo || adminBrand?.storeLogo || "").trim();
-  if (logoUrl.startsWith("//")) logoUrl = `https:${logoUrl}`;
+  logoUrl = omafitUpgradeShopifyMediaToHttps(logoUrl);
   const shopName = (root.dataset.shopName || root.getAttribute("data-shop-name") || "").trim();
   const lang = pickLocale(root.dataset.locale);
 

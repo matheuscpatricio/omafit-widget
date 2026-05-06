@@ -182,9 +182,20 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
       configFromUrl = JSON.parse(tryDecodeUrlParam(configParam)) as Record<string, unknown>;
       if (typeof configFromUrl.primaryColor === 'string' && configFromUrl.primaryColor) {
         primaryColor = configFromUrl.primaryColor;
+      } else if (
+        typeof (configFromUrl.colors as { primary?: unknown } | undefined)?.primary === 'string' &&
+        String((configFromUrl.colors as { primary?: unknown }).primary).trim() !== ''
+      ) {
+        primaryColor = String((configFromUrl.colors as { primary?: unknown }).primary).trim();
       }
       if (typeof configFromUrl.storeLogo === 'string' && configFromUrl.storeLogo.trim() !== '' && !storeLogo) {
         storeLogo = configFromUrl.storeLogo.trim();
+      } else if (
+        typeof (configFromUrl as { store_logo?: unknown }).store_logo === 'string' &&
+        String((configFromUrl as { store_logo?: unknown }).store_logo).trim() !== '' &&
+        !storeLogo
+      ) {
+        storeLogo = String((configFromUrl as { store_logo?: unknown }).store_logo).trim();
       }
       if (typeof configFromUrl.fontFamily === 'string' && configFromUrl.fontFamily.trim() !== '' && !fontFamily) {
         fontFamily = configFromUrl.fontFamily.trim();
@@ -212,6 +223,10 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     }
     return '';
   };
+  const primaryFromQuery = pickQ(['primaryColor', 'primary_color', 'primary', 'brandColor', 'brand_color']);
+  if (primaryFromQuery) {
+    primaryColor = primaryFromQuery;
+  }
 
   const accessoryType = pickQ(['arAccessoryType', 'ar_accessory_type']).toLowerCase();
   const categoryPath = pickQ(['arCategoryPath', 'ar_category_path']);
