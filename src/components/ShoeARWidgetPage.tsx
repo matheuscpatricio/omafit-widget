@@ -5,7 +5,7 @@ import {
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
-import { readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
+import { readWidgetInitialStoreLanguage, readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -72,7 +72,7 @@ export function ShoeARWidgetPage() {
   const [storeLogo, setStoreLogo] = useState<string>('');
   const [primaryColor, setPrimaryColor] = useState<string>('#810707');
   const [fontFamily, setFontFamily] = useState<string>('Outfit');
-  const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>('pt');
+  const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>(() => readWidgetInitialStoreLanguage());
   const [shoeModelUrl, setShoeModelUrl] = useState<string>(DEFAULT_SHOE_MODEL_URL);
   const [shoeModelIosUrl, setShoeModelIosUrl] = useState<string>('');
   const [publicId, setPublicId] = useState<string>('');
@@ -115,7 +115,8 @@ export function ShoeARWidgetPage() {
       params.get('admin_locale') ||
       params.get('language') ||
       params.get('lang') ||
-      params.get('storeLanguage');
+      params.get('storeLanguage') ||
+      params.get('locale');
     const shoeModelParam = params.get('shoeModelUrl') || params.get('modelUrl') || params.get('shoeModel');
     const shoeModelIosParam = params.get('shoeModelIosUrl') || params.get('iosModelUrl');
     const heroBackgroundParam = params.get('tryonLayoutBackgroundImage') || params.get('tryon_layout_background_image');

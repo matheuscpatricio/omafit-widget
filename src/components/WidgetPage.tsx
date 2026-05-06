@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
-import { readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
+import { readWidgetInitialStoreLanguage, readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
 import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
 import {
   parseCollectionHandlesFromMessage,
@@ -359,7 +359,7 @@ export function WidgetPage() {
   const [collectionElasticity, setCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
   const [recommendedProductUrl, setRecommendedProductUrl] = useState<string>('');
-  const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>('en');
+  const [storeLanguage, setStoreLanguage] = useState<'pt' | 'es' | 'en'>(() => readWidgetInitialStoreLanguage());
   const [productCatalog, setProductCatalog] = useState<ProductCatalog>({
     sizes: [],
     colors: [],
@@ -409,7 +409,8 @@ export function WidgetPage() {
       params.get('admin_locale') ||
       params.get('language') ||
       params.get('lang') ||
-      params.get('storeLanguage');
+      params.get('storeLanguage') ||
+      params.get('locale');
 
     console.log('🔍 ===== WIDGETPAGE: PARÂMETROS DA URL =====');
     console.log('   - shopName/shop_name:', shopNameParam);
@@ -537,12 +538,12 @@ export function WidgetPage() {
         console.log('✅ URL do produto recomendado definida (formato antigo):', decodedUrl);
         setRecommendedProductUrl(decodedUrl);
       }
+    }
 
     const normalizedLanguage = normalizeWidgetLanguage(languageParam);
     if (normalizedLanguage) {
       setStoreLanguage(normalizedLanguage);
       console.log('✅ Idioma do widget definido via URL/adminLocale:', normalizedLanguage);
-    }
     }
 
     // Prioridade 1: parâmetro direto storeLogo
