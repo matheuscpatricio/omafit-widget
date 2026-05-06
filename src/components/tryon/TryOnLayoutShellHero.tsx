@@ -176,13 +176,13 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
           backgroundRepeat: 'no-repeat, no-repeat',
         }
       : {
-          backgroundImage: `linear-gradient(180deg, ${p}cc 0%, ${p} 100%)`,
+          backgroundImage: 'linear-gradient(180deg, #d1d5db 0%, #9ca3af 100%)',
           backgroundSize: 'cover',
         };
 
   /** Placeholder alinhado ao hero sem foto (evita flash da imagem a carregar). */
   const mobileStylePlaceholder: CSSProperties = {
-    backgroundImage: `linear-gradient(180deg, ${p}d9 0%, ${p}f0 45%, ${p} 100%)`,
+    backgroundImage: 'linear-gradient(180deg, #e5e7eb 0%, #d1d5db 45%, #9ca3af 100%)',
     backgroundSize: 'cover',
   };
 
@@ -201,7 +201,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
   };
 
   const desktopNoImageStyle: CSSProperties = {
-    backgroundImage: `linear-gradient(90deg, ${p}cc 0%, ${p} 100%)`,
+    backgroundImage: 'linear-gradient(90deg, #d1d5db 0%, #9ca3af 100%)',
     backgroundSize: 'cover',
   };
 
