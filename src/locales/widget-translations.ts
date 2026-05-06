@@ -109,7 +109,7 @@ export const widgetTranslations = {
     loadingProduct: 'Cargando producto...',
 
     // Step 1: Info
-    visualExperience: 'Bienvenido al asistente inteligente de ventas de {storeName}!',
+    visualExperience: '¡Hola, soy el asistente inteligente de {storeName}!',
     visualExperienceDesc:
       'Te ayudaré con cualquier duda sobre esta prenda. Introduce tu altura, peso y biotipo y envía una foto; calcularemos la mejor talla para ti.',
     startNow: 'Empezar Ahora',
@@ -214,7 +214,7 @@ export const widgetTranslations = {
     loadingProduct: 'Loading product...',
 
     // Step 1: Info
-    visualExperience: 'Welcome to {storeName}\'s intelligent sales assistant!',
+    visualExperience: 'Hello, I\'m the intelligent assistant for {storeName}!',
     visualExperienceDesc:
       'I\'ll help you with any questions about this garment. Enter your height, weight, and body type, and send a photo — we\'ll calculate the best size for you.',
     startNow: 'Start Now',

@@ -4814,11 +4814,11 @@ function pickLocale(raw) {
  */
 const COPY = {
   pt: {
-    title: "Provador AR de óculos",
-    desc: "Veja como este modelo combina com o seu rosto em tempo real, usando a câmera do seu dispositivo.",
+    title: "Olá, sou o assistente inteligente da {storeName}!",
+    desc: "Veja como estes óculos ficam no seu rosto em tempo real, usando a câmera do seu dispositivo. Posicione o rosto de frente para a tela — o modelo 3D dos óculos acompanha o seu movimento. Os dados não são gravados nos nossos servidores.",
     howTitle: "Como funciona",
     howBody:
-      "Na próxima etapa, autorize o uso da câmera. Posicione o rosto de frente para a tela — o óculos 3D acompanha o seu movimento. Os dados não são gravados nos nossos servidores.",
+      "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera quando o navegador pedir.",
     cta: "Começar experiência AR",
     privacy: "Ao continuar, você concorda em usar a câmera apenas localmente no seu navegador para visualização.",
     close: "Fechar",
@@ -4844,29 +4844,26 @@ const COPY = {
     byType: {
       glasses: {},
       necklace: {
-        title: "Provador AR de colares",
-        desc: "Veja como este colar fica no seu pescoço em tempo real, usando a câmera do seu dispositivo.",
+        desc: "Veja como este colar fica no seu pescoço em tempo real, usando a câmera do seu dispositivo. Deixe o rosto e a parte superior do peito visíveis na tela — o colar 3D acompanha o seu pescoço. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, autorize o uso da câmera. Deixe o rosto e a parte superior do peito visíveis na tela — o colar 3D acompanha o seu pescoço. Os dados não são gravados nos nossos servidores.",
+          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera quando o navegador pedir.",
         linkTextFallback: "Experimentar colar (AR)",
         arLoading: "A iniciar câmera e modelo 3D do colar…",
         errFace: "Não foi possível carregar a detecção do rosto/pescoço.",
       },
       watch: {
-        title: "Provador AR de relógios",
-        desc: "Veja como este relógio fica no seu pulso em tempo real, usando a câmera traseira do seu celular.",
+        desc: "Veja como este relógio fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — o relógio 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, autorize o uso da câmera traseira. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — o relógio 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
+          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar relógio (AR)",
         arLoading: "A iniciar câmera e modelo 3D do relógio…",
         errCamera: "Permita o uso da câmera traseira para experimentar o relógio.",
         errFace: "Não foi possível carregar a detecção da mão.",
       },
       bracelet: {
-        title: "Provador AR de pulseiras",
-        desc: "Veja como esta pulseira fica no seu pulso em tempo real, usando a câmera traseira do seu celular.",
+        desc: "Veja como esta pulseira fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — a pulseira 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, autorize o uso da câmera traseira. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — a pulseira 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
+          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar pulseira (AR)",
         arLoading: "A iniciar câmera e modelo 3D da pulseira…",
         errCamera: "Permita o uso da câmera traseira para experimentar a pulseira.",
@@ -4875,11 +4872,11 @@ const COPY = {
     },
   },
   en: {
-    title: "AR eyewear try-on",
-    desc: "See how this frame looks on your face in real time using your device camera.",
+    title: "Hello, I'm the intelligent assistant for {storeName}!",
+    desc: "See how these glasses look on your face in real time using your device camera. Face the screen — the 3D glasses model tracks your movement. Your data is not stored on our servers.",
     howTitle: "How it works",
     howBody:
-      "Next, allow camera access. Face the screen — the 3D glasses track your face. Video is processed locally and is not uploaded to our servers.",
+      'Next, tap “Start AR experience” and allow camera access when your browser asks.',
     cta: "Start AR experience",
     privacy: "By continuing, you agree to use the camera locally in your browser for preview only.",
     close: "Close",
@@ -4905,29 +4902,26 @@ const COPY = {
     byType: {
       glasses: {},
       necklace: {
-        title: "AR necklace try-on",
-        desc: "See how this necklace looks on your neck in real time using your device camera.",
+        desc: "See how this necklace looks on your neck in real time using your device camera. Keep your face and upper chest visible on screen — the 3D necklace follows your neck. Your data is not stored on our servers.",
         howBody:
-          "Next, allow camera access. Keep your face and upper chest visible on screen — the 3D necklace tracks your neckline. Video is processed locally and is not uploaded to our servers.",
+          'Next, tap “Start AR experience” and allow camera access when your browser asks.',
         linkTextFallback: "Try necklace on (AR)",
         arLoading: "Starting camera and 3D necklace…",
         errFace: "Could not load face/neck detection.",
       },
       watch: {
-        title: "AR watch try-on",
-        desc: "See how this watch looks on your wrist in real time using your phone's rear camera.",
+        desc: "See how this watch looks on your wrist in real time using your phone's rear camera. Keep your open hand centered on screen with your wrist clearly visible — the 3D watch fits on your wrist. Your data is not stored on our servers.",
         howBody:
-          "Next, allow rear-camera access. Keep your open hand centered on screen with your wrist clearly visible — the 3D watch snaps onto your wrist. Video is processed locally and is not uploaded to our servers.",
+          'Next, tap “Start AR experience” and allow rear-camera access when your browser asks.',
         linkTextFallback: "Try watch on (AR)",
         arLoading: "Starting rear camera and 3D watch…",
         errCamera: "Allow rear-camera access to try the watch on.",
         errFace: "Could not load hand detection.",
       },
       bracelet: {
-        title: "AR bracelet try-on",
-        desc: "See how this bracelet looks on your wrist in real time using your phone's rear camera.",
+        desc: "See how this bracelet looks on your wrist in real time using your phone's rear camera. Keep your open hand centered on screen with your wrist clearly visible — the 3D bracelet fits on your wrist. Your data is not stored on our servers.",
         howBody:
-          "Next, allow rear-camera access. Keep your open hand centered on screen with your wrist clearly visible — the 3D bracelet snaps onto your wrist. Video is processed locally and is not uploaded to our servers.",
+          'Next, tap “Start AR experience” and allow rear-camera access when your browser asks.',
         linkTextFallback: "Try bracelet on (AR)",
         arLoading: "Starting rear camera and 3D bracelet…",
         errCamera: "Allow rear-camera access to try the bracelet on.",
@@ -4936,11 +4930,11 @@ const COPY = {
     },
   },
   es: {
-    title: "Probador AR de gafas",
-    desc: "Mira cómo quedan estas gafas en tu rostro en tiempo real con la cámara de tu dispositivo.",
+    title: "¡Hola, soy el asistente inteligente de {storeName}!",
+    desc: "Mira cómo quedan estas gafas en tu rostro en tiempo real con la cámara de tu dispositivo. Sitúa el rostro de frente a la pantalla: el modelo 3D de las gafas sigue tu movimiento. Los datos no se guardan en nuestros servidores.",
     howTitle: "Cómo funciona",
     howBody:
-      "En el siguiente paso, autoriza la cámara. Mira de frente a la pantalla: el modelo 3D sigue tu rostro. El vídeo se procesa localmente y no se sube a nuestros servidores.",
+      "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara cuando el navegador lo pida.",
     cta: "Empezar experiencia AR",
     privacy: "Al continuar, aceptas usar la cámara solo en tu navegador para la vista previa.",
     close: "Cerrar",
@@ -4966,29 +4960,26 @@ const COPY = {
     byType: {
       glasses: {},
       necklace: {
-        title: "Probador AR de collares",
-        desc: "Mira cómo queda este collar en tu cuello en tiempo real con la cámara de tu dispositivo.",
+        desc: "Mira cómo queda este collar en tu cuello en tiempo real con la cámara de tu dispositivo. Mantén el rostro y la parte superior del pecho visibles en pantalla: el collar 3D sigue tu cuello. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, autoriza la cámara. Mantén el rostro y la parte superior del pecho visibles en pantalla: el collar 3D sigue tu cuello. El vídeo se procesa localmente y no se sube a nuestros servidores.",
+          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara cuando el navegador lo pida.",
         linkTextFallback: "Probar collar (AR)",
         arLoading: "Iniciando cámara y modelo 3D del collar…",
         errFace: "No se pudo cargar la detección del rostro/cuello.",
       },
       watch: {
-        title: "Probador AR de relojes",
-        desc: "Mira cómo queda este reloj en tu muñeca en tiempo real con la cámara trasera del móvil.",
+        desc: "Mira cómo queda este reloj en tu muñeca en tiempo real con la cámara trasera del móvil. Mantén la mano abierta en el centro de la pantalla, con la muñeca bien visible: el reloj 3D encaja en la muñeca. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, autoriza la cámara trasera. Mantén la mano abierta en el centro de la pantalla con la muñeca visible: el reloj 3D se ajusta a la muñeca. El vídeo se procesa localmente y no se sube a nuestros servidores.",
+          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
         linkTextFallback: "Probar reloj (AR)",
         arLoading: "Iniciando cámara trasera y reloj 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar el reloj.",
         errFace: "No se pudo cargar la detección de la mano.",
       },
       bracelet: {
-        title: "Probador AR de pulseras",
-        desc: "Mira cómo queda esta pulsera en tu muñeca en tiempo real con la cámara trasera del móvil.",
+        desc: "Mira cómo queda esta pulsera en tu muñeca en tiempo real con la cámara trasera del móvil. Mantén la mano abierta en el centro de la pantalla, con la muñeca bien visible: la pulsera 3D encaja en la muñeca. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, autoriza la cámara trasera. Mantén la mano abierta en el centro de la pantalla con la muñeca visible: la pulsera 3D se ajusta a la muñeca. El vídeo se procesa localmente y no se sube a nuestros servidores.",
+          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
         linkTextFallback: "Probar pulsera (AR)",
         arLoading: "Iniciando cámara trasera y pulsera 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar la pulsera.",
@@ -5011,6 +5002,22 @@ function resolveCopyForType(lang, accessoryType) {
     : "glasses";
   const override = (base.byType && base.byType[typeKey]) || {};
   return { ...base, ...override };
+}
+
+function omafitResolveStoreNameForTitle(shopName, locale) {
+  const n = String(shopName || "").trim();
+  if (n) return n;
+  const base = String(locale || "pt").toLowerCase().split("-")[0];
+  if (base === "en") return "our store";
+  if (base === "es") return "nuestra tienda";
+  return "nossa loja";
+}
+
+function omafitFormatWelcomeTitle(template, shopName, locale) {
+  return String(template || "").replace(
+    /\{storeName\}/g,
+    omafitResolveStoreNameForTitle(shopName, locale),
+  );
 }
 
 /** Estilo TryOnWidget: font-family com nomes entre aspas + !important em todo o subtree. */
@@ -5983,7 +5990,7 @@ function buildInfoModal({
   const titleBlock = el("div", { style: { textAlign: "center", marginBottom: "16px" } });
   titleBlock.appendChild(
     el("h3", {
-      textContent: t.title,
+      textContent: omafitFormatWelcomeTitle(t.title, shopName, locale),
       style: {
         margin: "0 0 6px 0",
         fontSize: isSidebar || isHero ? "clamp(1.05rem, 2.2vw, 1.25rem)" : "clamp(1.35rem, 4vw, 1.85rem)",

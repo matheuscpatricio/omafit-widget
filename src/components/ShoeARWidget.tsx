@@ -85,7 +85,7 @@ const copy = {
     feature1: 'Modelo 3D de calcado pronto para AR',
     feature2: 'Mesmas personalizacoes de logo, cores e fonte',
     feature3: 'Fluxo isolado, sem alterar o widget atual',
-    welcomeTitle: 'Bem-vindo ao assistente inteligente da {storeName}',
+    welcomeTitle: 'Olá, sou o assistente inteligente da {storeName}!',
     infoTitle: 'Como funciona?',
     infoBody:
       'Envie uma foto do seu pé para calcularmos o tamanho ideal desse calçado para você, tire qualquer dúvida!',
@@ -151,7 +151,7 @@ const copy = {
     feature1: 'Modelo 3D de calzado listo para AR',
     feature2: 'Mismas personalizaciones de logo, colores y tipografia',
     feature3: 'Flujo aislado, sin alterar el widget actual',
-    welcomeTitle: 'Bienvenido al asistente inteligente de {storeName}',
+    welcomeTitle: '¡Hola, soy el asistente inteligente de {storeName}!',
     infoTitle: '¿Cómo funciona?',
     infoBody:
       'Envía una foto de tu pie para calcular la talla ideal de este calzado para ti y resuelve cualquier duda al final.',
@@ -217,7 +217,7 @@ const copy = {
     feature1: '3D footwear model ready for AR',
     feature2: 'Same logo, color and font personalization',
     feature3: 'Isolated flow, without changing the current widget',
-    welcomeTitle: 'Welcome to {storeName}\'s intelligent assistant',
+    welcomeTitle: 'Hello, I\'m the intelligent assistant for {storeName}!',
     infoTitle: 'How does it work?',
     infoBody:
       'Send a photo of your foot so we can calculate the ideal size for this footwear and answer any questions at the end.',
