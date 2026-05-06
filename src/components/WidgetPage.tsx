@@ -183,6 +183,11 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
       if (typeof configFromUrl.primaryColor === 'string' && configFromUrl.primaryColor) {
         primaryColor = configFromUrl.primaryColor;
       } else if (
+        typeof (configFromUrl as { primary_color?: unknown }).primary_color === 'string' &&
+        String((configFromUrl as { primary_color?: unknown }).primary_color).trim() !== ''
+      ) {
+        primaryColor = String((configFromUrl as { primary_color?: unknown }).primary_color).trim();
+      } else if (
         typeof (configFromUrl.colors as { primary?: unknown } | undefined)?.primary === 'string' &&
         String((configFromUrl.colors as { primary?: unknown }).primary).trim() !== ''
       ) {
@@ -394,6 +399,12 @@ export function WidgetPage() {
     return m === 'hero' || m === 'sidebar';
   });
   const [eyewearTryonLayoutFromMessage, setEyewearTryonLayoutFromMessage] = useState<TryonLayoutMode | null>(null);
+  /** Branding do Supabase para o AR no iframe — mesmo fluxo que TryOnWidget (`primary_color` / `store_logo`). */
+  const [eyewearShopConfig, setEyewearShopConfig] = useState<{
+    status: 'idle' | 'loading' | 'ready';
+    primaryColor: string | null;
+    storeLogo: string | null;
+  }>({ status: 'idle', primaryColor: null, storeLogo: null });
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
@@ -811,37 +822,73 @@ export function WidgetPage() {
     if (!showEyewearArNetlify || !eyewearBootstrap) {
       setEyewearTryonLayoutFromMessage(null);
       setEyewearTryonLayoutFromDb(null);
-      return;
-    }
-    if (eyewearBootstrap.tryonLayout !== undefined || eyewearTryonLayoutFromMessage !== null) {
-      setEyewearTryonLayoutFromDb(null);
+      setEyewearShopConfig({ status: 'ready', primaryColor: null, storeLogo: null });
       return;
     }
     const sd = (eyewearBootstrap.shopDomain || '').trim();
     if (!sd) {
-      setEyewearTryonLayoutFromDb('default');
+      setEyewearTryonLayoutFromDb(null);
+      setEyewearShopConfig({ status: 'ready', primaryColor: null, storeLogo: null });
       return;
     }
+
+    setEyewearShopConfig({ status: 'loading', primaryColor: null, storeLogo: null });
+
+    const skipLayoutFromDb =
+      eyewearBootstrap.tryonLayout !== undefined || eyewearTryonLayoutFromMessage !== null;
+
+    if (skipLayoutFromDb) {
+      setEyewearTryonLayoutFromDb(null);
+    }
+
     let cancelled = false;
     void (async () => {
       try {
         const { data, error } = await supabase
           .from('widget_configurations')
-          .select('tryon_layout, tryon_layout_background_image')
+          .select('tryon_layout, tryon_layout_background_image, primary_color, store_logo')
           .eq('shop_domain', sd)
           .order('updated_at', { ascending: false })
           .limit(1);
         if (cancelled) return;
+
         if (error || !data?.length) {
-          setEyewearTryonLayoutFromDb('default');
+          if (!skipLayoutFromDb) setEyewearTryonLayoutFromDb('default');
+          setEyewearShopConfig({ status: 'ready', primaryColor: null, storeLogo: null });
           return;
         }
-        const raw = (data[0] as { tryon_layout?: string }).tryon_layout;
-        setEyewearTryonLayoutFromDb(raw === 'hero' ? 'hero' : raw === 'sidebar' ? 'sidebar' : 'default');
-        const heroBg = (data[0] as { tryon_layout_background_image?: string }).tryon_layout_background_image;
-        if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
+
+        const row = data[0] as {
+          tryon_layout?: string;
+          tryon_layout_background_image?: string;
+          primary_color?: string | null;
+          store_logo?: string | null;
+        };
+
+        const dbPrimary =
+          typeof row.primary_color === 'string' && row.primary_color.trim() !== ''
+            ? row.primary_color.trim()
+            : null;
+        const dbLogo =
+          typeof row.store_logo === 'string' && row.store_logo.trim() !== '' ? row.store_logo.trim() : null;
+
+        setEyewearShopConfig({ status: 'ready', primaryColor: dbPrimary, storeLogo: dbLogo });
+
+        if (!skipLayoutFromDb) {
+          const raw = row.tryon_layout;
+          setEyewearTryonLayoutFromDb(
+            raw === 'hero' ? 'hero' : raw === 'sidebar' ? 'sidebar' : 'default',
+          );
+          const heroBg = row.tryon_layout_background_image;
+          if (typeof heroBg === 'string' && heroBg.trim() !== '') {
+            setTryonLayoutBackgroundImage(heroBg.trim());
+          }
+        }
       } catch {
-        if (!cancelled) setEyewearTryonLayoutFromDb('default');
+        if (!cancelled) {
+          if (!skipLayoutFromDb) setEyewearTryonLayoutFromDb('default');
+          setEyewearShopConfig({ status: 'ready', primaryColor: null, storeLogo: null });
+        }
       }
     })();
     return () => {
@@ -860,8 +907,10 @@ export function WidgetPage() {
   const [arModuleBootError, setArModuleBootError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!showEyewearArNetlify) return;
+    if (!showEyewearArNetlify || !eyewearBootstrap) return;
     if (eyewearResolvedTryonLayout === null) return;
+    const sd = (eyewearBootstrap.shopDomain || '').trim();
+    if (sd && eyewearShopConfig.status !== 'ready') return;
     setArModuleBootError(null);
     let cancelled = false;
     const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.js?v=${encodeURIComponent(
@@ -911,7 +960,7 @@ export function WidgetPage() {
     return () => {
       cancelled = true;
     };
-  }, [showEyewearArNetlify, eyewearResolvedTryonLayout]);
+  }, [showEyewearArNetlify, eyewearBootstrap, eyewearResolvedTryonLayout, eyewearShopConfig.status]);
 
   if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams() && !eyewearBootstrap) {
     return (
@@ -929,7 +978,9 @@ export function WidgetPage() {
   }
 
   if (showEyewearArNetlify && eyewearBootstrap) {
-    if (eyewearResolvedTryonLayout === null) {
+    const eyewearNeedsShopRow = Boolean((eyewearBootstrap.shopDomain || '').trim());
+    const eyewearShopRowPending = eyewearNeedsShopRow && eyewearShopConfig.status !== 'ready';
+    if (eyewearResolvedTryonLayout === null || eyewearShopRowPending) {
       return (
         <div className="min-h-screen bg-white flex items-center justify-center p-6" onContextMenu={(e) => e.preventDefault()}>
           <div className="text-center">
@@ -969,10 +1020,10 @@ export function WidgetPage() {
           data-tryon-layout={eyewearResolvedTryonLayout}
           data-tryon-layout-background-image={tryonLayoutBackgroundImage || eyewearBootstrap.tryonLayoutBackgroundImage || ''}
           data-glb-url={eyewearBootstrap.glbUrl}
-          data-primary-color={eyewearBootstrap.primaryColor}
+          data-primary-color={eyewearShopConfig.primaryColor ?? eyewearBootstrap.primaryColor}
           data-product-title={eyewearBootstrap.productTitle}
           data-product-image={eyewearBootstrap.productImage}
-          data-store-logo={eyewearBootstrap.storeLogo}
+          data-store-logo={eyewearShopConfig.storeLogo ?? eyewearBootstrap.storeLogo}
           {...(eyewearBootstrap.fontFamily
             ? { 'data-font-family': eyewearBootstrap.fontFamily }
             : {})}
