@@ -4818,8 +4818,8 @@ const COPY = {
     desc: "Veja como estes óculos ficam no seu rosto em tempo real, usando a câmera do seu dispositivo. Posicione o rosto de frente para a tela — o modelo 3D dos óculos acompanha o seu movimento. Os dados não são gravados nos nossos servidores.",
     howTitle: "Como funciona",
     howBody:
-      "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera quando o navegador pedir.",
-    cta: "Começar experiência AR",
+      "Na próxima etapa, toque em «Começar experiência» e autorize a câmera quando o navegador pedir.",
+    cta: "Começar experiência",
     privacy: "Ao continuar, você concorda em usar a câmera apenas localmente no seu navegador para visualização.",
     close: "Fechar",
     linkTextFallback: "Experimentar óculos (AR)",
@@ -4836,7 +4836,7 @@ const COPY = {
     arPopupBlocked:
       "O navegador bloqueou a janela nova. Permita pop-ups para o domínio do widget (ex.: omafit.netlify.app) e tente de novo.",
     arWindowModeBanner:
-      "Janela dedicada ao AR: use «Começar experiência AR» e autorize a câmara quando o browser pedir.",
+      "Janela dedicada ao AR: use «Começar experiência» e autorize a câmara quando o browser pedir.",
     addToCart: "Adicionar ao carrinho",
     addedToCart: "Adicionado!",
     addToCartError: "Erro ao adicionar",
@@ -4846,7 +4846,7 @@ const COPY = {
       necklace: {
         desc: "Veja como este colar fica no seu pescoço em tempo real, usando a câmera do seu dispositivo. Deixe o rosto e a parte superior do peito visíveis na tela — o colar 3D acompanha o seu pescoço. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera quando o navegador pedir.",
+          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera quando o navegador pedir.",
         linkTextFallback: "Experimentar colar (AR)",
         arLoading: "A iniciar câmera e modelo 3D do colar…",
         errFace: "Não foi possível carregar a detecção do rosto/pescoço.",
@@ -4854,7 +4854,7 @@ const COPY = {
       watch: {
         desc: "Veja como este relógio fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — o relógio 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera traseira quando o navegador pedir.",
+          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar relógio (AR)",
         arLoading: "A iniciar câmera e modelo 3D do relógio…",
         errCamera: "Permita o uso da câmera traseira para experimentar o relógio.",
@@ -4863,7 +4863,7 @@ const COPY = {
       bracelet: {
         desc: "Veja como esta pulseira fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — a pulseira 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência AR» e autorize a câmera traseira quando o navegador pedir.",
+          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar pulseira (AR)",
         arLoading: "A iniciar câmera e modelo 3D da pulseira…",
         errCamera: "Permita o uso da câmera traseira para experimentar a pulseira.",
@@ -4876,8 +4876,8 @@ const COPY = {
     desc: "See how these glasses look on your face in real time using your device camera. Face the screen — the 3D glasses model tracks your movement. Your data is not stored on our servers.",
     howTitle: "How it works",
     howBody:
-      'Next, tap “Start AR experience” and allow camera access when your browser asks.',
-    cta: "Start AR experience",
+      'Next, tap “Start experience” and allow camera access when your browser asks.',
+    cta: "Start experience",
     privacy: "By continuing, you agree to use the camera locally in your browser for preview only.",
     close: "Close",
     linkTextFallback: "Try glasses on (AR)",
@@ -4894,7 +4894,7 @@ const COPY = {
     arPopupBlocked:
       "The browser blocked the new window. Allow pop-ups for the widget domain (e.g. omafit.netlify.app) and try again.",
     arWindowModeBanner:
-      "Dedicated AR window: tap “Start AR experience” and allow the camera when the browser asks.",
+      "Dedicated AR window: tap “Start experience” and allow the camera when the browser asks.",
     addToCart: "Add to cart",
     addedToCart: "Added!",
     addToCartError: "Error adding",
@@ -4904,7 +4904,7 @@ const COPY = {
       necklace: {
         desc: "See how this necklace looks on your neck in real time using your device camera. Keep your face and upper chest visible on screen — the 3D necklace follows your neck. Your data is not stored on our servers.",
         howBody:
-          'Next, tap “Start AR experience” and allow camera access when your browser asks.',
+          'Next, tap “Start experience” and allow camera access when your browser asks.',
         linkTextFallback: "Try necklace on (AR)",
         arLoading: "Starting camera and 3D necklace…",
         errFace: "Could not load face/neck detection.",
@@ -4912,7 +4912,7 @@ const COPY = {
       watch: {
         desc: "See how this watch looks on your wrist in real time using your phone's rear camera. Keep your open hand centered on screen with your wrist clearly visible — the 3D watch fits on your wrist. Your data is not stored on our servers.",
         howBody:
-          'Next, tap “Start AR experience” and allow rear-camera access when your browser asks.',
+          'Next, tap “Start experience” and allow rear-camera access when your browser asks.',
         linkTextFallback: "Try watch on (AR)",
         arLoading: "Starting rear camera and 3D watch…",
         errCamera: "Allow rear-camera access to try the watch on.",
@@ -4921,7 +4921,7 @@ const COPY = {
       bracelet: {
         desc: "See how this bracelet looks on your wrist in real time using your phone's rear camera. Keep your open hand centered on screen with your wrist clearly visible — the 3D bracelet fits on your wrist. Your data is not stored on our servers.",
         howBody:
-          'Next, tap “Start AR experience” and allow rear-camera access when your browser asks.',
+          'Next, tap “Start experience” and allow rear-camera access when your browser asks.',
         linkTextFallback: "Try bracelet on (AR)",
         arLoading: "Starting rear camera and 3D bracelet…",
         errCamera: "Allow rear-camera access to try the bracelet on.",
@@ -4934,8 +4934,8 @@ const COPY = {
     desc: "Mira cómo quedan estas gafas en tu rostro en tiempo real con la cámara de tu dispositivo. Sitúa el rostro de frente a la pantalla: el modelo 3D de las gafas sigue tu movimiento. Los datos no se guardan en nuestros servidores.",
     howTitle: "Cómo funciona",
     howBody:
-      "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara cuando el navegador lo pida.",
-    cta: "Empezar experiencia AR",
+      "En el siguiente paso, pulsa «Empezar experiencia» y permite el acceso a la cámara cuando el navegador lo pida.",
+    cta: "Empezar experiencia",
     privacy: "Al continuar, aceptas usar la cámara solo en tu navegador para la vista previa.",
     close: "Cerrar",
     linkTextFallback: "Probar gafas (AR)",
@@ -4952,7 +4952,7 @@ const COPY = {
     arPopupBlocked:
       "El navegador bloqueó la ventana emergente. Permita ventanas emergentes para el dominio del widget (p. ej. omafit.netlify.app) e inténtelo de nuevo.",
     arWindowModeBanner:
-      "Ventana dedicada al AR: pulse «Empezar experiencia AR» y permita la cámara cuando el navegador lo pida.",
+      "Ventana dedicada al AR: pulse «Empezar experiencia» y permita la cámara cuando el navegador lo pida.",
     addToCart: "Añadir al carrito",
     addedToCart: "¡Añadido!",
     addToCartError: "Error al añadir",
@@ -4962,7 +4962,7 @@ const COPY = {
       necklace: {
         desc: "Mira cómo queda este collar en tu cuello en tiempo real con la cámara de tu dispositivo. Mantén el rostro y la parte superior del pecho visibles en pantalla: el collar 3D sigue tu cuello. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara cuando el navegador lo pida.",
+          "En el siguiente paso, pulsa «Empezar experiencia» y permite el acceso a la cámara cuando el navegador lo pida.",
         linkTextFallback: "Probar collar (AR)",
         arLoading: "Iniciando cámara y modelo 3D del collar…",
         errFace: "No se pudo cargar la detección del rostro/cuello.",
@@ -4970,7 +4970,7 @@ const COPY = {
       watch: {
         desc: "Mira cómo queda este reloj en tu muñeca en tiempo real con la cámara trasera del móvil. Mantén la mano abierta en el centro de la pantalla, con la muñeca bien visible: el reloj 3D encaja en la muñeca. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
+          "En el siguiente paso, pulsa «Empezar experiencia» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
         linkTextFallback: "Probar reloj (AR)",
         arLoading: "Iniciando cámara trasera y reloj 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar el reloj.",
@@ -4979,7 +4979,7 @@ const COPY = {
       bracelet: {
         desc: "Mira cómo queda esta pulsera en tu muñeca en tiempo real con la cámara trasera del móvil. Mantén la mano abierta en el centro de la pantalla, con la muñeca bien visible: la pulsera 3D encaja en la muñeca. Los datos no se guardan en nuestros servidores.",
         howBody:
-          "En el siguiente paso, pulsa «Empezar experiencia AR» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
+          "En el siguiente paso, pulsa «Empezar experiencia» y permite el acceso a la cámara trasera cuando el navegador lo pida.",
         linkTextFallback: "Probar pulsera (AR)",
         arLoading: "Iniciando cámara trasera y pulsera 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar la pulsera.",

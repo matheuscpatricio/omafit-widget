@@ -155,6 +155,8 @@ type EyewearArBootstrap = {
   /** Layout do iframe (query `tryon_layout` / tema Shopify). */
   tryonLayout?: TryonLayoutMode;
   tryonLayoutBackgroundImage?: string;
+  /** Nome da loja para título AR (query `shopName` / `storeName`). */
+  storeName?: string;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -264,6 +266,20 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     }
   }
 
+  let storeNameBootstrap = pickQ(['shopName', 'storeName', 'shop_name', 'store_name']);
+  if (!storeNameBootstrap && configFromUrl) {
+    const c = configFromUrl;
+    const fromCfg =
+      (typeof c.storeName === 'string' && c.storeName.trim()) ||
+      (typeof c.shopName === 'string' && c.shopName.trim()) ||
+      (typeof (c as { store_name?: unknown }).store_name === 'string' &&
+        String((c as { store_name?: unknown }).store_name).trim()) ||
+      (typeof (c as { shop_name?: unknown }).shop_name === 'string' &&
+        String((c as { shop_name?: unknown }).shop_name).trim()) ||
+      '';
+    if (fromCfg) storeNameBootstrap = fromCfg;
+  }
+
   let tryonLayoutEyewear: TryonLayoutMode | undefined;
   const tryLayoutRaw = pickQ(['tryonLayout', 'tryon_layout']).trim().toLowerCase();
   if (tryLayoutRaw === 'hero') tryonLayoutEyewear = 'hero';
@@ -314,6 +330,8 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     }
   })();
 
+  const linkTextFromQuery = pickQ(['linkText', 'link_text']);
+
   return {
     glbUrl,
     productTitle,
@@ -322,7 +340,8 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     storeLogo,
     fontFamily,
     locale: lang,
-    linkText: defaultLinkText,
+    linkText: (linkTextFromQuery && linkTextFromQuery.trim()) || defaultLinkText,
+    storeName: storeNameBootstrap || undefined,
     accessoryType: accessoryType || undefined,
     categoryPath: categoryPath || undefined,
     productType: productType || undefined,
@@ -1024,6 +1043,7 @@ export function WidgetPage() {
           data-product-title={eyewearBootstrap.productTitle}
           data-product-image={eyewearBootstrap.productImage}
           data-store-logo={eyewearShopConfig.storeLogo ?? eyewearBootstrap.storeLogo}
+          data-shop-name={(eyewearBootstrap.storeName || storeName || '').trim()}
           {...(eyewearBootstrap.fontFamily
             ? { 'data-font-family': eyewearBootstrap.fontFamily }
             : {})}
