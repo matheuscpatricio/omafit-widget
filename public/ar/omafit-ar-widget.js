@@ -5203,6 +5203,32 @@ function omafitResolveTryonLayoutBackground(root, fallback) {
   return omafitUpgradeShopifyMediaToHttps(fallback || "");
 }
 
+function omafitResolvePrimaryColor(root, preferred = "") {
+  const fromPreferred = String(preferred || "").trim();
+  const fromDataset = String(root?.dataset?.primaryColor || "").trim();
+  const fromAdminAttr = String(root?.getAttribute?.("data-omafit-admin-primary") || "").trim();
+  const fromStyleVar = String(root?.style?.getPropertyValue("--omafit-ar-primary") || "").trim();
+  let fromQuery = "";
+  try {
+    const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+    fromQuery = String(
+      q.get("primaryColor") ||
+        q.get("primary_color") ||
+        q.get("primary") ||
+        q.get("brandColor") ||
+        q.get("brand_color") ||
+        "",
+    ).trim();
+  } catch {
+    fromQuery = "";
+  }
+  return (
+    (fromPreferred || fromDataset || fromAdminAttr || fromStyleVar || fromQuery || "#810707")
+      .replace(/[<>]/g, "")
+      .trim() || "#810707"
+  );
+}
+
 function omafitContrastOnPrimary(hex) {
   const h = String(hex || "").replace("#", "").trim();
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
@@ -5228,16 +5254,7 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
   const rawFont = resolveArFontFamilyStack(root);
   const stack = formatCssFontFamilyStack(rawFont);
   const appliedStack = stack || "'Outfit', system-ui, sans-serif";
-  const fromOverride =
-    typeof primaryOverride === "string" && primaryOverride.trim()
-      ? primaryOverride.trim()
-      : "";
-  const primary =
-    (fromOverride ||
-      (root?.dataset?.primaryColor || "").trim() ||
-      root?.style?.getPropertyValue("--omafit-ar-primary") ||
-      "#810707")
-      .replace(/[<>]/g, "") || "#810707";
+  const primary = omafitResolvePrimaryColor(root, primaryOverride);
 
   const s = document.createElement("style");
   s.id = "omafit-ar-styles";
@@ -15313,11 +15330,10 @@ async function main() {
   const embedPrimary = String(
     widgetRootEl?.getAttribute("data-omafit-admin-primary") || "",
   ).trim();
-  const rootPrimary = String(root.dataset.primaryColor || "").trim().replace(/[<>]/g, "");
-  const primaryColor =
-    (rootPrimary || embedPrimary || adminBrand?.primary || "#810707")
-      .trim()
-      .replace(/[<>]/g, "") || "#810707";
+  const primaryColor = omafitResolvePrimaryColor(
+    root,
+    (embedPrimary || adminBrand?.primary || "").trim(),
+  );
   const productTitle = root.dataset.productTitle || "Produto";
   const productImage = omafitUpgradeShopifyMediaToHttps(root.dataset.productImage || "");
   const rootLogo = (root.dataset.storeLogo || root.getAttribute("data-store-logo") || "").trim();
