@@ -708,6 +708,7 @@ export function ShoeARWidget({
   const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
   const [initialMeasurementTracked, setInitialMeasurementTracked] = useState(false);
   const [showHeaderLogoFallback, setShowHeaderLogoFallback] = useState(!storeLogo);
+  const [heroPresentationReady, setHeroPresentationReady] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const {
@@ -1442,6 +1443,40 @@ export function ShoeARWidget({
   /** Hero visual desligado no chat pós-medida — mesmo aspeto que layout default (fundo branco). */
   const heroChromeActive = isHeroLayout && step !== 'measure-result';
 
+  const heroPresentationGateActive = tryonLayout !== 'pending' && heroChromeActive;
+
+  useEffect(() => {
+    if (!heroPresentationGateActive) {
+      setHeroPresentationReady(false);
+      return;
+    }
+
+    setHeroPresentationReady(false);
+
+    let cancelled = false;
+    const unlock = () => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setHeroPresentationReady(true);
+        });
+      });
+    };
+
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(unlock);
+    } else {
+      unlock();
+    }
+
+    const timeoutId = window.setTimeout(unlock, 1600);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [heroPresentationGateActive, fontFamily]);
+
   if (tryonLayout === 'pending') {
     const loadingLabel =
       language === 'es' ? 'Cargando…' : language === 'en' ? 'Loading…' : 'A carregar…';
@@ -2161,6 +2196,7 @@ export function ShoeARWidget({
             primaryColor={primaryColor}
             backgroundImage={tryonLayoutBackgroundImage || productImage || ''}
             blurBackground={step !== 'info'}
+            presentationLocked={!heroPresentationReady}
           />
         )}
       </div>

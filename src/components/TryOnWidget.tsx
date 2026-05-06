@@ -3280,6 +3280,44 @@ const handleSubmit = async () => {
     }
   };
 
+  /** Hero: só revelar fundo marca+foto quando UI/fontes estiverem prontos — evita flash vermelho+foto antes do texto alinhado. */
+  const heroPresentationGateActive =
+    Boolean(product) && tryonLayout !== 'pending' && tryonLayout === 'hero' && step !== 'result';
+
+  const [heroPresentationReady, setHeroPresentationReady] = useState(false);
+
+  useEffect(() => {
+    if (!heroPresentationGateActive) {
+      setHeroPresentationReady(false);
+      return;
+    }
+
+    setHeroPresentationReady(false);
+
+    let cancelled = false;
+    const unlock = () => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setHeroPresentationReady(true);
+        });
+      });
+    };
+
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(unlock);
+    } else {
+      unlock();
+    }
+
+    const timeoutId = window.setTimeout(unlock, 1600);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [heroPresentationGateActive, fontFamily]);
+
   // Verificar se o produto foi carregado
   if (!product) {
     return (
@@ -4531,6 +4569,7 @@ const handleSubmit = async () => {
             primaryColor={localPrimaryColor}
             backgroundImage={localHeroBackgroundImage || displayImage}
             blurBackground={step !== 'info'}
+            presentationLocked={!heroPresentationReady}
           />
         )}
       </div>

@@ -6,6 +6,8 @@ type Props = {
   primaryColor: string;
   backgroundImage?: string;
   blurBackground?: boolean;
+  /** Enquanto true, não pinta gradiente/imagem da marca — só placeholder neutro até UI/fontes estarem prontos. */
+  presentationLocked?: boolean;
 };
 
 function clampPct(n: number): number {
@@ -54,7 +56,12 @@ function buildDesktopOverlayGradient(primaryHex: string, seamPct: number | null)
  * Até a imagem estar decodificada e a costura medida, mostra só gradiente da marca (sem foto) para evitar
  * “piscar” vermelho + produto antes do layout final.
  */
-export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackground = false }: Props) {
+export function TryOnLayoutShellHero({
+  primaryColor,
+  backgroundImage,
+  blurBackground = false,
+  presentationLocked = false,
+}: Props) {
   const p = primaryColor || '#810707';
   const bg = backgroundImage || '';
   const desktopMeasureRef = useRef<HTMLDivElement>(null);
@@ -207,7 +214,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
 
   const bgBlurClass = blurBackground ? 'blur-[4px] scale-[1.03]' : 'blur-0 scale-100';
 
-  const showPhoto = Boolean(bg && surfaceReady && !imgFailed);
+  const showHeroVisual = Boolean(bg && surfaceReady && !imgFailed && !presentationLocked);
 
   return (
     <div
@@ -218,7 +225,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
       <motion.section
         className={`absolute inset-0 transition-[filter,transform] duration-200 ease-out md:hidden ${bgBlurClass}`}
         style={
-          showPhoto ? mobileStyleFull : bg && imgFailed ? mobileStyleFull : mobileStylePlaceholder
+          showHeroVisual ? mobileStyleFull : bg && imgFailed ? mobileStyleFull : mobileStylePlaceholder
         }
         initial={false}
       />
@@ -228,7 +235,7 @@ export function TryOnLayoutShellHero({ primaryColor, backgroundImage, blurBackgr
           className={`absolute inset-0 hidden overflow-hidden transition-[filter,transform] duration-200 ease-out md:block ${bgBlurClass}`}
           initial={false}
         >
-          {showPhoto ? (
+          {showHeroVisual ? (
             <>
               <div className="absolute inset-0" style={desktopImageLayerStyle} />
               <div className="pointer-events-none absolute inset-0" style={desktopGradientOverlayStyle} />
