@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { isTryonWidgetEmbedded } from '../utils/isTryonWidgetEmbedded';
-import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 
 export type TryonLayoutPreferenceState = TryonLayoutMode | 'pending';
 
@@ -39,7 +39,7 @@ type Opts = {
  * Mesma fonte de verdade que TryOnWidget: URL → override → sessionStorage → widget_configurations.
  */
 export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutResolved }: Opts) {
-  const layoutFromUrl = useMemo(() => parseTryonLayoutFromUrl(), []);
+  const layoutFromUrl = useMemo(() => parseTryonLayoutFromLocation(), []);
   const effectiveShopDomain = (shopDomain || '').trim();
 
   const [tryonLayout, setTryonLayout] = useState<TryonLayoutPreferenceState>(() => {
@@ -111,7 +111,9 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
 
         if (cancelled) return;
         if (error) {
-          setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+          if (!isTryonWidgetEmbedded()) {
+            setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+          }
           return;
         }
         if (configs && configs.length > 0) {
@@ -119,12 +121,14 @@ export function useTryonLayoutPreference({ shopDomain, layoutOverride, onLayoutR
           const resolved: TryonLayoutMode = raw === 'hero' ? 'hero' : raw === 'sidebar' ? 'sidebar' : 'default';
           setTryonLayout(resolved);
           writeTryonLayoutToSession(effectiveShopDomain, resolved);
-        } else {
+        } else if (!isTryonWidgetEmbedded()) {
           setTryonLayout('default');
           writeTryonLayoutToSession(effectiveShopDomain, 'default');
         }
       } catch {
-        if (!cancelled) setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+        if (!cancelled && !isTryonWidgetEmbedded()) {
+          setTryonLayout((p) => (p === 'pending' ? 'default' : p));
+        }
       }
     };
     void run();

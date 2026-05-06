@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TryOnWidget } from './TryOnWidget';
-import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
@@ -366,7 +366,10 @@ export function WidgetPage() {
 
   const tryonIframeSidebar = false;
   /** Sidebar ativa (URL ou config vinda do TryOnWidget) — iframe sem margens para o layout encaixar. */
-  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => {
+    const m = parseTryonLayoutFromLocation();
+    return m === 'hero' || m === 'sidebar';
+  });
   const [eyewearTryonLayoutFromMessage, setEyewearTryonLayoutFromMessage] = useState<TryonLayoutMode | null>(null);
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');

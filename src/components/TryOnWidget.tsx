@@ -11,7 +11,7 @@ import {
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
-import { parseTryonLayoutFromUrl, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { isTryonWidgetEmbedded } from '../utils/isTryonWidgetEmbedded';
 import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
@@ -499,7 +499,7 @@ export function TryOnWidget({
   const [error, setError] = useState('');
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
 
-  const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromUrl(), []);
+  const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromLocation(), []);
   const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutState>(() => {
     if (layoutFromUrl !== undefined) return layoutFromUrl;
     if (tryonLayoutOverride === 'hero' || tryonLayoutOverride === 'sidebar' || tryonLayoutOverride === 'default') return tryonLayoutOverride;
@@ -1308,13 +1308,21 @@ export function TryOnWidget({
             console.log('🌍 Idioma definido via widget_configurations.admin_locale:', adminLocale);
             setCurrentLanguage(adminLocale);
           }
-        } else if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+        } else if (
+          layoutFromUrl === undefined &&
+          tryonLayoutOverride === undefined &&
+          !isTryonWidgetEmbedded()
+        ) {
           setTryonLayout('default');
           writeTryonLayoutToSession(effectiveShopDomain, 'default');
         }
       } catch (error) {
         console.error('❌ Erro ao buscar configurações:', error);
-        if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
+        if (
+          layoutFromUrl === undefined &&
+          tryonLayoutOverride === undefined &&
+          !isTryonWidgetEmbedded()
+        ) {
           setTryonLayout((p) => (p === 'pending' ? 'default' : p));
         }
       }

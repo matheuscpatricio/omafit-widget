@@ -4,7 +4,7 @@ import {
   parseCollectionHandlesFromMessage,
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
-import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
+import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -50,7 +50,10 @@ type ProductCatalog = {
 };
 
 export function ShoeARWidgetPage() {
-  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => false);
+  const [tryonSidebarChrome, setTryonSidebarChrome] = useState(() => {
+    const m = parseTryonLayoutFromLocation();
+    return m === 'hero' || m === 'sidebar';
+  });
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
