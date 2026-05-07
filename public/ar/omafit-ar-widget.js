@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-06-hero-text-left-desktop-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-07-how-it-works-refine-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5790,7 +5790,15 @@ function buildInfoModal({
       alt: shopName || "",
       loading: "eager",
       decoding: "async",
-      style: { maxHeight: "48px", width: "auto", maxWidth: "min(200px, 70vw)", objectFit: "contain" },
+      style: {
+        maxHeight: "48px",
+        width: "auto",
+        maxWidth: "min(200px, 70vw)",
+        objectFit: "contain",
+        borderRadius: "10px",
+        padding: "2px 4px",
+        background: "rgba(255,255,255,0.88)",
+      },
     });
     // #region agent log
     img.addEventListener("error", () => {
@@ -6105,25 +6113,48 @@ function buildInfoModal({
 
   const blueBox = el("div", {
     style: {
-      background: isHero ? heroInfoPanelBg : "#eff6ff",
+      background: isHero ? heroInfoPanelBg : "linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%)",
       border: isHero ? `1px solid ${heroInfoPanelBorder}` : "1px solid #bfdbfe",
-      borderRadius: "8px",
-      padding: isSidebar || isHero ? "12px" : "16px",
+      borderRadius: "12px",
+      padding: isSidebar || isHero ? "12px 12px" : "16px 18px",
       marginBottom: isSidebar || isHero ? "12px" : "20px",
+      boxShadow: isHero ? "inset 0 1px 0 rgba(255,255,255,0.14)" : "0 6px 16px rgba(30,64,175,0.10)",
+      backdropFilter: isHero ? "blur(3px)" : "none",
+      WebkitBackdropFilter: isHero ? "blur(3px)" : "none",
     },
   });
   const blueInner = el("div", {
     className: isHero ? "omafit-ar-hero-blue-inner" : "",
-    style: isHero ? {} : { textAlign: "center" },
+    style: isHero ? { textAlign: "left" } : { textAlign: "center" },
   });
+  const howBadge = el("span", {
+    textContent: "i",
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: isSidebar || isHero ? "20px" : "22px",
+      height: isSidebar || isHero ? "20px" : "22px",
+      borderRadius: "999px",
+      marginBottom: "8px",
+      fontSize: "12px",
+      fontWeight: "700",
+      lineHeight: "1",
+      background: isHero ? "rgba(255,255,255,0.18)" : "rgba(30,64,175,0.12)",
+      color: isHero ? "#ffffff" : "#1e40af",
+      border: isHero ? "1px solid rgba(255,255,255,0.34)" : "1px solid rgba(30,64,175,0.22)",
+    },
+  });
+  blueInner.appendChild(howBadge);
   blueInner.appendChild(
     el("h4", {
       textContent: t.howTitle,
       style: {
-        margin: "0 0 6px 0",
+        margin: "0 0 7px 0",
         fontWeight: "600",
         color: isHero ? heroInfoAccent : "#1e40af",
-        fontSize: isSidebar || isHero ? "0.95rem" : "1.05rem",
+        letterSpacing: "0.01em",
+        fontSize: isSidebar || isHero ? "0.96rem" : "1.08rem",
       },
     }),
   );
@@ -6133,8 +6164,8 @@ function buildInfoModal({
       style: {
         margin: 0,
         color: isHero ? heroInfoAccent : "#1d4ed8",
-        fontSize: isSidebar || isHero ? "clamp(0.82rem, 1.7vw, 0.92rem)" : "clamp(0.95rem, 2.8vw, 1.05rem)",
-        lineHeight: isSidebar || isHero ? "1.4" : "1.5",
+        fontSize: isSidebar || isHero ? "clamp(0.84rem, 1.7vw, 0.93rem)" : "clamp(0.95rem, 2.8vw, 1.04rem)",
+        lineHeight: isSidebar || isHero ? "1.45" : "1.52",
       },
     }),
   );
@@ -6269,6 +6300,50 @@ function buildInfoModal({
         zIndex: "1",
       },
     });
+    const heroTopBrand = el("div", {
+      style: {
+        position: "absolute",
+        top: "10px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: "4",
+        pointerEvents: "none",
+        maxWidth: "min(300px, 80vw)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      },
+    });
+    if (logoUrl) {
+      heroTopBrand.appendChild(
+        el("img", {
+          src: logoUrl,
+          alt: shopName || "",
+          style: {
+            maxHeight: "44px",
+            width: "auto",
+            maxWidth: "100%",
+            objectFit: "contain",
+            borderRadius: "10px",
+            padding: "2px 6px",
+            background: "rgba(255,255,255,0.82)",
+            filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.35))",
+          },
+        }),
+      );
+    } else if (shopName) {
+      heroTopBrand.appendChild(
+        el("span", {
+          textContent: shopName,
+          style: {
+            fontSize: "0.95rem",
+            fontWeight: "600",
+            color: "#ffffff",
+            textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+          },
+        }),
+      );
+    }
     const bgRoot = el("div", { className: "omafit-ar-hero-bg-root" });
     bgRoot.appendChild(
       el("div", {
@@ -6326,6 +6401,7 @@ function buildInfoModal({
       );
     }
     shell.appendChild(bgRoot);
+    if (heroTopBrand.childNodes.length > 0) contentOuter.appendChild(heroTopBrand);
     contentOuter.appendChild(mainRow);
     shell.appendChild(contentOuter);
     shell.__omafitArHeroApi = {
