@@ -1039,14 +1039,22 @@ export function WidgetPage() {
           data-tryon-layout={eyewearResolvedTryonLayout}
           data-tryon-layout-background-image={tryonLayoutBackgroundImage || eyewearBootstrap.tryonLayoutBackgroundImage || ''}
           data-glb-url={eyewearBootstrap.glbUrl}
-          data-primary-color={eyewearShopConfig.primaryColor ?? eyewearBootstrap.primaryColor}
+          data-primary-color={
+            eyewearShopConfig.primaryColor ?? eyewearBootstrap.primaryColor ?? primaryColor
+          }
           data-product-title={eyewearBootstrap.productTitle}
           data-product-image={eyewearBootstrap.productImage}
-          data-store-logo={eyewearShopConfig.storeLogo ?? eyewearBootstrap.storeLogo}
+          data-store-logo={(
+            eyewearShopConfig.storeLogo ??
+            eyewearBootstrap.storeLogo ??
+            storeLogo ??
+            ''
+          ).trim()}
           data-shop-name={(eyewearBootstrap.storeName || storeName || '').trim()}
-          {...(eyewearBootstrap.fontFamily
-            ? { 'data-font-family': eyewearBootstrap.fontFamily }
-            : {})}
+          {...( (() => {
+            const ff = (eyewearBootstrap.fontFamily || fontFamily || '').trim();
+            return ff ? { 'data-font-family': ff } : {};
+          })())}
           data-locale={eyewearBootstrap.locale}
           data-link-text={eyewearBootstrap.linkText}
           data-auto-open="1"

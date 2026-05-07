@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-05-hero-layout-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-06-hero-text-left-desktop-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5081,6 +5081,24 @@ function readWidgetRootAdminBranding() {
   };
 }
 
+/**
+ * Iframe Netlify: branding já está em `#omafit-ar-root` (React) — usar antes dos
+ * placeholders de `waitForOmafitWidgetAdminBranding`, alinhado ao fluxo do TryOnWidget.
+ */
+function readArRootBrandingSnapshot() {
+  const r = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+  if (!r) return null;
+  const primary = String(r.dataset?.primaryColor || r.getAttribute("data-primary-color") || "").trim();
+  const logo = String(r.dataset?.storeLogo || r.getAttribute("data-store-logo") || "").trim();
+  const link = String(r.dataset?.linkText || r.getAttribute("data-link-text") || "").trim();
+  if (!primary && !logo && !link) return null;
+  return {
+    primary: primary || "#810707",
+    linkText: link || "Experimentar virtualmente",
+    storeLogo: logo || "",
+  };
+}
+
 function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
   return new Promise((resolve) => {
     let settled = false;
@@ -5117,11 +5135,14 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
       arGlbFromQuery = false;
     }
     if (typeof window !== "undefined" && arGlbFromQuery) {
-      settle({
-        primary: "#810707",
-        linkText: "Experimentar virtualmente",
-        storeLogo: "",
-      });
+      const snap = readArRootBrandingSnapshot();
+      settle(
+        snap || {
+          primary: "#810707",
+          linkText: "Experimentar virtualmente",
+          storeLogo: "",
+        },
+      );
       return;
     }
     if (typeof window !== "undefined") {
@@ -5137,11 +5158,14 @@ function waitForOmafitWidgetAdminBranding(maxMs = 8000) {
       typeof document !== "undefined" &&
       !document.getElementById("omafit-widget-root")
     ) {
-      settle({
-        primary: "#810707",
-        linkText: "Experimentar virtualmente",
-        storeLogo: "",
-      });
+      const snap = readArRootBrandingSnapshot();
+      settle(
+        snap || {
+          primary: "#810707",
+          linkText: "Experimentar virtualmente",
+          storeLogo: "",
+        },
+      );
       return;
     }
     const first = readWidgetRootAdminBranding();
@@ -5229,11 +5253,15 @@ function omafitResolvePrimaryColor(root, preferred = "") {
   } catch {
     fromQuery = "";
   }
-  return (
-    (fromPreferred || fromDataset || fromAdminAttr || fromStyleVar || fromQuery || "#810707")
-      .replace(/[<>]/g, "")
-      .trim() || "#810707"
-  );
+  /**
+   * Prioridade alinhada ao TryOnWidget no iframe: dados explícitos no `#omafit-ar-root`
+   * e na query vencem o placeholder `#810707` devolvido por `waitForOmafitWidgetAdminBranding`
+   * quando não existe `#omafit-widget-root`.
+   */
+  const explicit =
+    fromDataset || fromAdminAttr || fromStyleVar || fromQuery;
+  const chosen = explicit || fromPreferred || "#810707";
+  return chosen.replace(/[<>]/g, "").trim() || "#810707";
 }
 
 function omafitContrastOnPrimary(hex) {
@@ -5417,6 +5445,52 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
       .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-mobile { display: none; }
       .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-desktop { display: block; }
     }
+    /* Hero passo info: mobile texto centrado em baixo; desktop à esquerda (paridade TryOnWidget.tsx). */
+    .omafit-ar-shell-hero-layout .omafit-ar-hero-info-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: stretch;
+      min-height: 0;
+      flex: 1;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: 8px 14px max(18px, env(safe-area-inset-bottom, 0px));
+    }
+    .omafit-ar-shell-hero-layout .omafit-ar-hero-text-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 24rem;
+      margin-left: auto;
+      margin-right: auto;
+      align-items: stretch;
+      box-sizing: border-box;
+    }
+    .omafit-ar-shell-hero-layout .omafit-ar-hero-title-block,
+    .omafit-ar-shell-hero-layout .omafit-ar-hero-blue-inner,
+    .omafit-ar-shell-hero-layout .omafit-ar-hero-privacy {
+      text-align: center;
+    }
+    @media (min-width: 768px) {
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-info-col {
+        justify-content: center;
+        align-items: flex-start;
+        padding: 3.5rem 1rem 1.25rem 1.25rem;
+      }
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-text-stack {
+        max-width: 28rem;
+        margin-left: 0;
+        margin-right: 0;
+        align-items: flex-start;
+      }
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-title-block,
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-blue-inner,
+      .omafit-ar-shell-hero-layout .omafit-ar-hero-privacy {
+        text-align: left;
+      }
+    }
   `;
   document.head.appendChild(s);
   const hasThemeFontFace = document.getElementById("omafit-ar-theme-font-face");
@@ -5430,6 +5504,28 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
     l.href =
       "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap";
     document.head.appendChild(l);
+  } else if (
+    rawFont &&
+    !hasThemeFontFace &&
+    !document.querySelector("link[data-omafit-ar-google-font='1']")
+  ) {
+    const firstFamily = String(rawFont.split(",")[0] || "")
+      .trim()
+      .replace(/^["']|["']$/g, "");
+    if (
+      firstFamily &&
+      !/^(serif|sans-serif|cursive|fantasy|monospace|system-ui|inherit|initial|ui-sans-serif|ui-serif)$/i.test(
+        firstFamily,
+      )
+    ) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.setAttribute("data-omafit-ar-google-font", "1");
+      l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+        firstFamily.replace(/ /g, "+"),
+      )}:wght@300;400;500;600;700&display=swap`;
+      document.head.appendChild(l);
+    }
   }
 
   // #region agent log
@@ -5938,22 +6034,15 @@ function buildInfoModal({
   colImg.appendChild(imgBox);
 
   const colContent = el("div", {
-    style: {
-      flex: "1",
-      overflowY: "auto",
-      boxSizing: "border-box",
-      ...(isHero
-        ? {
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            minHeight: "0",
-            padding: "8px 14px max(18px, env(safe-area-inset-bottom, 0px))",
-          }
-        : {
-            padding: isSidebar ? "8px 14px 12px" : "12px 16px 24px",
-          }),
-    },
+    className: isHero ? "omafit-ar-hero-info-col" : "",
+    style: isHero
+      ? {}
+      : {
+          flex: "1",
+          overflowY: "auto",
+          boxSizing: "border-box",
+          padding: isSidebar ? "8px 14px 12px" : "12px 16px 24px",
+        },
   });
 
   const mobileImgWrap = el("div", {
@@ -5987,7 +6076,10 @@ function buildInfoModal({
   const heroInfoPanelBg = "rgba(255, 255, 255, 0.12)";
   const heroInfoPanelBorder = "rgba(255, 255, 255, 0.35)";
 
-  const titleBlock = el("div", { style: { textAlign: "center", marginBottom: "16px" } });
+  const titleBlock = el("div", {
+    className: isHero ? "omafit-ar-hero-title-block" : "",
+    style: { marginBottom: "16px", ...(!isHero ? { textAlign: "center" } : {}) },
+  });
   titleBlock.appendChild(
     el("h3", {
       textContent: omafitFormatWelcomeTitle(t.title, shopName, locale),
@@ -6020,7 +6112,10 @@ function buildInfoModal({
       marginBottom: isSidebar || isHero ? "12px" : "20px",
     },
   });
-  const blueInner = el("div", { style: { textAlign: "center" } });
+  const blueInner = el("div", {
+    className: isHero ? "omafit-ar-hero-blue-inner" : "",
+    style: isHero ? {} : { textAlign: "center" },
+  });
   blueInner.appendChild(
     el("h4", {
       textContent: t.howTitle,
@@ -6100,10 +6195,11 @@ function buildInfoModal({
   });
 
   const privacy = el("p", {
+    className: isHero ? "omafit-ar-hero-privacy" : "",
     textContent: t.privacy,
     style: {
       margin: 0,
-      textAlign: "center",
+      ...(!isHero ? { textAlign: "center" } : {}),
       color: isHero ? heroInfoMuted : "#6b7280",
       fontSize: isSidebar || isHero ? "0.78rem" : "0.875rem",
       lineHeight: isSidebar || isHero ? "1.3" : "1.4",
@@ -6136,10 +6232,19 @@ function buildInfoModal({
   }
 
   if (!isHero) colContent.appendChild(mobileImgWrap);
-  colContent.appendChild(titleBlock);
-  colContent.appendChild(blueBox);
-  colContent.appendChild(cta);
-  colContent.appendChild(privacy);
+  if (isHero) {
+    const heroTextStack = el("div", { className: "omafit-ar-hero-text-stack" });
+    heroTextStack.appendChild(titleBlock);
+    heroTextStack.appendChild(blueBox);
+    heroTextStack.appendChild(cta);
+    heroTextStack.appendChild(privacy);
+    colContent.appendChild(heroTextStack);
+  } else {
+    colContent.appendChild(titleBlock);
+    colContent.appendChild(blueBox);
+    colContent.appendChild(cta);
+    colContent.appendChild(privacy);
+  }
 
   mainRow.appendChild(colImg);
   mainRow.appendChild(colContent);
