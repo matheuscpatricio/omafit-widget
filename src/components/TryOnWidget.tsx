@@ -632,6 +632,13 @@ export function TryOnWidget({
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
+  /**
+   * Evita flash no hero: não usar fallback `displayImage` até resolvermos se há
+   * background configurado (query/postMessage/Supabase) para a loja atual.
+   */
+  const [heroBackgroundResolved, setHeroBackgroundResolved] = useState<boolean>(
+    Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''),
+  );
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
 
   /** Quando `shopDomain` / `localShopDomain` fica disponível, aplicar cache e sair de `pending` sem flash. */
@@ -1020,6 +1027,7 @@ export function TryOnWidget({
   useEffect(() => {
     if (tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== '') {
       setLocalHeroBackgroundImage(tryonLayoutBackgroundImage.trim());
+      setHeroBackgroundResolved(true);
     }
   }, [tryonLayoutBackgroundImage]);
 
@@ -1181,6 +1189,7 @@ export function TryOnWidget({
         const heroBg = event.data.tryon_layout_background_image ?? event.data.tryonLayoutBackgroundImage;
         if (typeof heroBg === 'string') {
           setLocalHeroBackgroundImage(heroBg.trim());
+          setHeroBackgroundResolved(true);
         }
 
         if (event.data.storeName) {
@@ -1273,6 +1282,7 @@ export function TryOnWidget({
     const fetchWidgetConfig = async () => {
       if (!effectiveShopDomain) {
         console.log('⚠️ Não há shopDomain para buscar configurações');
+        setHeroBackgroundResolved(true);
         if (layoutFromUrl === undefined && tryonLayoutOverride === undefined && !isTryonWidgetEmbedded()) {
           setTryonLayout((p) => (p === 'pending' ? 'default' : p));
         }
@@ -1289,6 +1299,7 @@ export function TryOnWidget({
 
         if (error) {
           console.error('❌ Erro ao buscar configurações do widget:', error);
+          setHeroBackgroundResolved(true);
           if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
             setTryonLayout((p) => (p === 'pending' ? 'default' : p));
           }
@@ -1326,6 +1337,7 @@ export function TryOnWidget({
           if (typeof heroBg === 'string') {
             setLocalHeroBackgroundImage(heroBg.trim());
           }
+          setHeroBackgroundResolved(true);
 
           // Fonte de verdade do idioma: admin_locale salvo no Supabase.
           const adminLocale = normalizeWidgetLanguage(config.admin_locale);
@@ -1343,6 +1355,7 @@ export function TryOnWidget({
         }
       } catch (error) {
         console.error('❌ Erro ao buscar configurações:', error);
+        setHeroBackgroundResolved(true);
         if (
           layoutFromUrl === undefined &&
           tryonLayoutOverride === undefined &&
@@ -1357,6 +1370,11 @@ export function TryOnWidget({
     // tryonLayoutOverride / layoutFromUrl: lidos no fecho; não re-fetch ao mudarem
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shop domain é a fonte de novo fetch
   }, [effectiveShopDomain, tryonEnabledProp]);
+
+  useEffect(() => {
+    // Nova loja/domínio: aguardar resolução do background hero de novo.
+    setHeroBackgroundResolved(Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''));
+  }, [effectiveShopDomain, tryonLayoutBackgroundImage]);
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
@@ -4567,7 +4585,7 @@ const handleSubmit = async () => {
         {heroChromeActive && (
           <TryOnLayoutShellHero
             primaryColor={localPrimaryColor}
-            backgroundImage={localHeroBackgroundImage || displayImage}
+            backgroundImage={localHeroBackgroundImage || (heroBackgroundResolved ? displayImage : '')}
             blurBackground={step !== 'info'}
             presentationLocked={!heroPresentationReady}
           />
