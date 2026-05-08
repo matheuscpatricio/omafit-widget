@@ -12395,6 +12395,21 @@ async function runHandArSession({
     calibRot.add(braceletWristAlignGroup);
     braceletWristAlignGroup.add(handMicroUxWrap);
     handMicroUxWrap.add(glbRoot);
+    /** Oclusão parcial: só depth buffer, sem color — pulseira encosta ao braço no vídeo. */
+    const braceletPartialOccMat = new THREE.MeshBasicMaterial({
+      colorWrite: false,
+      depthWrite: true,
+      depthTest: true,
+    });
+    const braceletPartialOcclusionMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.08, 24),
+      braceletPartialOccMat,
+    );
+    braceletPartialOcclusionMesh.name = "omafit-ar-bracelet-partial-occlusion";
+    braceletPartialOcclusionMesh.rotation.z = Math.PI / 2;
+    braceletPartialOcclusionMesh.renderOrder = -800;
+    braceletPartialOcclusionMesh.frustumCulled = false;
+    anchor.add(braceletPartialOcclusionMesh);
     if (debug) {
       const axes = new THREE.AxesHelper(0.03);
       axes.name = "omafit-bracelet-debug-axes";
@@ -13676,10 +13691,15 @@ async function runHandArSession({
   const braceletForwardAxis = new THREE.Vector3();
   const braceletSideAxis = new THREE.Vector3();
   const braceletNormalAxis = new THREE.Vector3();
+  /** Direcção anatómica da largura do punho (MCP17 − MCP5), antes da ortogonalização. */
+  const braceletWristWidthDir = new THREE.Vector3();
   const braceletTargetPos = new THREE.Vector3();
   const braceletTargetQuat = new THREE.Quaternion();
   /** Scratch para `decompose` ao aplicar escala na âncora sem perder tracking. */
   const braceletAnchorScaleScratch = new THREE.Vector3();
+  /** Inclinação local extra na âncora (pulseira “deita” no braço). */
+  const braceletAnchorLocalEuler = new THREE.Euler(-0.18, 0, 0.08, "XYZ");
+  const braceletAnchorLocalTiltQuat = new THREE.Quaternion();
   let braceletModelDiameter = 0.06;
 
   function refreshBraceletModelDiameter() {
@@ -14770,6 +14790,10 @@ async function runHandArSession({
         // forearmDir = normalize(middleMcp - wrist) → sentido mão; recuar = negativo.
         braceletForwardAxis.subVectors(w9, w0);
         braceletSideAxis.subVectors(w17, w5);
+        braceletWristWidthDir.copy(braceletSideAxis);
+        if (braceletWristWidthDir.lengthSq() > 1e-10) {
+          braceletWristWidthDir.normalize();
+        }
         if (braceletForwardAxis.lengthSq() > 1e-10 && braceletSideAxis.lengthSq() > 1e-10) {
           braceletForwardAxis.normalize();
           braceletSideAxis.normalize();
@@ -14786,7 +14810,13 @@ async function runHandArSession({
             );
             braceletTargetQuat.setFromRotationMatrix(basisMat);
 
-            braceletTargetPos.copy(w0).addScaledVector(braceletForwardAxis, -0.025);
+            braceletTargetPos
+              .copy(w0)
+              .addScaledVector(braceletForwardAxis, -0.025)
+              .addScaledVector(braceletWristWidthDir, -0.018);
+            braceletTargetPos.y -= 0.012;
+            braceletTargetPos.addScaledVector(braceletForwardAxis, -0.02);
+            braceletTargetPos.addScaledVector(braceletNormalAxis, -0.01);
 
             if (!braceletState.initialized) {
               braceletState.position.copy(braceletTargetPos);
@@ -14813,6 +14843,8 @@ async function runHandArSession({
           braceletAnchorScaleScratch,
         );
         braceletAnchor.scale.setScalar(finalScale);
+        braceletAnchorLocalTiltQuat.setFromEuler(braceletAnchorLocalEuler);
+        anchor.quaternion.multiply(braceletAnchorLocalTiltQuat);
         anchor.matrix.compose(
           anchor.position,
           anchor.quaternion,
