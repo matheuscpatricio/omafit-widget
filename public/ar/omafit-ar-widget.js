@@ -13670,7 +13670,6 @@ async function runHandArSession({
   let smoothedStrapK = 1;
   /** Estado de smoothing runtime da pulseira (escala + posição). */
   const braceletState = {
-    scale: Number.NaN,
     position: new THREE.Vector3(),
     initialized: false,
   };
@@ -13679,6 +13678,8 @@ async function runHandArSession({
   const braceletNormalAxis = new THREE.Vector3();
   const braceletTargetPos = new THREE.Vector3();
   const braceletTargetQuat = new THREE.Quaternion();
+  /** Scratch para `decompose` ao aplicar escala na âncora sem perder tracking. */
+  const braceletAnchorScaleScratch = new THREE.Vector3();
   let braceletModelDiameter = 0.06;
 
   function refreshBraceletModelDiameter() {
@@ -13742,7 +13743,6 @@ async function runHandArSession({
           glbRoot.position.sub(center);
           glbRoot.updateMatrixWorld(true);
           refreshBraceletModelDiameter();
-          braceletState.scale = Number.NaN;
           braceletState.position.set(0, 0, 0);
           braceletState.initialized = false;
         }
@@ -14755,13 +14755,11 @@ async function runHandArSession({
     if (glbRoot && localInnerR > 1e-6) {
       if (accessoryType === "bracelet") {
         const wristWidth = w5.distanceTo(w17);
-        const modelDiameter = Math.max(braceletModelDiameter, 1e-6);
-        const targetScale = (wristWidth * 0.82) / modelDiameter;
-        const safeScale = THREE.MathUtils.clamp(targetScale, 0.015, 0.065);
-        const prevS = Number.isFinite(braceletState.scale)
-          ? braceletState.scale
-          : safeScale;
-        braceletState.scale = THREE.MathUtils.lerp(prevS, safeScale, 0.18);
+        const braceletModelWidth = Math.max(braceletModelDiameter, 1e-6);
+        const desiredWidth = wristWidth * 1.35;
+        const scale = desiredWidth / braceletModelWidth;
+        const finalScale = THREE.MathUtils.clamp(scale, 0.045, 0.09);
+        const braceletAnchor = anchor;
 
         // Pulseira mantém grupos auxiliares neutros; pose aplicada no glbRoot.
         wearPosition.position.set(0, 0, 0);
@@ -14798,13 +14796,6 @@ async function runHandArSession({
               braceletState.position.lerp(braceletTargetPos, 0.22);
               glbRoot.quaternion.slerp(braceletTargetQuat, 0.22);
             }
-
-            anchor.quaternion.identity();
-            anchor.scale.set(1, 1, 1);
-            anchor.position.set(0, 0, 0);
-            anchor.matrix.compose(anchor.position, anchor.quaternion, anchor.scale);
-            anchor.matrixWorldNeedsUpdate = true;
-            anchor.updateMatrixWorld(true);
           }
         }
 
@@ -14814,15 +14805,27 @@ async function runHandArSession({
           braceletWristAlignGroup.scale.set(1, 1, 1);
         }
         glbRoot.position.copy(braceletState.position);
-        glbRoot.scale.setScalar(braceletState.scale);
+        glbRoot.scale.set(1, 1, 1);
 
-        console.log("[bracelet-debug]", {
+        anchor.matrix.decompose(
+          anchor.position,
+          anchor.quaternion,
+          braceletAnchorScaleScratch,
+        );
+        braceletAnchor.scale.setScalar(finalScale);
+        anchor.matrix.compose(
+          anchor.position,
+          anchor.quaternion,
+          braceletAnchor.scale,
+        );
+        anchor.matrixWorldNeedsUpdate = true;
+        anchor.updateMatrixWorld(true);
+
+        console.log("[bracelet-scale-fix]", {
           wristWidth,
-          modelDiameter,
-          safeScale,
-          smoothedScale: braceletState.scale,
-          targetPos: braceletTargetPos.toArray(),
-          quat: braceletTargetQuat.toArray(),
+          braceletModelWidth,
+          scale,
+          finalScale,
         });
       } else {
       const gapOffset = OMAFIT_WATCH_WRIST_GAP_M;
@@ -15344,7 +15347,6 @@ async function runHandArSession({
                 glbRoot.position.sub(center);
                 glbRoot.updateMatrixWorld(true);
                 refreshBraceletModelDiameter();
-                braceletState.scale = Number.NaN;
                 braceletState.position.set(0, 0, 0);
                 braceletState.initialized = false;
               }
