@@ -13284,15 +13284,30 @@ async function runHandArSession({
         : 1;
 
     if (accessoryType === "bracelet") {
-      // Escala única anatômica para pulseira (bbox máximo -> diâmetro de pulso alvo).
-      const maxDimBracelet = Math.max(size.x, size.y, size.z, 1e-6);
-      const scaleBracelet =
-        (OMAFIT_BRACELET_WRIST_DIAMETER_METERS / maxDimBracelet) * finalMul;
-      glbScene.scale.setScalar(scaleBracelet);
+      /**
+       * Normalização física estável da pulseira:
+       * - mede `maxDim` do GLB como veio exportado
+       * - aplica escala para diâmetro físico alvo
+       * - usa este fator como `baseScale` (não assumir 1)
+       */
+      const rawMaxDimBracelet = Math.max(size.x, size.y, size.z, 1e-6);
+      const normalizedBaseScale = OMAFIT_BRACELET_WRIST_DIAMETER_METERS / rawMaxDimBracelet;
+      glbScene.scale.multiplyScalar(normalizedBaseScale);
       glbScene.updateMatrixWorld(true);
-      calcBaseScale = 1;
+      bbox.setFromObject(glbScene);
+      bbox.getSize(size);
+
+      calcBaseScale = normalizedBaseScale;
       localInnerR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
-      glbRoot.scale.set(1, 1, 1);
+      glbRoot.scale.setScalar(finalMul);
+
+      if (debug) {
+        console.log("[omafit-ar] bracelet normalize", {
+          rawMaxDim: rawMaxDimBracelet,
+          normalizedBaseScale,
+          maxDimAfter: Math.max(size.x, size.y, size.z),
+        });
+      }
     } else {
       glbRoot.scale.setScalar(calcBaseScale * finalMul);
     }
