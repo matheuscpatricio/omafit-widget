@@ -13657,7 +13657,7 @@ async function runHandArSession({
   let smoothedStrapK = 1;
   /** Escala suave exclusiva da pulseira (runtime tracking). */
   let braceletSmoothScale = null;
-  const OMAFIT_BRACELET_WRIST_SCALE_MULTIPLIER = 0.92;
+  const OMAFIT_BRACELET_WRIST_SCALE_MULTIPLIER = 0.88;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
     url: String(finalGlbUrl || "").slice(0, 200),
     draco: Boolean(dracoLoaderHand),
@@ -14707,45 +14707,51 @@ async function runHandArSession({
     if (glbRoot && localInnerR > 1e-6) {
       if (accessoryType === "bracelet") {
         const wristWidth = w5.distanceTo(w17);
-        const targetScale = THREE.MathUtils.clamp(
+        const trackingScale = THREE.MathUtils.clamp(
           wristWidth * OMAFIT_BRACELET_WRIST_SCALE_MULTIPLIER,
-          0.45,
-          1.4,
+          0.75,
+          1.35,
         );
         braceletSmoothScale = THREE.MathUtils.lerp(
-          Number.isFinite(braceletSmoothScale) ? braceletSmoothScale : targetScale,
-          targetScale,
+          Number.isFinite(braceletSmoothScale) ? braceletSmoothScale : trackingScale,
+          trackingScale,
           0.18,
         );
+        const finalScale = baseScale * braceletSmoothScale;
 
-        // Pipeline exclusivo da pulseira: não reutiliza fatores de relógio.
-        glbRoot.scale.setScalar(braceletSmoothScale);
+        // Mantém o fit inicial no GLB; tracking escala no grupo da âncora.
+        glbRoot.position.set(0, 0, 0);
         wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
         wearPosition.updateMatrixWorld(true);
 
-        // Pulseira segue o pulso real no mundo.
-        anchor.position.copy(w0);
-        anchor.updateMatrixWorld(true);
-
-        if (braceletWristAlignGroup && !braceletProceduralRadial) {
-          const wristDir = handToMcpRawScratch.subVectors(w9, w0);
-          if (wristDir.lengthSq() > 1e-10) {
-            wristDir.normalize();
-            const targetQuat = handRollQuat.setFromUnitVectors(
-              new THREE.Vector3(0, 0, 1),
-              wristDir,
-            );
-            braceletWristAlignGroup.quaternion.slerp(targetQuat, 0.35);
+        // Orientação anatómica: wrist(0), middle_mcp(9), index_mcp(5), pinky_mcp(17)
+        const forward = handToMcpRawScratch.subVectors(w9, w0);
+        const right = handW0to1Scratch.subVectors(w17, w5);
+        if (forward.lengthSq() > 1e-10 && right.lengthSq() > 1e-10) {
+          forward.normalize();
+          right.normalize();
+          const up = handNAltScratch.crossVectors(forward, right);
+          if (up.lengthSq() > 1e-10) {
+            up.normalize();
+            basisMat.makeBasis(right, up, forward);
+            tmpMat.copy(basisMat);
+            tmpMat.setPosition(w0);
+            anchor.matrix.copy(tmpMat);
+            anchor.matrixWorldNeedsUpdate = true;
+            anchor.updateMatrixWorld(true);
           }
-          braceletWristAlignGroup.position.set(0, 0, 0);
-          braceletWristAlignGroup.scale.set(1, 1, 1);
         }
 
-        console.log("[bracelet-debug]", {
+        if (braceletWristAlignGroup && !braceletProceduralRadial) {
+          braceletWristAlignGroup.position.set(0, 0, 0);
+          braceletWristAlignGroup.scale.setScalar(finalScale);
+        }
+
+        console.log("[bracelet-fix]", {
           wristWidth,
-          targetScale,
-          smoothScale: braceletSmoothScale,
-          anchor: anchor.position.toArray(),
+          trackingScale,
+          finalScale,
+          baseScale,
         });
       } else {
       const gapOffset = OMAFIT_WATCH_WRIST_GAP_M;
