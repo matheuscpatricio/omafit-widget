@@ -13656,7 +13656,8 @@ async function runHandArSession({
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
   /** Escala suave exclusiva da pulseira (runtime tracking). */
-  let braceletSmoothScale = 1;
+  let braceletSmoothScale = null;
+  const OMAFIT_BRACELET_WRIST_SCALE_MULTIPLIER = 0.92;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
     url: String(finalGlbUrl || "").slice(0, 200),
     draco: Boolean(dracoLoaderHand),
@@ -14705,25 +14706,20 @@ async function runHandArSession({
      */
     if (glbRoot && localInnerR > 1e-6) {
       if (accessoryType === "bracelet") {
-        const userMul =
-          Number.isFinite(Number(userScale)) && Number(userScale) > 0
-            ? Number(userScale)
-            : 1;
         const wristWidth = w5.distanceTo(w17);
-        const targetScale = wristWidth * 0.85;
+        const targetScale = THREE.MathUtils.clamp(
+          wristWidth * OMAFIT_BRACELET_WRIST_SCALE_MULTIPLIER,
+          0.45,
+          1.4,
+        );
         braceletSmoothScale = THREE.MathUtils.lerp(
-          braceletSmoothScale,
+          Number.isFinite(braceletSmoothScale) ? braceletSmoothScale : targetScale,
           targetScale,
           0.18,
         );
-        const runtimeScale = THREE.MathUtils.clamp(
-          baseScale * braceletSmoothScale * userMul,
-          baseScale * 0.25,
-          baseScale * 1.8,
-        );
 
         // Pipeline exclusivo da pulseira: não reutiliza fatores de relógio.
-        glbRoot.scale.setScalar(runtimeScale);
+        glbRoot.scale.setScalar(braceletSmoothScale);
         wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
         wearPosition.updateMatrixWorld(true);
 
@@ -14736,7 +14732,7 @@ async function runHandArSession({
           if (wristDir.lengthSq() > 1e-10) {
             wristDir.normalize();
             const targetQuat = handRollQuat.setFromUnitVectors(
-              new THREE.Vector3(0, 1, 0),
+              new THREE.Vector3(0, 0, 1),
               wristDir,
             );
             braceletWristAlignGroup.quaternion.slerp(targetQuat, 0.35);
