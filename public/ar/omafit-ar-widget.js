@@ -11612,6 +11612,65 @@ function omafitPromiseTimeoutRace(promise, ms, label) {
 }
 
 /**
+ * Normalização automática de orientação para GLBs de pulseira (IA/Tripo):
+ * - recentra no origin por bbox
+ * - detecta eixo fino (espessura)
+ * - aplica rotação corretiva condicional (sem preset fixo global)
+ *
+ * Mantém materiais/texturas/escala; atua apenas em transform local do scene root.
+ */
+function normalizeBraceletGlbOrientation(THREE, glbScene) {
+  if (!THREE || !glbScene) return;
+
+  glbScene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(glbScene);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+
+  // Recenter no origin (equivalente ao pedido no root do modelo).
+  glbScene.position.sub(center);
+  glbScene.updateMatrixWorld(true);
+
+  const dims = [
+    { axis: "x", value: size.x },
+    { axis: "y", value: size.y },
+    { axis: "z", value: size.z },
+  ].sort((a, b) => a.value - b.value);
+  const thinAxis = dims[0]?.axis || "y";
+
+  let appliedRotation = "none";
+  if (thinAxis === "z") {
+    glbScene.rotation.x += Math.PI / 2;
+    appliedRotation = "rotateX(+PI/2)";
+  } else if (thinAxis === "x") {
+    glbScene.rotation.z += -Math.PI / 2;
+    appliedRotation = "rotateZ(-PI/2)";
+  } else if (size.y < size.z) {
+    // Heurística adicional do pedido para casos "deitado".
+    glbScene.rotation.x += Math.PI / 2;
+    appliedRotation = "rotateX(+PI/2)-fallback";
+  }
+
+  glbScene.updateMatrixWorld(true);
+  const postBox = new THREE.Box3().setFromObject(glbScene);
+  const postSize = postBox.getSize(new THREE.Vector3());
+
+  console.log("[bracelet-bounds]", {
+    pre: { x: size.x, y: size.y, z: size.z },
+    post: { x: postSize.x, y: postSize.y, z: postSize.z },
+    center: { x: center.x, y: center.y, z: center.z },
+  });
+  console.log("[bracelet-axis-fix]", {
+    thinAxis,
+    appliedRotation,
+  });
+  console.log("[bracelet-glb-normalized]", {
+    position: glbScene.position.toArray(),
+    rotation: [glbScene.rotation.x, glbScene.rotation.y, glbScene.rotation.z],
+  });
+}
+
+/**
  * Sessão AR para acessórios de pulso (relógios, pulseiras) usando
  * MediaPipe Hand Landmarker + Three.js directamente (sem MindAR).
  *
@@ -13671,10 +13730,6 @@ async function runHandArSession({
   const braceletTargetQuat = new THREE.Quaternion();
   const braceletLastTargetQuat = new THREE.Quaternion();
   const braceletDepthOffset = new THREE.Vector3();
-  const braceletRotFixQuat = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(1, 0, 0),
-    Math.PI / 2,
-  );
   let braceletPoseInitialized = false;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
     url: String(finalGlbUrl || "").slice(0, 200),
@@ -13719,6 +13774,9 @@ async function runHandArSession({
           /* ignore */
         }
         glbRoot.add(glbScene);
+        if (accessoryType === "bracelet") {
+          normalizeBraceletGlbOrientation(THREE, glbScene);
+        }
         upgradeHandArGlassMaterials(THREE, glbScene);
 
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
@@ -14748,9 +14806,10 @@ async function runHandArSession({
         wearPosition.position.set(0, 0, 0);
         wearPosition.updateMatrixWorld(true);
 
-        // Base ortonormal do pulso: side(5-17), forward(9-0), normal=cross(side,forward).
-        braceletSideAxis.subVectors(w5, w17);
-        braceletForwardAxis.subVectors(w9, w0);
+        // Base ortonormal REAL do pulso:
+        // xAxis = pinky-index, yAxis = wrist-middle, zAxis = cross(x,y)
+        braceletSideAxis.subVectors(w17, w5);
+        braceletForwardAxis.subVectors(w0, w9);
         if (braceletSideAxis.lengthSq() > 1e-10 && braceletForwardAxis.lengthSq() > 1e-10) {
           braceletSideAxis.normalize();
           braceletForwardAxis.normalize();
@@ -14759,7 +14818,7 @@ async function runHandArSession({
             braceletNormalAxis.normalize();
             braceletForwardAxis.crossVectors(braceletNormalAxis, braceletSideAxis).normalize();
             basisMat.makeBasis(braceletSideAxis, braceletNormalAxis, braceletForwardAxis);
-            braceletTargetQuat.setFromRotationMatrix(basisMat).multiply(braceletRotFixQuat);
+            braceletTargetQuat.setFromRotationMatrix(basisMat);
 
             // Limitador de jitter de quaternion.
             if (braceletPoseInitialized) {
@@ -14774,11 +14833,12 @@ async function runHandArSession({
               }
             }
 
-            // Posição suavizada com offset anatómico + profundidade real.
-            braceletDepthOffset.copy(braceletNormalAxis).multiplyScalar(0.012);
+            // Posição anatómica: descer no antebraço e entrar levemente no volume do braço.
+            // yAxis = braceletForwardAxis (wrist->middle invertido).
+            braceletDepthOffset.copy(braceletNormalAxis).multiplyScalar(-0.008);
             braceletTargetPos
               .copy(w0)
-              .addScaledVector(braceletNormalAxis, 0.008)
+              .addScaledVector(braceletForwardAxis, 0.035)
               .add(braceletDepthOffset);
             if (
               braceletPoseInitialized &&
@@ -14814,15 +14874,23 @@ async function runHandArSession({
         }
         glbRoot.scale.setScalar(finalScale);
 
-        console.log("[bracelet-fix]", {
+        console.log("[bracelet-axis]", {
+          xAxis: braceletSideAxis.clone(),
+          yAxis: braceletForwardAxis.clone(),
+          zAxis: braceletNormalAxis.clone(),
+        });
+        console.log("[bracelet-quat]", {
+          quaternion: braceletTargetQuat,
+        });
+        console.log("[bracelet-position]", {
+          target: braceletTargetPos.toArray(),
+          anchor: anchor.position.toArray(),
+        });
+        console.log("[bracelet-final]", {
           wristWidth,
           trackingScale,
           finalScale,
           baseScale,
-          side: braceletSideAxis.clone(),
-          forward: braceletForwardAxis.clone(),
-          normal: braceletNormalAxis.clone(),
-          quaternion: braceletTargetQuat,
         });
       } else {
       const gapOffset = OMAFIT_WATCH_WRIST_GAP_M;
@@ -15337,6 +15405,9 @@ async function runHandArSession({
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
+              if (accessoryType === "bracelet") {
+                normalizeBraceletGlbOrientation(THREE, next);
+              }
               upgradeHandArGlassMaterials(THREE, next);
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               baseScale = fitRes.baseScale;
