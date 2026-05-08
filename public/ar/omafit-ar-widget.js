@@ -369,6 +369,7 @@ const OMAFIT_BRACELET_SCALE_BOOST = 0.94;
 /** Micro-ajuste local para evitar efeito "afundado". */
 const OMAFIT_BRACELET_GLB_MICRO_POS_Y_M = 0.005;
 const OMAFIT_BRACELET_GLB_MICRO_POS_Z_M = 0.003;
+const OMAFIT_BRACELET_WRIST_DIAMETER_METERS = 0.060;
 const OMAFIT_BRACELET_AXIS_DEBUG_ENABLED = false;
 const OMAFIT_BRACELET_OCC_NORMAL_DEBUG_ENABLED = false;
 
@@ -13124,16 +13125,7 @@ async function runHandArSession({
           bbox = new THREE.Box3().setFromObject(glbScene);
           bbox.getSize(size);
         }
-        const braceletDims = [size.x, size.y, size.z].sort((a, b) => a - b);
-        const braceletFlatRatio =
-          braceletDims[2] / Math.max(1e-6, braceletDims[1]);
-        if (braceletFlatRatio > 1.85) {
-          const wrapRadius = Math.max(1e-6, size.x * 0.5 * 1.1);
-          wrapBraceletCylinderNormalized(glbScene, wrapRadius);
-          glbScene.updateMatrixWorld(true);
-          bbox = new THREE.Box3().setFromObject(glbScene);
-          bbox.getSize(size);
-        }
+        // Pipeline novo pulseira: GLB intacto (sem rebuild radial / sem wrap procedural).
       }
     } else {
       /**
@@ -13291,8 +13283,13 @@ async function runHandArSession({
         ? Number(calScale)
         : 1;
 
-    /** Pulseira radial procedural: escala só nas instâncias; raiz não escala geometria orbital. */
-    if (accessoryType === "bracelet" && braceletProceduralRadial) {
+    if (accessoryType === "bracelet") {
+      // Escala única anatômica para pulseira (bbox máximo -> diâmetro de pulso alvo).
+      const maxDimBracelet = Math.max(size.x, size.y, size.z, 1e-6);
+      const scaleBracelet =
+        (OMAFIT_BRACELET_WRIST_DIAMETER_METERS / maxDimBracelet) * finalMul;
+      glbScene.scale.setScalar(scaleBracelet);
+      glbScene.updateMatrixWorld(true);
       calcBaseScale = 1;
       localInnerR = OMAFIT_DEFAULT_WRIST_R_M + gapOffset;
       glbRoot.scale.set(1, 1, 1);
@@ -13333,6 +13330,9 @@ async function runHandArSession({
       glbScene.position.z -= size.z * OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL;
       glbScene.position.y += OMAFIT_BRACELET_GLB_MICRO_POS_Y_M;
       glbScene.position.z += OMAFIT_BRACELET_GLB_MICRO_POS_Z_M;
+      glbScene.traverse((o) => {
+        if (o?.isMesh) o.frustumCulled = false;
+      });
     } else {
       glbScene.position.y += OMAFIT_HAND_GLB_LOCAL_Y_BIND_M;
     }
@@ -13668,39 +13668,7 @@ async function runHandArSession({
         braceletRadialSegCount = 0;
         braceletRadialGroup = null;
         if (accessoryType === "bracelet") {
-          normalizeGLB(THREE, glbScene, "bracelet", {
-            targetSize: 0.15,
-          });
-          glbScene.updateMatrixWorld(true);
-          const radialMode = cfgAttr("arBraceletRadial", "on");
-          const radialShould = omafitBraceletRadialShouldRebuild(
-            THREE,
-            glbScene,
-            radialMode,
-          );
-          if (radialShould) {
-            const segRaw = Number(
-              String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
-            );
-            const seg = Number.isFinite(segRaw) ? segRaw : 24;
-            const outR = { value: 0 };
-            braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
-              THREE,
-              glbScene,
-              seg,
-              outR,
-            );
-            if (braceletProceduralRadial) {
-              braceletRadialRadiusLocal = outR.value;
-            }
-          }
-          console.log("[omafit-ar] bracelet radial init", {
-            radialMode,
-            radialShould,
-            activated: braceletProceduralRadial,
-            segments: braceletRadialSegCount,
-            radiusLocal: braceletRadialRadiusLocal,
-          });
+          // Pipeline procedural radial removido para pulseira: GLB intacto.
         }
         try {
           const triH = omafitCountGltfTriangles(glbScene);
@@ -14220,24 +14188,8 @@ async function runHandArSession({
       );
     }
     if (accessoryType === "bracelet") {
-      /**
-       * Mantém o centro no punho e aplica apenas um inset pequeno/estável na
-       * normal local já calibrada (tmpY). O bloco anterior recalculava uma
-       * normal alternativa (palmNormal) por frame e sobrescrevia `tmpPos`,
-       * causando desencaixe lateral no pulso.
-       */
-      const wristWidth = w5.distanceTo(w17);
-      const dynamicInset = THREE.MathUtils.clamp(wristWidth * 0.065, 0.003, 0.007);
-      const forearmRetreat = THREE.MathUtils.clamp(
-        OMAFIT_BRACELET_WRIST_OFFSET_BASE_M + wristWidth * OMAFIT_BRACELET_WRIST_OFFSET_WIDTH_MUL,
-        OMAFIT_BRACELET_WRIST_OFFSET_MIN_M,
-        OMAFIT_BRACELET_WRIST_OFFSET_MAX_M,
-      );
-      tmpPos
-        .copy(w0)
-        .addScaledVector(tmpY, -dynamicInset)
-        // Empurra levemente para o antebraço para evitar ficar "alto" na mão.
-        .addScaledVector(handToMcpScratch, -forearmRetreat);
+      // Pipeline pulseira: posição no centro do pulso com pequeno offset anatómico na normal.
+      tmpPos.copy(w0).addScaledVector(tmpY, 0.008);
     }
 
     /**
@@ -14788,31 +14740,22 @@ async function runHandArSession({
             braceletRadialGroup.scale.setScalar(OMAFIT_BRACELET_RADIAL_FINAL_SCALE);
           }
         } else {
-          glbRoot.scale.set(sw.sx, sw.sy, sw.sz);
+          glbRoot.scale.set(1, 1, 1);
         }
-        wearPosition.position.set(sw.wearX, sw.wearY, sw.wearZ);
+        wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
         wearPosition.updateMatrixWorld(true);
-        if (braceletWristAlignGroup) {
-          if (!braceletProceduralRadial) {
-            omafitBraceletWristAlignStep(THREE, braceletPlaceState, {
-              calibRot,
-              alignGroup: braceletWristAlignGroup,
-              w0,
-              w5,
-              w9,
-              w17,
-              camera,
-              clampDt,
-              closeEnoughHand,
-              alignTauMs: OMAFIT_BRACELET_ALIGN_TAU_MS,
-              ringHoleAxisLocal: braceletRingHoleAxisAlignLocal,
-              debugAxisLine: braceletAxisDebugLine,
-            });
-          } else {
-            braceletWristAlignGroup.position.set(0, 0, 0);
-            braceletWristAlignGroup.quaternion.identity();
-            braceletWristAlignGroup.scale.set(1, 1, 1);
+        if (braceletWristAlignGroup && !braceletProceduralRadial) {
+          const wristDir = handToMcpRawScratch.subVectors(w9, w0);
+          if (wristDir.lengthSq() > 1e-10) {
+            wristDir.normalize();
+            const targetQuat = handRollQuat.setFromUnitVectors(
+              new THREE.Vector3(0, 1, 0),
+              wristDir,
+            );
+            braceletWristAlignGroup.quaternion.slerp(targetQuat, 0.35);
           }
+          braceletWristAlignGroup.position.set(0, 0, 0);
+          braceletWristAlignGroup.scale.set(1, 1, 1);
         }
         if (braceletProceduralRadial && braceletRadialInstMesh) {
           calibRot.updateMatrixWorld(true);
@@ -15355,39 +15298,7 @@ async function runHandArSession({
               braceletRadialSegCount = 0;
               braceletRadialGroup = null;
               if (accessoryType === "bracelet") {
-                normalizeGLB(THREE, next, "bracelet", {
-                  targetSize: 0.15,
-                });
-                next.updateMatrixWorld(true);
-                const radialMode = cfgAttr("arBraceletRadial", "on");
-                const radialShould = omafitBraceletRadialShouldRebuild(
-                  THREE,
-                  next,
-                  radialMode,
-                );
-                if (radialShould) {
-                  const segRaw = Number(
-                    String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
-                  );
-                  const seg = Number.isFinite(segRaw) ? segRaw : 24;
-                  const outR = { value: 0 };
-                  braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
-                    THREE,
-                    next,
-                    seg,
-                    outR,
-                  );
-                  if (braceletProceduralRadial) {
-                    braceletRadialRadiusLocal = outR.value;
-                  }
-                }
-                console.log("[omafit-ar] bracelet radial switch", {
-                  radialMode,
-                  radialShould,
-                  activated: braceletProceduralRadial,
-                  segments: braceletRadialSegCount,
-                  radiusLocal: braceletRadialRadiusLocal,
-                });
+                // Pipeline procedural radial removido para pulseira: GLB intacto.
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
