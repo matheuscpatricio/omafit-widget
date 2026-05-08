@@ -12883,21 +12883,25 @@ async function runHandArSession({
           : null;
     if (radialContainer?.scale) radialContainer.scale.setScalar(OMAFIT_BRACELET_RADIAL_FINAL_SCALE);
 
-    braceletRadVx.subVectors(indexLm, wrist);
-    if (braceletRadVx.lengthSq() < 1e-12) return;
-    braceletRadVx.normalize();
+    // Frame anatómico real (world):
+    // X = largura do punho, Y = eixo do braço, Z = profundidade.
+    const wristCenter = braceletRadPos.copy(wrist);
+    const palmCenter = braceletRadRingCenter.copy(indexLm).add(pinkyLm).multiplyScalar(0.5);
+    const armAxis = braceletRadHandDir.subVectors(palmCenter, wristCenter);
+    if (armAxis.lengthSq() < 1e-12) return;
+    armAxis.normalize();
 
-    braceletRadHandDir.subVectors(pinkyLm, wrist);
-    if (braceletRadHandDir.lengthSq() < 1e-12) return;
-    braceletRadHandDir.normalize();
+    const sideAxis = braceletRadVx.subVectors(pinkyLm, indexLm);
+    if (sideAxis.lengthSq() < 1e-12) return;
+    sideAxis.normalize();
 
-    braceletRadNormal.crossVectors(braceletRadVx, braceletRadHandDir);
-    if (braceletRadNormal.lengthSq() < 1e-12) return;
-    braceletRadNormal.normalize();
+    const normalAxis = braceletRadNormal.crossVectors(armAxis, sideAxis);
+    if (normalAxis.lengthSq() < 1e-12) return;
+    normalAxis.normalize();
 
-    braceletRadTangent.crossVectors(braceletRadNormal, braceletRadVx);
-    if (braceletRadTangent.lengthSq() < 1e-12) return;
-    braceletRadTangent.normalize();
+    const correctedSide = braceletRadTangent.crossVectors(normalAxis, armAxis);
+    if (correctedSide.lengthSq() < 1e-12) return;
+    correctedSide.normalize();
 
     const wristWidth = indexLm.distanceTo(pinkyLm);
     const orbitRadius = THREE.MathUtils.clamp(
@@ -12907,14 +12911,10 @@ async function runHandArSession({
     );
     if (orbitRadius < 1e-8) return;
 
-    braceletRadRingCenter.copy(wrist).addScaledVector(braceletRadNormal, -orbitRadius * 0.25);
+    braceletRadRingCenter.copy(wristCenter).addScaledVector(normalAxis, -0.008);
 
-    // Frame anatómico: Y = eixo longitudinal do braço; anel no plano XZ.
-    const yAxis = braceletRadNormal.clone().normalize();
-    const xAxis = braceletRadVx.clone().normalize();
-    const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
-    braceletRadBasisMat.makeBasis(xAxis, yAxis, zAxis);
-    const wristQuaternion = new THREE.Quaternion().setFromRotationMatrix(braceletRadBasisMat);
+    braceletRadBasisMat.makeBasis(correctedSide, armAxis, normalAxis);
+    const wristQuaternion = braceletRadQuat.setFromRotationMatrix(braceletRadBasisMat);
     if (radialContainer) {
       const parentOfGroup = radialContainer.parent;
       if (parentOfGroup) {
@@ -12931,7 +12931,6 @@ async function runHandArSession({
         radialContainer.position.copy(braceletRadRingCenter);
         radialContainer.quaternion.copy(wristQuaternion);
       }
-      radialContainer.rotateX(Math.PI / 2);
       radialContainer.scale.setScalar(OMAFIT_BRACELET_RADIAL_FINAL_SCALE);
     }
 
