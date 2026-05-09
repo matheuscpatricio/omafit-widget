@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { Navbar } from './landing/Navbar';
 import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
-import { PainSolutionYoutube } from './landing/PainSolutionYoutube';
+import { PainSolutionVideo } from './landing/PainSolutionVideo';
 import { Solution } from './landing/Solution';
 import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
@@ -113,7 +113,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
         <Pain />
 
-        <PainSolutionYoutube />
+        <PainSolutionVideo />
 
         <Solution />
 
