@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -26,7 +26,7 @@ const features: Feature[] = [
   {
     title: 'Visualização AR (Óculos e Acessórios)',
     description:
-      'Realidade aumentada direta do navegador para óculos, bonés, relógios e mais. Zero app, zero fricção.',
+      'Realidade aumentada direta do navegador para óculos, pulseiras, relógios e mais. Zero fricção, tudo ao vivo.',
     bullets: ['WebAR sem instalação', 'Tracking facial em tempo real', 'Compatível com iOS e Android'],
   },
   {
@@ -166,32 +166,59 @@ function useMarqueeViewportCardWidth() {
   return [ref, cardWidth] as const;
 }
 
-function FeatureMarqueeStrip({ features: list, cardWidth }: { features: Feature[]; cardWidth: number }) {
+function FeatureMarqueeStrip({
+  features: list,
+  cardWidth,
+  scrollSnap,
+}: {
+  features: Feature[];
+  cardWidth: number;
+  scrollSnap?: boolean;
+}) {
   return (
     <div className="flex w-max max-w-none flex-nowrap gap-2 md:gap-4">
       {list.map((feature) => (
         <div
           key={feature.title}
-          className="min-h-[min(52vh,380px)] min-w-0 shrink-0 md:min-h-[min(48vh,420px)]"
+          className={cn(
+            'min-h-[min(52vh,380px)] min-w-0 shrink-0 md:min-h-[min(48vh,420px)]',
+            scrollSnap && 'snap-start snap-always',
+          )}
           style={{ width: cardWidth, flexBasis: cardWidth }}
         >
           <FeatureInfoCard feature={feature} compact />
         </div>
       ))}
+      {/** Mesma distância entre o último cartão e o primeiro da cópia do marquee (Widget ↔ MediaPipe). */}
+      <div className="shrink-0 select-none w-2 md:w-4" aria-hidden />
     </div>
   );
 }
 
-/** Uma fileira horizontal; ~2 / ~3 / ~4 cartões visíveis (<768 / md / lg+). Marquee duplicado. */
+/** Uma fileira horizontal; ~2 / ~3 / ~4 cartões visíveis (<768 / md / lg+). Desktop: marquee duplicado. Mobile: arrastar com o dedo. */
 function SolutionAutoMarqueeGrid() {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
   const [viewportRef, cardWidth] = useMarqueeViewportCardWidth();
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  );
 
-  if (reduceMotion) {
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const scrollStripClass =
+    'mx-auto w-full overflow-x-auto overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x snap-x snap-mandatory px-1';
+
+  if (reduceMotion || isMobile) {
     return (
-      <div ref={viewportRef} className="mx-auto w-full max-w-6xl overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
+      <div ref={viewportRef} className={scrollStripClass}>
+        <FeatureMarqueeStrip features={features} cardWidth={cardWidth} scrollSnap />
       </div>
     );
   }
@@ -242,8 +269,8 @@ export function Solution() {
             <span className="text-oma-accent">Dúvida em Confiança</span> e Vendas.
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            Uma suíte completa de IA visual para moda, acessórios e calçados. Plug-and-play na sua Shopify,
-            invisível para o cliente, inesquecível no resultado.
+            Uma suíte completa de IA visual para moda, acessórios e calçados. Instalação rápida e fácil na sua
+            loja.
           </motion.p>
         </motion.div>
 

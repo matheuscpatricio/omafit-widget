@@ -40,7 +40,7 @@ export function Pain() {
           </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-2xl font-semibold tracking-tight text-oma-cream sm:text-3xl lg:text-[2.125rem]"
+            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
             Sua loja está ótima.{' '}
@@ -53,22 +53,17 @@ export function Pain() {
           whileInView="visible"
           viewport={{ once: true, margin: '-80px' }}
           variants={containerVariants}
-          className="mx-auto mt-10 max-w-2xl text-center sm:mt-12"
+          className="mx-auto mt-10 max-w-3xl text-center sm:mt-12 lg:mt-14"
         >
-          <motion.div
+          <motion.p
             variants={itemVariants}
-            className="space-y-4 text-[15px] leading-relaxed text-oma-muted sm:text-base sm:leading-relaxed"
+            className="text-lg leading-relaxed text-oma-muted sm:text-xl sm:leading-relaxed lg:text-[1.35rem] lg:leading-relaxed"
           >
-            <p className="text-oma-cream/95">
-              Devoluções por tamanho ou caimento não combinados continuam a corroer margem: frete reverso,
-              reembolso e peça de volta ao estoque repetem o custo enquanto o cliente já foi embora.
-            </p>
-            <p>
-              No checkout, a dúvida sobre o ajuste é um dos maiores motivos de abandono — sem confiança na
-              compra, o carrinho fecha antes da venda, e o tráfego que você conquistou não vira receita de forma
-              estável.
-            </p>
-          </motion.div>
+            Devoluções por tamanho ou caimento não desejados continuam a corroer sua margem: frete reverso,
+            reembolso e peça de volta ao estoque aumentam o custo e o seu cliente não compra nunca mais. No
+            checkout, a dúvida sobre o ajuste é um dos maiores motivos de abandono. Sem confiança na compra, o
+            cliente abandona o carrinho, e o tráfego que você conquistou não vira receita de forma estável.
+          </motion.p>
         </motion.div>
       </div>
     </section>
