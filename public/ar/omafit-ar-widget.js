@@ -11646,6 +11646,50 @@ function normalizeBraceletGlbOrientation(THREE, glbScene) {
 }
 
 /**
+ * Alinha o eixo do “buraco” da pulseira (anel) com +Z local, para o plano do anel
+ * ficar perpendicular ao braço quando Z segue `correctedForward` no anchor.
+ * Heurística: menor dimensão do bbox ≈ espessura da banda no plano do anel;
+ * o eixo mais curto costuma coincidir com o eixo pelo qual o punso atravessa o GLB.
+ */
+function omafitOrientBraceletGlbHoleAlongZ(THREE, glbScene) {
+  if (!THREE || !glbScene) return;
+  glbScene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(glbScene);
+  const size = box.getSize(new THREE.Vector3());
+  const sx = size.x;
+  const sy = size.y;
+  const sz = size.z;
+  const dims = [
+    { key: "x", v: sx },
+    { key: "y", v: sy },
+    { key: "z", v: sz },
+  ].sort((a, b) => a.v - b.v);
+  const thinKey = dims[0].key;
+  let applied = "none";
+  if (thinKey === "z") {
+    applied = "holeAlongZ-noRotate";
+  } else if (thinKey === "x") {
+    glbScene.rotation.y += Math.PI / 2;
+    applied = "rotateY+90-holeXtoZ";
+  } else if (thinKey === "y") {
+    glbScene.rotation.x -= Math.PI / 2;
+    applied = "rotateX-90-holeYtoZ";
+  }
+  glbScene.updateMatrixWorld(true);
+  const boxRecenter = new THREE.Box3().setFromObject(glbScene);
+  const center2 = boxRecenter.getCenter(new THREE.Vector3());
+  glbScene.position.sub(center2);
+  glbScene.updateMatrixWorld(true);
+  console.log("[bracelet-glb-hole-axis]", {
+    thinKey,
+    thinV: dims[0].v,
+    sizes: { x: sx, y: sy, z: sz },
+    applied,
+    rotation: [glbScene.rotation.x, glbScene.rotation.y, glbScene.rotation.z],
+  });
+}
+
+/**
  * Sessão AR para acessórios de pulso (relógios, pulseiras) usando
  * MediaPipe Hand Landmarker + Three.js directamente (sem MindAR).
  *
@@ -13683,8 +13727,9 @@ async function runHandArSession({
   const braceletRadialHoleAxisScene = new THREE.Vector3(0, 1, 0);
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
-  /** Suavização do offset local Y do GLB (entra no pulso); posição/rotação world vêm do anchor. */
+  /** Suavização dos offsets locais do GLB (Y/Z); pose world vem do anchor + SLERP existente. */
   let braceletGlbLocalYSmooth = 0;
+  let braceletGlbLocalZSmooth = 0;
   let braceletGlbLocalYInit = false;
   const braceletForwardAxis = new THREE.Vector3();
   const braceletSideAxis = new THREE.Vector3();
@@ -13752,6 +13797,7 @@ async function runHandArSession({
         glbRoot.add(glbScene);
         if (accessoryType === "bracelet") {
           normalizeBraceletGlbOrientation(THREE, glbScene);
+          omafitOrientBraceletGlbHoleAlongZ(THREE, glbScene);
           const box = new THREE.Box3().setFromObject(glbRoot);
           const center = box.getCenter(new THREE.Vector3());
           glbRoot.position.sub(center);
@@ -13959,6 +14005,8 @@ async function runHandArSession({
   const tmpX = new THREE.Vector3();
   const tmpY = new THREE.Vector3();
   const tmpZ = new THREE.Vector3();
+  /** Scratch: chirality da base pulseira (side/up/correctedForward). */
+  const tmpBraceletBasisChirality = new THREE.Vector3();
   const tmpPos = new THREE.Vector3();
   const tmpCamToWrist = new THREE.Vector3();
   /** Triângulo punho→MCP índice / mindinho: normal ≈ palma vs dorso (só relógio). */
@@ -14211,8 +14259,9 @@ async function runHandArSession({
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
     /**
-     * Pulseira: base só a partir de landmarks em mundo (sem alinhamento à câmera).
-     * X = lateral punho (pinky − index), Y = forward × side, Z = X × Y (braço / fecho do anel).
+     * Pulseira: base ortonormal anatómica (world space relativo ao punho).
+     * side = pinky−index, forward = middle−wrist, up = side×forward,
+     * correctedForward = up×side → plano do anel ⟂ braço (colunas X,Y,Z).
      */
     if (accessoryType === "bracelet") {
       braceletForwardAxis.subVectors(w9, w0);
@@ -14224,10 +14273,13 @@ async function runHandArSession({
         braceletForwardAxis.normalize();
         braceletSideAxis.normalize();
         tmpX.copy(braceletSideAxis);
-        tmpY.copy(braceletForwardAxis).cross(braceletSideAxis);
+        tmpY.crossVectors(tmpX, braceletForwardAxis);
         if (tmpY.lengthSq() > 1e-10) {
           tmpY.normalize();
-          tmpZ.crossVectors(tmpX, tmpY).normalize();
+          /** correctedForward = up × side (pedido); fechar triedra destroga X×Y≈Z */
+          tmpZ.crossVectors(tmpY, tmpX).normalize();
+          tmpBraceletBasisChirality.crossVectors(tmpX, tmpY);
+          if (tmpBraceletBasisChirality.dot(tmpZ) < 0) tmpZ.negate();
           tmpX.crossVectors(tmpY, tmpZ).normalize();
           tmpY.crossVectors(tmpZ, tmpX).normalize();
         }
@@ -14769,8 +14821,10 @@ async function runHandArSession({
         wearPosition.updateMatrixWorld(true);
 
         const targetLocalY = -wristWidth * 0.12;
+        const targetLocalZ = -wristWidth * 0.18;
         if (!braceletGlbLocalYInit) {
           braceletGlbLocalYSmooth = targetLocalY;
+          braceletGlbLocalZSmooth = targetLocalZ;
           braceletGlbLocalYInit = true;
         } else {
           braceletGlbLocalYSmooth = THREE.MathUtils.lerp(
@@ -14778,8 +14832,13 @@ async function runHandArSession({
             targetLocalY,
             0.18,
           );
+          braceletGlbLocalZSmooth = THREE.MathUtils.lerp(
+            braceletGlbLocalZSmooth,
+            targetLocalZ,
+            0.18,
+          );
         }
-        glbRoot.position.set(0, braceletGlbLocalYSmooth, 0);
+        glbRoot.position.set(0, braceletGlbLocalYSmooth, braceletGlbLocalZSmooth);
         glbRoot.quaternion.identity();
         glbRoot.scale.set(1, 1, 1);
 
@@ -15365,6 +15424,7 @@ async function runHandArSession({
               glbRoot.add(next);
               if (accessoryType === "bracelet") {
                 normalizeBraceletGlbOrientation(THREE, next);
+                omafitOrientBraceletGlbHoleAlongZ(THREE, next);
                 const box = new THREE.Box3().setFromObject(glbRoot);
                 const center = box.getCenter(new THREE.Vector3());
                 glbRoot.position.sub(center);
