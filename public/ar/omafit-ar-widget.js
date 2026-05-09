@@ -11646,43 +11646,11 @@ function normalizeBraceletGlbOrientation(THREE, glbScene) {
 }
 
 /**
- * Tripo / export inconsistente: alinhar o eixo “do buraco” (2ª menor dimensão do AABB)
- * a +Z local — espessura = menor eixo; o anel envolve em torno do eixo mediano.
- * Usa só `Quaternion.setFromUnitVectors` (sem rotações Euler fixas).
- */
-function omafitBraceletAlignHoleAxisToZ(THREE, glbScene) {
-  if (!THREE || !glbScene) return;
-  glbScene.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(glbScene);
-  const size = box.getSize(new THREE.Vector3());
-  const axes = [
-    { v: size.x, hole: new THREE.Vector3(1, 0, 0) },
-    { v: size.y, hole: new THREE.Vector3(0, 1, 0) },
-    { v: size.z, hole: new THREE.Vector3(0, 0, 1) },
-  ].sort((a, b) => a.v - b.v);
-  const holeLocal = axes[1].hole.clone().normalize();
-  const zWant = new THREE.Vector3(0, 0, 1);
-  const qAlign = new THREE.Quaternion().setFromUnitVectors(holeLocal, zWant);
-  glbScene.quaternion.premultiply(qAlign);
-  glbScene.updateMatrixWorld(true);
-  const box2 = new THREE.Box3().setFromObject(glbScene);
-  const c2 = box2.getCenter(new THREE.Vector3());
-  glbScene.position.sub(c2);
-  glbScene.updateMatrixWorld(true);
-  console.log("[bracelet-glb-hole-to-z]", {
-    thicknessAxis: axes[0].hole.toArray(),
-    holeAxis: axes[1].hole.toArray(),
-    longestAxis: axes[2].hole.toArray(),
-    sizes: { x: size.x, y: size.y, z: size.z },
-  });
-}
-
-/**
  * Sessão AR para acessórios de pulso (relógios, pulseiras) usando
  * MediaPipe Hand Landmarker + Three.js directamente (sem MindAR).
  *
- * Hierarquia Three.js igual à do face path (pulseira: grupo extra de alinhamento):
- *   anchorGroup → wearPosition → calibRot → [braceletWristAlign] → glbRoot
+   * Hierarquia Three.js (pulseira): âncora só traduz; rotação do tracking num grupo dedicado.
+   *   anchor → wearPosition → calibRot → wristRotationGroup → handMicroUxWrap → glbRoot
  *
  * `anchorGroup` é re-orientado a cada frame a partir dos landmarks 0, 1, 5, 9
  * e 17 (punho, CMC polegar, MCP índice/mindinho, MCP médio): eixo do antebraço
@@ -12391,8 +12359,8 @@ async function runHandArSession({
   }
 
   /**
-   * Hierarquia espelha a face path para paridade com o preview do admin:
-   *   anchor → wearPosition → calibRot → [pulseira: wristAlign] → glbRoot
+   * Pulseira: anchor (só posição no mundo) → … → wristRotationGroup (só rotação tracking)
+   * → handMicroUxWrap → glbRoot (orientação GLB exportada + offset anatómico local).
    */
   const anchor = new THREE.Group();
   /** Matriz escrita em `updateAnchorFromHand` — não deixar o Three interpolar. */
@@ -12405,8 +12373,8 @@ async function runHandArSession({
   const calibRot = new THREE.Group();
   wearPosition.add(calibRot);
 
-  /** Só pulseira: rotação suave punho→MCP9 em espaço de `calibRot`. */
-  let braceletWristAlignGroup = null;
+  /** Só pulseira: rotação do punho (tracking) — nunca aplicada directamente em `glbRoot`. */
+  let wristRotationGroup = null;
   let braceletPartialOcclusionMesh = null;
   let braceletAxisDebugLine = null;
   let braceletOccNormalDebugLine = null;
@@ -12423,10 +12391,10 @@ async function runHandArSession({
   };
   let handMicroOpacityRoot = null;
   if (accessoryType === "bracelet") {
-    braceletWristAlignGroup = new THREE.Group();
-    braceletWristAlignGroup.name = "omafit-ar-bracelet-wrist-align";
-    calibRot.add(braceletWristAlignGroup);
-    braceletWristAlignGroup.add(handMicroUxWrap);
+    wristRotationGroup = new THREE.Group();
+    wristRotationGroup.name = "omafit-ar-wrist-rotation";
+    calibRot.add(wristRotationGroup);
+    wristRotationGroup.add(handMicroUxWrap);
     handMicroUxWrap.add(glbRoot);
     /** Oclusão parcial: só depth buffer, sem color — pulseira encosta ao braço no vídeo. */
     const braceletPartialOccMat = new THREE.MeshBasicMaterial({
@@ -12441,11 +12409,11 @@ async function runHandArSession({
     braceletPartialOcclusionMesh.name = "omafit-ar-bracelet-partial-occlusion";
     braceletPartialOcclusionMesh.renderOrder = -800;
     braceletPartialOcclusionMesh.frustumCulled = false;
-    anchor.add(braceletPartialOcclusionMesh);
+    wristRotationGroup.add(braceletPartialOcclusionMesh);
     if (debug) {
       const axes = new THREE.AxesHelper(0.03);
       axes.name = "omafit-bracelet-debug-axes";
-      anchor.add(axes);
+      wristRotationGroup.add(axes);
     }
     if (OMAFIT_BRACELET_AXIS_DEBUG_ENABLED || omafitBraceletBAxisDebugFromQuery()) {
       const dbgGeom = new THREE.BufferGeometry().setFromPoints([
@@ -13428,203 +13396,6 @@ async function runHandArSession({
     };
   }
 
-  /** @typedef {{ xx: number, xy: number, xz: number, yy: number, yz: number, zz: number }} OmafitCov3 */
-
-  function omafitMulCov3(C, v, out) {
-    out.x = C.xx * v.x + C.xy * v.y + C.xz * v.z;
-    out.y = C.xy * v.x + C.yy * v.y + C.yz * v.z;
-    out.z = C.xz * v.x + C.yz * v.y + C.zz * v.z;
-    return out;
-  }
-
-  function omafitPowerMaxUnitEigen3(C, vOut, tmp) {
-    vOut.set(1, 0.17, 0.03);
-    vOut.normalize();
-    for (let it = 0; it < 48; it++) {
-      omafitMulCov3(C, vOut, tmp);
-      const ls = tmp.lengthSq();
-      if (ls < 1e-28) {
-        vOut.set(1, 0, 0);
-        return;
-      }
-      tmp.multiplyScalar(1 / Math.sqrt(ls));
-      if (tmp.dot(vOut) < 0) tmp.negate();
-      vOut.copy(tmp);
-    }
-  }
-
-  function omafitPowerSecondUnitEigen3(C, e2, vOut, tmp) {
-    vOut.set(0.31, 1, 0.27);
-    vOut.addScaledVector(e2, -e2.dot(vOut)).normalize();
-    for (let it = 0; it < 48; it++) {
-      omafitMulCov3(C, vOut, tmp);
-      tmp.addScaledVector(e2, -e2.dot(tmp));
-      const ls = tmp.lengthSq();
-      if (ls < 1e-28) break;
-      tmp.multiplyScalar(1 / Math.sqrt(ls));
-      if (tmp.dot(vOut) < 0) tmp.negate();
-      vOut.copy(tmp);
-    }
-  }
-
-  /**
-   * Eixo do “furo” no espaço local do `glbScene`: PCA sobre vértices (amostrados),
-   * espessura ≈ autovetor da menor variância; eixo do anel ⟂ espessura.
-   */
-  function omafitDetectBraceletRingHoleAxisUnitInGlb(THREE, glbScene) {
-    glbScene.updateMatrixWorld(true);
-    const tmp = new THREE.Vector3();
-    const tmp2 = new THREE.Vector3();
-    const tmp3 = new THREE.Vector3();
-    const ringOut = new THREE.Vector3(0, 0, 1);
-
-    let vertTotal = 0;
-    glbScene.traverse((obj) => {
-      if (!obj?.isMesh || !obj.geometry?.attributes?.position) return;
-      vertTotal += obj.geometry.attributes.position.count;
-    });
-    if (vertTotal < 1) {
-      const box = new THREE.Box3().setFromObject(glbScene);
-      const sz = new THREE.Vector3();
-      box.getSize(sz);
-      const ax = sz.x;
-      const ay = sz.y;
-      const az = sz.z;
-      if (!Number.isFinite(ax + ay + az) || (ax < 1e-10 && ay < 1e-10 && az < 1e-10)) {
-        return ringOut.set(0, 0, 1);
-      }
-      const d = [ax, ay, az];
-      let iMax = 0;
-      for (let i = 1; i < 3; i++) if (d[i] > d[iMax]) iMax = i;
-      return ringOut.set(iMax === 0 ? 1 : 0, iMax === 1 ? 1 : 0, iMax === 2 ? 1 : 0).normalize();
-    }
-
-    const MAX_SAMPLES = 10000;
-    const stride = Math.max(1, Math.ceil(vertTotal / MAX_SAMPLES));
-    const coords = [];
-    let capDone = false;
-    glbScene.traverse((obj) => {
-      if (capDone) return;
-      if (!obj?.isMesh || !obj.geometry?.attributes?.position) return;
-      const pos = obj.geometry.attributes.position;
-      obj.updateMatrixWorld(true);
-      for (let i = 0; i < pos.count; i += stride) {
-        if (coords.length >= MAX_SAMPLES * 3) {
-          capDone = true;
-          return;
-        }
-        tmp.set(pos.getX(i), pos.getY(i), pos.getZ(i));
-        obj.localToWorld(tmp);
-        glbScene.worldToLocal(tmp);
-        coords.push(tmp.x, tmp.y, tmp.z);
-      }
-    });
-
-    const n = (coords.length / 3) | 0;
-    if (n < 4) {
-      const box = new THREE.Box3().setFromObject(glbScene);
-      const sz = new THREE.Vector3();
-      box.getSize(sz);
-      const ax = sz.x;
-      const ay = sz.y;
-      const az = sz.z;
-      if (!Number.isFinite(ax + ay + az) || (ax < 1e-10 && ay < 1e-10 && az < 1e-10)) {
-        return ringOut.set(0, 0, 1);
-      }
-      const d = [ax, ay, az];
-      let iMax = 0;
-      for (let i = 1; i < 3; i++) if (d[i] > d[iMax]) iMax = i;
-      return ringOut.set(iMax === 0 ? 1 : 0, iMax === 1 ? 1 : 0, iMax === 2 ? 1 : 0).normalize();
-    }
-
-    let mx = 0;
-    let my = 0;
-    let mz = 0;
-    for (let i = 0; i < n; i++) {
-      const j = i * 3;
-      mx += coords[j];
-      my += coords[j + 1];
-      mz += coords[j + 2];
-    }
-    const invN = 1 / n;
-    mx *= invN;
-    my *= invN;
-    mz *= invN;
-
-    let xx = 0;
-    let xy = 0;
-    let xz = 0;
-    let yy = 0;
-    let yz = 0;
-    let zz = 0;
-    for (let i = 0; i < n; i++) {
-      const j = i * 3;
-      const x = coords[j] - mx;
-      const y = coords[j + 1] - my;
-      const z = coords[j + 2] - mz;
-      xx += x * x;
-      xy += x * y;
-      xz += x * z;
-      yy += y * y;
-      yz += y * z;
-      zz += z * z;
-    }
-    const invNm1 = n > 1 ? 1 / (n - 1) : 1;
-    xx *= invNm1;
-    xy *= invNm1;
-    xz *= invNm1;
-    yy *= invNm1;
-    yz *= invNm1;
-    zz *= invNm1;
-
-    /** @type {OmafitCov3} */
-    const C = { xx, xy, xz, yy, yz, zz };
-    const e2 = tmp;
-    const e1 = tmp2;
-    const thick = tmp3;
-    omafitPowerMaxUnitEigen3(C, e2, ringOut);
-    omafitPowerSecondUnitEigen3(C, e2, e1, ringOut);
-    thick.crossVectors(e2, e1);
-    if (thick.lengthSq() < 1e-16) thick.set(0, 0, 1);
-    else thick.normalize();
-
-    ringOut.crossVectors(thick, new THREE.Vector3(1, 0, 0));
-    if (ringOut.lengthSq() < 0.25) ringOut.crossVectors(thick, new THREE.Vector3(0, 1, 0));
-    if (ringOut.lengthSq() < 1e-16) ringOut.set(0, 0, 1);
-    else ringOut.normalize();
-
-    return ringOut;
-  }
-
-  /** Eixo do “furo” em espaço local de `calibRot` (pai de `braceletWristAlignGroup`). */
-  function omafitRefreshBraceletRingHoleAxisInCalibLocal(
-    THREE,
-    glbScene,
-    calibRot,
-    outAxisUnit,
-    tmpMat,
-    forceHoleAxisSceneUnit,
-  ) {
-    glbScene.matrixAutoUpdate = true;
-    glbScene.scale.set(1, 1, 1);
-    glbScene.updateMatrixWorld(true);
-    calibRot.updateMatrixWorld(true);
-    if (
-      forceHoleAxisSceneUnit &&
-      forceHoleAxisSceneUnit.lengthSq() > 1e-12
-    ) {
-      outAxisUnit.copy(forceHoleAxisSceneUnit).normalize();
-    } else {
-      const h = omafitDetectBraceletRingHoleAxisUnitInGlb(THREE, glbScene);
-      outAxisUnit.copy(h);
-    }
-    outAxisUnit.transformDirection(glbScene.matrixWorld);
-    tmpMat.copy(calibRot.matrixWorld).invert();
-    outAxisUnit.transformDirection(tmpMat);
-    if (outAxisUnit.lengthSq() < 1e-12) outAxisUnit.set(0, 0, 1);
-    else outAxisUnit.normalize();
-  }
-
   // Load the GLB (Draco lazy: partilha WASM com o caminho face).
   const arGlbDracoHand = !/^(0|false|off|no)$/i.test(String(cfgAttr("arGlbDraco", "1")).trim());
   let dracoLoaderHand = null;
@@ -13709,8 +13480,6 @@ async function runHandArSession({
     accessoryType === "bracelet"
       ? createOmafitBraceletWristPlacementState(THREE)
       : null;
-  const braceletRingHoleAxisAlignLocal = new THREE.Vector3(0, 0, 1);
-  const braceletRingHoleTmpMat = new THREE.Matrix4();
   /** Eixo do “furo” em espaço do GLB para pulseira procedural (anel em XZ). */
   const braceletRadialHoleAxisScene = new THREE.Vector3(0, 1, 0);
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
@@ -13720,13 +13489,17 @@ async function runHandArSession({
   const braceletWristCenterScratch = new THREE.Vector3();
   const braceletAnatBasisMat = new THREE.Matrix4();
   const braceletAnatTargetQuat = new THREE.Quaternion();
-  const braceletViewTwistQuat = new THREE.Quaternion();
+  const braceletPalmNormalScratch = new THREE.Vector3();
+  const braceletIndexDirScratch = new THREE.Vector3();
+  const braceletPinkyDirScratch = new THREE.Vector3();
+  const braceletPalmFlipQuat = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 0, 1),
+    Math.PI,
+  );
   /** Cilindro Three.js segue +Y; alinhar +Y ao +Z local do bracelete (eixo do punso). */
   const braceletOccCylinderAlignQuat = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(Math.PI / 2, 0, 0),
   );
-  /** Scratch: direcção câmera ↔ pulso e normal em mundo para atenuação traseira. */
-  const braceletDepthCamDir = new THREE.Vector3();
   /** Scratch para `decompose` ao aplicar escala na âncora sem perder tracking. */
   const braceletAnchorScaleScratch = new THREE.Vector3();
   let braceletModelDiameter = 0.06;
@@ -13784,10 +13557,14 @@ async function runHandArSession({
         } catch {
           /* ignore */
         }
+        if (accessoryType === "bracelet") {
+          glbRoot.rotation.set(0, 0, 0);
+          glbRoot.position.set(0, 0, 0);
+          glbRoot.quaternion.identity();
+        }
         glbRoot.add(glbScene);
         if (accessoryType === "bracelet") {
           normalizeBraceletGlbOrientation(THREE, glbScene);
-          omafitBraceletAlignHoleAxisToZ(THREE, glbScene);
           const box = new THREE.Box3().setFromObject(glbRoot);
           const center = box.getCenter(new THREE.Vector3());
           glbRoot.position.sub(center);
@@ -13869,14 +13646,6 @@ async function runHandArSession({
             }
           });
           braceletOcclusionSmooth = 0;
-          omafitRefreshBraceletRingHoleAxisInCalibLocal(
-            THREE,
-            glbScene,
-            calibRot,
-            braceletRingHoleAxisAlignLocal,
-            braceletRingHoleTmpMat,
-            braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
-          );
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
             watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
@@ -14422,7 +14191,7 @@ async function runHandArSession({
     }
 
     if (accessoryType === "bracelet") {
-      /** Âncora = translação + escala; orientação 3D no `glbRoot` (base anatómica + slerp). */
+      /** Âncora = translação + escala; orientação do punho em `wristRotationGroup`. */
       tmpMat.identity();
       tmpMat.setPosition(smPos);
     } else {
@@ -14812,52 +14581,39 @@ async function runHandArSession({
         wearPosition.updateMatrixWorld(true);
 
         glbRoot.rotation.set(0, 0, 0);
-        /** Offset local −Z: recuar ao longo do eixo do braço (Z = forward anatómico). */
-        glbRoot.position.set(0, 0, -0.018);
+        glbRoot.quaternion.identity();
+        const wristRadiusOff = Math.max(1e-5, smoothWristRadius);
+        glbRoot.position.set(
+          0,
+          -wristRadiusOff * 0.15,
+          -wristRadiusOff * 0.35,
+        );
         glbRoot.scale.set(1, 1, 1);
 
-        braceletSideAxis.subVectors(w5, w17);
-        braceletForwardAxis.subVectors(w9, w0);
-        if (braceletSideAxis.lengthSq() > 1e-10 && braceletForwardAxis.lengthSq() > 1e-10) {
-          tmpX.copy(braceletSideAxis).normalize();
-          braceletForwardAxis.addScaledVector(
-            tmpX,
-            -braceletForwardAxis.dot(tmpX),
-          );
-          if (braceletForwardAxis.lengthSq() > 1e-10) {
-            braceletForwardAxis.normalize();
-            tmpY.crossVectors(braceletForwardAxis, tmpX).normalize();
-            tmpZ.crossVectors(tmpY, tmpX).normalize();
-            tmpX.crossVectors(tmpY, tmpZ).normalize();
-            tmpY.crossVectors(tmpZ, tmpX).normalize();
-            braceletAnatBasisMat.makeBasis(tmpX, tmpY, tmpZ);
-            braceletAnatTargetQuat.setFromRotationMatrix(braceletAnatBasisMat);
-            /** Só quando o braço está quase paralelo à vista: torção de 90° em torno do radial (evita “anel plano”). */
-            braceletDepthCamDir.subVectors(camera.position, smPos);
-            if (braceletDepthCamDir.lengthSq() > 1e-10) {
-              braceletDepthCamDir.normalize();
-            } else {
-              braceletDepthCamDir.set(0, 0, 1);
-            }
-            if (Math.abs(tmpZ.dot(braceletDepthCamDir)) > 0.88) {
-              braceletViewTwistQuat.setFromAxisAngle(tmpX, Math.PI / 2);
-              braceletAnatTargetQuat.multiply(braceletViewTwistQuat);
-            }
-            glbRoot.quaternion.slerp(braceletAnatTargetQuat, 0.18);
+        braceletAnatBasisMat.makeBasis(tmpX, tmpY, tmpZ);
+        braceletAnatTargetQuat.setFromRotationMatrix(braceletAnatBasisMat);
+        braceletIndexDirScratch.subVectors(w5, w0);
+        braceletPinkyDirScratch.subVectors(w17, w0);
+        if (
+          braceletIndexDirScratch.lengthSq() > 1e-10 &&
+          braceletPinkyDirScratch.lengthSq() > 1e-10
+        ) {
+          braceletIndexDirScratch.normalize();
+          braceletPinkyDirScratch.normalize();
+          braceletPalmNormalScratch
+            .crossVectors(braceletIndexDirScratch, braceletPinkyDirScratch)
+            .normalize();
+          if (braceletPalmNormalScratch.z > 0) {
+            braceletAnatTargetQuat.multiply(braceletPalmFlipQuat);
           }
+        }
+        if (wristRotationGroup) {
+          wristRotationGroup.quaternion.slerp(braceletAnatTargetQuat, 0.18);
         }
 
         if (braceletPartialOcclusionMesh) {
-          braceletPartialOcclusionMesh.quaternion.copy(glbRoot.quaternion).multiply(
-            braceletOccCylinderAlignQuat,
-          );
+          braceletPartialOcclusionMesh.quaternion.copy(braceletOccCylinderAlignQuat);
           braceletPartialOcclusionMesh.position.set(0, 0, 0);
-        }
-
-        if (braceletWristAlignGroup && !braceletProceduralRadial) {
-          braceletWristAlignGroup.position.set(0, 0, 0);
-          braceletWristAlignGroup.quaternion.identity();
-          braceletWristAlignGroup.scale.set(1, 1, 1);
         }
 
         anchor.matrix.decompose(
@@ -14879,7 +14635,9 @@ async function runHandArSession({
           wristRight: tmpX.toArray(),
           wristForward: tmpZ.toArray(),
           wristUp: tmpY.toArray(),
-          quaternion: glbRoot.quaternion.toArray(),
+          quaternion: wristRotationGroup
+            ? wristRotationGroup.quaternion.toArray()
+            : braceletAnatTargetQuat.toArray(),
         });
 
         console.log("[bracelet-scale-fix]", {
@@ -15254,9 +15012,10 @@ async function runHandArSession({
         if (braceletPlaceState) {
           resetOmafitBraceletWristPlacementState(braceletPlaceState);
         }
-        if (braceletWristAlignGroup) {
-          braceletWristAlignGroup.quaternion.identity();
-          braceletWristAlignGroup.position.set(0, 0, 0);
+        if (wristRotationGroup) {
+          wristRotationGroup.quaternion.identity();
+          wristRotationGroup.position.set(0, 0, 0);
+          wristRotationGroup.scale.set(1, 1, 1);
         }
         if (braceletLinkRadial) {
           braceletLinkRadial.scale.set(1, 1, 1);
@@ -15407,10 +15166,14 @@ async function runHandArSession({
                 // Pipeline procedural radial removido para pulseira: GLB intacto.
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
+              if (accessoryType === "bracelet") {
+                glbRoot.rotation.set(0, 0, 0);
+                glbRoot.position.set(0, 0, 0);
+                glbRoot.quaternion.identity();
+              }
               glbRoot.add(next);
               if (accessoryType === "bracelet") {
                 normalizeBraceletGlbOrientation(THREE, next);
-                omafitBraceletAlignHoleAxisToZ(THREE, next);
                 const box = new THREE.Box3().setFromObject(glbRoot);
                 const center = box.getCenter(new THREE.Vector3());
                 glbRoot.position.sub(center);
@@ -15451,14 +15214,6 @@ async function runHandArSession({
                     );
                   }
                 }
-                omafitRefreshBraceletRingHoleAxisInCalibLocal(
-                  THREE,
-                  next,
-                  calibRot,
-                  braceletRingHoleAxisAlignLocal,
-                  braceletRingHoleTmpMat,
-                  braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
-                );
               } else if (accessoryType === "watch") {
                 if (countHandArSolidMeshes(next) === 1) {
                   watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
