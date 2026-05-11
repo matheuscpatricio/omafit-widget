@@ -157,6 +157,8 @@ type EyewearArBootstrap = {
   tryonLayoutBackgroundImage?: string;
   /** Nome da loja para título AR (query `shopName` / `storeName`). */
   storeName?: string;
+  /** Handle Shopify (`/products/{handle}`) — o AR widget usa para `products/{handle}.js` (variantes). */
+  productHandle?: string;
 };
 
 /** GLB e metadados para o provador AR no iframe Netlify (query da página /widget). */
@@ -248,6 +250,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   let variantId = pickQ(['variant', 'variant_id', 'variantId']);
   let shopDomain = pickQ(['shopDomain', 'shop_domain', 'shop']);
   let productIdBootstrap = pickQ(['productId', 'product_id']);
+  let productHandleBootstrap = pickQ(['productHandle', 'product_handle', 'handle']);
   if (configFromUrl) {
     if (!variantId && typeof configFromUrl.variantId === 'string' && configFromUrl.variantId.trim()) {
       variantId = configFromUrl.variantId.trim();
@@ -263,6 +266,20 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     }
     if (!productIdBootstrap && typeof configFromUrl.productId === 'string' && String(configFromUrl.productId).trim()) {
       productIdBootstrap = String(configFromUrl.productId).trim();
+    }
+    if (
+      !productHandleBootstrap &&
+      typeof (configFromUrl as { productHandle?: unknown }).productHandle === 'string' &&
+      String((configFromUrl as { productHandle?: unknown }).productHandle).trim()
+    ) {
+      productHandleBootstrap = String((configFromUrl as { productHandle?: unknown }).productHandle).trim();
+    }
+    if (
+      !productHandleBootstrap &&
+      typeof (configFromUrl as { product_handle?: unknown }).product_handle === 'string' &&
+      String((configFromUrl as { product_handle?: unknown }).product_handle).trim()
+    ) {
+      productHandleBootstrap = String((configFromUrl as { product_handle?: unknown }).product_handle).trim();
     }
   }
 
@@ -353,6 +370,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
+    productHandle: productHandleBootstrap || undefined,
     tryonLayout: tryonLayoutEyewear,
     tryonLayoutBackgroundImage: tryonLayoutBackgroundImage || undefined,
   };
@@ -1061,6 +1079,7 @@ export function WidgetPage() {
           {...(eyewearBootstrap.variantId ? { 'data-variant-id': eyewearBootstrap.variantId } : {})}
           {...(eyewearBootstrap.shopDomain ? { 'data-shop-domain': eyewearBootstrap.shopDomain } : {})}
           {...(eyewearBootstrap.productId ? { 'data-product-id': eyewearBootstrap.productId } : {})}
+          {...(eyewearBootstrap.productHandle ? { 'data-product-handle': eyewearBootstrap.productHandle } : {})}
           {...arExtraAttrs}
         />
       </div>

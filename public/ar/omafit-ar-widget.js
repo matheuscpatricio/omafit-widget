@@ -6824,46 +6824,29 @@ function omafitFeaturedImageUrlFromStorefrontVariant(sv) {
   return omafitNormalizeShopifyProductImgUrl(raw);
 }
 
-/**
- * ID estável para cruzar Liquid ↔ `products/{handle}.js`: aceita `id`, `variant_id`,
- * `variantId` e GIDs (`gid://shopify/ProductVariant/123`). Sem isto, o embed pode
- * enviar só `variant_id` e o merge/dedupe descartava variantes → uma miniatura.
- */
-function omafitCoerceProductVariantId(obj) {
-  if (!obj || typeof obj !== "object") return "";
-  const raw = obj.id ?? obj.variant_id ?? obj.variantId ?? obj.variantID;
-  if (raw == null) return "";
-  const s = String(raw).trim();
-  if (!s) return "";
-  const gid = s.match(/ProductVariant\/(\d+)\s*$/i);
-  if (gid) return gid[1];
-  if (/^\d+$/.test(s)) return s;
-  return s;
-}
-
 /** Handle do produto para `/products/{handle}.js` (data-attrs ou URL `/products/...`). */
 function omafitResolveProductHandleForVariantFetch() {
-  const pick = (s) => String(s || "").trim();
-  if (typeof document !== "undefined") {
-    const w = document.getElementById("omafit-widget-root");
-    const ar = document.getElementById("omafit-ar-root");
-    const fromDom =
-      pick(w?.dataset?.productHandle || w?.getAttribute?.("data-product-handle")) ||
-      pick(ar?.dataset?.productHandle || ar?.getAttribute?.("data-product-handle"));
-    if (fromDom) return fromDom;
-    const firstAttr = document.querySelector("[data-product-handle]");
-    const fromAny = pick(firstAttr?.getAttribute?.("data-product-handle"));
-    if (fromAny) return fromAny;
-    try {
-      const og = document.querySelector('meta[property="og:url"]')?.getAttribute("content");
-      if (og) {
-        const u = new URL(og, typeof location !== "undefined" ? location.href : undefined);
-        const pm = u.pathname.match(/\/products\/([^/?#]+)/i);
-        if (pm && pm[1]) return decodeURIComponent(pm[1]);
-      }
-    } catch {
-      /* ignore */
+  const fromDom =
+    typeof document !== "undefined"
+      ? String(
+          document.getElementById("omafit-widget-root")?.getAttribute("data-product-handle") ||
+            document.getElementById("omafit-ar-root")?.getAttribute("data-product-handle") ||
+            "",
+        ).trim()
+      : "";
+  if (fromDom) return fromDom;
+  try {
+    const qs =
+      typeof window !== "undefined" && window.location?.search
+        ? new URLSearchParams(window.location.search)
+        : null;
+    if (qs) {
+      const fromQ =
+        String(qs.get("productHandle") || qs.get("product_handle") || qs.get("handle") || "").trim();
+      if (fromQ) return fromQ;
     }
+  } catch {
+    /* ignore */
   }
   try {
     const m = typeof location !== "undefined" ? location.pathname.match(/\/products\/([^/?#]+)/i) : null;
@@ -6896,14 +6879,7 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
     });
     if (!res.ok) return list;
     const data = await res.json();
-    const fromEmb = new Map();
-    for (let li = 0; li < list.length; li++) {
-      const v = list[li];
-      const kid = omafitCoerceProductVariantId(v);
-      if (!kid) continue;
-      const prev = fromEmb.get(kid);
-      fromEmb.set(kid, prev ? { ...prev, ...v } : { ...v });
-    }
+    const fromEmb = new Map(list.map((v) => [String(v.id), { ...v }]));
     const variantImgMap = omafitVariantImageUrlMapFromProductJson(data);
     /** Fallback quando não há imagem por variante: roda pelas URLs do produto. */
     const flatProductImgs = [];
@@ -6921,8 +6897,8 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
     const out = [];
     let rotImg = 0;
     for (const sv of data.variants || []) {
-      const sid = omafitCoerceProductVariantId({ id: sv.id });
-      const base = (sid && fromEmb.get(sid)) || {
+      const sid = String(sv.id);
+      const base = fromEmb.get(sid) || {
         id: sv.id,
         title: sv.name || sv.title || "",
         price: sv.price,
@@ -6933,7 +6909,7 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
       };
       let img = String(base.imageUrl || base.image_url || "").trim();
       if (!img) img = omafitFeaturedImageUrlFromStorefrontVariant(sv);
-      if (!img) img = (sid && variantImgMap.get(sid)) || variantImgMap.get(String(sv.id)) || "";
+      if (!img) img = variantImgMap.get(sid) || "";
       if (!img && flatProductImgs.length === 1) img = flatProductImgs[0];
       if (!img && flatProductImgs.length > 1) {
         img = flatProductImgs[rotImg % flatProductImgs.length] || "";
@@ -6945,7 +6921,6 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
         title: String(base.title || sv.name || sv.title || "").trim() || String(sv.name || sv.title || ""),
         price: base.price ?? sv.price,
         imageUrl: omafitNormalizeShopifyProductImgUrl(img) || String(base.imageUrl || "").trim(),
-        position: sv.position != null ? Number(sv.position) : Number(base.position) || 0,
       });
     }
     return out.length ? out : list;
@@ -7060,19 +7035,6 @@ async function runArSession({
     variantSource = await omafitEnrichVariantsFromStorefrontJs(productHandleForFetch, variantSource);
   }
 
-  /** Mescla duplicados por `id` (Liquid + fetch) — mantém metadados mais completos. */
-  if (Array.isArray(variantSource) && variantSource.length > 1) {
-    const byId = new Map();
-    for (const v of variantSource) {
-      if (!v) continue;
-      const sid = omafitCoerceProductVariantId(v);
-      if (!sid) continue;
-      const prev = byId.get(sid);
-      byId.set(sid, prev ? { ...prev, ...v } : v);
-    }
-    variantSource = [...byId.values()];
-  }
-
   const sessionGlb = String(glbUrl || "").trim();
   /** GLB do produto (`data-glb-url`) ou, se vazio, o primeiro `glbUrl` presente nas variantes (Liquid). */
   const baseGlb =
@@ -7083,25 +7045,12 @@ async function runArSession({
 
   const resolveVariantGlb = (v) =>
     String(v?.glbUrl ?? v?.glb_url ?? "").trim() || baseGlb;
-  /**
-   * Todas as variantes com `id` (loja + AR): o GLB pode ser partilhado (`baseGlb` / `data-glb-url`).
-   * Não filtrar por “tem glb próprio” — senão opções de cor/tamanho sem URL no JSON Liquid desaparecem.
-   */
-  let arVariants = (Array.isArray(variantSource) ? variantSource : []).filter((v) => {
+  /** Incluir todas as variantes com id — GLB partilhado ao nível do produto ou numa variante (`baseGlb`). */
+  let arVariants = variantSource.filter((v) => {
     if (!v) return false;
-    return Boolean(omafitCoerceProductVariantId(v));
-  });
-  arVariants.sort(
-    (a, b) =>
-      (Number(a.position) || 0) - (Number(b.position) || 0) ||
-      omafitCoerceProductVariantId(a).localeCompare(omafitCoerceProductVariantId(b)),
-  );
-  /** Garantir `id` no objecto (carrinho / dataset) quando o Liquid só envia `variant_id`. */
-  arVariants = arVariants.map((v) => {
-    const kid = omafitCoerceProductVariantId(v);
-    if (v.id != null && String(v.id).trim() !== "") return v;
-    if (kid && /^\d+$/.test(kid)) return { ...v, id: Number(kid) };
-    return kid ? { ...v, id: kid } : v;
+    const id = v.id != null ? String(v.id).trim() : "";
+    if (!id) return false;
+    return Boolean(resolveVariantGlb(v));
   });
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com
@@ -7124,30 +7073,35 @@ async function runArSession({
     /* ignore */
   }
   let currentVariantId = arVariants.length > 0 ? arVariants[0].id : null;
-  let currentGlbUrl =
-    arVariants.length > 0
-      ? resolveVariantGlb(arVariants[0]) ||
-        (() => {
-          for (let vi = 0; vi < arVariants.length; vi++) {
-            const g = resolveVariantGlb(arVariants[vi]);
-            if (g) return g;
-          }
-          return baseGlb;
-        })()
-      : baseGlb;
+  let currentGlbUrl = arVariants.length > 0 ? resolveVariantGlb(arVariants[0]) : baseGlb;
+  try {
+    if (
+      typeof location !== "undefined" &&
+      /[?&]omafit_ar_debug=1\b/.test(String(location.search || ""))
+    ) {
+      console.info("[omafit-ar] variant wiring", {
+        productHandleForFetch: productHandleForFetch || "(none)",
+        variantSourceLen: Array.isArray(variantSource) ? variantSource.length : 0,
+        arVariantsLen: arVariants.length,
+        hasBaseGlb: Boolean(String(baseGlb || "").trim()),
+        windowVariantsLen:
+          typeof window !== "undefined" && Array.isArray(window.__OMAFIT_AR_VARIANTS__)
+            ? window.__OMAFIT_AR_VARIANTS__.length
+            : 0,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
   try {
     const pqv = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search || "" : "",
     ).get("variant");
     if (pqv && String(pqv).trim() && arVariants.length) {
-      const pqvNorm = omafitCoerceProductVariantId({ id: pqv });
-      const mv = pqvNorm
-        ? arVariants.find((vv) => omafitCoerceProductVariantId(vv) === pqvNorm)
-        : null;
+      const mv = arVariants.find((vv) => String(vv.id) === String(pqv).trim());
       if (mv) {
         currentVariantId = mv.id;
-        const gSel = resolveVariantGlb(mv);
-        if (gSel) currentGlbUrl = gSel;
+        currentGlbUrl = resolveVariantGlb(mv);
       }
     }
   } catch {
@@ -7156,10 +7110,6 @@ async function runArSession({
   let arBottomBar = null;
   const variantCalPayload = (v) =>
     v && typeof v.calibration === "object" && v.calibration !== null ? v.calibration : {};
-  const variantIdKey = (x) =>
-    typeof x === "object" && x != null
-      ? omafitCoerceProductVariantId(x)
-      : omafitCoerceProductVariantId({ id: x });
 
   /** Miniaturas + carrinho: sempre que existir pelo menos uma variante com GLB (próprio ou do produto). */
   if (arVariants.length >= 1) {
@@ -7198,7 +7148,7 @@ async function runArSession({
     const syncThumbBorders = () => {
       thumbRow.querySelectorAll("button").forEach((b) => {
         b.style.border =
-          variantIdKey({ id: b.dataset.variantId }) === variantIdKey(currentVariantId)
+          String(b.dataset.variantId) === String(currentVariantId)
             ? `3px solid ${primaryColor}`
             : "2px solid rgba(255,255,255,0.5)";
       });
@@ -7225,7 +7175,7 @@ async function runArSession({
           height: "56px",
           borderRadius: "10px",
           border:
-            variantIdKey(v) === variantIdKey(currentVariantId)
+            String(v.id) === String(currentVariantId)
               ? `3px solid ${primaryColor}`
               : "2px solid rgba(255,255,255,0.5)",
           background: "#fff",
@@ -7271,13 +7221,12 @@ async function runArSession({
         }));
       }
       thumb.addEventListener("click", () => {
-        if (variantIdKey(v) === variantIdKey(currentVariantId)) return;
+        if (String(v.id) === String(currentVariantId)) return;
         currentVariantId = v.id;
-        const nextGlb = resolveVariantGlb(v);
-        if (nextGlb) currentGlbUrl = nextGlb;
+        currentGlbUrl = resolveVariantGlb(v);
         syncThumbBorders();
-        if (typeof window.__omafitArSwitchGlb === "function" && nextGlb) {
-          window.__omafitArSwitchGlb(nextGlb, variantCalPayload(v));
+        if (typeof window.__omafitArSwitchGlb === "function") {
+          window.__omafitArSwitchGlb(currentGlbUrl, variantCalPayload(v));
         }
       });
       thumbRow.appendChild(thumb);
@@ -7709,7 +7658,7 @@ async function runArSession({
         arFit,
         mindarHost,
         loading,
-        glbUrl: String(currentGlbUrl || glbUrl || "").trim(),
+        glbUrl,
         t,
         variants,
         productId,
@@ -7721,15 +7670,12 @@ async function runArSession({
       if (
         arVariants.length > 0 &&
         typeof window.__omafitArSwitchGlb === "function" &&
-        variantIdKey(currentVariantId) !== variantIdKey(arVariants[0])
+        String(currentVariantId) !== String(arVariants[0].id)
       ) {
-        const ivSel = arVariants.find((vv) => variantIdKey(vv) === variantIdKey(currentVariantId));
+        const ivSel = arVariants.find((vv) => String(vv.id) === String(currentVariantId));
         if (ivSel) {
           try {
-            const gInit = resolveVariantGlb(ivSel);
-            if (gInit) {
-              window.__omafitArSwitchGlb(gInit, variantCalPayload(ivSel));
-            }
+            window.__omafitArSwitchGlb(resolveVariantGlb(ivSel), variantCalPayload(ivSel));
           } catch (e) {
             console.warn("[omafit-ar] switch variante inicial (mão):", e?.message || e);
           }
@@ -8465,8 +8411,7 @@ async function runArSession({
       return { u, v };
     })();
     const sessionGlbUrl =
-      omafitReadGlbUrlFromRootOrQuery() ||
-      omafitAbsolutizeGlbUrlMaybe(String(currentGlbUrl || glbUrl || "").trim());
+      omafitReadGlbUrlFromRootOrQuery() || omafitAbsolutizeGlbUrlMaybe(String(glbUrl || "").trim());
     const glbVersion =
       fromDom.v ||
       String(arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "").trim();
@@ -8488,7 +8433,7 @@ async function runArSession({
       if (THREE.Cache && typeof THREE.Cache.remove === "function") {
         THREE.Cache.remove(glbLoadUrl);
         THREE.Cache.remove(sessionGlbUrl);
-        THREE.Cache.remove(String(currentGlbUrl || glbUrl || "").trim());
+        THREE.Cache.remove(glbUrl);
       }
     } catch {
       /* ignore */
@@ -12714,8 +12659,7 @@ async function runHandArSession({
   /**
    * Pulseira tipo Tripo (malha alongada): substitui por `InstancedMesh` radial —
    * distribui N cópias do mesmo visual ao redor do eixo Y local (anel em XZ).
-   * O raio em espaço “encaixado” (m) vem de `radiusLocal * baseScale` + clamp no caller;
-   * este rebuild não mede raio bruto do bbox para escala.
+   * `outRadiusLocal` recebe o raio usado (unidades GLB), para corrigir `localInnerR`.
    */
   function omafitBraceletRadialShouldRebuild(THREE, glbScene, modeRaw) {
     const mode = String(modeRaw ?? "auto").trim().toLowerCase();
@@ -12787,16 +12731,9 @@ async function runHandArSession({
   }
 
   /**
-   * Só após `fitWristGlb` aplicar `glbRoot.scale` e `updateMatrixWorld`.
-   * `safeRadiusM` (m) vem do AABB de `glbRoot` pós-fit — não usar dimensões GLB brutas.
    * @returns {boolean}
    */
-  function omafitRebuildBraceletRadialInstanced(
-    THREE,
-    rootScene,
-    segments,
-    safeRadiusM,
-  ) {
+  function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments, outRadiusLocal) {
     braceletRadialInstMesh = null;
     braceletRadialSegCount = 0;
     let srcMesh = null;
@@ -12806,17 +12743,22 @@ async function runHandArSession({
     });
     if (!srcMesh) return false;
 
+    const sceneBox = new THREE.Box3().setFromObject(rootScene);
+    const sz = new THREE.Vector3();
+    sceneBox.getSize(sz);
+    const wristRadiusLocal = Math.max(
+      1e-6,
+      Math.max(sz.x, sz.z) * 0.5 * 1.1,
+    );
+    if (outRadiusLocal && typeof outRadiusLocal === "object") {
+      outRadiusLocal.value = wristRadiusLocal;
+    }
+
     const matSrc = srcMesh.material;
     const matPick =
       Array.isArray(matSrc) && matSrc.length ? matSrc[0] : matSrc;
     if (!matPick || typeof matPick.clone !== "function") return false;
     const mat = matPick.clone();
-    if (
-      !Number.isFinite(safeRadiusM) ||
-      safeRadiusM < 1e-7
-    ) {
-      return false;
-    }
 
     const geoCentered = srcMesh.geometry.clone();
     geoCentered.computeBoundingBox();
@@ -12924,11 +12866,7 @@ async function runHandArSession({
     const radiusWorldRaw = Number.isFinite(radiusOverrideWorld)
       ? radiusOverrideWorld
       : radiusFromLandmarks;
-    const radialCap =
-      Number.isFinite(braceletRadialSafeRadiusM) && braceletRadialSafeRadiusM > 1e-7
-        ? braceletRadialSafeRadiusM
-        : 0.042;
-    const radiusWorld = THREE.MathUtils.clamp(radiusWorldRaw, 0.016, radialCap);
+    const radiusWorld = THREE.MathUtils.clamp(radiusWorldRaw, 0.016, 0.042);
     if (radiusWorld < 1e-8) return;
 
     braceletRadRingCenter
@@ -13282,7 +13220,6 @@ async function runHandArSession({
       braceletProceduralRadial &&
       braceletRadialRadiusLocal > 1e-8
     ) {
-      /** `braceletRadialRadiusLocal` ≈ safeRadiusM / baseScale (equiv. GLB), não raio bruto Tripo. */
       localInnerR = Math.max(1e-6, braceletRadialRadiusLocal * 0.88);
       localRingR = Math.max(localRingR, braceletRadialRadiusLocal);
     }
@@ -13604,13 +13541,8 @@ async function runHandArSession({
   let watchVertexDeform = null;
   /** Pulseira rígida (bangle): só escala global; elos: grupo ou vértices. */
   let braceletProceduralRadial = false;
-  /**
-   * Com pulseira radial activa: raio característico em unidades GLB equivalente a
-   * `safeRadiusM / baseScale` (para o override de `localInnerR` em `fitWristGlb`).
-   */
+  /** Raio do anel procedural (`InstancedMesh`), unidades GLB antes do scale root. */
   let braceletRadialRadiusLocal = 0;
-  /** Raio-alvo em metros (pós `radiusLocal * baseScale` + clamp) para o anel radial. */
-  let braceletRadialSafeRadiusM = 0;
   /** `InstancedMesh` da pulseira radial (actualização por frame com base no pulso). */
   let braceletRadialInstMesh = null;
   let braceletRadialSegCount = 0;
@@ -13674,24 +13606,38 @@ async function runHandArSession({
         });
         braceletProceduralRadial = false;
         braceletRadialRadiusLocal = 0;
-        braceletRadialSafeRadiusM = 0;
         braceletRadialInstMesh = null;
         braceletRadialSegCount = 0;
-        let braceletRadialShouldInit = false;
-        let braceletRadialSegInit = 24;
         if (accessoryType === "bracelet") {
           const radialMode = cfgAttr("arBraceletRadial", "on");
-          braceletRadialShouldInit = omafitBraceletRadialShouldRebuild(
+          const radialShould = omafitBraceletRadialShouldRebuild(
             THREE,
             glbScene,
             radialMode,
           );
-          if (braceletRadialShouldInit) {
+          if (radialShould) {
             const segRaw = Number(
               String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
             );
-            braceletRadialSegInit = Number.isFinite(segRaw) ? segRaw : 24;
+            const seg = Number.isFinite(segRaw) ? segRaw : 24;
+            const outR = { value: 0 };
+            braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
+              THREE,
+              glbScene,
+              seg,
+              outR,
+            );
+            if (braceletProceduralRadial) {
+              braceletRadialRadiusLocal = outR.value;
+            }
           }
+          console.log("[omafit-ar] bracelet radial init", {
+            radialMode,
+            radialShould,
+            activated: braceletProceduralRadial,
+            segments: braceletRadialSegCount,
+            radiusLocal: braceletRadialRadiusLocal,
+          });
         }
         try {
           const triH = omafitCountGltfTriangles(glbScene);
@@ -13708,57 +13654,7 @@ async function runHandArSession({
         glbRoot.add(glbScene);
         upgradeHandArGlassMaterials(THREE, glbScene);
 
-        /** 1.º fit: `braceletProceduralRadial` permanece false — fit é a única fonte de escala inicial. */
-        let fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
-        if (accessoryType === "bracelet" && braceletRadialShouldInit) {
-          glbRoot.updateMatrixWorld(true);
-          const fittedBox = new THREE.Box3().setFromObject(glbRoot);
-          const fittedSize = new THREE.Vector3();
-          fittedBox.getSize(fittedSize);
-          const fittedRadius =
-            Math.max(fittedSize.x, fittedSize.z) * 0.5;
-          const safeRadius = THREE.MathUtils.clamp(
-            fittedRadius,
-            0.025,
-            0.045,
-          );
-          console.log("[bracelet-radial-postfit]", {
-            fittedSize: {
-              x: fittedSize.x,
-              y: fittedSize.y,
-              z: fittedSize.z,
-            },
-            fittedRadius,
-            safeRadius,
-            finalScale: glbRoot.scale.x,
-          });
-          braceletRadialSafeRadiusM = safeRadius;
-          braceletRadialRadiusLocal =
-            safeRadius / Math.max(1e-9, fitRes.baseScale);
-          braceletProceduralRadial = true;
-          const rebuildOk = omafitRebuildBraceletRadialInstanced(
-            THREE,
-            glbScene,
-            braceletRadialSegInit,
-            safeRadius,
-          );
-          braceletProceduralRadial = rebuildOk;
-          if (rebuildOk) {
-            fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
-          } else {
-            braceletRadialSafeRadiusM = 0;
-            braceletRadialRadiusLocal = 0;
-            braceletProceduralRadial = false;
-          }
-          console.log("[omafit-ar] bracelet radial init", {
-            radialMode: cfgAttr("arBraceletRadial", "on"),
-            radialShould: braceletRadialShouldInit,
-            activated: braceletProceduralRadial,
-            segments: braceletRadialSegCount,
-            safeRadiusM: braceletRadialSafeRadiusM,
-            radialInnerEquivLocal: braceletRadialRadiusLocal,
-          });
-        }
+        const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
         localRingR = fitRes.localRingR;
         localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
@@ -15372,80 +15268,43 @@ async function runHandArSession({
               bakeGLBTransforms(THREE, next, () => {});
               braceletProceduralRadial = false;
               braceletRadialRadiusLocal = 0;
-              braceletRadialSafeRadiusM = 0;
               braceletRadialInstMesh = null;
               braceletRadialSegCount = 0;
-              let braceletRadialShouldSwitch = false;
-              let braceletRadialSegSwitch = 24;
               if (accessoryType === "bracelet") {
-                const radialModeSw = cfgAttr("arBraceletRadial", "on");
-                braceletRadialShouldSwitch = omafitBraceletRadialShouldRebuild(
+                const radialMode = cfgAttr("arBraceletRadial", "on");
+                const radialShould = omafitBraceletRadialShouldRebuild(
                   THREE,
                   next,
-                  radialModeSw,
+                  radialMode,
                 );
-                if (braceletRadialShouldSwitch) {
-                  const segRawSw = Number(
+                if (radialShould) {
+                  const segRaw = Number(
                     String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
                   );
-                  braceletRadialSegSwitch = Number.isFinite(segRawSw)
-                    ? segRawSw
-                    : 24;
+                  const seg = Number.isFinite(segRaw) ? segRaw : 24;
+                  const outR = { value: 0 };
+                  braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
+                    THREE,
+                    next,
+                    seg,
+                    outR,
+                  );
+                  if (braceletProceduralRadial) {
+                    braceletRadialRadiusLocal = outR.value;
+                  }
                 }
+                console.log("[omafit-ar] bracelet radial switch", {
+                  radialMode,
+                  radialShould,
+                  activated: braceletProceduralRadial,
+                  segments: braceletRadialSegCount,
+                  radiusLocal: braceletRadialRadiusLocal,
+                });
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
               upgradeHandArGlassMaterials(THREE, next);
-              let fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
-              if (accessoryType === "bracelet" && braceletRadialShouldSwitch) {
-                glbRoot.updateMatrixWorld(true);
-                const fittedBoxSw = new THREE.Box3().setFromObject(glbRoot);
-                const fittedSizeSw = new THREE.Vector3();
-                fittedBoxSw.getSize(fittedSizeSw);
-                const fittedRadiusSw =
-                  Math.max(fittedSizeSw.x, fittedSizeSw.z) * 0.5;
-                const safeRadiusSw = THREE.MathUtils.clamp(
-                  fittedRadiusSw,
-                  0.025,
-                  0.045,
-                );
-                console.log("[bracelet-radial-postfit]", {
-                  fittedSize: {
-                    x: fittedSizeSw.x,
-                    y: fittedSizeSw.y,
-                    z: fittedSizeSw.z,
-                  },
-                  fittedRadius: fittedRadiusSw,
-                  safeRadius: safeRadiusSw,
-                  finalScale: glbRoot.scale.x,
-                });
-                braceletRadialSafeRadiusM = safeRadiusSw;
-                braceletRadialRadiusLocal =
-                  safeRadiusSw / Math.max(1e-9, fitRes.baseScale);
-                braceletProceduralRadial = true;
-                const rebuildOkSw = omafitRebuildBraceletRadialInstanced(
-                  THREE,
-                  next,
-                  braceletRadialSegSwitch,
-                  safeRadiusSw,
-                );
-                braceletProceduralRadial = rebuildOkSw;
-                if (rebuildOkSw) {
-                  fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
-                } else {
-                  braceletRadialSafeRadiusM = 0;
-                  braceletRadialRadiusLocal = 0;
-                  braceletProceduralRadial = false;
-                }
-                console.log("[omafit-ar] bracelet radial switch", {
-                  radialMode: cfgAttr("arBraceletRadial", "on"),
-                  radialShould: braceletRadialShouldSwitch,
-                  activated: braceletProceduralRadial,
-                  segments: braceletRadialSegCount,
-                  safeRadiusM: braceletRadialSafeRadiusM,
-                  radialInnerEquivLocal: braceletRadialRadiusLocal,
-                });
-              }
+              const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               baseScale = fitRes.baseScale;
               localRingR = fitRes.localRingR;
               localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
