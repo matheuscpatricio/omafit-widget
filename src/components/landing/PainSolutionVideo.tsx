@@ -2,37 +2,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Pause, Play } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-/** MP4 no Storage (pesado): só começa a pedir dados quando o bloco entra no viewport. */
 const VIDEO_URL =
   'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/VideoOmafit.mp4';
 
 export function PainSolutionVideo() {
-  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [attachSrc, setAttachSrc] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
+  const [canPlay, setCanPlay] = useState(false);
   const [error, setError] = useState(false);
 
+  /** Garante que o pedido de rede começa logo após montar (MP4 pesado). */
   useEffect(() => {
-    const root = containerRef.current;
-    if (!root) return;
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setAttachSrc(true);
-      },
-      { rootMargin: '160px 0px', threshold: 0 },
-    );
-
-    io.observe(root);
-    return () => io.disconnect();
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      video.load();
+    } catch {
+      /* noop */
+    }
   }, []);
 
   const togglePlay = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || !attachSrc || error) return;
+    if (!video || !canPlay || error) return;
 
     try {
       if (video.paused) {
@@ -43,11 +37,12 @@ export function PainSolutionVideo() {
     } catch {
       setError(true);
     }
-  }, [attachSrc, error]);
+  }, [canPlay, error]);
+
+  const showPreparing = !canPlay && !error;
 
   return (
     <section
-      ref={containerRef}
       aria-label="Vídeo promocional Omafit"
       className="relative mx-3 my-6 max-w-7xl sm:mx-4 sm:my-8 md:mx-6 lg:mx-auto lg:my-10"
     >
@@ -59,21 +54,24 @@ export function PainSolutionVideo() {
               'absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
               hasFrame ? 'opacity-100' : 'opacity-0',
             )}
-            src={attachSrc ? VIDEO_URL : undefined}
-            preload={attachSrc ? 'metadata' : 'none'}
+            src={VIDEO_URL}
+            preload="auto"
             playsInline
             controls={false}
             muted={false}
             onLoadedData={() => setHasFrame(true)}
+            onCanPlay={() => {
+              setCanPlay(true);
+              setBuffering(false);
+            }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onWaiting={() => setBuffering(true)}
-            onCanPlay={() => setBuffering(false)}
             onPlaying={() => setBuffering(false)}
             onError={() => setError(true)}
           />
 
-          {attachSrc && !hasFrame && !error && (
+          {showPreparing && (
             <div
               className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-oma-canvas/90 text-oma-muted"
               aria-busy="true"
@@ -96,10 +94,10 @@ export function PainSolutionVideo() {
             <button
               type="button"
               onClick={togglePlay}
-              disabled={!attachSrc || error}
+              disabled={!canPlay || error}
               className={cn(
                 'flex h-10 w-10 items-center justify-center rounded-full border border-oma-cream/20 bg-oma-elevated/85 text-oma-cream shadow-elegant backdrop-blur-sm transition hover:bg-oma-elevated hover:border-oma-accent/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oma-accent sm:h-11 sm:w-11',
-                (!attachSrc || error) && 'cursor-not-allowed opacity-50',
+                (!canPlay || error) && 'cursor-not-allowed opacity-50',
               )}
               aria-label={playing ? 'Pausar vídeo' : 'Reproduzir vídeo'}
             >
