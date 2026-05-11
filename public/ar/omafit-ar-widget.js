@@ -6824,6 +6824,23 @@ function omafitFeaturedImageUrlFromStorefrontVariant(sv) {
   return omafitNormalizeShopifyProductImgUrl(raw);
 }
 
+/**
+ * ID estável para cruzar Liquid ↔ `products/{handle}.js`: aceita `id`, `variant_id`,
+ * `variantId` e GIDs (`gid://shopify/ProductVariant/123`). Sem isto, o embed pode
+ * enviar só `variant_id` e o merge/dedupe descartava variantes → uma miniatura.
+ */
+function omafitCoerceProductVariantId(obj) {
+  if (!obj || typeof obj !== "object") return "";
+  const raw = obj.id ?? obj.variant_id ?? obj.variantId ?? obj.variantID;
+  if (raw == null) return "";
+  const s = String(raw).trim();
+  if (!s) return "";
+  const gid = s.match(/ProductVariant\/(\d+)\s*$/i);
+  if (gid) return gid[1];
+  if (/^\d+$/.test(s)) return s;
+  return s;
+}
+
 /** Handle do produto para `/products/{handle}.js` (data-attrs ou URL `/products/...`). */
 function omafitResolveProductHandleForVariantFetch() {
   const pick = (s) => String(s || "").trim();
@@ -6879,7 +6896,14 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
     });
     if (!res.ok) return list;
     const data = await res.json();
-    const fromEmb = new Map(list.map((v) => [String(v.id), { ...v }]));
+    const fromEmb = new Map();
+    for (let li = 0; li < list.length; li++) {
+      const v = list[li];
+      const kid = omafitCoerceProductVariantId(v);
+      if (!kid) continue;
+      const prev = fromEmb.get(kid);
+      fromEmb.set(kid, prev ? { ...prev, ...v } : { ...v });
+    }
     const variantImgMap = omafitVariantImageUrlMapFromProductJson(data);
     /** Fallback quando não há imagem por variante: roda pelas URLs do produto. */
     const flatProductImgs = [];
@@ -6897,8 +6921,8 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
     const out = [];
     let rotImg = 0;
     for (const sv of data.variants || []) {
-      const sid = String(sv.id);
-      const base = fromEmb.get(sid) || {
+      const sid = omafitCoerceProductVariantId({ id: sv.id });
+      const base = (sid && fromEmb.get(sid)) || {
         id: sv.id,
         title: sv.name || sv.title || "",
         price: sv.price,
@@ -6909,7 +6933,7 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
       };
       let img = String(base.imageUrl || base.image_url || "").trim();
       if (!img) img = omafitFeaturedImageUrlFromStorefrontVariant(sv);
-      if (!img) img = variantImgMap.get(sid) || "";
+      if (!img) img = (sid && variantImgMap.get(sid)) || variantImgMap.get(String(sv.id)) || "";
       if (!img && flatProductImgs.length === 1) img = flatProductImgs[0];
       if (!img && flatProductImgs.length > 1) {
         img = flatProductImgs[rotImg % flatProductImgs.length] || "";
@@ -7040,8 +7064,8 @@ async function runArSession({
   if (Array.isArray(variantSource) && variantSource.length > 1) {
     const byId = new Map();
     for (const v of variantSource) {
-      if (!v || v.id == null) continue;
-      const sid = String(v.id).trim();
+      if (!v) continue;
+      const sid = omafitCoerceProductVariantId(v);
       if (!sid) continue;
       const prev = byId.get(sid);
       byId.set(sid, prev ? { ...prev, ...v } : v);
@@ -7065,12 +7089,20 @@ async function runArSession({
    */
   let arVariants = (Array.isArray(variantSource) ? variantSource : []).filter((v) => {
     if (!v) return false;
-    const id = v.id != null ? String(v.id).trim() : "";
-    return Boolean(id);
+    return Boolean(omafitCoerceProductVariantId(v));
   });
   arVariants.sort(
-    (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || String(a.id).localeCompare(String(b.id)),
+    (a, b) =>
+      (Number(a.position) || 0) - (Number(b.position) || 0) ||
+      omafitCoerceProductVariantId(a).localeCompare(omafitCoerceProductVariantId(b)),
   );
+  /** Garantir `id` no objecto (carrinho / dataset) quando o Liquid só envia `variant_id`. */
+  arVariants = arVariants.map((v) => {
+    const kid = omafitCoerceProductVariantId(v);
+    if (v.id != null && String(v.id).trim() !== "") return v;
+    if (kid && /^\d+$/.test(kid)) return { ...v, id: Number(kid) };
+    return kid ? { ...v, id: kid } : v;
+  });
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com
    * `data-variant-id` + `data-glb-url` sintetizamos uma variante para miniaturas
@@ -7108,7 +7140,10 @@ async function runArSession({
       typeof window !== "undefined" ? window.location.search || "" : "",
     ).get("variant");
     if (pqv && String(pqv).trim() && arVariants.length) {
-      const mv = arVariants.find((vv) => String(vv.id) === String(pqv).trim());
+      const pqvNorm = omafitCoerceProductVariantId({ id: pqv });
+      const mv = pqvNorm
+        ? arVariants.find((vv) => omafitCoerceProductVariantId(vv) === pqvNorm)
+        : null;
       if (mv) {
         currentVariantId = mv.id;
         const gSel = resolveVariantGlb(mv);
@@ -7121,6 +7156,10 @@ async function runArSession({
   let arBottomBar = null;
   const variantCalPayload = (v) =>
     v && typeof v.calibration === "object" && v.calibration !== null ? v.calibration : {};
+  const variantIdKey = (x) =>
+    typeof x === "object" && x != null
+      ? omafitCoerceProductVariantId(x)
+      : omafitCoerceProductVariantId({ id: x });
 
   /** Miniaturas + carrinho: sempre que existir pelo menos uma variante com GLB (próprio ou do produto). */
   if (arVariants.length >= 1) {
@@ -7159,7 +7198,7 @@ async function runArSession({
     const syncThumbBorders = () => {
       thumbRow.querySelectorAll("button").forEach((b) => {
         b.style.border =
-          String(b.dataset.variantId) === String(currentVariantId)
+          variantIdKey({ id: b.dataset.variantId }) === variantIdKey(currentVariantId)
             ? `3px solid ${primaryColor}`
             : "2px solid rgba(255,255,255,0.5)";
       });
@@ -7186,7 +7225,7 @@ async function runArSession({
           height: "56px",
           borderRadius: "10px",
           border:
-            String(v.id) === String(currentVariantId)
+            variantIdKey(v) === variantIdKey(currentVariantId)
               ? `3px solid ${primaryColor}`
               : "2px solid rgba(255,255,255,0.5)",
           background: "#fff",
@@ -7232,7 +7271,7 @@ async function runArSession({
         }));
       }
       thumb.addEventListener("click", () => {
-        if (String(v.id) === String(currentVariantId)) return;
+        if (variantIdKey(v) === variantIdKey(currentVariantId)) return;
         currentVariantId = v.id;
         const nextGlb = resolveVariantGlb(v);
         if (nextGlb) currentGlbUrl = nextGlb;
@@ -7682,9 +7721,9 @@ async function runArSession({
       if (
         arVariants.length > 0 &&
         typeof window.__omafitArSwitchGlb === "function" &&
-        String(currentVariantId) !== String(arVariants[0].id)
+        variantIdKey(currentVariantId) !== variantIdKey(arVariants[0])
       ) {
-        const ivSel = arVariants.find((vv) => String(vv.id) === String(currentVariantId));
+        const ivSel = arVariants.find((vv) => variantIdKey(vv) === variantIdKey(currentVariantId));
         if (ivSel) {
           try {
             const gInit = resolveVariantGlb(ivSel);
