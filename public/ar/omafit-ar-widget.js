@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-procedural-radius-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-tripo-normalize-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12649,6 +12649,52 @@ async function runHandArSession({
   }
 
   /**
+   * Diâmetro-alvo (~65 mm) para encolher GLBs Tripo com escala nativa gigante
+   * antes do radial procedural e antes de `fitWristGlb` (âncora / posição).
+   */
+  const OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M = 0.065;
+
+  /**
+   * Normaliza escala da cena da pulseira quando o bbox é desproporcional.
+   * Não altera landmarks nem tracking — só `glbScene.scale`.
+   */
+  function omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot) {
+    if (!glbScene || !THREE) return;
+    glbScene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(glbScene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z, 1e-9);
+    const estimatedRadius = maxDim * 0.5;
+    const normalizationScale = THREE.MathUtils.clamp(
+      OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M / maxDim,
+      0.01,
+      1,
+    );
+    const isGiant = maxDim > 0.25 || estimatedRadius > 0.12;
+    const needsNormalize =
+      isGiant || maxDim > OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M;
+    if (needsNormalize && normalizationScale < 1 - 1e-9) {
+      glbScene.scale.multiplyScalar(normalizationScale);
+      glbScene.updateMatrixWorld(true);
+    }
+    try {
+      const gr = glbRoot && glbRoot.scale ? glbRoot.scale.x : 1;
+      console.log("[bracelet-normalization]", {
+        maxDim,
+        normalizationScale,
+        finalScale: glbScene.scale.x,
+        glbRootScale: gr,
+        estimatedRadius,
+        isGiant,
+        needsNormalize,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
    * Pulseira tipo Tripo (malha alongada): substitui por `InstancedMesh` radial —
    * distribui N cópias do mesmo visual ao redor do eixo no plano do pulso.
    * O raio da curva é **sempre procedural** (landmarks), nunca derivado do GLB.
@@ -13601,6 +13647,7 @@ async function runHandArSession({
         braceletRadialInstMesh = null;
         braceletRadialSegCount = 0;
         if (accessoryType === "bracelet") {
+          omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot);
           const radialMode = cfgAttr("arBraceletRadial", "on");
           const radialShould = omafitBraceletRadialShouldRebuild(
             THREE,
@@ -15273,6 +15320,7 @@ async function runHandArSession({
               braceletRadialInstMesh = null;
               braceletRadialSegCount = 0;
               if (accessoryType === "bracelet") {
+                omafitNormalizeBraceletTripoGlbScale(THREE, next, glbRoot);
                 const radialMode = cfgAttr("arBraceletRadial", "on");
                 const radialShould = omafitBraceletRadialShouldRebuild(
                   THREE,
