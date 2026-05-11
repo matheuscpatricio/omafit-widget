@@ -12700,9 +12700,16 @@ async function runHandArSession({
   }
 
   /**
+   * Só após `fitWristGlb` aplicar `glbRoot.scale` e `updateMatrixWorld`.
+   * `safeRadiusM` (m) vem do AABB de `glbRoot` pós-fit — não usar dimensões GLB brutas.
    * @returns {boolean}
    */
-  function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments) {
+  function omafitRebuildBraceletRadialInstanced(
+    THREE,
+    rootScene,
+    segments,
+    safeRadiusM,
+  ) {
     braceletRadialInstMesh = null;
     braceletRadialSegCount = 0;
     let srcMesh = null;
@@ -12717,6 +12724,12 @@ async function runHandArSession({
       Array.isArray(matSrc) && matSrc.length ? matSrc[0] : matSrc;
     if (!matPick || typeof matPick.clone !== "function") return false;
     const mat = matPick.clone();
+    if (
+      !Number.isFinite(safeRadiusM) ||
+      safeRadiusM < 1e-7
+    ) {
+      return false;
+    }
 
     const geoCentered = srcMesh.geometry.clone();
     geoCentered.computeBoundingBox();
@@ -13606,48 +13619,44 @@ async function runHandArSession({
           /* ignore */
         }
         glbRoot.add(glbScene);
-        let braceletRadialRadiusLocalPrefit = 0;
-        if (accessoryType === "bracelet") {
-          glbRoot.scale.set(1, 1, 1);
-          glbScene.updateMatrixWorld(true);
-          const rb = new THREE.Box3().setFromObject(glbScene);
-          const rsz = new THREE.Vector3();
-          rb.getSize(rsz);
-          braceletRadialRadiusLocalPrefit = Math.max(
-            1e-6,
-            Math.max(rsz.x, rsz.z) * 0.5 * 1.1,
-          );
-        }
-        if (accessoryType === "bracelet" && braceletRadialShouldInit) {
-          braceletProceduralRadial = true;
-        }
         upgradeHandArGlassMaterials(THREE, glbScene);
 
+        /** 1.º fit: `braceletProceduralRadial` permanece false — fit é a única fonte de escala inicial. */
         let fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         if (accessoryType === "bracelet" && braceletRadialShouldInit) {
-          const normalizedRadius =
-            braceletRadialRadiusLocalPrefit * fitRes.baseScale;
+          glbRoot.updateMatrixWorld(true);
+          const fittedBox = new THREE.Box3().setFromObject(glbRoot);
+          const fittedSize = new THREE.Vector3();
+          fittedBox.getSize(fittedSize);
+          const fittedRadius =
+            Math.max(fittedSize.x, fittedSize.z) * 0.5;
           const safeRadius = THREE.MathUtils.clamp(
-            normalizedRadius,
+            fittedRadius,
             0.025,
             0.045,
           );
-          console.log("[bracelet-radial-final]", {
-            radiusLocal: braceletRadialRadiusLocalPrefit,
-            baseScale: fitRes.baseScale,
-            normalizedRadius,
+          console.log("[bracelet-radial-postfit]", {
+            fittedSize: {
+              x: fittedSize.x,
+              y: fittedSize.y,
+              z: fittedSize.z,
+            },
+            fittedRadius,
             safeRadius,
+            finalScale: glbRoot.scale.x,
           });
           braceletRadialSafeRadiusM = safeRadius;
+          braceletRadialRadiusLocal =
+            safeRadius / Math.max(1e-9, fitRes.baseScale);
+          braceletProceduralRadial = true;
           const rebuildOk = omafitRebuildBraceletRadialInstanced(
             THREE,
             glbScene,
             braceletRadialSegInit,
+            safeRadius,
           );
           braceletProceduralRadial = rebuildOk;
           if (rebuildOk) {
-            braceletRadialRadiusLocal =
-              safeRadius / Math.max(1e-9, fitRes.baseScale);
             fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
           } else {
             braceletRadialSafeRadiusM = 0;
@@ -13659,7 +13668,6 @@ async function runHandArSession({
             radialShould: braceletRadialShouldInit,
             activated: braceletProceduralRadial,
             segments: braceletRadialSegCount,
-            radiusLocal: braceletRadialRadiusLocalPrefit,
             safeRadiusM: braceletRadialSafeRadiusM,
             radialInnerEquivLocal: braceletRadialRadiusLocal,
           });
@@ -15300,47 +15308,42 @@ async function runHandArSession({
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
-              let braceletRadialRadiusLocalPrefitSw = 0;
-              if (accessoryType === "bracelet") {
-                glbRoot.scale.set(1, 1, 1);
-                next.updateMatrixWorld(true);
-                const rbSw = new THREE.Box3().setFromObject(next);
-                const rszSw = new THREE.Vector3();
-                rbSw.getSize(rszSw);
-                braceletRadialRadiusLocalPrefitSw = Math.max(
-                  1e-6,
-                  Math.max(rszSw.x, rszSw.z) * 0.5 * 1.1,
-                );
-              }
-              if (accessoryType === "bracelet" && braceletRadialShouldSwitch) {
-                braceletProceduralRadial = true;
-              }
               upgradeHandArGlassMaterials(THREE, next);
               let fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               if (accessoryType === "bracelet" && braceletRadialShouldSwitch) {
-                const normalizedRadiusSw =
-                  braceletRadialRadiusLocalPrefitSw * fitRes.baseScale;
+                glbRoot.updateMatrixWorld(true);
+                const fittedBoxSw = new THREE.Box3().setFromObject(glbRoot);
+                const fittedSizeSw = new THREE.Vector3();
+                fittedBoxSw.getSize(fittedSizeSw);
+                const fittedRadiusSw =
+                  Math.max(fittedSizeSw.x, fittedSizeSw.z) * 0.5;
                 const safeRadiusSw = THREE.MathUtils.clamp(
-                  normalizedRadiusSw,
+                  fittedRadiusSw,
                   0.025,
                   0.045,
                 );
-                console.log("[bracelet-radial-final]", {
-                  radiusLocal: braceletRadialRadiusLocalPrefitSw,
-                  baseScale: fitRes.baseScale,
-                  normalizedRadius: normalizedRadiusSw,
+                console.log("[bracelet-radial-postfit]", {
+                  fittedSize: {
+                    x: fittedSizeSw.x,
+                    y: fittedSizeSw.y,
+                    z: fittedSizeSw.z,
+                  },
+                  fittedRadius: fittedRadiusSw,
                   safeRadius: safeRadiusSw,
+                  finalScale: glbRoot.scale.x,
                 });
                 braceletRadialSafeRadiusM = safeRadiusSw;
+                braceletRadialRadiusLocal =
+                  safeRadiusSw / Math.max(1e-9, fitRes.baseScale);
+                braceletProceduralRadial = true;
                 const rebuildOkSw = omafitRebuildBraceletRadialInstanced(
                   THREE,
                   next,
                   braceletRadialSegSwitch,
+                  safeRadiusSw,
                 );
                 braceletProceduralRadial = rebuildOkSw;
                 if (rebuildOkSw) {
-                  braceletRadialRadiusLocal =
-                    safeRadiusSw / Math.max(1e-9, fitRes.baseScale);
                   fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
                 } else {
                   braceletRadialSafeRadiusM = 0;
@@ -15352,7 +15355,6 @@ async function runHandArSession({
                   radialShould: braceletRadialShouldSwitch,
                   activated: braceletProceduralRadial,
                   segments: braceletRadialSegCount,
-                  radiusLocal: braceletRadialRadiusLocalPrefitSw,
                   safeRadiusM: braceletRadialSafeRadiusM,
                   radialInnerEquivLocal: braceletRadialRadiusLocal,
                 });
