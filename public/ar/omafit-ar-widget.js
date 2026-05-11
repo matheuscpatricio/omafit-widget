@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-ar-variants-all-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-procedural-radius-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12650,8 +12650,8 @@ async function runHandArSession({
 
   /**
    * Pulseira tipo Tripo (malha alongada): substitui por `InstancedMesh` radial —
-   * distribui N cópias do mesmo visual ao redor do eixo Y local (anel em XZ).
-   * `outRadiusLocal` recebe o raio usado (unidades GLB), para corrigir `localInnerR`.
+   * distribui N cópias do mesmo visual ao redor do eixo no plano do pulso.
+   * O raio da curva é **sempre procedural** (landmarks), nunca derivado do GLB.
    */
   function omafitBraceletRadialShouldRebuild(THREE, glbScene, modeRaw) {
     const mode = String(modeRaw ?? "auto").trim().toLowerCase();
@@ -12725,7 +12725,7 @@ async function runHandArSession({
   /**
    * @returns {boolean}
    */
-  function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments, outRadiusLocal) {
+  function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments) {
     braceletRadialInstMesh = null;
     braceletRadialSegCount = 0;
     let srcMesh = null;
@@ -12734,17 +12734,6 @@ async function runHandArSession({
       if (!srcMesh && o?.isMesh && o.geometry && !o.isSkinnedMesh) srcMesh = o;
     });
     if (!srcMesh) return false;
-
-    const sceneBox = new THREE.Box3().setFromObject(rootScene);
-    const sz = new THREE.Vector3();
-    sceneBox.getSize(sz);
-    const wristRadiusLocal = Math.max(
-      1e-6,
-      Math.max(sz.x, sz.z) * 0.5 * 1.1,
-    );
-    if (outRadiusLocal && typeof outRadiusLocal === "object") {
-      outRadiusLocal.value = wristRadiusLocal;
-    }
 
     const matSrc = srcMesh.material;
     const matPick =
@@ -12813,10 +12802,9 @@ async function runHandArSession({
 
   /**
    * Anel da pulseira procedural em **mundo**: base ortonormal a partir de
-   * landmarks (wrist=w0, index=w5, pinky=w17), círculo no plano (vX, vY),
+   * landmarks (wrist=w0, index=w5, pinky=w17), círculo no plano tangente,
    * orientação fixa via `makeBasis` + quaternion (sem `lookAt`).
-   * Raio = distância(index,pinky)*0.55; centro do anel com offset −0.25*r ao
-   * longo de vZ (normal da mão).
+   * Raio **só** a partir da largura do pulso (corda 5–17): `clamp(span*0.42, 26..34) mm`.
    * Matrizes em espaço do pai do `instMesh`.
    */
   function omafitUpdateBraceletRadialWristOriented(
@@ -12826,7 +12814,6 @@ async function runHandArSession({
     wrist,
     indexLm,
     pinkyLm,
-    radiusOverrideWorld,
   ) {
     if (
       !instMesh?.isInstancedMesh ||
@@ -12854,16 +12841,23 @@ async function runHandArSession({
     if (braceletRadTangent.lengthSq() < 1e-12) return;
     braceletRadTangent.normalize();
 
-    const radiusFromLandmarks = indexLm.distanceTo(pinkyLm) * 0.34;
-    const radiusWorldRaw = Number.isFinite(radiusOverrideWorld)
-      ? radiusOverrideWorld
-      : radiusFromLandmarks;
-    const radiusWorld = THREE.MathUtils.clamp(radiusWorldRaw, 0.016, 0.042);
-    if (radiusWorld < 1e-8) return;
+    const wristWidth = indexLm.distanceTo(pinkyLm);
+    const wristRadius = wristWidth * 0.42;
+    const safeRadius = THREE.MathUtils.clamp(wristRadius, 0.026, 0.034);
+    try {
+      console.log("[bracelet-procedural-radius]", {
+        wristWidth,
+        wristRadius,
+        safeRadius,
+      });
+    } catch {
+      /* ignore */
+    }
+    if (safeRadius < 1e-8) return;
 
     braceletRadRingCenter
       .copy(wrist)
-      .addScaledVector(braceletRadNormal, -radiusWorld * 0.25);
+      .addScaledVector(braceletRadNormal, -safeRadius * 0.25);
 
     braceletRadBasisMat.makeBasis(
       braceletRadVx,
@@ -12877,8 +12871,8 @@ async function runHandArSession({
 
     for (let i = 0; i < segCount; i++) {
       const angle = (i / segCount) * Math.PI * 2;
-      const rc = Math.cos(angle) * radiusWorld;
-      const rs = Math.sin(angle) * radiusWorld;
+      const rc = Math.cos(angle) * safeRadius;
+      const rs = Math.sin(angle) * safeRadius;
       braceletRadPos
         .copy(braceletRadRingCenter)
         .addScaledVector(braceletRadVx, rc)
@@ -13180,40 +13174,49 @@ async function runHandArSession({
      * com eixo ao longo de +Z local. A mediana do bbox ≈ 2·localRingR
      * (raio do eixo central). Para relógio NÃO-plano (já enrolado pela
      * autoria, ratio < 2), usamos median/2 como estimativa do raio.
-     */
-    const sorted = [size.x, size.y, size.z].sort((a, b) => a - b);
-    const medianDim = sorted[1] || 1;
-    const maxDim = sorted[2] || 1;
-    let localRingR = didBend
-      ? bendLocalR
-      : Math.max(medianDim / 2, 1e-6);
-
-    /**
-     * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
      *
-     * `localRingR` é o raio do EIXO central. A superfície INTERNA do
-     * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
-     * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
-     * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
-     * a superfície interna fica exactamente na pele (encaixe perfeito).
-     *
-     * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
-     * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
-     * de 10% de espessura radial).
+     * Pulseira **procedural radial** (Tripo / malha alongada): NÃO usar
+     * bbox nem `computeLocalInnerRadius` — GLB sem unidade física confiável.
+     * `localInnerR` neutro = alvo anatómico default ⇒ `baseScale ≈ 1` (só mesh visual).
      */
-    const computedInner = computeLocalInnerRadius(glbScene, bbox);
-    let localInnerR =
-      computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
-        ? computedInner
-        : Math.max(localRingR * 0.9, 1e-6);
+    let medianDim;
+    let maxDim;
+    let localRingR;
+    let localInnerR;
+    if (accessoryType === "bracelet" && braceletProceduralRadial) {
+      const gapNeutral = OMAFIT_BRACELET_WRIST_GAP_M;
+      const tgtInnerNeutral = OMAFIT_DEFAULT_WRIST_R_M + gapNeutral;
+      localInnerR = tgtInnerNeutral;
+      localRingR = tgtInnerNeutral * 1.02;
+      const sortedP = [size.x, size.y, size.z].sort((a, b) => a - b);
+      medianDim = sortedP[1] || 1;
+      maxDim = sortedP[2] || 1;
+    } else {
+      const sorted = [size.x, size.y, size.z].sort((a, b) => a - b);
+      medianDim = sorted[1] || 1;
+      maxDim = sorted[2] || 1;
+      localRingR = didBend
+        ? bendLocalR
+        : Math.max(medianDim / 2, 1e-6);
 
-    if (
-      accessoryType === "bracelet" &&
-      braceletProceduralRadial &&
-      braceletRadialRadiusLocal > 1e-8
-    ) {
-      localInnerR = Math.max(1e-6, braceletRadialRadiusLocal * 0.88);
-      localRingR = Math.max(localRingR, braceletRadialRadiusLocal);
+      /**
+       * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
+       *
+       * `localRingR` é o raio do EIXO central. A superfície INTERNA do
+       * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
+       * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
+       * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
+       * a superfície interna fica exactamente na pele (encaixe perfeito).
+       *
+       * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
+       * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
+       * de 10% de espessura radial).
+       */
+      const computedInner = computeLocalInnerRadius(glbScene, bbox);
+      localInnerR =
+        computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
+          ? computedInner
+          : Math.max(localRingR * 0.9, 1e-6);
     }
 
     /**
@@ -13533,8 +13536,6 @@ async function runHandArSession({
   let watchVertexDeform = null;
   /** Pulseira rígida (bangle): só escala global; elos: grupo ou vértices. */
   let braceletProceduralRadial = false;
-  /** Raio do anel procedural (`InstancedMesh`), unidades GLB antes do scale root. */
-  let braceletRadialRadiusLocal = 0;
   /** `InstancedMesh` da pulseira radial (actualização por frame com base no pulso). */
   let braceletRadialInstMesh = null;
   let braceletRadialSegCount = 0;
@@ -13597,7 +13598,6 @@ async function runHandArSession({
           );
         });
         braceletProceduralRadial = false;
-        braceletRadialRadiusLocal = 0;
         braceletRadialInstMesh = null;
         braceletRadialSegCount = 0;
         if (accessoryType === "bracelet") {
@@ -13612,23 +13612,18 @@ async function runHandArSession({
               String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
             );
             const seg = Number.isFinite(segRaw) ? segRaw : 24;
-            const outR = { value: 0 };
             braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
               THREE,
               glbScene,
               seg,
-              outR,
             );
-            if (braceletProceduralRadial) {
-              braceletRadialRadiusLocal = outR.value;
-            }
           }
           console.log("[omafit-ar] bracelet radial init", {
             radialMode,
             radialShould,
             activated: braceletProceduralRadial,
             segments: braceletRadialSegCount,
-            radiusLocal: braceletRadialRadiusLocal,
+            sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
           });
         }
         try {
@@ -13764,32 +13759,43 @@ async function runHandArSession({
           }
         }
 
-        console.log("[omafit-ar] hand GLB fit", {
-          accessoryType,
-          strategy: fitRes.didBend
-            ? "watch BENT → scale by INNER surface radius"
-            : accessoryType === "bracelet"
-              ? "bracelet → scale by INNER surface radius"
-              : "watch wrapped → scale by INNER surface radius",
-          baseScale: fitRes.baseScale,
-          maxDim: fitRes.maxDim,
-          medianDim: fitRes.medianDim,
-          localRingR_mm: (fitRes.localRingR * 1000).toFixed(1),
-          localInnerR_mm: ((fitRes.localInnerR || 0) * 1000).toFixed(1),
-          ringThickness_mm: (
-            (fitRes.localRingR - (fitRes.localInnerR || 0)) *
-            1000
-          ).toFixed(1),
-          didBend: fitRes.didBend,
-          defaultWristR_mm: Math.round(OMAFIT_DEFAULT_WRIST_R_M * 1000),
-          effMaxMm: Math.round(
-            fitRes.maxDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
-          ),
-          effMedianMm: Math.round(
-            fitRes.medianDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
-          ),
-          bbox: { x: fitRes.size.x, y: fitRes.size.y, z: fitRes.size.z },
-        });
+        console.log(
+          "[omafit-ar] hand GLB fit",
+          braceletProceduralRadial && accessoryType === "bracelet"
+            ? {
+                accessoryType,
+                strategy: "bracelet procedural radial → GLB scale neutral (wrist-only ring)",
+                baseScale: fitRes.baseScale,
+                didBend: fitRes.didBend,
+                bbox: { x: fitRes.size.x, y: fitRes.size.y, z: fitRes.size.z },
+              }
+            : {
+                accessoryType,
+                strategy: fitRes.didBend
+                  ? "watch BENT → scale by INNER surface radius"
+                  : accessoryType === "bracelet"
+                    ? "bracelet → scale by INNER surface radius"
+                    : "watch wrapped → scale by INNER surface radius",
+                baseScale: fitRes.baseScale,
+                maxDim: fitRes.maxDim,
+                medianDim: fitRes.medianDim,
+                localRingR_mm: (fitRes.localRingR * 1000).toFixed(1),
+                localInnerR_mm: ((fitRes.localInnerR || 0) * 1000).toFixed(1),
+                ringThickness_mm: (
+                  (fitRes.localRingR - (fitRes.localInnerR || 0)) *
+                  1000
+                ).toFixed(1),
+                didBend: fitRes.didBend,
+                defaultWristR_mm: Math.round(OMAFIT_DEFAULT_WRIST_R_M * 1000),
+                effMaxMm: Math.round(
+                  fitRes.maxDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
+                ),
+                effMedianMm: Math.round(
+                  fitRes.medianDim * fitRes.baseScale * (userScale > 0 ? userScale : 1) * 1000,
+                ),
+                bbox: { x: fitRes.size.x, y: fitRes.size.y, z: fitRes.size.z },
+              },
+        );
         braceletHandLog("glb:load_ok", {
           baseScale: fitRes.baseScale,
           bangle: accessoryType === "bracelet" ? braceletIsBangle : null,
@@ -14748,7 +14754,6 @@ async function runHandArSession({
             w0,
             w5,
             w17,
-            smoothWristRadius,
           );
         }
       } else {
@@ -14926,19 +14931,25 @@ async function runHandArSession({
         occluderR_mm: (occluderR * 1000).toFixed(1),
         forearmL_cm: (smoothForearmLength * 100).toFixed(1),
         bent: didBendWatch,
-        /** Raio INTERNO do GLB (superfície que toca a pele em unidades GLB). */
-        localInnerR_mm: (localInnerR * 1000).toFixed(1),
-        /** Raio do EIXO do GLB (metade da mediana do bbox). */
-        localRingR_mm: (localRingR * 1000).toFixed(1),
+        ...(accessoryType === "bracelet" && braceletProceduralRadial
+          ? {
+              braceletRadialSizing: "procedural-wrist-only (ver [bracelet-procedural-radius])",
+            }
+          : {
+              /** Raio INTERNO do GLB (superfície que toca a pele em unidades GLB). */
+              localInnerR_mm: (localInnerR * 1000).toFixed(1),
+              /** Raio do EIXO do GLB (metade da mediana do bbox). */
+              localRingR_mm: (localRingR * 1000).toFixed(1),
+              /** Raio INTERNO final do GLB no mundo (deve ≈ wristR + gap).
+               *  Se este valor for MENOR que smoothWristR, o GLB clipa no braço!
+               *  Se for MAIOR que smoothWristR + 5mm, o GLB fica flutuando. */
+              finalInnerR_mm: (localInnerR * baseScale * userMul * adaptMul * 1000).toFixed(1),
+            }),
         adaptScale: adaptMul.toFixed(3),
         glbScale: (baseScale * userMul * adaptMul * wristSpanScaleMul).toFixed(
           4,
         ),
         wristSpanScaleMul: wristSpanScaleMul.toFixed(3),
-        /** Raio INTERNO final do GLB no mundo (deve ≈ wristR + gap).
-         *  Se este valor for MENOR que smoothWristR, o GLB clipa no braço!
-         *  Se for MAIOR que smoothWristR + 5mm, o GLB fica flutuando. */
-        finalInnerR_mm: (localInnerR * baseScale * userMul * adaptMul * 1000).toFixed(1),
         zDist: zDist.toFixed(3),
         Yz: tmpY.z.toFixed(3),
         strapBiometricK:
@@ -15259,7 +15270,6 @@ async function runHandArSession({
               }
               bakeGLBTransforms(THREE, next, () => {});
               braceletProceduralRadial = false;
-              braceletRadialRadiusLocal = 0;
               braceletRadialInstMesh = null;
               braceletRadialSegCount = 0;
               if (accessoryType === "bracelet") {
@@ -15274,23 +15284,18 @@ async function runHandArSession({
                     String(cfgAttr("arBraceletRadialSegments", "24")).trim(),
                   );
                   const seg = Number.isFinite(segRaw) ? segRaw : 24;
-                  const outR = { value: 0 };
                   braceletProceduralRadial = omafitRebuildBraceletRadialInstanced(
                     THREE,
                     next,
                     seg,
-                    outR,
                   );
-                  if (braceletProceduralRadial) {
-                    braceletRadialRadiusLocal = outR.value;
-                  }
                 }
                 console.log("[omafit-ar] bracelet radial switch", {
                   radialMode,
                   radialShould,
                   activated: braceletProceduralRadial,
                   segments: braceletRadialSegCount,
-                  radiusLocal: braceletRadialRadiusLocal,
+                  sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
                 });
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
