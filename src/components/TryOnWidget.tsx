@@ -48,6 +48,7 @@ function writeTryonLayoutToSession(shopDomain: string, layout: TryonLayoutMode) 
 interface TryOnWidgetProps {
   garmentImage: string;
   productId?: string;
+  productHandle?: string;
   productName?: string;
   storeName?: string;
   storeLogo?: string;
@@ -380,6 +381,7 @@ const logProductCatalogDebug = (
 export function TryOnWidget({
   garmentImage,
   productId = 'unknown',
+  productHandle = '',
   productName = 'Produto',
   storeName = '',
   storeLogo,
@@ -412,6 +414,7 @@ export function TryOnWidget({
   console.log('   - publicId:', publicId);
   console.log('   - shopDomain:', shopDomain);
   console.log('   - productId:', productId);
+  console.log('   - productHandle:', productHandle || 'não fornecido');
   console.log('   - productName:', productName);
   console.log('   - storeName:', storeName);
   console.log('   - storeLogo:', storeLogo ? 'Sim' : 'Não');
@@ -629,6 +632,7 @@ export function TryOnWidget({
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
+  const [localProductHandle, setLocalProductHandle] = useState<string>(productHandle || '');
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
@@ -1064,6 +1068,12 @@ export function TryOnWidget({
     }
   }, [shopDomain]);
 
+  useEffect(() => {
+    if (productHandle && productHandle.trim()) {
+      setLocalProductHandle(productHandle.trim());
+    }
+  }, [productHandle]);
+
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
     if (step === 'result' && sizeData && chatMessages.length === 0 && !gptLoading) {
@@ -1121,6 +1131,12 @@ export function TryOnWidget({
           const name = event.data.productName || event.data.product_name;
           console.log('✅ Atualizando productName:', name);
           setLocalProductName(name);
+        }
+
+        if (event.data.productHandle || event.data.product_handle) {
+          const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
+          console.log('✅ Atualizando productHandle:', handle);
+          setLocalProductHandle(handle);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -1207,6 +1223,12 @@ export function TryOnWidget({
           const name = event.data.productName || event.data.product_name;
           console.log('✅ Atualizando productName:', name);
           setLocalProductName(name);
+        }
+
+        if (event.data.productHandle || event.data.product_handle) {
+          const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
+          console.log('✅ Atualizando productHandle:', handle);
+          setLocalProductHandle(handle);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -2082,56 +2104,87 @@ export function TryOnWidget({
       console.log('   - Handles candidatos (Shopify):', candidateHandles.length ? candidateHandles.join(', ') : '(nenhum)');
       console.log('   - Collection handle efetivo (busca):', handleForChart || 'null (tabela global / collection_id)');
       console.log('   - Product ID:', productId);
+      console.log('   - Product Handle:', localProductHandle || productHandle || 'null');
       console.log('   - 🎯 Gender FINAL para busca (sempre do usuário):', searchGender);
 
       try {
         // Buscar a size_chart primeiro
         console.log('🔍 ===== BUSCANDO SIZE_CHART =====');
-        let sizeChartQuery = supabase
-          .from('size_charts')
-          .select('id, collection_id, collection_handle, gender, shop_domain');
+        const effectiveProductHandle = (localProductHandle || productHandle || '').trim();
+        let sizeChartRecord: any = null;
+        let chartError: any = null;
 
-        // Prioridade 1: collection_handle (vindo do Shopify)
-        if (handleForChart) {
-          console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
-          console.log('   SELECT * FROM size_charts');
+        if (effectiveProductHandle) {
+          console.log('🔍 Modo: BUSCA POR PRODUCT_HANDLE (SHOPIFY)');
           console.log('   WHERE shop_domain =', effectiveShopDomain);
-          console.log('   AND collection_handle =', handleForChart);
+          console.log('   AND product_handle =', effectiveProductHandle);
           console.log('   AND gender =', searchGender);
 
-          sizeChartQuery = sizeChartQuery
+          const productChartResult = await supabase
+            .from('size_charts')
+            .select('id, collection_id, collection_handle, product_handle, gender, shop_domain')
             .eq('shop_domain', effectiveShopDomain)
-            .eq('collection_handle', handleForChart)
-            .eq('gender', searchGender);
-        }
-        // Prioridade 2: collection_id (UUID interno)
-        else if (collectionId && collectionId.trim() !== '') {
-          console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
-          console.log('   SELECT * FROM size_charts');
-          console.log('   WHERE collection_id =', collectionId);
-          console.log('   AND gender =', searchGender);
+            .eq('product_handle', effectiveProductHandle)
+            .eq('gender', searchGender)
+            .maybeSingle();
 
-          sizeChartQuery = sizeChartQuery
-            .eq('collection_id', collectionId)
-            .eq('gender', searchGender);
-        }
-        // Prioridade 3: Tabela global (sem collection)
-        else {
-          console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
-          console.log('   SELECT * FROM size_charts');
-          console.log('   WHERE shop_domain =', effectiveShopDomain);
-          console.log('   AND collection_handle IS NULL');
-          console.log('   AND collection_id IS NULL');
-          console.log('   AND gender =', searchGender);
-
-          sizeChartQuery = sizeChartQuery
-            .eq('shop_domain', effectiveShopDomain)
-            .is('collection_handle', null)
-            .is('collection_id', null)
-            .eq('gender', searchGender);
+          if (productChartResult.error) {
+            console.warn('⚠️ Busca por product_handle falhou, seguindo para coleção:', productChartResult.error);
+          } else if (productChartResult.data) {
+            sizeChartRecord = productChartResult.data;
+          }
         }
 
-        const { data: sizeChartRecord, error: chartError } = await sizeChartQuery.maybeSingle();
+        if (!sizeChartRecord) {
+          let sizeChartQuery = supabase
+            .from('size_charts')
+            .select('id, collection_id, collection_handle, product_handle, gender, shop_domain');
+
+          // Prioridade 2: collection_handle (vindo do Shopify)
+          if (handleForChart) {
+            console.log('🔍 Modo: BUSCA POR COLLECTION_HANDLE (SHOPIFY)');
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE shop_domain =', effectiveShopDomain);
+            console.log('   AND collection_handle =', handleForChart);
+            console.log('   AND gender =', searchGender);
+
+            sizeChartQuery = sizeChartQuery
+              .eq('shop_domain', effectiveShopDomain)
+              .eq('collection_handle', handleForChart)
+              .eq('product_handle', '')
+              .eq('gender', searchGender);
+          }
+          // Prioridade 3: collection_id (UUID interno)
+          else if (collectionId && collectionId.trim() !== '') {
+            console.log('🔍 Modo: BUSCA POR COLLECTION_ID (UUID INTERNO)');
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE collection_id =', collectionId);
+            console.log('   AND gender =', searchGender);
+
+            sizeChartQuery = sizeChartQuery
+              .eq('collection_id', collectionId)
+              .eq('gender', searchGender);
+          }
+          // Prioridade 4: Tabela global (sem collection)
+          else {
+            console.log('🔍 Modo: BUSCA POR TABELA GLOBAL (SEM COLEÇÃO)');
+            console.log('   SELECT * FROM size_charts');
+            console.log('   WHERE shop_domain =', effectiveShopDomain);
+            console.log('   AND collection_handle = ""');
+            console.log('   AND product_handle = ""');
+            console.log('   AND gender =', searchGender);
+
+            sizeChartQuery = sizeChartQuery
+              .eq('shop_domain', effectiveShopDomain)
+              .eq('collection_handle', '')
+              .eq('product_handle', '')
+              .eq('gender', searchGender);
+          }
+
+          const chartResult = await sizeChartQuery.maybeSingle();
+          sizeChartRecord = chartResult.data;
+          chartError = chartResult.error;
+        }
 
         if (chartError) {
           console.error('❌ Erro ao buscar size_chart:', chartError);
@@ -2232,48 +2285,71 @@ export function TryOnWidget({
           console.log('⚠️ Chart específico NÃO encontrado, tentando fallback unisex...');
           console.log('🔍 Executando query fallback:');
 
-          let fallbackQuery = supabase
-            .from('size_charts')
-            .select('id, collection_id, collection_handle, gender, shop_domain');
+          const effectiveProductHandle = (localProductHandle || productHandle || '').trim();
+          let unisexChart: any = null;
 
-          // Prioridade 1: collection_handle (vindo do Shopify)
-          if (handleForChart) {
-            console.log('   SELECT * FROM size_charts');
-            console.log('   WHERE shop_domain =', effectiveShopDomain);
-            console.log('   AND collection_handle =', handleForChart);
-            console.log('   AND gender = unisex');
-
-            fallbackQuery = fallbackQuery
+          if (effectiveProductHandle) {
+            const productFallbackResult = await supabase
+              .from('size_charts')
+              .select('id, collection_id, collection_handle, product_handle, gender, shop_domain')
               .eq('shop_domain', effectiveShopDomain)
-              .eq('collection_handle', handleForChart)
-              .eq('gender', 'unisex');
-          }
-          // Prioridade 2: collection_id (UUID interno)
-          else if (collectionId && collectionId.trim() !== '') {
-            console.log('   SELECT * FROM size_charts');
-            console.log('   WHERE collection_id =', collectionId);
-            console.log('   AND gender = unisex');
+              .eq('product_handle', effectiveProductHandle)
+              .eq('gender', 'unisex')
+              .maybeSingle();
 
-            fallbackQuery = fallbackQuery
-              .eq('collection_id', collectionId)
-              .eq('gender', 'unisex');
-          }
-          // Prioridade 3: Tabela global
-          else {
-            console.log('   SELECT * FROM size_charts');
-            console.log('   WHERE shop_domain =', effectiveShopDomain);
-            console.log('   AND collection_handle IS NULL');
-            console.log('   AND collection_id IS NULL');
-            console.log('   AND gender = unisex');
-
-            fallbackQuery = fallbackQuery
-              .eq('shop_domain', effectiveShopDomain)
-              .is('collection_handle', null)
-              .is('collection_id', null)
-              .eq('gender', 'unisex');
+            if (productFallbackResult.error) {
+              console.warn('⚠️ Fallback unisex por product_handle falhou:', productFallbackResult.error);
+            } else if (productFallbackResult.data) {
+              unisexChart = productFallbackResult.data;
+            }
           }
 
-          const { data: unisexChart } = await fallbackQuery.maybeSingle();
+          if (!unisexChart) {
+            let fallbackQuery = supabase
+              .from('size_charts')
+              .select('id, collection_id, collection_handle, product_handle, gender, shop_domain');
+
+            // Prioridade 2: collection_handle (vindo do Shopify)
+            if (handleForChart) {
+              console.log('   SELECT * FROM size_charts');
+              console.log('   WHERE shop_domain =', effectiveShopDomain);
+              console.log('   AND collection_handle =', handleForChart);
+              console.log('   AND gender = unisex');
+
+              fallbackQuery = fallbackQuery
+                .eq('shop_domain', effectiveShopDomain)
+                .eq('collection_handle', handleForChart)
+                .eq('product_handle', '')
+                .eq('gender', 'unisex');
+            }
+            // Prioridade 3: collection_id (UUID interno)
+            else if (collectionId && collectionId.trim() !== '') {
+              console.log('   SELECT * FROM size_charts');
+              console.log('   WHERE collection_id =', collectionId);
+              console.log('   AND gender = unisex');
+
+              fallbackQuery = fallbackQuery
+                .eq('collection_id', collectionId)
+                .eq('gender', 'unisex');
+            }
+            // Prioridade 4: Tabela global
+            else {
+              console.log('   SELECT * FROM size_charts');
+              console.log('   WHERE shop_domain =', effectiveShopDomain);
+              console.log('   AND collection_handle = ""');
+              console.log('   AND product_handle = ""');
+              console.log('   AND gender = unisex');
+
+              fallbackQuery = fallbackQuery
+                .eq('shop_domain', effectiveShopDomain)
+                .eq('collection_handle', '')
+                .eq('product_handle', '')
+                .eq('gender', 'unisex');
+            }
+
+            const collectionFallbackResult = await fallbackQuery.maybeSingle();
+            unisexChart = collectionFallbackResult.data;
+          }
 
           if (unisexChart) {
             console.log('✅ Chart UNISEX encontrado, buscando entries...');
@@ -2340,6 +2416,8 @@ export function TryOnWidget({
     collectionId,
     collectionHandle,
     collectionHandles?.join(','),
+    localProductHandle,
+    productHandle,
   ]);
 
 const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

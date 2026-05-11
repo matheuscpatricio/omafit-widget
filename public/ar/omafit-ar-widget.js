@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-tripo-normalize-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-bake-world-scale-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12769,6 +12769,32 @@ async function runHandArSession({
   }
 
   /**
+   * Incorpora a escala mundial do `mesh` (incl. pais, ex. `glbScene.scale` pós-Tripo)
+   * nos vértices da `geometry` em espaço local — `InstancedMesh` ignora escala do pai
+   * nos buffers clonados; sem isto, beads ficam no tamanho bruto do GLB.
+   */
+  function omafitBakeMeshWorldScaleIntoGeometry(mesh, geometry) {
+    if (!mesh || !geometry?.attributes?.position) return;
+    mesh.updateMatrixWorld(true);
+    const tmpP = new THREE.Vector3();
+    const tmpQ = new THREE.Quaternion();
+    const tmpS = new THREE.Vector3();
+    mesh.matrixWorld.decompose(tmpP, tmpQ, tmpS);
+    const pos = geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setXYZ(
+        i,
+        pos.getX(i) * tmpS.x,
+        pos.getY(i) * tmpS.y,
+        pos.getZ(i) * tmpS.z,
+      );
+    }
+    pos.needsUpdate = true;
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+  }
+
+  /**
    * @returns {boolean}
    */
   function omafitRebuildBraceletRadialInstanced(THREE, rootScene, segments) {
@@ -12792,6 +12818,10 @@ async function runHandArSession({
     const ctr = new THREE.Vector3();
     geoCentered.boundingBox.getCenter(ctr);
     geoCentered.translate(-ctr.x, -ctr.y, -ctr.z);
+    omafitBakeMeshWorldScaleIntoGeometry(srcMesh, geoCentered);
+    /** Escalas já nos vértices da instância — evitar dupla aplicação no grafo. */
+    rootScene.scale.set(1, 1, 1);
+    rootScene.updateMatrixWorld(true);
 
     const trash = [];
     rootScene.traverse((o) => {

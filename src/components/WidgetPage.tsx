@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-11-bracelet-tripo-normalize-v1';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-11-bracelet-bake-world-scale-v1';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -398,6 +398,7 @@ export function WidgetPage() {
   const [productImage, setProductImage] = useState<string>(sb.productImage);
   const [productImages, setProductImages] = useState<string[]>(sb.productImages);
   const [productId, setProductId] = useState<string>('');
+  const [productHandle, setProductHandle] = useState<string>(sb.productHandle || '');
   const [productName, setProductName] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('Omafit');
   const [storeLogo, setStoreLogo] = useState<string>('');
@@ -451,6 +452,7 @@ export function WidgetPage() {
     const image = params.get('productImage');
     const imagesParam = params.get('productImages');
     const id = params.get('productId');
+    const productHandleParam = params.get('productHandle') || params.get('product_handle') || params.get('handle');
     const name = params.get('productName');
     const configParam = params.get('config');
     const pubId = params.get('publicId');
@@ -512,6 +514,10 @@ export function WidgetPage() {
 
     if (id) {
       setProductId(id);
+    }
+
+    if (productHandleParam) {
+      setProductHandle(decodeURIComponent(productHandleParam));
     }
 
     if (name) {
@@ -709,6 +715,11 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
+        if (event.data.productHandle || event.data.product_handle) {
+          const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
+          console.log('📦 Product Handle do contexto:', handle);
+          setProductHandle(handle);
+        }
         const contextLanguage = normalizeWidgetLanguage(event.data.adminLocale || event.data.admin_locale || event.data.language);
         if (contextLanguage) {
           setStoreLanguage(contextLanguage);
@@ -785,6 +796,11 @@ export function WidgetPage() {
         if (event.data.shopDomain) {
           console.log('🏪 Shop Domain do config:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
+        }
+        if (event.data.productHandle || event.data.product_handle) {
+          const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
+          console.log('📦 Product Handle do config:', handle);
+          setProductHandle(handle);
         }
         if (event.data.defaultGender) {
           console.log('👤 Default Gender do config:', event.data.defaultGender);
@@ -1141,6 +1157,7 @@ export function WidgetPage() {
           garmentImage={productImage}
           productImages={productImages}
           productId={productId}
+          productHandle={productHandle}
           productName={productName}
           storeName={storeName}
           storeLogo={storeLogo}

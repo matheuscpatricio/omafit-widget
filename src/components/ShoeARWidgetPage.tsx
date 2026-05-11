@@ -66,6 +66,7 @@ export function ShoeARWidgetPage() {
   }, []);
   const [productImage, setProductImage] = useState<string>(sb.productImage);
   const [productId, setProductId] = useState<string>('');
+  const [productHandle, setProductHandle] = useState<string>(sb.productHandle || '');
   const [productName, setProductName] = useState<string>('Calçado em destaque');
   const [productDescription, setProductDescription] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('Omafit');
@@ -99,6 +100,7 @@ export function ShoeARWidgetPage() {
     const configParam = params.get('config');
     const image = params.get('productImage');
     const id = params.get('productId');
+    const productHandleParam = params.get('productHandle') || params.get('product_handle') || params.get('handle');
     const name = params.get('productName');
     const description = params.get('productDescription') || params.get('product_description');
     const publicIdParam = params.get('publicId') || params.get('public_id');
@@ -123,6 +125,7 @@ export function ShoeARWidgetPage() {
 
     if (image) setProductImage(image);
     if (id) setProductId(id);
+    if (productHandleParam) setProductHandle(decodeURIComponent(productHandleParam));
     if (name) setProductName(decodeURIComponent(name));
     if (description) setProductDescription(decodeURIComponent(description));
     if (publicIdParam) setPublicId(decodeURIComponent(publicIdParam));
@@ -161,6 +164,9 @@ export function ShoeARWidgetPage() {
         if (config.fontFamily) setFontFamily(config.fontFamily);
         if (config.productName || config.product_name) {
           setProductName(config.productName || config.product_name);
+        }
+        if (config.productHandle || config.product_handle) {
+          setProductHandle(config.productHandle || config.product_handle);
         }
         if (config.productDescription || config.product_description) {
           setProductDescription(config.productDescription || config.product_description);
@@ -210,6 +216,9 @@ export function ShoeARWidgetPage() {
           setPublicId(event.data.publicId || event.data.public_id);
         }
         if (event.data.productId) setProductId(event.data.productId);
+        if (event.data.productHandle || event.data.product_handle) {
+          setProductHandle(String(event.data.productHandle || event.data.product_handle || '').trim());
+        }
         if (event.data.shopDomain) setShopDomain(event.data.shopDomain);
         if (event.data.collectionId) setCollectionId(event.data.collectionId);
         if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
@@ -301,6 +310,7 @@ export function ShoeARWidgetPage() {
           <ShoeARWidget
             productImage={productImage}
             productId={productId}
+            productHandle={productHandle}
             productName={productName}
             productDescription={productDescription}
             publicId={publicId}

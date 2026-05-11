@@ -27,6 +27,7 @@ interface ShoeARWidgetProps {
   productDescription?: string;
   publicId?: string;
   productId?: string;
+  productHandle?: string;
   storeName?: string;
   storeLogo?: string;
   primaryColor?: string;
@@ -666,6 +667,7 @@ export function ShoeARWidget({
   productDescription = '',
   publicId = '',
   productId = 'unknown',
+  productHandle = '',
   storeName = 'Omafit',
   storeLogo,
   primaryColor = '#810707',
@@ -771,6 +773,7 @@ export function ShoeARWidget({
         console.log('🔍 ===== BUSCANDO SIZE_CHART (CALÇADOS) =====');
         console.log('📊 Parâmetros de busca no ShoeARWidget:');
         console.log('   - Shop Domain:', effectiveShopDomain);
+        console.log('   - Product Handle:', productHandle || 'null');
         console.log('   - Collection Handle (Shopify):', collectionHandle || 'null');
 
         const candidateHandles = Array.from(
@@ -800,12 +803,39 @@ export function ShoeARWidget({
 
         const normalizedCollectionHandle = handleForChart;
 
-        const { data: sizeChartRecord, error: chartError } = await supabase
-          .from('size_charts')
-          .select('id, shop_domain, collection_handle, sizes, measurement_refs')
-          .eq('shop_domain', effectiveShopDomain)
-          .eq('collection_handle', normalizedCollectionHandle)
-          .maybeSingle();
+        let sizeChartRecord: any = null;
+        let chartError: any = null;
+        const effectiveProductHandle = String(productHandle || '').trim();
+
+        if (effectiveProductHandle) {
+          const productChartResult = await supabase
+            .from('size_charts')
+            .select('id, shop_domain, collection_handle, product_handle, sizes, measurement_refs')
+            .eq('shop_domain', effectiveShopDomain)
+            .eq('product_handle', effectiveProductHandle)
+            .limit(1)
+            .maybeSingle();
+
+          if (productChartResult.error) {
+            console.warn('⚠️ Busca de tabela de calçado por product_handle falhou:', productChartResult.error);
+          } else if (productChartResult.data) {
+            sizeChartRecord = productChartResult.data;
+          }
+        }
+
+        if (!sizeChartRecord) {
+          const collectionChartResult = await supabase
+            .from('size_charts')
+            .select('id, shop_domain, collection_handle, product_handle, sizes, measurement_refs')
+            .eq('shop_domain', effectiveShopDomain)
+            .eq('collection_handle', normalizedCollectionHandle)
+            .eq('product_handle', '')
+            .limit(1)
+            .maybeSingle();
+
+          sizeChartRecord = collectionChartResult.data;
+          chartError = collectionChartResult.error;
+        }
 
         if (chartError) {
           console.error('Erro ao buscar size_chart para calçados:', chartError);
@@ -819,6 +849,7 @@ export function ShoeARWidget({
           console.log('✅ SIZE_CHART ENCONTRADO:');
           console.log('   - ID:', chartRecord.id);
           console.log('   - Shop Domain:', chartRecord.shop_domain);
+          console.log('   - Product Handle:', chartRecord.product_handle || 'null');
           console.log('   - Collection Handle:', chartRecord.collection_handle || 'null');
         } else {
           console.log('❌ SIZE_CHART NÃO ENCONTRADO');
@@ -875,7 +906,7 @@ export function ShoeARWidget({
     };
 
     loadSizeChart();
-  }, [shopDomain, collectionHandle, collectionHandles?.join(',')]);
+  }, [shopDomain, productHandle, collectionHandle, collectionHandles?.join(',')]);
 
   const surfaceTint = useMemo(() => hexToRgba(primaryColor, 0.1), [primaryColor]);
   const borderTint = useMemo(() => hexToRgba(primaryColor, 0.2), [primaryColor]);
