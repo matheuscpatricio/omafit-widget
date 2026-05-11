@@ -518,6 +518,25 @@ export function WidgetPage() {
 
     if (productHandleParam) {
       setProductHandle(decodeURIComponent(productHandleParam));
+    } else {
+      // Fallback: extrair handle a partir do referrer (URL da página do produto que carrega o iframe).
+      // Útil quando o asset omafit-widget.js do tema ainda não foi redeployado e não envia productHandle.
+      try {
+        const referrer = typeof document !== 'undefined' ? document.referrer : '';
+        if (referrer) {
+          const ref = new URL(referrer);
+          const match = ref.pathname.match(/\/products\/([^/?#]+)/i);
+          if (match && match[1]) {
+            const handleFromReferrer = decodeURIComponent(match[1]).trim();
+            if (handleFromReferrer) {
+              console.log('🔁 productHandle inferido do referrer:', handleFromReferrer);
+              setProductHandle(handleFromReferrer);
+            }
+          }
+        }
+      } catch (refErr) {
+        console.warn('⚠️ Falha ao inferir productHandle do referrer:', refErr);
+      }
     }
 
     if (name) {
