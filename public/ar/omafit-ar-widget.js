@@ -6826,15 +6826,28 @@ function omafitFeaturedImageUrlFromStorefrontVariant(sv) {
 
 /** Handle do produto para `/products/{handle}.js` (data-attrs ou URL `/products/...`). */
 function omafitResolveProductHandleForVariantFetch() {
-  const fromDom =
-    typeof document !== "undefined"
-      ? String(
-          document.getElementById("omafit-widget-root")?.getAttribute("data-product-handle") ||
-            document.getElementById("omafit-ar-root")?.getAttribute("data-product-handle") ||
-            "",
-        ).trim()
-      : "";
-  if (fromDom) return fromDom;
+  const pick = (s) => String(s || "").trim();
+  if (typeof document !== "undefined") {
+    const w = document.getElementById("omafit-widget-root");
+    const ar = document.getElementById("omafit-ar-root");
+    const fromDom =
+      pick(w?.dataset?.productHandle || w?.getAttribute?.("data-product-handle")) ||
+      pick(ar?.dataset?.productHandle || ar?.getAttribute?.("data-product-handle"));
+    if (fromDom) return fromDom;
+    const firstAttr = document.querySelector("[data-product-handle]");
+    const fromAny = pick(firstAttr?.getAttribute?.("data-product-handle"));
+    if (fromAny) return fromAny;
+    try {
+      const og = document.querySelector('meta[property="og:url"]')?.getAttribute("content");
+      if (og) {
+        const u = new URL(og, typeof location !== "undefined" ? location.href : undefined);
+        const pm = u.pathname.match(/\/products\/([^/?#]+)/i);
+        if (pm && pm[1]) return decodeURIComponent(pm[1]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   try {
     const m = typeof location !== "undefined" ? location.pathname.match(/\/products\/([^/?#]+)/i) : null;
     return m && m[1] ? decodeURIComponent(m[1]) : "";
@@ -6908,6 +6921,7 @@ async function omafitEnrichVariantsFromStorefrontJs(productHandle, existing) {
         title: String(base.title || sv.name || sv.title || "").trim() || String(sv.name || sv.title || ""),
         price: base.price ?? sv.price,
         imageUrl: omafitNormalizeShopifyProductImgUrl(img) || String(base.imageUrl || "").trim(),
+        position: sv.position != null ? Number(sv.position) : Number(base.position) || 0,
       });
     }
     return out.length ? out : list;
@@ -7022,6 +7036,19 @@ async function runArSession({
     variantSource = await omafitEnrichVariantsFromStorefrontJs(productHandleForFetch, variantSource);
   }
 
+  /** Mescla duplicados por `id` (Liquid + fetch) — mantém metadados mais completos. */
+  if (Array.isArray(variantSource) && variantSource.length > 1) {
+    const byId = new Map();
+    for (const v of variantSource) {
+      if (!v || v.id == null) continue;
+      const sid = String(v.id).trim();
+      if (!sid) continue;
+      const prev = byId.get(sid);
+      byId.set(sid, prev ? { ...prev, ...v } : v);
+    }
+    variantSource = [...byId.values()];
+  }
+
   const sessionGlb = String(glbUrl || "").trim();
   /** GLB do produto (`data-glb-url`) ou, se vazio, o primeiro `glbUrl` presente nas variantes (Liquid). */
   const baseGlb =
@@ -7032,13 +7059,18 @@ async function runArSession({
 
   const resolveVariantGlb = (v) =>
     String(v?.glbUrl ?? v?.glb_url ?? "").trim() || baseGlb;
-  /** Incluir todas as variantes com id — GLB partilhado ao nível do produto ou numa variante (`baseGlb`). */
-  let arVariants = variantSource.filter((v) => {
+  /**
+   * Todas as variantes com `id` (loja + AR): o GLB pode ser partilhado (`baseGlb` / `data-glb-url`).
+   * Não filtrar por “tem glb próprio” — senão opções de cor/tamanho sem URL no JSON Liquid desaparecem.
+   */
+  let arVariants = (Array.isArray(variantSource) ? variantSource : []).filter((v) => {
     if (!v) return false;
     const id = v.id != null ? String(v.id).trim() : "";
-    if (!id) return false;
-    return Boolean(resolveVariantGlb(v));
+    return Boolean(id);
   });
+  arVariants.sort(
+    (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || String(a.id).localeCompare(String(b.id)),
+  );
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com
    * `data-variant-id` + `data-glb-url` sintetizamos uma variante para miniaturas
@@ -7060,7 +7092,17 @@ async function runArSession({
     /* ignore */
   }
   let currentVariantId = arVariants.length > 0 ? arVariants[0].id : null;
-  let currentGlbUrl = arVariants.length > 0 ? resolveVariantGlb(arVariants[0]) : baseGlb;
+  let currentGlbUrl =
+    arVariants.length > 0
+      ? resolveVariantGlb(arVariants[0]) ||
+        (() => {
+          for (let vi = 0; vi < arVariants.length; vi++) {
+            const g = resolveVariantGlb(arVariants[vi]);
+            if (g) return g;
+          }
+          return baseGlb;
+        })()
+      : baseGlb;
   try {
     const pqv = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search || "" : "",
@@ -7069,7 +7111,8 @@ async function runArSession({
       const mv = arVariants.find((vv) => String(vv.id) === String(pqv).trim());
       if (mv) {
         currentVariantId = mv.id;
-        currentGlbUrl = resolveVariantGlb(mv);
+        const gSel = resolveVariantGlb(mv);
+        if (gSel) currentGlbUrl = gSel;
       }
     }
   } catch {
@@ -7191,10 +7234,11 @@ async function runArSession({
       thumb.addEventListener("click", () => {
         if (String(v.id) === String(currentVariantId)) return;
         currentVariantId = v.id;
-        currentGlbUrl = resolveVariantGlb(v);
+        const nextGlb = resolveVariantGlb(v);
+        if (nextGlb) currentGlbUrl = nextGlb;
         syncThumbBorders();
-        if (typeof window.__omafitArSwitchGlb === "function") {
-          window.__omafitArSwitchGlb(currentGlbUrl, variantCalPayload(v));
+        if (typeof window.__omafitArSwitchGlb === "function" && nextGlb) {
+          window.__omafitArSwitchGlb(nextGlb, variantCalPayload(v));
         }
       });
       thumbRow.appendChild(thumb);
@@ -7626,7 +7670,7 @@ async function runArSession({
         arFit,
         mindarHost,
         loading,
-        glbUrl,
+        glbUrl: String(currentGlbUrl || glbUrl || "").trim(),
         t,
         variants,
         productId,
@@ -7643,7 +7687,10 @@ async function runArSession({
         const ivSel = arVariants.find((vv) => String(vv.id) === String(currentVariantId));
         if (ivSel) {
           try {
-            window.__omafitArSwitchGlb(resolveVariantGlb(ivSel), variantCalPayload(ivSel));
+            const gInit = resolveVariantGlb(ivSel);
+            if (gInit) {
+              window.__omafitArSwitchGlb(gInit, variantCalPayload(ivSel));
+            }
           } catch (e) {
             console.warn("[omafit-ar] switch variante inicial (mão):", e?.message || e);
           }
@@ -8379,7 +8426,8 @@ async function runArSession({
       return { u, v };
     })();
     const sessionGlbUrl =
-      omafitReadGlbUrlFromRootOrQuery() || omafitAbsolutizeGlbUrlMaybe(String(glbUrl || "").trim());
+      omafitReadGlbUrlFromRootOrQuery() ||
+      omafitAbsolutizeGlbUrlMaybe(String(currentGlbUrl || glbUrl || "").trim());
     const glbVersion =
       fromDom.v ||
       String(arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "").trim();
@@ -8401,7 +8449,7 @@ async function runArSession({
       if (THREE.Cache && typeof THREE.Cache.remove === "function") {
         THREE.Cache.remove(glbLoadUrl);
         THREE.Cache.remove(sessionGlbUrl);
-        THREE.Cache.remove(glbUrl);
+        THREE.Cache.remove(String(currentGlbUrl || glbUrl || "").trim());
       }
     } catch {
       /* ignore */
