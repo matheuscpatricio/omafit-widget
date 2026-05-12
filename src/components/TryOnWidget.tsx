@@ -3398,10 +3398,20 @@ const handleSubmit = async () => {
         selected_color: selectedColorHex,
         variant_catalog: productCatalog.variants.slice(0, 100),
         complementary_product: complementaryProduct,
-        chat_history: chatMessages
-          .slice(-12)
-          .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
-          .map(m => ({ role: m.role, content: String(m.content || '').trim() })),
+        chat_history: (() => {
+          const base = chatMessages
+            .slice(-12)
+            .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
+            .map(m => ({ role: m.role, content: String(m.content || '').trim() }));
+          const q = intention === 'custom' && customMessage ? String(customMessage).trim() : '';
+          if (q) {
+            const last = base[base.length - 1];
+            if (!last || last.role !== 'user' || last.content !== q) {
+              base.push({ role: 'user', content: q });
+            }
+          }
+          return base;
+        })(),
         ...(candidate_products ? { candidate_products } : {}),
       };
 

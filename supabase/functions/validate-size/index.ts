@@ -93,7 +93,17 @@ function shapeGPTResponse(parsed: unknown, defaultTamanho: string): GPTResponse 
     throw new Error("Model returned non-object JSON");
   }
   const o = parsed as Record<string, unknown>;
-  const explicacao = String(o.explicacao ?? (o as { explicação?: string }).explicação ?? "").trim();
+  const explicacao = String(
+    o.explicacao ??
+      (o as { explicação?: string }).explicação ??
+      (o as { explanation?: string }).explanation ??
+      (o as { message?: string }).message ??
+      (o as { texto?: string }).texto ??
+      (o as { response?: string }).response ??
+      (o as { answer?: string }).answer ??
+      (o as { resposta?: string }).resposta ??
+      ""
+  ).trim();
   const tamanho_final = String(o.tamanho_final ?? defaultTamanho).trim() || defaultTamanho;
   if (!explicacao) {
     throw new Error("Model JSON missing explicacao");
@@ -1186,6 +1196,23 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
   };
 }
 
+/** Garante texto da pergunta atual e intenção coerente (evita cair no prompt de carrinho quando o cliente já perguntou algo). */
+function normalizeUserQuestion(data: ValidateSizeRequest): void {
+  let msg = String(data.custom_message ?? "").trim();
+  if (!msg) {
+    const hist = Array.isArray(data.chat_history) ? data.chat_history : [];
+    const lastUser = [...hist].reverse().find((m) => m.role === "user");
+    if (lastUser?.content) {
+      msg = String(lastUser.content).trim();
+      if (msg) data.custom_message = msg;
+    }
+  }
+  if (msg && data.intencao_usuario !== "sugerir_combinacoes") {
+    data.intencao_usuario = "custom_message";
+    data.custom_message = msg;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -1225,6 +1252,8 @@ Deno.serve(async (req: Request) => {
     if (!data.tamanho_calculado_algoritmo) {
       data.tamanho_calculado_algoritmo = 'M';
     }
+
+    normalizeUserQuestion(data);
 
     // Construir prompt baseado na intenção
     let userPrompt: string;
@@ -1300,7 +1329,8 @@ Deno.serve(async (req: Request) => {
           suggested_products: [],
         };
       } else {
-        throw aiErr;
+        console.error("OpenAI indisponível ou resposta inválida; usando fallback por intenção:", aiErr);
+        gptResponse = buildGuaranteedFallbackResponse(data, language);
       }
     }
 
@@ -1338,6 +1368,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         data: finalResponse,
         interaction_count: interactionCount + 1,
+        _validate_size_rev: "2026-05-12d",
       }),
       {
         headers: {
