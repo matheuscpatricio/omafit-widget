@@ -64,6 +64,72 @@ interface GPTResponse {
   suggested_products?: Array<{ handle: string; rationale?: string }>;
 }
 
+function tryParseModelJson(content: string): unknown {
+  const trimmed = String(content || "").trim();
+  if (!trimmed) throw new Error("Empty model content");
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    /* continua */
+  }
+  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```\s*$/im);
+  if (fence) {
+    try {
+      return JSON.parse(fence[1].trim());
+    } catch {
+      /* continua */
+    }
+  }
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+  throw new Error("Could not parse model output as JSON");
+}
+
+function shapeGPTResponse(parsed: unknown, defaultTamanho: string): GPTResponse {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Model returned non-object JSON");
+  }
+  const o = parsed as Record<string, unknown>;
+  const explicacao = String(o.explicacao ?? (o as { explicação?: string }).explicação ?? "").trim();
+  const tamanho_final = String(o.tamanho_final ?? defaultTamanho).trim() || defaultTamanho;
+  if (!explicacao) {
+    throw new Error("Model JSON missing explicacao");
+  }
+  const coerencia = String(o.coerencia ?? "alta");
+  let confianca: number;
+  if (typeof o.confianca === "number" && Number.isFinite(o.confianca)) {
+    confianca = o.confianca;
+  } else {
+    const n = parseFloat(String(o.confianca ?? "0.9"));
+    confianca = Number.isFinite(n) ? n : 0.9;
+  }
+  const should_end_conversation =
+    typeof o.should_end_conversation === "boolean" ? o.should_end_conversation : undefined;
+  const rawSuggested = o.suggested_products;
+  let suggested_products: GPTResponse["suggested_products"];
+  if (Array.isArray(rawSuggested)) {
+    suggested_products = rawSuggested
+      .filter((x) => x && typeof x === "object")
+      .map((x) => {
+        const h = String((x as { handle?: string }).handle || "").trim();
+        const rationale = String((x as { rationale?: string }).rationale || "").trim();
+        return h ? { handle: h, ...(rationale ? { rationale } : {}) } : null;
+      })
+      .filter(Boolean) as GPTResponse["suggested_products"];
+  }
+  return {
+    tamanho_final,
+    explicacao,
+    coerencia,
+    confianca,
+    ...(should_end_conversation !== undefined ? { should_end_conversation } : {}),
+    ...(suggested_products?.length ? { suggested_products } : {}),
+  };
+}
+
 function sanitizeSuggestedProducts(
   raw: unknown,
   candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
@@ -474,54 +540,81 @@ IMPORTANT: Return valid JSON with this structure:
   return prompts[language] || prompts['en'];
 }
 
+async function callOpenAISingle(
+  userPrompt: string,
+  language: string,
+  opts: { systemExtra?: string; maxTokens: number; defaultTamanho: string }
+): Promise<GPTResponse> {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY not configured");
+  }
+  const systemPrompt = [getSystemPrompt(language), opts.systemExtra].filter(Boolean).join("\n\n");
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: opts.maxTokens,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("OpenAI API error:", errorText);
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content;
+  const finishReason = choice?.finish_reason;
+
+  if (!content) {
+    throw new Error("No content in OpenAI response");
+  }
+
+  if (finishReason === "length") {
+    console.warn("OpenAI finish_reason=length (truncated); will retry if attempts remain");
+    throw new Error("OpenAI response truncated (finish_reason=length)");
+  }
+
+  const parsed = tryParseModelJson(content);
+  return shapeGPTResponse(parsed, opts.defaultTamanho);
+}
+
 async function callOpenAI(
   userPrompt: string,
-  language: string = 'pt',
-  opts?: { systemExtra?: string; maxTokens?: number }
+  language: string = "pt",
+  opts?: { systemExtra?: string; maxTokens?: number; defaultTamanho?: string }
 ): Promise<GPTResponse> {
-  try {
-    if (!OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY not configured");
+  const defaultTamanho = normalizeSizeLabel(opts?.defaultTamanho || "M") || "M";
+  const requested = opts?.maxTokens ?? 1200;
+  const attempts = [requested, Math.min(Math.max(requested * 2, 1800), 4096)];
+
+  let lastError: unknown;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      return await callOpenAISingle(userPrompt, language, {
+        systemExtra: opts?.systemExtra,
+        maxTokens: attempts[i],
+        defaultTamanho,
+      });
+    } catch (err) {
+      lastError = err;
+      console.error(`callOpenAI attempt ${i + 1}/${attempts.length} failed:`, err);
     }
-    const systemPrompt = [getSystemPrompt(language), opts?.systemExtra].filter(Boolean).join("\n\n");
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: opts?.maxTokens ?? 600,
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error:", errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No content in OpenAI response");
-    }
-
-    const parsed = JSON.parse(content);
-    return parsed as GPTResponse;
-  } catch (error) {
-    console.error("Error calling OpenAI:", error);
-    throw error;
   }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 function buildValidationPrompt(data: ValidateSizeRequest): string {
@@ -803,7 +896,14 @@ Return JSON:
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
-    return JSON.parse(content);
+    if (!content) {
+      return { is_appropriate: true, response_message: "" };
+    }
+    const mod = tryParseModelJson(content) as Record<string, unknown>;
+    return {
+      is_appropriate: mod.is_appropriate !== false,
+      response_message: String(mod.response_message ?? ""),
+    };
   } catch (error) {
     console.error("Error validating message:", error);
     // Em caso de erro, permitir a mensagem
@@ -1025,6 +1125,35 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
   const colors = (data.available_colors || []).filter(Boolean);
   const sizeHint = data.tamanho_calculado_algoritmo || sizes[0] || 'M';
 
+  // Resposta quando o assistente falhou mas o usuário perguntou algo (ex.: combinações) — evita repetir o mesmo texto de “adicione ao carrinho” + catálogo.
+  if (data.intencao_usuario === "custom_message") {
+    if (language === "es") {
+      return {
+        tamanho_final: sizeHint,
+        explicacao:
+          `Con ${productName} puedes equilibrar el look con una base más clara, denim o una prenda con textura distinta (camisa, chaqueta ligera). Dime la ocasión que buscas (trabajo, día a día, salir) y lo afinamos.`,
+        coerencia: "alta",
+        confianca: 0.72,
+      };
+    }
+    if (language === "en") {
+      return {
+        tamanho_final: sizeHint,
+        explicacao:
+          `With ${productName}, balance the outfit with lighter bottoms, denim, or a different texture up close (shirt, light jacket). Tell me the occasion (work, everyday, going out) and I will narrow it down.`,
+        coerencia: "high",
+        confianca: 0.72,
+      };
+    }
+    return {
+      tamanho_final: sizeHint,
+      explicacao:
+        `Com o ${productName}, no seu caso costuma funcionar equilibrar o preto com calça em tom mais claro, jeans, ou uma camada com textura diferente (camisa, jaqueta leve). Se disser a ocasião — trabalho, dia a dia, sair à noite — consigo afunilar melhor.`,
+      coerencia: "alta",
+      confianca: 0.72,
+    };
+  }
+
   if (language === 'es') {
     const colorLine = colors.length > 0 ? ` Colores disponibles: ${colors.join(', ')}.` : '';
     const sizeLine = sizes.length > 0 ? ` Tallas disponibles: ${sizes.join(', ')}.` : '';
@@ -1150,7 +1279,8 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: hasStylistCandidates ? getStylistSystemExtra(language) : undefined,
-        maxTokens: hasStylistCandidates ? 800 : 600,
+        maxTokens: hasStylistCandidates ? 1800 : 1400,
+        defaultTamanho: data.tamanho_calculado_algoritmo || "M",
       });
     } catch (aiErr) {
       console.error("OpenAI unavailable:", aiErr);
