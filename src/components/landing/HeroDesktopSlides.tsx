@@ -206,7 +206,7 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
                     variant="secondary"
                     size="lg"
                     type="button"
-                    className="w-full justify-center border-oma-cream/25 bg-oma-parchment/95 text-oma-ink hover:bg-oma-light sm:w-auto"
+                    className="w-full justify-center border-oma-cream/25 bg-oma-parchment/95 text-white hover:bg-oma-light hover:text-white sm:w-auto [&_svg]:text-white"
                     onClick={onRequestDemo}
                   >
                     <Play className="h-4 w-4" />
