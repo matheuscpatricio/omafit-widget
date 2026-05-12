@@ -140,6 +140,22 @@ function shapeGPTResponse(parsed: unknown, defaultTamanho: string): GPTResponse 
   };
 }
 
+function defaultSuggestedFromCandidates(
+  candidates: NonNullable<ValidateSizeRequest["candidate_products"]>,
+  language: string
+): Array<{ handle: string; rationale: string }> {
+  const rationale =
+    language === "es"
+      ? "Buena combinación con lo que tienes en el probador."
+      : language === "en"
+        ? "Pairs nicely with your try-on piece."
+        : "Combina bem com a peça que está a experimentar no provador.";
+  return candidates
+    .slice(0, 3)
+    .map((c) => ({ handle: String(c.handle || "").trim(), rationale }))
+    .filter((x) => x.handle);
+}
+
 function sanitizeSuggestedProducts(
   raw: unknown,
   candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
@@ -813,12 +829,12 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
         : "(upper = tops; think bottoms/accessories for silhouette and color.)";
 
   if (language === "es") {
-    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista con tono personal ("tú", "para ti", "en tu caso"); desarrolla lo que haga falta en explicacao. Devuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista con tono personal ("tú", "para ti", "en tu caso"); desarrolla lo que haga falta en explicacao.\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
   }
   if (language === "en") {
-    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist with a personal tone ("you", "for you", "in your case"); use the space you need in explicacao. Return JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist with a personal tone ("you", "for you", "in your case"); use the space you need in explicacao.\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
   }
-  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); desenvolva o que precisar em explicacao. Devolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); desenvolva o que precisar em explicacao.\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -1141,7 +1157,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
       return {
         tamanho_final: sizeHint,
         explicacao:
-          `Con ${productName} puedes equilibrar el look con una base más clara, denim o una prenda con textura distinta (camisa, chaqueta ligera). Dime la ocasión que buscas (trabajo, día a día, salir) y lo afinamos.`,
+          `Tu talla sugerida para ${productName} es ${sizeHint}. Con esta prenda puedes equilibrar el look con una base más clara, denim o textura distinta (camisa, chaqueta ligera). Dime la ocasión (trabajo, día a día, salir) y lo afinamos.`,
         coerencia: "alta",
         confianca: 0.72,
       };
@@ -1150,7 +1166,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
       return {
         tamanho_final: sizeHint,
         explicacao:
-          `With ${productName}, balance the outfit with lighter bottoms, denim, or a different texture up close (shirt, light jacket). Tell me the occasion (work, everyday, going out) and I will narrow it down.`,
+          `Your suggested size for ${productName} is ${sizeHint}. You can balance the outfit with lighter bottoms, denim, or a different texture (shirt, light jacket). Tell me the occasion (work, everyday, going out) and I will narrow it down.`,
         coerencia: "high",
         confianca: 0.72,
       };
@@ -1158,7 +1174,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
     return {
       tamanho_final: sizeHint,
       explicacao:
-        `Com o ${productName}, no seu caso costuma funcionar equilibrar o preto com calça em tom mais claro, jeans, ou uma camada com textura diferente (camisa, jaqueta leve). Se disser a ocasião — trabalho, dia a dia, sair à noite — consigo afunilar melhor.`,
+        `Para o ${productName}, o tamanho sugerido para você é ${sizeHint}. No seu caso costuma funcionar equilibrar o preto com calça mais clara, jeans ou uma camada com textura diferente (camisa, jaqueta leve). Se disser a ocasião — trabalho, dia a dia, sair à noite — afunilo melhor as ideias.`,
       coerencia: "alta",
       confianca: 0.72,
     };
@@ -1169,7 +1185,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
     const sizeLine = sizes.length > 0 ? ` Tallas disponibles: ${sizes.join(', ')}.` : '';
     return {
       tamanho_final: sizeHint,
-      explicacao: `${productName} te queda excelente para el estilo que buscas.${colorLine}${sizeLine} Si te gusta, agrégalo al carrito ahora para no perderlo.`,
+      explicacao: `Para ${productName}, tu talla sugerida es ${sizeHint}. Te queda excelente para el estilo que buscas.${colorLine}${sizeLine} Si te gusta, agrégalo al carrito ahora para no perderlo.`,
       coerencia: "alta",
       confianca: 0.92,
     };
@@ -1180,7 +1196,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
     const sizeLine = sizes.length > 0 ? ` Available sizes: ${sizes.join(', ')}.` : '';
     return {
       tamanho_final: sizeHint,
-      explicacao: `${productName} is a great match for your look.${colorLine}${sizeLine} If you like it, add it to cart now so you do not miss it.`,
+      explicacao: `For ${productName}, your suggested size is ${sizeHint}. It is a great match for your look.${colorLine}${sizeLine} If you like it, add it to cart now so you do not miss it.`,
       coerencia: "high",
       confianca: 0.92,
     };
@@ -1190,7 +1206,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
   const sizeLine = sizes.length > 0 ? ` Tamanhos disponíveis: ${sizes.join(', ')}.` : '';
   return {
     tamanho_final: sizeHint,
-    explicacao: `${productName} combina muito com o estilo que você procura.${colorLine}${sizeLine} Se gostou, adicione ao carrinho agora para garantir.`,
+    explicacao: `Para o ${productName}, o tamanho sugerido para o seu perfil é ${sizeHint}. A peça combina com o estilo que você procura.${colorLine}${sizeLine} Se gostou, adicione ao carrinho agora para garantir.`,
     coerencia: "alta",
     confianca: 0.92,
   };
@@ -1305,6 +1321,7 @@ Deno.serve(async (req: Request) => {
       data.candidate_products.length > 0;
 
     let gptResponse: GPTResponse;
+    let assistantSource: "openai" | "fallback_openai" = "openai";
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: hasStylistCandidates ? getStylistSystemExtra(language) : undefined,
@@ -1313,6 +1330,7 @@ Deno.serve(async (req: Request) => {
       });
     } catch (aiErr) {
       console.error("OpenAI unavailable:", aiErr);
+      assistantSource = "fallback_openai";
       if (hasStylistCandidates) {
         const lang = language;
         const emptyHint =
@@ -1335,12 +1353,16 @@ Deno.serve(async (req: Request) => {
     }
 
     if (hasStylistCandidates && data.candidate_products) {
+      let suggested = sanitizeSuggestedProducts(
+        gptResponse.suggested_products,
+        data.candidate_products
+      );
+      if (suggested.length === 0) {
+        suggested = defaultSuggestedFromCandidates(data.candidate_products, language);
+      }
       gptResponse = {
         ...gptResponse,
-        suggested_products: sanitizeSuggestedProducts(
-          gptResponse.suggested_products,
-          data.candidate_products
-        ),
+        suggested_products: suggested,
       };
     }
 
@@ -1368,7 +1390,8 @@ Deno.serve(async (req: Request) => {
         success: true,
         data: finalResponse,
         interaction_count: interactionCount + 1,
-        _validate_size_rev: "2026-05-12d",
+        meta: { assistant_source: assistantSource },
+        _validate_size_rev: "2026-05-12f",
       }),
       {
         headers: {
@@ -1390,6 +1413,8 @@ Deno.serve(async (req: Request) => {
         success: true,
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
+        meta: { assistant_source: "error_fallback" as const },
+        _validate_size_rev: "2026-05-12f",
       }),
       {
         headers: {

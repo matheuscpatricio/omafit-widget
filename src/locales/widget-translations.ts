@@ -109,6 +109,8 @@ export const widgetTranslations = {
     // Chat / consultor + catálogo Omafit
     chatPlaceholderStylist: 'Pergunte sobre combinações ou diga o que procura…',
     chatStylingHint: 'Quer ideias para combinar? Pergunte abaixo',
+    stylistInitialOutfitAsk:
+      'Já vi o provador com {productName}. Sugere até 3 produtos da lista de candidatos que combinem bem (cor, silhueta, ocasião). Cita só handles da lista. No texto, lembra o meu tamanho sugerido pelo sistema e convida a experimentar ou adicionar ao carrinho.',
     chatNewPhotoAria: 'Enviar nova foto para o provador (útil para peças de baixo se a foto atual for só de tronco)',
     catalogUnavailableShort: 'Sugestões da loja indisponíveis agora; o assistente responde sem lista de produtos.',
     suggestedTryOnCta: 'Experimentar com o provador',
@@ -225,6 +227,8 @@ export const widgetTranslations = {
 
     chatPlaceholderStylist: 'Pregunta combinaciones o di qué buscas…',
     chatStylingHint: '¿Ideas para combinar? Pregunta abajo',
+    stylistInitialOutfitAsk:
+      'Ya vi el probador con {productName}. Sugiere hasta 3 productos de la lista de candidatos que combinen bien (color, silueta, ocasión). Solo handles de la lista. En el texto, recuerda mi talla sugerida por el sistema e invita a probar o añadir al carrito.',
     chatNewPhotoAria: 'Enviar nueva foto para el probador (útil para prendas inferiores si la foto actual es solo torso)',
     catalogUnavailableShort: 'Sugerencias de la tienda no disponibles; el asistente responde sin lista de productos.',
     suggestedTryOnCta: 'Probar con el probador',
@@ -341,6 +345,8 @@ export const widgetTranslations = {
 
     chatPlaceholderStylist: 'Ask about outfit pairings or describe what you want…',
     chatStylingHint: 'Want outfit ideas? Ask below',
+    stylistInitialOutfitAsk:
+      'I have seen the try-on with {productName}. Suggest up to 3 products from the candidate list that pair well (color, silhouette, occasion). Use only handles from the list. In your reply, mention my system-suggested size and invite me to try on or add to cart.',
     chatNewPhotoAria: 'Upload a new photo for try-on (helpful for bottoms if your current photo is torso-only)',
     catalogUnavailableShort: 'Store suggestions unavailable; the assistant will answer without a product list.',
     suggestedTryOnCta: 'Try on with preview',

@@ -3364,19 +3364,25 @@ const handleSubmit = async () => {
       const { baseUrl: omafitBase, secret: omafitSecret, isReady: omafitCatalogReady } =
         getOmafitCatalogRuntimeConfig();
 
-      if (
-        intention === 'custom' &&
-        customMessage &&
-        omafitCatalogReady &&
-        effectiveShopDomain &&
-        publicId
-      ) {
+      let intencaoForPayload: 'custom_message' | 'sugerir_combinacoes' | 'induzir_adicionar_carrinho' =
+        intention === 'custom'
+          ? 'custom_message'
+          : intention === 'complementary'
+            ? 'sugerir_combinacoes'
+            : 'induzir_adicionar_carrinho';
+      let customMessageForPayload: string | undefined = customMessage;
+
+      const canOmafitSearch =
+        Boolean(omafitCatalogReady && effectiveShopDomain && publicId);
+
+      const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
+        if (!canOmafitSearch) return;
         const searchRes = await fetchOmafitCatalogSearch({
           baseUrl: omafitBase,
           secret: omafitSecret,
           shopDomain: effectiveShopDomain,
           publicId,
-          userMessage: customMessage,
+          userMessage: userMessageForSearch,
           excludeHandle: (localProductHandle || productHandle || '').trim(),
           productName: localProductName,
           collectionType: localCollectionType || 'upper',
@@ -3387,7 +3393,37 @@ const handleSubmit = async () => {
         if (searchRes.error && searchRes.error !== 'no_session') {
           console.warn('[Omafit catalog-search]', searchRes.error);
         }
+      };
+
+      if (intention === 'custom' && customMessage && canOmafitSearch) {
+        const enrichedQuery = [customMessage, localProductName, localProductDescription]
+          .filter((s) => String(s || '').trim())
+          .join(' | ');
+        await runOmafitCatalogSearch(enrichedQuery);
+      } else if (intention === 'add_to_cart' && canOmafitSearch) {
+        const autoQuery = [
+          `Combinar outfit com ${localProductName || 'esta peça'}`,
+          localProductDescription,
+          `Coleção tipo ${localCollectionType || 'upper'}`,
+          'calça jeans casaco camisa calçado acessórios cores neutras',
+        ]
+          .filter((s) => String(s || '').trim())
+          .join(' | ');
+        await runOmafitCatalogSearch(autoQuery);
+        if (candidate_products?.length) {
+          intencaoForPayload = 'custom_message';
+          customMessageForPayload = t('stylistInitialOutfitAsk').replace(
+            /\{productName\}/g,
+            localProductName || 'esta peça'
+          );
+        }
       }
+
+      console.log(
+        '🛍️ Omafit candidatos para o consultor:',
+        candidate_products?.length ?? 0,
+        canOmafitSearch ? '' : '(URL/segredo Omafit ou shop/publicId em falta)'
+      );
 
       const payload = {
         altura_cm: sizeData.height,
@@ -3401,8 +3437,8 @@ const handleSubmit = async () => {
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
-        intencao_usuario: intention === 'custom' ? 'custom_message' : intention === 'complementary' ? 'sugerir_combinacoes' : 'induzir_adicionar_carrinho',
-        custom_message: customMessage,
+        intencao_usuario: intencaoForPayload,
+        custom_message: customMessageForPayload,
         session_id: analyticsSessionId || sessionId,
         interaction_count: interactionCount,
         shop_name: localStoreName,
@@ -3421,7 +3457,10 @@ const handleSubmit = async () => {
             .slice(-12)
             .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
             .map(m => ({ role: m.role, content: String(m.content || '').trim() }));
-          const q = intention === 'custom' && customMessage ? String(customMessage).trim() : '';
+          const q =
+            intencaoForPayload === 'custom_message' && customMessageForPayload
+              ? String(customMessageForPayload).trim()
+              : '';
           if (q) {
             const last = base[base.length - 1];
             if (!last || last.role !== 'user' || last.content !== q) {
