@@ -137,6 +137,10 @@ export function SizeCalculator({
     if (data) onContinueWithoutPhoto(data);
   };
 
+  const selectedMannequinOutline = heroFooterCTAs
+    ? { borderColor: '#ffffff', boxShadow: '0 0 0 2px #ffffff' }
+    : { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -252,7 +256,7 @@ export function SizeCalculator({
                         key={`${gender}-${index}`}
                         type="button"
                         onClick={() => setBodyTypeIndex(index)}
-                        style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                        style={bodyTypeIndex === index ? selectedMannequinOutline : {}}
                         className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
                           bodyTypeIndex === index
                             ? ''
@@ -285,7 +289,7 @@ export function SizeCalculator({
                         onClick={() => setBodyTypeIndex(index + 3)}
                         style={{
                           width: 'calc(50% - 0.25rem)',
-                          ...(bodyTypeIndex === index + 3 ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}),
+                          ...(bodyTypeIndex === index + 3 ? selectedMannequinOutline : {}),
                         }}
                         className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
                           bodyTypeIndex === index + 3
@@ -313,7 +317,7 @@ export function SizeCalculator({
                         key={`${gender}-d-${index}`}
                         type="button"
                         onClick={() => setBodyTypeIndex(index)}
-                        style={bodyTypeIndex === index ? { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` } : {}}
+                        style={bodyTypeIndex === index ? selectedMannequinOutline : {}}
                         className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
                           bodyTypeIndex === index
                             ? ''
@@ -343,7 +347,7 @@ export function SizeCalculator({
             <label className="block text-sm font-medium text-gray-700 mb-4">
               {t('fitPreferenceLabel')}
             </label>
-            <div className="px-2">
+            <div className={heroFooterCTAs ? 'rounded-2xl border border-white px-3 py-3' : 'px-2'}>
               {/* Slider Container */}
               <div className="relative">
                 {/* Linha do slider */}
@@ -369,10 +373,14 @@ export function SizeCalculator({
                     >
                       {/* Círculo do ponto */}
                       <div
-                        className={`w-6 h-6 rounded-full border-4 transition-all duration-300 ${
-                          fitIndex === index
-                            ? 'border-white shadow-lg scale-110'
-                            : 'border-gray-300 bg-white hover:scale-105'
+                        className={`w-6 h-6 rounded-full transition-all duration-300 ${
+                          heroFooterCTAs
+                            ? fitIndex === index
+                              ? 'border-2 border-white shadow-lg scale-110'
+                              : 'border-2 border-white/75 bg-white/15 hover:scale-105 hover:border-white'
+                            : fitIndex === index
+                              ? 'border-4 border-white shadow-lg scale-110'
+                              : 'border-4 border-gray-300 bg-white hover:scale-105'
                         }`}
                         style={fitIndex === index ? { backgroundColor: primaryColor } : {}}
                       />
