@@ -627,6 +627,9 @@ export function TryOnWidget({
   );
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatPhotoInputRef = useRef<HTMLInputElement>(null);
+  /** Evita aplicar resposta de um fetch antigo se outro pedido ao GPT foi iniciado (remount / duplo efeito). */
+  const gptAssistSeqRef = useRef(0);
+  const initialGptScheduleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
   /** Últimas sugestões do consultor (para "quero experimentar" / try-on automático). */
   const lastStylistSuggestionsRef = useRef<
@@ -1119,12 +1122,25 @@ export function TryOnWidget({
 
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
-    if (step === 'result' && sizeData && chatMessages.length === 0 && !gptLoading) {
-      setTimeout(() => {
-        callGPTAssistant('add_to_cart');
-      }, 1000);
+    if (initialGptScheduleRef.current) {
+      clearTimeout(initialGptScheduleRef.current);
+      initialGptScheduleRef.current = null;
     }
-  }, [step, sizeData]);
+    if (step !== 'result' || !sizeData) return;
+    if (chatMessages.length > 0 || gptLoading) return;
+
+    initialGptScheduleRef.current = setTimeout(() => {
+      initialGptScheduleRef.current = null;
+      void callGPTAssistant('add_to_cart');
+    }, 1000);
+
+    return () => {
+      if (initialGptScheduleRef.current) {
+        clearTimeout(initialGptScheduleRef.current);
+        initialGptScheduleRef.current = null;
+      }
+    };
+  }, [step, sizeData, chatMessages.length, gptLoading]);
 
   // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
@@ -3260,6 +3276,8 @@ const handleSubmit = async () => {
   };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
+    const requestSeq = ++gptAssistSeqRef.current;
+
     if (interactionCount >= GPT_INTERACTION_LIMIT) {
       const limitMessages = {
         pt: 'Você atingiu o limite de interações por sessão.',
@@ -3439,14 +3457,38 @@ const handleSubmit = async () => {
         throw new Error('Erro ao chamar assistente');
       }
 
-      const result = await response.json();
-      console.log('📥 Resposta recebida:', result);
+      const rawBody = await response.text();
+      let result: { success?: boolean; data?: Record<string, unknown>; message?: string };
+      try {
+        result = rawBody ? (JSON.parse(rawBody) as typeof result) : {};
+      } catch (parseErr) {
+        console.error('❌ validate-size devolveu corpo não-JSON:', rawBody?.slice?.(0, 800) ?? rawBody, parseErr);
+        throw new Error('Resposta inválida do assistente');
+      }
+      console.log('📥 Resposta validate-size:', rawBody?.slice?.(0, 2000) ?? rawBody);
 
-      if (result.success && result.data) {
-        const { explicacao, should_end_conversation, suggested_products } = result.data;
+      if (result.success && result.data && typeof result.data === 'object') {
+        const data = result.data;
+        const should_end_conversation = Boolean(data.should_end_conversation);
+        const suggested_products = data.suggested_products;
+        const tamanhoFinal = String(data.tamanho_final ?? '').trim();
+        let explicacao = typeof data.explicacao === 'string' ? data.explicacao.trim() : '';
+        if (!explicacao && tamanhoFinal) {
+          const sizeFallback = {
+            pt: `O seu tamanho sugerido é ${tamanhoFinal}. Veja o resultado no espelho virtual e, se curtir, pode adicionar ao carrinho.`,
+            es: `Tu talla sugerida es ${tamanhoFinal}. Mira el resultado en el espejo virtual y, si te gusta, añádelo al carrito.`,
+            en: `Your suggested size is ${tamanhoFinal}. Check the virtual mirror result and add to cart when you are ready.`,
+          };
+          explicacao = sizeFallback[currentLanguage] || sizeFallback.en;
+        }
+        if (!explicacao) {
+          console.error('❌ validate-size sem explicacao/tamanho:', result);
+          throw new Error('Resposta do assistente sem texto');
+        }
 
         // Se a conversa deve ser encerrada (conteúdo inadequado), mostrar mensagem e bloquear
         if (should_end_conversation) {
+          if (requestSeq !== gptAssistSeqRef.current) return;
           setChatMessages(prev => [...prev, {
             role: 'assistant',
             content: explicacao,
@@ -3481,6 +3523,7 @@ const handleSubmit = async () => {
           suggestedProductsBlock = mapped.length ? mapped : undefined;
         }
 
+        if (requestSeq !== gptAssistSeqRef.current) return;
         setChatMessages(prev => [...prev, {
           role: 'assistant',
           content: explicacao,
@@ -3492,25 +3535,38 @@ const handleSubmit = async () => {
           lastStylistSuggestionsRef.current = suggestedProductsBlock;
         }
 
-        setInteractionCount(result.interaction_count || interactionCount + 1);
+        setInteractionCount(
+          typeof result.interaction_count === 'number' ? result.interaction_count : interactionCount + 1
+        );
       } else {
+        console.error('❌ validate-size formato inesperado:', result);
         throw new Error(result.message || 'Erro ao processar resposta');
       }
     } catch (error) {
       console.error('Erro ao chamar GPT:', error);
+      const sz = String(calculatedSize || recommendedSize || '').trim();
       const fallbackMessages = {
-        pt: `Essa peça combina muito bem com seu perfil. ${localProductName ? `${localProductName} ` : 'Ela '}é uma excelente escolha - adicione ao carrinho para garantir!`,
-        es: `${localProductName ? localProductName + ' ' : 'Esta prenda '}combina muy bien contigo. Agrega al carrito para asegurar tu compra.`,
-        en: `${localProductName ? localProductName + ' ' : 'This item '}fits your style very well. Add it to cart to secure your purchase.`
+        pt: sz
+          ? `Não consegui carregar a mensagem do assistente agora. Com base no seu perfil, o tamanho sugerido é ${sz}. ${localProductName ? `${localProductName} ` : 'A peça '}fica ótima no espelho virtual — adicione ao carrinho quando quiser.`
+          : `Essa peça combina muito bem com seu perfil. ${localProductName ? `${localProductName} ` : 'Ela '}é uma excelente escolha - adicione ao carrinho para garantir!`,
+        es: sz
+          ? `No pude cargar el mensaje del asistente. Tu talla sugerida es ${sz}. ${localProductName ? localProductName + ' ' : 'La prenda '}queda genial en el espejo virtual — agrégalo al carrito cuando quieras.`
+          : `${localProductName ? localProductName + ' ' : 'Esta prenda '}combina muy bien contigo. Agrega al carrito para asegurar tu compra.`,
+        en: sz
+          ? `I could not load the assistant message right now. Your suggested size is ${sz}. ${localProductName ? localProductName + ' ' : 'This item '}looks great in the virtual mirror — add to cart when you are ready.`
+          : `${localProductName ? localProductName + ' ' : 'This item '}fits your style very well. Add it to cart to secure your purchase.`
       };
 
+      if (requestSeq !== gptAssistSeqRef.current) return;
       setChatMessages(prev => [...prev, {
         role: 'assistant',
         content: fallbackMessages[currentLanguage],
         timestamp: Date.now()
       }]);
     } finally {
-      setGptLoading(false);
+      if (requestSeq === gptAssistSeqRef.current) {
+        setGptLoading(false);
+      }
     }
   };
 
