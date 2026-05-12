@@ -8,7 +8,6 @@ export type WidgetSearchBootstrap = {
   productImage: string;
   productImages: string[];
   productHandle?: string;
-  apparelGenderScope?: 'both' | 'male' | 'female';
   tryonLayoutBackgroundImage: string;
 };
 
@@ -63,7 +62,7 @@ export function readWidgetInitialStoreLanguage(): 'pt' | 'es' | 'en' {
 
 export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
   if (typeof window === 'undefined') {
-    return { productImage: '', productImages: [], apparelGenderScope: 'both', tryonLayoutBackgroundImage: '' };
+    return { productImage: '', productImages: [], tryonLayoutBackgroundImage: '' };
   }
   const params = new URLSearchParams(window.location.search);
 
@@ -73,15 +72,6 @@ export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
     params.get('product_handle')?.trim() ||
     params.get('handle')?.trim() ||
     '';
-
-  const rawApparelGenderScope =
-    params.get('apparelGenderScope')?.trim().toLowerCase() ||
-    params.get('apparel_gender_scope')?.trim().toLowerCase() ||
-    '';
-  const apparelGenderScope =
-    rawApparelGenderScope === 'male' || rawApparelGenderScope === 'female'
-      ? rawApparelGenderScope
-      : 'both';
 
   let productImages: string[] = [];
   const imagesParam = params.get('productImages');
@@ -101,5 +91,5 @@ export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
     params.get('tryonLayoutBackgroundImage')?.trim() ||
     '';
 
-  return { productImage, productImages, productHandle: productHandle || undefined, apparelGenderScope, tryonLayoutBackgroundImage };
+  return { productImage, productImages, productHandle: productHandle || undefined, tryonLayoutBackgroundImage };
 }

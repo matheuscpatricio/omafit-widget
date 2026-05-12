@@ -70,7 +70,6 @@ interface TryOnWidgetProps {
   collectionHandles?: string[];
   gender?: string;
   defaultGender?: string;
-  apparelGenderScope?: 'both' | 'male' | 'female';
   collectionType?: 'upper' | 'lower' | 'full';
   collectionElasticity?: 'structured' | 'light_flex' | 'flexible' | 'high_elasticity';
   recommendedProductName?: string;
@@ -424,7 +423,6 @@ export function TryOnWidget({
   collectionHandles = [],
   gender = 'unisex',
   defaultGender = 'unisex',
-  apparelGenderScope = 'both',
   collectionType,
   collectionElasticity,
   recommendedProductName,
@@ -460,7 +458,6 @@ export function TryOnWidget({
   );
   console.log('   - 👤 gender (deprecated):', gender);
   console.log('   - 👤 defaultGender (sugestão inicial):', defaultGender);
-  console.log('   - 👤 apparelGenderScope:', apparelGenderScope);
   console.log('   - 🎁 recommendedProductName:', recommendedProductName || 'não fornecido');
   console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrl || 'não fornecido');
 
@@ -682,9 +679,12 @@ export function TryOnWidget({
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
   const [localProductHandle, setLocalProductHandle] = useState<string>(productHandle || '');
-  const [localApparelGenderScope, setLocalApparelGenderScope] = useState<'both' | 'male' | 'female'>(
-    apparelGenderScope === 'male' || apparelGenderScope === 'female' ? apparelGenderScope : 'both'
-  );
+  /**
+   * Escopo de gênero da tabela de medidas que vai ser usada (produto > coleção > global).
+   * Descoberto via Supabase no efeito abaixo; quando `male`/`female`, a etapa 2 (calculadora)
+   * deixa de mostrar a escolha de gênero e força o valor configurado pelo lojista.
+   */
+  const [chartGenderScope, setChartGenderScope] = useState<'both' | 'male' | 'female'>('both');
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
@@ -1126,11 +1126,108 @@ export function TryOnWidget({
     }
   }, [productHandle]);
 
+  /**
+   * Descobre o `gender_scope` da `size_charts` que se aplica ao produto/coleção.
+   * Prioridade: product_handle > collection_handle > global (handle vazio).
+   * Roda assim que tivermos `shopDomain` para evitar mostrar a escolha de gênero
+   * quando o lojista já fixou male/female naquela tabela.
+   */
   useEffect(() => {
-    setLocalApparelGenderScope(
-      apparelGenderScope === 'male' || apparelGenderScope === 'female' ? apparelGenderScope : 'both'
-    );
-  }, [apparelGenderScope]);
+    const shop = (localShopDomain || shopDomain || '').trim();
+    if (!shop) return;
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    let cancelled = false;
+
+    const normalize = (raw: unknown): 'both' | 'male' | 'female' => {
+      const v = String(raw || '').trim().toLowerCase();
+      return v === 'male' || v === 'female' ? v : 'both';
+    };
+
+    const fetchScope = async (productHandleQuery: string, collectionHandleQuery: string) => {
+      const params = new URLSearchParams();
+      params.set('shop_domain', `eq.${shop}`);
+      params.set('product_handle', `eq.${productHandleQuery}`);
+      params.set('collection_handle', `eq.${collectionHandleQuery}`);
+      params.set('select', 'gender_scope');
+      params.set('limit', '1');
+      const res = await fetch(`${supabaseUrl}/rest/v1/size_charts?${params.toString()}`, {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        if (errText && errText.toLowerCase().includes('gender_scope')) {
+          console.warn('⚠️ Coluna gender_scope ausente em size_charts — execute supabase_add_gender_scope_to_size_charts.sql');
+        }
+        return null;
+      }
+      const rows: Array<{ gender_scope?: string }> = await res.json().catch(() => []);
+      if (!Array.isArray(rows) || rows.length === 0) return null;
+      return normalize(rows[0]?.gender_scope);
+    };
+
+    (async () => {
+      try {
+        const handle = (localProductHandle || productHandle || '').trim();
+        const colls = [
+          ...(collectionHandles || []).map((c) => String(c || '').trim()).filter(Boolean),
+          String(collectionHandle || '').trim(),
+        ].filter(Boolean);
+
+        if (handle) {
+          for (const coll of [...colls, '']) {
+            const scope = await fetchScope(handle, coll);
+            if (cancelled) return;
+            if (scope) {
+              console.log('👤 gender_scope encontrado por produto:', { handle, coll, scope });
+              setChartGenderScope(scope);
+              return;
+            }
+          }
+        }
+
+        for (const coll of colls) {
+          const scope = await fetchScope('', coll);
+          if (cancelled) return;
+          if (scope) {
+            console.log('👤 gender_scope encontrado por coleção:', { coll, scope });
+            setChartGenderScope(scope);
+            return;
+          }
+        }
+
+        const globalScope = await fetchScope('', '');
+        if (cancelled) return;
+        if (globalScope) {
+          console.log('👤 gender_scope encontrado global:', globalScope);
+          setChartGenderScope(globalScope);
+        } else {
+          console.log('👤 Nenhum gender_scope encontrado para esse produto/coleção — usando "both"');
+          setChartGenderScope('both');
+        }
+      } catch (err) {
+        console.warn('⚠️ Erro ao buscar gender_scope da size_charts:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    localShopDomain,
+    shopDomain,
+    localProductHandle,
+    productHandle,
+    collectionHandle,
+    collectionHandles,
+  ]);
 
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
@@ -1208,13 +1305,6 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
-        }
-
-        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
-          const scope = String(event.data.apparelGenderScope || event.data.apparel_gender_scope || '').trim().toLowerCase();
-          const normalizedScope = scope === 'male' || scope === 'female' ? scope : 'both';
-          console.log('✅ Atualizando apparelGenderScope:', normalizedScope);
-          setLocalApparelGenderScope(normalizedScope);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -1307,13 +1397,6 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
-        }
-
-        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
-          const scope = String(event.data.apparelGenderScope || event.data.apparel_gender_scope || '').trim().toLowerCase();
-          const normalizedScope = scope === 'male' || scope === 'female' ? scope : 'both';
-          console.log('✅ Atualizando apparelGenderScope:', normalizedScope);
-          setLocalApparelGenderScope(normalizedScope);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -4592,7 +4675,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
             transition={tryonFadeUp.transition}
           >
           <SizeCalculator
-            key={`calculator-${step}-${localApparelGenderScope}`}
+            key={`calculator-${step}-${chartGenderScope}`}
             heroFooterCTAs={isHeroLayout}
             onComplete={(data) => {
               console.log('🎯 SizeCalculator onComplete - Dados recebidos:', data);
@@ -4623,7 +4706,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
             onContinueWithoutPhoto={handleCalculatorContinueWithoutPhoto}
             primaryColor={primaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
-            forcedGender={localApparelGenderScope === 'male' || localApparelGenderScope === 'female' ? localApparelGenderScope : null}
+            forcedGender={chartGenderScope === 'male' || chartGenderScope === 'female' ? chartGenderScope : null}
             language={currentLanguage}
           />
           </motion.div>
