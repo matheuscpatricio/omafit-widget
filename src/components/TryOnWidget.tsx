@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Plus } from 'lucide-react';
+import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Plus, Loader2 } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -685,6 +685,11 @@ export function TryOnWidget({
    * deixa de mostrar a escolha de gênero e força o valor configurado pelo lojista.
    */
   const [chartGenderScope, setChartGenderScope] = useState<'both' | 'male' | 'female'>('both');
+  /**
+   * Enquanto a busca do `gender_scope` ainda não terminou, segura a renderização da
+   * calculadora para evitar o flash do seletor de gênero antes de cair em `male`/`female`.
+   */
+  const [chartGenderScopeResolved, setChartGenderScopeResolved] = useState<boolean>(false);
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
@@ -1138,7 +1143,15 @@ export function TryOnWidget({
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) return;
+    if (!supabaseUrl || !supabaseKey) {
+      // Sem Supabase configurado, libera a calculadora com 'both' para não bloquear o fluxo.
+      setChartGenderScopeResolved(true);
+      return;
+    }
+
+    // Recomeçar a busca cancela o estado anterior — evita que uma resolução antiga
+    // libere a etapa 2 antes da nova busca terminar.
+    setChartGenderScopeResolved(false);
 
     let cancelled = false;
 
@@ -1188,6 +1201,7 @@ export function TryOnWidget({
             if (scope) {
               console.log('👤 gender_scope encontrado por produto:', { handle, coll, scope });
               setChartGenderScope(scope);
+              setChartGenderScopeResolved(true);
               return;
             }
           }
@@ -1199,6 +1213,7 @@ export function TryOnWidget({
           if (scope) {
             console.log('👤 gender_scope encontrado por coleção:', { coll, scope });
             setChartGenderScope(scope);
+            setChartGenderScopeResolved(true);
             return;
           }
         }
@@ -1212,8 +1227,11 @@ export function TryOnWidget({
           console.log('👤 Nenhum gender_scope encontrado para esse produto/coleção — usando "both"');
           setChartGenderScope('both');
         }
+        setChartGenderScopeResolved(true);
       } catch (err) {
         console.warn('⚠️ Erro ao buscar gender_scope da size_charts:', err);
+        // Em erro de rede, libera o fluxo com 'both' para não travar a UX.
+        if (!cancelled) setChartGenderScopeResolved(true);
       }
     })();
 
@@ -4668,7 +4686,23 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
         )}
 
         {/* Step 2: Size Calculator */}
-        {step === 'calculator' && (
+        {step === 'calculator' && !chartGenderScopeResolved && (
+          <motion.div
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
+            className="flex min-h-[280px] items-center justify-center"
+            aria-busy="true"
+          >
+            <Loader2
+              className="h-8 w-8 animate-spin"
+              style={{ color: primaryColor }}
+              aria-hidden="true"
+            />
+          </motion.div>
+        )}
+
+        {step === 'calculator' && chartGenderScopeResolved && (
           <motion.div
             initial={tryonFadeUp.initial}
             animate={tryonFadeUp.animate}

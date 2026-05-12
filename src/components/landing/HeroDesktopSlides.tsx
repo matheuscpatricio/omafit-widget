@@ -104,7 +104,7 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
 
   return (
     <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2">
-      <div className="relative aspect-video w-full overflow-hidden border-b border-oma-line/30 bg-oma-canvas md:rounded-none md:border-x-0 md:border-t-0">
+      <div className="relative aspect-[5/2] w-full overflow-hidden border-b border-oma-line/30 bg-oma-canvas md:rounded-none md:border-x-0 md:border-t-0">
         <AnimatePresence initial={false} mode="sync">
           <motion.div
             key={slide.id}
