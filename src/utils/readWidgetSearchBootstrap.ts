@@ -7,6 +7,8 @@ import { detectWidgetLanguage } from '../locales/widget-translations';
 export type WidgetSearchBootstrap = {
   productImage: string;
   productImages: string[];
+  productHandle?: string;
+  apparelGenderScope?: 'both' | 'male' | 'female';
   tryonLayoutBackgroundImage: string;
 };
 
@@ -61,11 +63,25 @@ export function readWidgetInitialStoreLanguage(): 'pt' | 'es' | 'en' {
 
 export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
   if (typeof window === 'undefined') {
-    return { productImage: '', productImages: [], tryonLayoutBackgroundImage: '' };
+    return { productImage: '', productImages: [], apparelGenderScope: 'both', tryonLayoutBackgroundImage: '' };
   }
   const params = new URLSearchParams(window.location.search);
 
   const productImage = params.get('productImage')?.trim() || '';
+  const productHandle =
+    params.get('productHandle')?.trim() ||
+    params.get('product_handle')?.trim() ||
+    params.get('handle')?.trim() ||
+    '';
+
+  const rawApparelGenderScope =
+    params.get('apparelGenderScope')?.trim().toLowerCase() ||
+    params.get('apparel_gender_scope')?.trim().toLowerCase() ||
+    '';
+  const apparelGenderScope =
+    rawApparelGenderScope === 'male' || rawApparelGenderScope === 'female'
+      ? rawApparelGenderScope
+      : 'both';
 
   let productImages: string[] = [];
   const imagesParam = params.get('productImages');
@@ -85,5 +101,5 @@ export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
     params.get('tryonLayoutBackgroundImage')?.trim() ||
     '';
 
-  return { productImage, productImages, tryonLayoutBackgroundImage };
+  return { productImage, productImages, productHandle: productHandle || undefined, apparelGenderScope, tryonLayoutBackgroundImage };
 }

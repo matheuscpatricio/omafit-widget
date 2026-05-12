@@ -14,6 +14,7 @@ interface SizeCalculatorProps {
   heroFooterCTAs?: boolean;
   primaryColor?: string;
   defaultGender?: 'male' | 'female' | 'unisex';
+  forcedGender?: 'male' | 'female' | null;
   language?: 'pt' | 'es' | 'en';
 }
 
@@ -71,10 +72,11 @@ export function SizeCalculator({
   heroFooterCTAs = false,
   primaryColor = '#810707',
   defaultGender = 'female',
+  forcedGender = null,
   language = 'en',
 }: SizeCalculatorProps) {
   // Usar defaultGender como valor inicial, convertendo 'unisex' para 'female'
-  const initialGender = (defaultGender === 'unisex' ? 'female' : defaultGender) as 'male' | 'female';
+  const initialGender = (forcedGender || (defaultGender === 'unisex' ? 'female' : defaultGender)) as 'male' | 'female';
   const [gender, setGender] = useState<'male' | 'female'>(initialGender);
   const [height, setHeight] = useState<string>('');
   const [weight, setWeight] = useState<string>('');
@@ -86,7 +88,14 @@ export function SizeCalculator({
   const bodyTypes = gender === 'male' ? bodyTypesMale : bodyTypesFemale;
 
   useEffect(() => {
+    if (!forcedGender) return;
+    setGender(forcedGender);
+    setBodyTypeIndex(null);
+  }, [forcedGender]);
+
+  useEffect(() => {
     preloadMannequinsForGender(gender);
+    if (forcedGender) return;
     const other: 'male' | 'female' = gender === 'male' ? 'female' : 'male';
     if (typeof window.requestIdleCallback === 'function') {
       const id = window.requestIdleCallback(() => preloadMannequinsForGender(other), { timeout: 2000 });
@@ -94,7 +103,7 @@ export function SizeCalculator({
     }
     const t = window.setTimeout(() => preloadMannequinsForGender(other), 350);
     return () => clearTimeout(t);
-  }, [gender]);
+  }, [gender, forcedGender]);
 
   const getValidatedData = (): SizeCalculatorData | null => {
     if (!height || !weight || bodyTypeIndex === null) {
@@ -147,39 +156,41 @@ export function SizeCalculator({
         <h2 className="text-xl font-bold text-gray-900 mb-4">{t('sizeCalculatorTitle')}</h2>
 
         <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('genderLabel')}</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  setGender('female');
-                  setBodyTypeIndex(null);
-                }}
-                style={gender === 'female' ? { backgroundColor: primaryColor } : {}}
-                className={`py-2 px-4 rounded-lg font-medium transition-colors ${
-                  gender === 'female'
-                    ? 'text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {t('female')}
-              </button>
-              <button
-                onClick={() => {
-                  setGender('male');
-                  setBodyTypeIndex(null);
-                }}
-                style={gender === 'male' ? { backgroundColor: primaryColor } : {}}
-                className={`py-2 px-4 rounded-lg font-medium transition-colors ${
-                  gender === 'male'
-                    ? 'text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {t('male')}
-              </button>
+          {!forcedGender && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('genderLabel')}</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setGender('female');
+                    setBodyTypeIndex(null);
+                  }}
+                  style={gender === 'female' ? { backgroundColor: primaryColor } : {}}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${
+                    gender === 'female'
+                      ? 'text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {t('female')}
+                </button>
+                <button
+                  onClick={() => {
+                    setGender('male');
+                    setBodyTypeIndex(null);
+                  }}
+                  style={gender === 'male' ? { backgroundColor: primaryColor } : {}}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${
+                    gender === 'male'
+                      ? 'text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {t('male')}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">

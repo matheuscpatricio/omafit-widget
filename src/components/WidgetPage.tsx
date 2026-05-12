@@ -27,6 +27,12 @@ const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   return null;
 };
 
+const normalizeApparelGenderScope = (value: unknown): 'both' | 'male' | 'female' => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'male' || raw === 'female') return raw;
+  return 'both';
+};
+
 type ProductCatalog = {
   sizes: string[];
   colors: string[];
@@ -413,6 +419,9 @@ export function WidgetPage() {
   const [collectionHandlesList, setCollectionHandlesList] = useState<string[]>([]);
   const [gender, setGender] = useState<string>('unisex');
   const [defaultGender, setDefaultGender] = useState<string>('unisex');
+  const [apparelGenderScope, setApparelGenderScope] = useState<'both' | 'male' | 'female'>(
+    sb.apparelGenderScope || 'both'
+  );
   const [collectionType, setCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(undefined);
   const [collectionElasticity, setCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(undefined);
   const [recommendedProductName, setRecommendedProductName] = useState<string>('');
@@ -464,6 +473,7 @@ export function WidgetPage() {
     const collectionHandlesCsv = params.get('collectionHandles');
     const genderParam = params.get('gender');
     const defaultGenderParam = params.get('defaultGender');
+    const apparelGenderScopeParam = params.get('apparelGenderScope') || params.get('apparel_gender_scope');
     const collectionTypeParam = params.get('collectionType');
     const collectionElasticityParam = params.get('collectionElasticity');
     const recommendedProductNameParam = params.get('recommendedProductName');
@@ -591,6 +601,8 @@ export function WidgetPage() {
       setDefaultGender(defaultGenderParam);
     }
 
+    setApparelGenderScope(normalizeApparelGenderScope(apparelGenderScopeParam));
+
     if (collectionTypeParam && ['upper', 'lower', 'full'].includes(collectionTypeParam)) {
       console.log('✅ Collection Type definido:', collectionTypeParam);
       setCollectionType(collectionTypeParam as 'upper' | 'lower' | 'full');
@@ -672,6 +684,9 @@ export function WidgetPage() {
         } else if (typeof config.tryon_enabled === 'boolean') {
           setTryonEnabledOverride(config.tryon_enabled);
         }
+        if (config.apparelGenderScope || config.apparel_gender_scope) {
+          setApparelGenderScope(normalizeApparelGenderScope(config.apparelGenderScope || config.apparel_gender_scope));
+        }
         const heroBg = config.tryonLayoutBackgroundImage || config.tryon_layout_background_image;
         if (typeof heroBg === 'string') setTryonLayoutBackgroundImage(heroBg.trim());
       } catch (error) {
@@ -736,6 +751,11 @@ export function WidgetPage() {
         if (event.data.defaultGender) {
           console.log('✅ Default Gender do contexto:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
+        }
+        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
+          const scope = normalizeApparelGenderScope(event.data.apparelGenderScope || event.data.apparel_gender_scope);
+          console.log('👤 Apparel Gender Scope do contexto:', scope);
+          setApparelGenderScope(scope);
         }
         if (event.data.collectionHandle !== undefined || event.data.collectionHandles !== undefined) {
           const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
@@ -845,6 +865,11 @@ export function WidgetPage() {
         if (event.data.defaultGender) {
           console.log('👤 Default Gender do config:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
+        }
+        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
+          const scope = normalizeApparelGenderScope(event.data.apparelGenderScope || event.data.apparel_gender_scope);
+          console.log('👤 Apparel Gender Scope do config:', scope);
+          setApparelGenderScope(scope);
         }
         if (event.data.collectionType && ['upper', 'lower', 'full'].includes(event.data.collectionType)) {
           console.log('👕 Collection Type do config:', event.data.collectionType);
@@ -1210,6 +1235,7 @@ export function WidgetPage() {
           collectionHandles={collectionHandlesList}
           gender={gender}
           defaultGender={defaultGender}
+          apparelGenderScope={apparelGenderScope}
           collectionType={collectionType}
           collectionElasticity={collectionElasticity}
           recommendedProductName={recommendedProductName}

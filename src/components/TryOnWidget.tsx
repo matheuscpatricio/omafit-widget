@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Sparkles, Plus } from 'lucide-react';
+import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Plus } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -70,6 +70,7 @@ interface TryOnWidgetProps {
   collectionHandles?: string[];
   gender?: string;
   defaultGender?: string;
+  apparelGenderScope?: 'both' | 'male' | 'female';
   collectionType?: 'upper' | 'lower' | 'full';
   collectionElasticity?: 'structured' | 'light_flex' | 'flexible' | 'high_elasticity';
   recommendedProductName?: string;
@@ -423,6 +424,7 @@ export function TryOnWidget({
   collectionHandles = [],
   gender = 'unisex',
   defaultGender = 'unisex',
+  apparelGenderScope = 'both',
   collectionType,
   collectionElasticity,
   recommendedProductName,
@@ -458,6 +460,7 @@ export function TryOnWidget({
   );
   console.log('   - 👤 gender (deprecated):', gender);
   console.log('   - 👤 defaultGender (sugestão inicial):', defaultGender);
+  console.log('   - 👤 apparelGenderScope:', apparelGenderScope);
   console.log('   - 🎁 recommendedProductName:', recommendedProductName || 'não fornecido');
   console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrl || 'não fornecido');
 
@@ -529,7 +532,7 @@ export function TryOnWidget({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'confirm' | 'processing' | 'result'>('info');
+  const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'processing' | 'result'>('info');
 
   useEffect(() => {
     if (step === 'calculator') {
@@ -679,6 +682,9 @@ export function TryOnWidget({
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
   const [localProductHandle, setLocalProductHandle] = useState<string>(productHandle || '');
+  const [localApparelGenderScope, setLocalApparelGenderScope] = useState<'both' | 'male' | 'female'>(
+    apparelGenderScope === 'male' || apparelGenderScope === 'female' ? apparelGenderScope : 'both'
+  );
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
@@ -755,7 +761,7 @@ export function TryOnWidget({
       }
 
       try {
-        console.log('⚡ Pré-processando MediaPipe ainda na confirmação...');
+        console.log('⚡ Pré-processando MediaPipe após o upload…');
         const imgElement = await loadImageElement(preparedImage.previewUrl);
         if (activeModelImageJobRef.current !== jobId) return null;
 
@@ -1120,6 +1126,12 @@ export function TryOnWidget({
     }
   }, [productHandle]);
 
+  useEffect(() => {
+    setLocalApparelGenderScope(
+      apparelGenderScope === 'male' || apparelGenderScope === 'female' ? apparelGenderScope : 'both'
+    );
+  }, [apparelGenderScope]);
+
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
     if (initialGptScheduleRef.current) {
@@ -1196,6 +1208,13 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
+        }
+
+        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
+          const scope = String(event.data.apparelGenderScope || event.data.apparel_gender_scope || '').trim().toLowerCase();
+          const normalizedScope = scope === 'male' || scope === 'female' ? scope : 'both';
+          console.log('✅ Atualizando apparelGenderScope:', normalizedScope);
+          setLocalApparelGenderScope(normalizedScope);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -1288,6 +1307,13 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
+        }
+
+        if (event.data.apparelGenderScope || event.data.apparel_gender_scope) {
+          const scope = String(event.data.apparelGenderScope || event.data.apparel_gender_scope || '').trim().toLowerCase();
+          const normalizedScope = scope === 'male' || scope === 'female' ? scope : 'both';
+          console.log('✅ Atualizando apparelGenderScope:', normalizedScope);
+          setLocalApparelGenderScope(normalizedScope);
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -2549,11 +2575,9 @@ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (activeModelImageJobRef.current === jobId) {
       setImagePreview(previewObjectUrl);
       setError('');
-      setStep('confirm');
-      console.log('📍 Step alterado para: confirm');
+      console.log('📍 Upload concluído — iniciando try-on (sem passo de confirmação)');
+      void handleSubmit(file);
     }
-
-    void startModelImagePreparation(file, jobId);
   }
 };
 
@@ -2658,8 +2682,9 @@ const validatePhotoForCollection = (
   return { valid: true };
 };
 
-const handleSubmit = async () => {
-  if (!modelImage || !product) {
+const handleSubmit = async (modelFileOverride?: File | null) => {
+  const modelFile = modelFileOverride ?? modelImage;
+  if (!modelFile || !product) {
     setError(t('selectProductAndPhoto'));
     return;
   }
@@ -2672,17 +2697,17 @@ const handleSubmit = async () => {
   try {
     const currentJobId = activeModelImageJobRef.current;
     const optimizedImage = preparedModelImageRef.current
-      ?? await (modelImagePreparationPromiseRef.current || startModelImagePreparation(modelImage, currentJobId));
+      ?? await (modelImagePreparationPromiseRef.current || startModelImagePreparation(modelFile, currentJobId));
 
     if (!optimizedImage || activeModelImageJobRef.current !== currentJobId) {
       throw new Error(t('processingError'));
     }
 
     const modelImageUploadPromise = modelImageUploadPromiseRef.current
-      || startModelImageUploadPreparation(optimizedImage, modelImage.name || 'tryon-model.jpg', currentJobId);
+      || startModelImageUploadPreparation(optimizedImage, modelFile.name || 'tryon-model.jpg', currentJobId);
 
     console.log('🗜️ Imagem do modelo otimizada:', {
-      originalSizeBytes: modelImage.size,
+      originalSizeBytes: modelFile.size,
       optimizedSizeBytes: optimizedImage.blob.size,
       width: optimizedImage.width,
       height: optimizedImage.height,
@@ -2703,12 +2728,12 @@ const handleSubmit = async () => {
       console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
       setError(preparedPoseAnalysis.validationMessage);
       setLoading(false);
-      setStep('confirm');
+      setStep('photo');
       return;
     }
 
     if (preparedPoseAnalysis?.detectedLandmarks?.length) {
-      console.log('✅ Reutilizando landmarks pré-processados da etapa de confirmação');
+      console.log('✅ Reutilizando landmarks pré-processados do upload');
       detectedLandmarks = preparedPoseAnalysis.detectedLandmarks;
       detectedMeasurements = preparedPoseAnalysis.detectedMeasurements;
       console.log('✅ Medidas reutilizadas do pré-processamento:', detectedMeasurements);
@@ -2729,7 +2754,7 @@ const handleSubmit = async () => {
         console.error('   weight:', sizeData?.weight);
         setError(t('requiredBodyData'));
         setLoading(false);
-        setStep('confirm');
+        setStep('photo');
         return;
       }
     }
@@ -2894,7 +2919,7 @@ const handleSubmit = async () => {
       });
     } else {
       const formData = new FormData();
-      formData.append('model_image_file', optimizedImage.blob, modelImage.name || 'tryon-model.jpg');
+      formData.append('model_image_file', optimizedImage.blob, modelFile.name || 'tryon-model.jpg');
       formData.append('shop_domain', payload.shop_domain);
       formData.append('collection_type', String(payload.collection_type || 'upper'));
       formData.append('garment_image', payload.garment_image);
@@ -3030,7 +3055,7 @@ const handleSubmit = async () => {
   } catch (error: any) {
     console.error('Erro no try-on:', error);
     setError(error.message || t('processingError'));
-    setStep('confirm');
+    setStep('photo');
     setLoading(false);
   }
 };
@@ -3257,12 +3282,12 @@ const handleSubmit = async () => {
       }
 
       invalidatePreparedModelAssets();
-      setStep('confirm');
-
       if (options?.autoSubmitTryOn) {
         window.setTimeout(() => {
           void handleSubmit();
         }, 80);
+      } else {
+        setStep('photo');
       }
     } catch (e) {
       console.error('suggested product try-on', e);
@@ -3378,6 +3403,19 @@ const handleSubmit = async () => {
       const canOmafitSearch =
         hasOmafitUrl && hasOmafitSecret && hasShopDomain && hasPublicId;
 
+      const collectionHandlesLine = [
+        ...(collectionHandles || []).map((h) => String(h || '').trim()).filter(Boolean),
+        String(collectionHandle || '').trim(),
+      ]
+        .filter((h, i, a) => h && a.indexOf(h) === i)
+        .join(', ');
+
+      let lastCatalogSearch: {
+        diagnostic?: string;
+        error: string | null;
+        httpStatus: number;
+      } | null = null;
+
       const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
         if (!canOmafitSearch) return;
         const searchRes = await fetchOmafitCatalogSearch({
@@ -3390,20 +3428,27 @@ const handleSubmit = async () => {
           productName: localProductName,
           collectionType: localCollectionType || 'upper',
         });
+        lastCatalogSearch = {
+          diagnostic: searchRes.diagnostic,
+          error: searchRes.error,
+          httpStatus: searchRes.httpStatus,
+        };
         if (searchRes.candidates.length) {
           candidate_products = searchRes.candidates;
         }
         if (searchRes.error && searchRes.error !== 'no_session') {
-          console.warn('[Omafit catalog-search]', searchRes.error);
+          console.warn('[Omafit catalog-search]', searchRes.error, searchRes.diagnostic || '');
         }
       };
 
       if (intention === 'custom' && customMessage && canOmafitSearch) {
+        const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const enrichedQuery = [customMessage, localProductName, localProductDescription]
           .filter((s) => String(s || '').trim())
-          .join(' | ');
+          .join(' | ') + ctx;
         await runOmafitCatalogSearch(enrichedQuery);
       } else if (intention === 'add_to_cart' && canOmafitSearch) {
+        const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const autoQuery = [
           `Combinar outfit com ${localProductName || 'esta peça'}`,
           localProductDescription,
@@ -3411,7 +3456,7 @@ const handleSubmit = async () => {
           'calça jeans casaco camisa calçado acessórios cores neutras',
         ]
           .filter((s) => String(s || '').trim())
-          .join(' | ');
+          .join(' | ') + ctx;
         await runOmafitCatalogSearch(autoQuery);
         if (candidate_products?.length) {
           intencaoForPayload = 'custom_message';
@@ -3436,10 +3481,14 @@ const handleSubmit = async () => {
         nOmafitCandidates === 0 &&
         (intention === 'custom' || intention === 'add_to_cart')
       ) {
-        console.warn(
-          '[Omafit] catalog-search chamado mas 0 candidatos — confira na app Omafit se a loja/coleção tem produtos e se a rota /api/widget/catalog-search está acessível.',
-          { shopDomain: effectiveShopDomain }
-        );
+        console.warn('[Omafit] catalog-search devolveu 0 candidatos.', {
+          shopDomain: effectiveShopDomain,
+          publicId,
+          excludeHandle: (localProductHandle || productHandle || '').trim(),
+          resposta: lastCatalogSearch,
+          checklist:
+            '1) Na app Omafit: public_id e shop_domain ligados ao catálogo certo. 2) Há outros produtos na coleção (o atual é excluído por handle). 3) O JSON da API usa candidates|data.candidates|products. 4) Ver logs do servidor na rota /api/widget/catalog-search.',
+        });
       } else {
         console.log('🛍️ Omafit candidatos para o consultor:', nOmafitCandidates);
       }
@@ -3746,9 +3795,6 @@ const handleSubmit = async () => {
       case 'photo':
         setStep('calculator');
         break;
-      case 'confirm':
-        setStep('photo');
-        break;
       default:
         break;
     }
@@ -3971,7 +4017,7 @@ const handleSubmit = async () => {
             </div>
             <div
               className={`pointer-events-none absolute z-30 hidden md:block ${
-                step === 'calculator' || step === 'photo' || step === 'confirm' ? 'left-14 top-3' : 'left-4 top-3'
+                step === 'calculator' || step === 'photo' ? 'left-14 top-3' : 'left-4 top-3'
               }`}
             >
               <div className="pointer-events-auto">
@@ -4318,7 +4364,7 @@ const handleSubmit = async () => {
           }
         >
       {/* Embed sidebar: sem barra branca com voltar — botão flutuante (barra colorida do shell não inclui voltar). */}
-      {embed && (step === 'calculator' || step === 'photo' || step === 'confirm') && (
+      {embed && (step === 'calculator' || step === 'photo') && (
         <button
           type="button"
           onClick={goBack}
@@ -4399,7 +4445,7 @@ const handleSubmit = async () => {
                 }`
               : embed
                 ? `min-h-0 overflow-y-auto px-2 py-2 sm:px-3${
-                    step === 'calculator' || step === 'confirm' ? ' pt-11' : ''
+                    step === 'calculator' ? ' pt-11' : ''
                   }`
                 : `overflow-y-auto p-2 md:p-4${step !== 'info' ? ' md:w-full' : ''}`
           }`}
@@ -4546,7 +4592,7 @@ const handleSubmit = async () => {
             transition={tryonFadeUp.transition}
           >
           <SizeCalculator
-            key={`calculator-${step}`}
+            key={`calculator-${step}-${localApparelGenderScope}`}
             heroFooterCTAs={isHeroLayout}
             onComplete={(data) => {
               console.log('🎯 SizeCalculator onComplete - Dados recebidos:', data);
@@ -4577,6 +4623,7 @@ const handleSubmit = async () => {
             onContinueWithoutPhoto={handleCalculatorContinueWithoutPhoto}
             primaryColor={primaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
+            forcedGender={localApparelGenderScope === 'male' || localApparelGenderScope === 'female' ? localApparelGenderScope : null}
             language={currentLanguage}
           />
           </motion.div>
@@ -4979,91 +5026,7 @@ const handleSubmit = async () => {
           </motion.div>
         )}
 
-        {/* Step 4: Confirm */}
-        {step === 'confirm' && (
-          <motion.div
-            className="space-y-4"
-            variants={tryonTextStaggerParent}
-            initial="hidden"
-            animate="show"
-          >
-            <motion.div variants={tryonTextStaggerChild} className="text-center mb-3 md:mb-4">
-              <h3 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2" style={{ color: primaryColor }}>
-                {t('confirmData')}
-              </h3>
-              <p className="text-gray-700 text-base md:text-lg">
-                {t('verifyBeforeProcess')}
-              </p>
-            </motion.div>
-
-            <motion.div variants={tryonTextStaggerChild} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-              {/* Produto */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium mb-3 text-center text-base md:text-lg" style={{ color: primaryColor }}>
-                  {t('product')}
-                </h4>
-                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-white">
-                  {selectedProductImage ? (
-                    <img
-                      src={selectedProductImage}
-                      alt="Produto"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      {t('noImage')}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Foto do Usuário */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-5">
-                <h4 className="font-medium mb-3 text-center text-base md:text-lg" style={{ color: primaryColor }}>
-                  {t('yourPhotoLabel')}
-                </h4>
-                <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-white">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Sua foto"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      {t('noImage')}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div variants={tryonTextStaggerChild} className="flex gap-3">
-              <button
-                onClick={() => {
-                  invalidatePreparedModelAssets();
-                  revokePreviewObjectUrl();
-                  setStep('photo');
-                  setImagePreview(null);
-                  setModelImage(null);
-                }}
-                className="flex-1 bg-gray-100 text-gray-700 border border-gray-300 py-3 md:py-3.5 text-lg md:text-xl rounded-lg hover:bg-gray-200 transition-all duration-300 ease-in-out font-medium"
-              >
-                {t('change')}
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="bg-primary hover:bg-primary-dark flex-1 py-3 md:py-3.5 text-lg md:text-xl rounded-lg transition-all duration-300 ease-in-out flex items-center justify-center gap-2 disabled:opacity-50 font-medium"
-              >
-                <Sparkles className="w-5 h-5" />
-                {t('process')}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* Step 5: Processing */}
+        {/* Processing */}
         {step === 'processing' && (
           <motion.div
             className="text-center py-10 md:py-12"
