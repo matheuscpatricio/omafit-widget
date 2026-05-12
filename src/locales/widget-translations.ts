@@ -108,11 +108,11 @@ export const widgetTranslations = {
 
     // Chat / consultor + catálogo Omafit
     chatPlaceholderStylist: 'Pergunte sobre combinações ou diga o que procura…',
-    chatStylingHint:
-      'Quer ideias para combinar? Pergunte abaixo ou escreva o tipo de peça (ex.: calça clara, casaco). Use + para nova foto se precisar mostrar pernas/peça de baixo.',
+    chatStylingHint: 'Quer ideias para combinar? Pergunte abaixo',
     chatNewPhotoAria: 'Enviar nova foto para o provador (útil para peças de baixo se a foto atual for só de tronco)',
     catalogUnavailableShort: 'Sugestões da loja indisponíveis agora; o assistente responde sem lista de produtos.',
-    suggestedTryOnPrefix: 'Provador:',
+    suggestedTryOnCta: 'Experimentar com o provador',
+    tryOnNeedsPhoto: 'Para gerar o try-on com a peça sugerida, precisamos da sua foto. Use o + ao lado do campo ou volte atrás e envie uma imagem.',
     loadingSuggestedProduct: 'A carregar produto…',
     suggestedProductLoadError: 'Não foi possível carregar este produto. Tente outra sugestão.',
   },
@@ -224,11 +224,11 @@ export const widgetTranslations = {
     addToCartError: 'No se pudo agregar al carrito.',
 
     chatPlaceholderStylist: 'Pregunta combinaciones o di qué buscas…',
-    chatStylingHint:
-      '¿Ideas para combinar? Pregunta abajo o escribe el tipo de prenda. Usa + para una foto nueva si necesitas piernas/parte inferior.',
+    chatStylingHint: '¿Ideas para combinar? Pregunta abajo',
     chatNewPhotoAria: 'Enviar nueva foto para el probador (útil para prendas inferiores si la foto actual es solo torso)',
     catalogUnavailableShort: 'Sugerencias de la tienda no disponibles; el asistente responde sin lista de productos.',
-    suggestedTryOnPrefix: 'Probar:',
+    suggestedTryOnCta: 'Probar con el probador',
+    tryOnNeedsPhoto: 'Para generar el try-on con la prenda sugerida necesitamos tu foto. Usa el + junto al campo o vuelve atrás y sube una imagen.',
     loadingSuggestedProduct: 'Cargando producto…',
     suggestedProductLoadError: 'No se pudo cargar este producto. Prueba otra sugerencia.',
   },
@@ -340,11 +340,11 @@ export const widgetTranslations = {
     addToCartError: 'Could not add product to cart.',
 
     chatPlaceholderStylist: 'Ask about outfit pairings or describe what you want…',
-    chatStylingHint:
-      'Want styling ideas? Ask below or type the item type (e.g. light pants, jacket). Use + for a new photo if you need legs/full lower body in frame.',
+    chatStylingHint: 'Want outfit ideas? Ask below',
     chatNewPhotoAria: 'Upload a new photo for try-on (helpful for bottoms if your current photo is torso-only)',
     catalogUnavailableShort: 'Store suggestions unavailable; the assistant will answer without a product list.',
-    suggestedTryOnPrefix: 'Try on:',
+    suggestedTryOnCta: 'Try on with preview',
+    tryOnNeedsPhoto: 'To generate a try-on with the suggested item we need your photo. Use the + next to the field or go back and upload an image.',
     loadingSuggestedProduct: 'Loading product…',
     suggestedProductLoadError: 'Could not load this product. Try another suggestion.',
   },

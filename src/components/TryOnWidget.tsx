@@ -25,6 +25,7 @@ import {
   type OmafitCatalogCandidate,
 } from '../utils/omafitCatalogClient';
 import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
+import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../utils/chatTryOnIntent';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -627,6 +628,10 @@ export function TryOnWidget({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatPhotoInputRef = useRef<HTMLInputElement>(null);
   const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
+  /** Últimas sugestões do consultor (para "quero experimentar" / try-on automático). */
+  const lastStylistSuggestionsRef = useRef<
+    Array<{ handle: string; title: string; image_url?: string; rationale?: string }>
+  >([]);
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
   const pollingDeadlineRef = useRef<number | null>(null);
@@ -3164,6 +3169,7 @@ const handleSubmit = async () => {
     setChatMessages([]);
     setInteractionCount(0);
     setPendingSuggestedHandle(null);
+    lastStylistSuggestionsRef.current = [];
   };
 
   useEffect(() => {
@@ -3174,7 +3180,10 @@ const handleSubmit = async () => {
     };
   }, []);
 
-  const handleSuggestedProductTryOn = async (handle: string) => {
+  const handleSuggestedProductTryOn = async (
+    handle: string,
+    options?: { autoSubmitTryOn?: boolean }
+  ) => {
     const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
     if (!isReady || !effectiveShopDomain || !publicId) {
       return;
@@ -3233,6 +3242,12 @@ const handleSubmit = async () => {
 
       invalidatePreparedModelAssets();
       setStep('confirm');
+
+      if (options?.autoSubmitTryOn) {
+        window.setTimeout(() => {
+          void handleSubmit();
+        }, 80);
+      }
     } catch (e) {
       console.error('suggested product try-on', e);
       setChatMessages((prev) => [
@@ -3265,6 +3280,30 @@ const handleSubmit = async () => {
     setGptLoading(true);
 
     try {
+      if (intention === 'custom' && customMessage && userWantsTryOnGeneration(customMessage)) {
+        const sug = lastStylistSuggestionsRef.current;
+        if (sug.length > 0) {
+          try {
+            if (!modelImage) {
+              setChatMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: t('tryOnNeedsPhoto'), timestamp: Date.now() },
+              ]);
+              return;
+            }
+            const { isReady } = getOmafitCatalogRuntimeConfig();
+            if (!isReady || !effectiveShopDomain || !publicId) {
+              return;
+            }
+            const pickedHandle = pickSuggestedHandleFromUserText(customMessage, sug) || sug[0].handle;
+            await handleSuggestedProductTryOn(pickedHandle, { autoSubmitTryOn: true });
+          } finally {
+            setGptLoading(false);
+          }
+          return;
+        }
+      }
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -3438,6 +3477,10 @@ const handleSubmit = async () => {
           timestamp: Date.now(),
           ...(suggestedProductsBlock?.length ? { suggestedProducts: suggestedProductsBlock } : {}),
         }]);
+
+        if (suggestedProductsBlock?.length) {
+          lastStylistSuggestionsRef.current = suggestedProductsBlock;
+        }
 
         setInteractionCount(result.interaction_count || interactionCount + 1);
       } else {
@@ -3930,22 +3973,47 @@ const handleSubmit = async () => {
                 >
                   <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
-                    <div className="mt-3 flex flex-col gap-2 border-t border-gray-200 pt-3">
+                    <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
                       {message.suggestedProducts.map((sp) => (
-                        <button
+                        <div
                           key={sp.handle}
-                          type="button"
-                          disabled={Boolean(pendingSuggestedHandle)}
-                          onClick={() => void handleSuggestedProductTryOn(sp.handle)}
-                          className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-900 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex gap-3 rounded-xl border border-gray-200 bg-white p-2 shadow-sm"
                         >
-                          {pendingSuggestedHandle === sp.handle
-                            ? t('loadingSuggestedProduct')
-                            : `${t('suggestedTryOnPrefix')} ${sp.title}`}
-                          {sp.rationale ? (
-                            <span className="mt-1 block text-xs font-normal text-gray-600">{sp.rationale}</span>
-                          ) : null}
-                        </button>
+                          {sp.image_url ? (
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                              <img
+                                src={sp.image_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
+                              …
+                            </div>
+                          )}
+                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                            <p className="text-sm font-semibold text-gray-900 line-clamp-2">{sp.title}</p>
+                            {sp.rationale ? (
+                              <p className="text-xs text-gray-600 line-clamp-2">{sp.rationale}</p>
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={Boolean(pendingSuggestedHandle)}
+                              onClick={() => void handleSuggestedProductTryOn(sp.handle, { autoSubmitTryOn: true })}
+                              className="mt-1 w-full max-w-[220px] rounded-lg px-3 py-2 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+                              style={{
+                                backgroundColor: localPrimaryColor,
+                                color: getContrastTextColor(localPrimaryColor),
+                              }}
+                            >
+                              {pendingSuggestedHandle === sp.handle
+                                ? t('loadingSuggestedProduct')
+                                : t('suggestedTryOnCta')}
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : null}
@@ -4035,12 +4103,9 @@ const handleSubmit = async () => {
                 <p className="text-xs text-center text-gray-600 mb-3">{addToCartFeedback}</p>
               )}
 
-              {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
-              {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
-                <p className="text-sm text-gray-600 text-center mb-3">
-                  {t('chatStylingHint')}
-                </p>
-              )}
+              <p className="text-sm text-gray-600 text-center mb-3">
+                {t('chatStylingHint')}
+              </p>
 
               <input
                 ref={chatPhotoInputRef}
