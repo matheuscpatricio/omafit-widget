@@ -105,6 +105,16 @@ export const widgetTranslations = {
     requiredBodyData: 'Por favor, preencha todos os dados do formulário (altura e peso são obrigatórios).',
     addToCartSuccess: 'Produto adicionado ao carrinho!',
     addToCartError: 'Não foi possível adicionar ao carrinho.',
+
+    // Chat / consultor + catálogo Omafit
+    chatPlaceholderStylist: 'Pergunte sobre combinações ou diga o que procura…',
+    chatStylingHint:
+      'Quer ideias para combinar? Pergunte abaixo ou escreva o tipo de peça (ex.: calça clara, casaco). Use + para nova foto se precisar mostrar pernas/peça de baixo.',
+    chatNewPhotoAria: 'Enviar nova foto para o provador (útil para peças de baixo se a foto atual for só de tronco)',
+    catalogUnavailableShort: 'Sugestões da loja indisponíveis agora; o assistente responde sem lista de produtos.',
+    suggestedTryOnPrefix: 'Provador:',
+    loadingSuggestedProduct: 'A carregar produto…',
+    suggestedProductLoadError: 'Não foi possível carregar este produto. Tente outra sugestão.',
   },
   es: {
     // Loading
@@ -212,6 +222,15 @@ export const widgetTranslations = {
     requiredBodyData: 'Por favor, completa todos los datos del formulario (altura y peso son obligatorios).',
     addToCartSuccess: 'Producto agregado al carrito!',
     addToCartError: 'No se pudo agregar al carrito.',
+
+    chatPlaceholderStylist: 'Pregunta combinaciones o di qué buscas…',
+    chatStylingHint:
+      '¿Ideas para combinar? Pregunta abajo o escribe el tipo de prenda. Usa + para una foto nueva si necesitas piernas/parte inferior.',
+    chatNewPhotoAria: 'Enviar nueva foto para el probador (útil para prendas inferiores si la foto actual es solo torso)',
+    catalogUnavailableShort: 'Sugerencias de la tienda no disponibles; el asistente responde sin lista de productos.',
+    suggestedTryOnPrefix: 'Probar:',
+    loadingSuggestedProduct: 'Cargando producto…',
+    suggestedProductLoadError: 'No se pudo cargar este producto. Prueba otra sugerencia.',
   },
   en: {
     // Loading
@@ -319,6 +338,15 @@ export const widgetTranslations = {
     requiredBodyData: 'Please fill in all required form data (height and weight are mandatory).',
     addToCartSuccess: 'Product added to cart!',
     addToCartError: 'Could not add product to cart.',
+
+    chatPlaceholderStylist: 'Ask about outfit pairings or describe what you want…',
+    chatStylingHint:
+      'Want styling ideas? Ask below or type the item type (e.g. light pants, jacket). Use + for a new photo if you need legs/full lower body in frame.',
+    chatNewPhotoAria: 'Upload a new photo for try-on (helpful for bottoms if your current photo is torso-only)',
+    catalogUnavailableShort: 'Store suggestions unavailable; the assistant will answer without a product list.',
+    suggestedTryOnPrefix: 'Try on:',
+    loadingSuggestedProduct: 'Loading product…',
+    suggestedProductLoadError: 'Could not load this product. Try another suggestion.',
   },
 };
 

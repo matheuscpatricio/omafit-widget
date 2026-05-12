@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
 interface ValidateSizeRequest {
   altura_cm: number;
@@ -47,6 +47,12 @@ interface ValidateSizeRequest {
     role: 'user' | 'assistant';
     content: string;
   }>;
+  candidate_products?: Array<{
+    handle: string;
+    title: string;
+    url?: string;
+    image_url?: string;
+  }>;
 }
 
 interface GPTResponse {
@@ -55,6 +61,30 @@ interface GPTResponse {
   coerencia: string;
   confianca: number;
   should_end_conversation?: boolean;
+  suggested_products?: Array<{ handle: string; rationale?: string }>;
+}
+
+function sanitizeSuggestedProducts(
+  raw: unknown,
+  candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
+): Array<{ handle: string; rationale?: string }> {
+  const allowed = new Set(
+    (candidates || []).map((c) => String(c?.handle || "").trim().toLowerCase()).filter(Boolean)
+  );
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ handle: string; rationale?: string }> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const h = String((item as { handle?: string }).handle || "").trim();
+    if (!h || !allowed.has(h.toLowerCase())) continue;
+    const rationale = String((item as { rationale?: string }).rationale || "").trim();
+    out.push({
+      handle: h,
+      ...(rationale ? { rationale: rationale.slice(0, 220) } : {}),
+    });
+    if (out.length >= 3) break;
+  }
+  return out;
 }
 
 function normalizeSizeLabel(size: string): string {
@@ -441,9 +471,16 @@ IMPORTANT: Return valid JSON with this structure:
   return prompts[language] || prompts['en'];
 }
 
-async function callOpenAI(userPrompt: string, language: string = 'pt'): Promise<GPTResponse> {
+async function callOpenAI(
+  userPrompt: string,
+  language: string = 'pt',
+  opts?: { systemExtra?: string; maxTokens?: number }
+): Promise<GPTResponse> {
   try {
-    const systemPrompt = getSystemPrompt(language);
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY not configured");
+    }
+    const systemPrompt = [getSystemPrompt(language), opts?.systemExtra].filter(Boolean).join("\n\n");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -457,7 +494,7 @@ async function callOpenAI(userPrompt: string, language: string = 'pt'): Promise<
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 300,
+        max_tokens: opts?.maxTokens ?? 300,
         temperature: 0.7,
         response_format: { type: "json_object" },
       }),
@@ -602,6 +639,82 @@ function buildCatalogHardRules(data: ValidateSizeRequest, language: string): str
 - Se não houver tamanhos/cores no payload, informe brevemente que essa informação não veio no catálogo desta requisição, sem inventar dados.`;
 }
 
+function getStylistSystemExtra(language: string): string {
+  const blocks: Record<string, string> = {
+    pt: `MODO CONSULTOR DE MODA (catálogo limitado):
+- Você é um estilista profissional da loja: tom caloroso, claro e conciso (2–4 frases; pode usar um bullet curto). Evite tom de "vendedor genérico" ou jargão vazio.
+- Só pode mencionar produtos cujo "handle" apareça na lista CANDIDATOS abaixo. Nunca invente URLs, nomes ou peças fora da lista.
+- Critérios de styling (use os que fizerem sentido): harmonia de cor (contraste ou tonalidade intencional); proporção e silhueta em relação ao tipo de peça em try-on (categoria: upper/lower/full); ocasião (mais casual vs mais arrumado); coerência entre categorias (ex.: topo escuro + base mais clara quando adequado).
+- Explique brevemente POR QUE a peça combina antes de citar o nome.
+- Se o cliente pedir outro tipo de peça ou estilo diferente das sugestões anteriores (ex.: casaco em vez de calça), acolha a preferência: os CANDIDATOS já foram renovados pelo sistema — escolha só entre eles; não insista no que deixou de fazer sentido.
+- Se a lista não tiver o que o cliente pediu, seja honesto: diga que nesta busca não apareceu e sugira reformular ou explorar a loja — sem inventar produtos.
+- Responda em JSON válido incluindo "suggested_products": array (0 a 3 itens) com {"handle":"...","rationale":"frase curta opcional"} — apenas handles da lista.`,
+    es: `MODO ESTILISTA (catálogo limitado):
+- Eres un/a estilista profesional de la tienda: tono cálido y claro (2–4 frases; un bullet corto opcional). Evita tono de "vendedor genérico".
+- Solo puedes mencionar productos cuyo "handle" esté en CANDIDATOS. Nunca inventes URLs ni prendas fuera de la lista.
+- Criterios: armonía de color (contraste o tonalidad); proporción y silueta según la prenda en prueba (categoría upper/lower/full); ocasión (casual vs más arreglada); coherencia entre categorías.
+- Explica brevemente POR QUÉ combina antes de nombrar.
+- Si el cliente pide otra categoría o estilo (ej. abrigo en vez de pantalón), acoge la preferencia: los CANDIDATOS ya se actualizaron — elige solo entre ellos.
+- Si no hay nada adecuado en la lista, dilo con honestidad — sin inventar.
+- JSON válido con "suggested_products": 0–3 elementos {"handle":"...","rationale":"..."} solo de la lista.`,
+    en: `STYLIST MODE (limited catalog):
+- You are a professional in-store stylist: warm, clear, concise (2–4 sentences; optional short bullet). Avoid generic "salesy" tone.
+- You may ONLY mention products whose "handle" is in CANDIDATES. Never invent URLs or items outside the list.
+- Criteria: color harmony (contrast or intentional tone); proportion and silhouette vs the try-on garment category (upper/lower/full); occasion (casual vs dressier); sensible category pairing.
+- Briefly explain WHY pieces work before naming them.
+- If the shopper asks for a different category or vibe (e.g. coat instead of pants), embrace it: CANDIDATES were refreshed — pick only from the current list.
+- If nothing matches, say so honestly — do not invent products.
+- Valid JSON with "suggested_products": 0–3 items {"handle":"...","rationale":"..."} from the list only.`,
+  };
+  return blocks[language] || blocks.en;
+}
+
+function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: string): string {
+  const candidates = Array.isArray(data.candidate_products) ? data.candidate_products : [];
+  const lines = candidates
+    .map((c) => `- handle: ${String(c.handle || "").trim()} | title: ${String(c.title || "").trim()}`)
+    .join("\n");
+
+  const productCatalogContext = buildProductCatalogContext(data, language);
+  const chatHistory = Array.isArray(data.chat_history) ? data.chat_history : [];
+  const chatHistoryText = chatHistory.length > 0
+    ? `\nCONVERSATION CONTEXT:\n${chatHistory
+        .slice(-12)
+        .map((m) => `- ${m.role}: ${String(m.content || "").trim()}`)
+        .join("\n")}\n`
+    : "";
+
+  const storeContext = data.shop_name ? ` Store: ${data.shop_name}.` : "";
+  const msg = String(data.custom_message || "").trim();
+  const cat = String(data.categoria || "upper");
+  const catHintPt =
+    cat === "lower"
+      ? "(lower = peça de baixo; harmonize com o que combina por cima / conjunto.)"
+      : cat === "full"
+        ? "(full = corpo inteiro; equilibre proporções e ocasião.)"
+        : "(upper = peça de cima; pense em base/acessórios para silhueta e cor.)";
+  const catHintEs =
+    cat === "lower"
+      ? "(lower = parte inferior; armoniza con lo de arriba / conjunto.)"
+      : cat === "full"
+        ? "(full = cuerpo entero; equilibra proporción y ocasión.)"
+        : "(upper = parte superior; piensa en base/accesorios para silueta y color.)";
+  const catHintEn =
+    cat === "lower"
+      ? "(lower = bottoms; balance with tops / outfit cohesion.)"
+      : cat === "full"
+        ? "(full = full-body garment; balance proportion and occasion.)"
+        : "(upper = tops; think bottoms/accessories for silhouette and color.)";
+
+  if (language === "es") {
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista y devuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+  }
+  if (language === "en") {
+    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist and return JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+  }
+  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista e devolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+}
+
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
   const validationPrompt = {
     pt: `Analise a seguinte mensagem do usuário e determine se é apropriada para um contexto de compra de roupas:
@@ -664,6 +777,9 @@ Return JSON:
   };
 
   try {
+    if (!OPENAI_API_KEY) {
+      return { is_appropriate: true, response_message: "" };
+    }
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -1010,7 +1126,10 @@ Deno.serve(async (req: Request) => {
         );
       }
       // Se for apropriado, construir prompt para responder a pergunta
-      userPrompt = buildCustomMessagePrompt(data, language);
+      const hasCandidates = Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
+      userPrompt = hasCandidates
+        ? buildStylistConsultantPrompt(data, language)
+        : buildCustomMessagePrompt(data, language);
     } else if (data.intencao_usuario === "sugerir_combinacoes") {
       userPrompt = buildComplementaryPrompt(data, language);
     } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
@@ -1021,7 +1140,48 @@ Deno.serve(async (req: Request) => {
 
     // Chamar OpenAI
     console.log('🚀 Enviando prompt para OpenAI. Intenção:', data.intencao_usuario || 'validar_tamanho');
-    const gptResponse = await callOpenAI(userPrompt, language);
+    const hasStylistCandidates =
+      data.intencao_usuario === "custom_message" &&
+      Array.isArray(data.candidate_products) &&
+      data.candidate_products.length > 0;
+
+    let gptResponse: GPTResponse;
+    try {
+      gptResponse = await callOpenAI(userPrompt, language, {
+        systemExtra: hasStylistCandidates ? getStylistSystemExtra(language) : undefined,
+        maxTokens: hasStylistCandidates ? 480 : 300,
+      });
+    } catch (aiErr) {
+      console.error("OpenAI unavailable:", aiErr);
+      if (hasStylistCandidates) {
+        const lang = language;
+        const emptyHint =
+          lang === "es"
+            ? "No encontré sugerencias en el catálogo filtrado para esta búsqueda. Prueba reformular o explora la tienda."
+            : lang === "en"
+              ? "I could not find strong matches in this catalog search. Try rephrasing or browse the store."
+              : "Não encontrei sugestões fortes nesta busca do catálogo. Tente reformular ou explore a loja.";
+        gptResponse = {
+          tamanho_final: normalizeSizeLabel(data.tamanho_calculado_algoritmo || "M"),
+          explicacao: emptyHint,
+          coerencia: "alta",
+          confianca: 0.5,
+          suggested_products: [],
+        };
+      } else {
+        throw aiErr;
+      }
+    }
+
+    if (hasStylistCandidates && data.candidate_products) {
+      gptResponse = {
+        ...gptResponse,
+        suggested_products: sanitizeSuggestedProducts(
+          gptResponse.suggested_products,
+          data.candidate_products
+        ),
+      };
+    }
 
     // Garantir que o tamanho final exista no catálogo real do produto selecionado.
     // Exemplo: se o algoritmo sugerir "GG", mas o produto só tem P..G, corrigimos para um tamanho existente.

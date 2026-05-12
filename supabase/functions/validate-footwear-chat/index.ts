@@ -6,9 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const OPENAI_API_KEY =
-  Deno.env.get('OPENAI_API_KEY') ||
-  "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";
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
 interface FootwearChatRequest {
   recommended_size: string;

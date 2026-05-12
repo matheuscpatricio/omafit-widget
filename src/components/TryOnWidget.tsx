@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Sparkles } from 'lucide-react';
+import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Sparkles, Plus } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
 import { supabase } from '../lib/supabase';
@@ -19,6 +19,12 @@ import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
 import { contrastTextOnHex } from '../utils/contrastText';
 import { ensureMannequinPreconnect, preloadAllMannequinSilhouettes } from '../utils/mannequinAssets';
+import {
+  fetchOmafitCatalogSearch,
+  fetchOmafitProductByHandle,
+  type OmafitCatalogCandidate,
+} from '../utils/omafitCatalogClient';
+import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -146,6 +152,27 @@ const tryonFadeUp = {
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
 } as const;
+
+function inferCollectionTypeFromProductType(productType: string): 'upper' | 'lower' | 'full' {
+  const p = String(productType || '').toLowerCase();
+  if (
+    /pant|jeans?|trouser|short|bermuda|saia|skirt|legging|calç|calca|bottom|bikini|swim/.test(p)
+  ) {
+    return 'lower';
+  }
+  if (/dress|vestido|macac|jumpsuit|mono|full|body|enterizo|overall/.test(p)) {
+    return 'full';
+  }
+  return 'upper';
+}
+
+function safeDecodeUriComponent(url: string): string {
+  try {
+    return decodeURIComponent(url);
+  } catch {
+    return url;
+  }
+}
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -576,6 +603,12 @@ export function TryOnWidget({
     role: 'assistant' | 'user';
     content: string;
     timestamp: number;
+    suggestedProducts?: Array<{
+      handle: string;
+      title: string;
+      image_url?: string;
+      rationale?: string;
+    }>;
   }
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gptLoading, setGptLoading] = useState(false);
@@ -592,6 +625,8 @@ export function TryOnWidget({
     () => normalizeSelectedVariantOptions(initialSelectedVariantOptions)
   );
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
   const pollingDeadlineRef = useRef<number | null>(null);
@@ -3128,6 +3163,7 @@ const handleSubmit = async () => {
     setCurrentImageIndex(0);
     setChatMessages([]);
     setInteractionCount(0);
+    setPendingSuggestedHandle(null);
   };
 
   useEffect(() => {
@@ -3137,6 +3173,76 @@ const handleSubmit = async () => {
       revokePreviewObjectUrl();
     };
   }, []);
+
+  const handleSuggestedProductTryOn = async (handle: string) => {
+    const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!isReady || !effectiveShopDomain || !publicId) {
+      return;
+    }
+    const h = String(handle || '').trim();
+    if (!h) return;
+
+    setPendingSuggestedHandle(h);
+    try {
+      const { product, error } = await fetchOmafitProductByHandle({
+        baseUrl: base,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        handle: h,
+      });
+
+      if (error || !product) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: t('suggestedProductLoadError'), timestamp: Date.now() },
+        ]);
+        return;
+      }
+
+      setLocalProductHandle(product.handle);
+      setLocalProductName(product.title);
+      setLocalCollectionType(inferCollectionTypeFromProductType(product.product_type));
+
+      const imgs = product.images?.length ? product.images : [product.image_url].filter(Boolean);
+      const mainImg = imgs[0] || product.image_url || '';
+      setAvailableImages(imgs);
+      setCurrentImageIndex(0);
+      setSelectedProductImage(mainImg);
+      setProduct({
+        id: product.id,
+        name: product.title,
+        garment_image: safeDecodeUriComponent(mainImg),
+        category: 'auto',
+      });
+
+      const normalized = normalizeProductCatalog(product.catalog);
+      setProductCatalog(normalized);
+      logProductCatalogDebug('omafit-product-by-handle', normalized);
+
+      const first =
+        product.catalog.variants.find((v: { available?: boolean }) => v && v.available) ||
+        product.catalog.variants[0];
+      if (first) {
+        setSelectedVariantId(String(first.id));
+        setSelectedVariantOptions(normalizeSelectedVariantOptions(first.selectedOptions));
+      } else {
+        setSelectedVariantId('');
+        setSelectedVariantOptions({});
+      }
+
+      invalidatePreparedModelAssets();
+      setStep('confirm');
+    } catch (e) {
+      console.error('suggested product try-on', e);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: t('suggestedProductLoadError'), timestamp: Date.now() },
+      ]);
+    } finally {
+      setPendingSuggestedHandle(null);
+    }
+  };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
     if (interactionCount >= GPT_INTERACTION_LIMIT) {
@@ -3197,6 +3303,35 @@ const handleSubmit = async () => {
         });
       }
 
+      let candidate_products: OmafitCatalogCandidate[] | undefined;
+      const { baseUrl: omafitBase, secret: omafitSecret, isReady: omafitCatalogReady } =
+        getOmafitCatalogRuntimeConfig();
+
+      if (
+        intention === 'custom' &&
+        customMessage &&
+        omafitCatalogReady &&
+        effectiveShopDomain &&
+        publicId
+      ) {
+        const searchRes = await fetchOmafitCatalogSearch({
+          baseUrl: omafitBase,
+          secret: omafitSecret,
+          shopDomain: effectiveShopDomain,
+          publicId,
+          userMessage: customMessage,
+          excludeHandle: (localProductHandle || productHandle || '').trim(),
+          productName: localProductName,
+          collectionType: localCollectionType || 'upper',
+        });
+        if (searchRes.candidates.length) {
+          candidate_products = searchRes.candidates;
+        }
+        if (searchRes.error && searchRes.error !== 'no_session') {
+          console.warn('[Omafit catalog-search]', searchRes.error);
+        }
+      }
+
       const payload = {
         altura_cm: sizeData.height,
         peso_kg: sizeData.weight,
@@ -3214,6 +3349,7 @@ const handleSubmit = async () => {
         session_id: analyticsSessionId || sessionId,
         interaction_count: interactionCount,
         shop_name: localStoreName,
+        shop_domain: effectiveShopDomain,
         language: currentLanguage,
         product_name: localProductName,
         product_description: localProductDescription,
@@ -3227,6 +3363,7 @@ const handleSubmit = async () => {
           .slice(-12)
           .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
           .map(m => ({ role: m.role, content: String(m.content || '').trim() })),
+        ...(candidate_products ? { candidate_products } : {}),
       };
 
       console.log('🤖 [GPT PAYLOAD] Catálogo enviado para validate-size:');
@@ -3257,7 +3394,7 @@ const handleSubmit = async () => {
       console.log('📥 Resposta recebida:', result);
 
       if (result.success && result.data) {
-        const { tamanho_final, explicacao, should_end_conversation } = result.data;
+        const { explicacao, should_end_conversation, suggested_products } = result.data;
 
         // Se a conversa deve ser encerrada (conteúdo inadequado), mostrar mensagem e bloquear
         if (should_end_conversation) {
@@ -3270,10 +3407,36 @@ const handleSubmit = async () => {
           return;
         }
 
+        let suggestedProductsBlock: ChatMessage['suggestedProducts'];
+        if (
+          Array.isArray(suggested_products) &&
+          suggested_products.length > 0 &&
+          candidate_products?.length
+        ) {
+          const cmap = new Map(candidate_products.map((c) => [c.handle.toLowerCase(), c]));
+          const mapped = suggested_products
+            .map((s: { handle?: string; rationale?: string }) => {
+              const hh = String(s?.handle || '').trim();
+              const c = cmap.get(hh.toLowerCase());
+              if (!c) {
+                return null;
+              }
+              return {
+                handle: c.handle,
+                title: c.title,
+                image_url: c.image_url,
+                rationale: String(s?.rationale || '').trim() || undefined,
+              };
+            })
+            .filter(Boolean) as NonNullable<ChatMessage['suggestedProducts']>;
+          suggestedProductsBlock = mapped.length ? mapped : undefined;
+        }
+
         setChatMessages(prev => [...prev, {
           role: 'assistant',
           content: explicacao,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          ...(suggestedProductsBlock?.length ? { suggestedProducts: suggestedProductsBlock } : {}),
         }]);
 
         setInteractionCount(result.interaction_count || interactionCount + 1);
@@ -3766,6 +3929,26 @@ const handleSubmit = async () => {
                   style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
                 >
                   <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                  {message.role === 'assistant' && message.suggestedProducts?.length ? (
+                    <div className="mt-3 flex flex-col gap-2 border-t border-gray-200 pt-3">
+                      {message.suggestedProducts.map((sp) => (
+                        <button
+                          key={sp.handle}
+                          type="button"
+                          disabled={Boolean(pendingSuggestedHandle)}
+                          onClick={() => void handleSuggestedProductTryOn(sp.handle)}
+                          className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-sm font-medium text-gray-900 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {pendingSuggestedHandle === sp.handle
+                            ? t('loadingSuggestedProduct')
+                            : `${t('suggestedTryOnPrefix')} ${sp.title}`}
+                          {sp.rationale ? (
+                            <span className="mt-1 block text-xs font-normal text-gray-600">{sp.rationale}</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </motion.div>
             ))}
@@ -3855,22 +4038,33 @@ const handleSubmit = async () => {
               {/* Frase acima do campo - só mostra se é a primeira mensagem do assistente */}
               {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && (
                 <p className="text-sm text-gray-600 text-center mb-3">
-                  {currentLanguage === 'pt' && 'Restou alguma dúvida sobre esta roupa? Pergunte abaixo'}
-                  {currentLanguage === 'es' && '¿Quedó alguna duda sobre esta prenda? Pregunta abajo'}
-                  {currentLanguage === 'en' && 'Any questions about this garment? Ask below'}
+                  {t('chatStylingHint')}
                 </p>
               )}
 
+              <input
+                ref={chatPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+
               {/* Text Input */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-stretch">
+                <button
+                  type="button"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50"
+                  aria-label={t('chatNewPhotoAria')}
+                  title={t('chatNewPhotoAria')}
+                  onClick={() => chatPhotoInputRef.current?.click()}
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
                 <input
                   type="text"
-                  placeholder={
-                    currentLanguage === 'pt' ? 'Digite sua mensagem...' :
-                    currentLanguage === 'es' ? 'Escribe tu mensaje...' :
-                    'Type your message...'
-                  }
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
+                  placeholder={t('chatPlaceholderStylist')}
+                  className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
                   style={{ focusRing: localPrimaryColor }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && e.currentTarget.value.trim()) {
@@ -3886,10 +4080,12 @@ const handleSubmit = async () => {
                   }}
                 />
                 <button
-                  className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md"
+                  type="button"
+                  className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
                   style={{ backgroundColor: localPrimaryColor }}
                   onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                    const wrap = e.currentTarget.parentElement;
+                    const input = wrap?.querySelector('input[type="text"]') as HTMLInputElement | null;
                     if (input && input.value.trim()) {
                       const message = input.value.trim();
                       setChatMessages(prev => [...prev, {
