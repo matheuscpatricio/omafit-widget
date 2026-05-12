@@ -3361,8 +3361,7 @@ const handleSubmit = async () => {
       }
 
       let candidate_products: OmafitCatalogCandidate[] | undefined;
-      const { baseUrl: omafitBase, secret: omafitSecret, isReady: omafitCatalogReady } =
-        getOmafitCatalogRuntimeConfig();
+      const { baseUrl: omafitBase, secret: omafitSecret } = getOmafitCatalogRuntimeConfig();
 
       let intencaoForPayload: 'custom_message' | 'sugerir_combinacoes' | 'induzir_adicionar_carrinho' =
         intention === 'custom'
@@ -3372,8 +3371,12 @@ const handleSubmit = async () => {
             : 'induzir_adicionar_carrinho';
       let customMessageForPayload: string | undefined = customMessage;
 
+      const hasOmafitUrl = Boolean(String(omafitBase || '').trim());
+      const hasOmafitSecret = Boolean(String(omafitSecret || '').trim());
+      const hasShopDomain = Boolean(String(effectiveShopDomain || '').trim());
+      const hasPublicId = Boolean(String(publicId || '').trim());
       const canOmafitSearch =
-        Boolean(omafitCatalogReady && effectiveShopDomain && publicId);
+        hasOmafitUrl && hasOmafitSecret && hasShopDomain && hasPublicId;
 
       const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
         if (!canOmafitSearch) return;
@@ -3419,11 +3422,27 @@ const handleSubmit = async () => {
         }
       }
 
-      console.log(
-        '🛍️ Omafit candidatos para o consultor:',
-        candidate_products?.length ?? 0,
-        canOmafitSearch ? '' : '(URL/segredo Omafit ou shop/publicId em falta)'
-      );
+      const nOmafitCandidates = candidate_products?.length ?? 0;
+      if (!canOmafitSearch) {
+        console.warn('[Omafit] Pesquisa de catálogo desligada no bundle do widget.', {
+          VITE_OMAFIT_APP_URL_definida: hasOmafitUrl,
+          VITE_OMAFIT_WIDGET_HMAC_SECRET_ou_VITE_WIDGET_CATALOG_HMAC_SECRET: hasOmafitSecret,
+          shopDomain_presente: hasShopDomain,
+          publicId_presente: hasPublicId,
+          dica:
+            'No .env à raiz do projeto: VITE_OMAFIT_APP_URL (URL pública da app, sem / final) e o mesmo segredo HMAC que na app Omafit (Railway: WIDGET_CATALOG_HMAC_SECRET). Depois: npm run build e volte a publicar o JS do widget. O shopDomain e publicId vêm das props do embed.',
+        });
+      } else if (
+        nOmafitCandidates === 0 &&
+        (intention === 'custom' || intention === 'add_to_cart')
+      ) {
+        console.warn(
+          '[Omafit] catalog-search chamado mas 0 candidatos — confira na app Omafit se a loja/coleção tem produtos e se a rota /api/widget/catalog-search está acessível.',
+          { shopDomain: effectiveShopDomain }
+        );
+      } else {
+        console.log('🛍️ Omafit candidatos para o consultor:', nOmafitCandidates);
+      }
 
       const payload = {
         altura_cm: sizeData.height,
