@@ -3589,6 +3589,21 @@ const handleSubmit = async () => {
           background-color: rgb(255 255 255 / 0.92) !important;
           color: ${localPrimaryColor} !important;
         }
+        .omafit-tryon-hero button.omafit-hero-calculator-primary-cta {
+          background-color: #ffffff !important;
+          color: ${localPrimaryColor} !important;
+        }
+        .omafit-tryon-hero button.omafit-hero-calculator-primary-cta:hover:not(:disabled) {
+          background-color: rgb(255 255 255 / 0.92) !important;
+          color: ${localPrimaryColor} !important;
+        }
+        .omafit-tryon-hero button.omafit-hero-calculator-primary-cta:disabled {
+          background-color: rgb(255 255 255 / 0.35) !important;
+          color: rgb(255 255 255 / 0.85) !important;
+        }
+        .omafit-tryon-hero button.omafit-hero-calculator-skip-link {
+          color: #ffffff !important;
+        }
         .omafit-tryon-hero button.omafit-hero-floating-back {
           color: ${localPrimaryColor} !important;
         }
@@ -4147,6 +4162,7 @@ const handleSubmit = async () => {
           >
           <SizeCalculator
             key={`calculator-${step}`}
+            heroFooterCTAs={isHeroLayout}
             onComplete={(data) => {
               console.log('🎯 SizeCalculator onComplete - Dados recebidos:', data);
               console.log('   - height:', data.height);

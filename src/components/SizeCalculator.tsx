@@ -10,6 +10,8 @@ interface SizeCalculatorProps {
   onBack?: () => void;
   /** Se definido, mostra o link «Continuar sem foto» abaixo do CTA principal. */
   onContinueWithoutPhoto?: (data: SizeCalculatorData) => void;
+  /** Layout hero: rodapé com botão branco (texto primário) e link branco. */
+  heroFooterCTAs?: boolean;
   primaryColor?: string;
   defaultGender?: 'male' | 'female' | 'unisex';
   language?: 'pt' | 'es' | 'en';
@@ -66,6 +68,7 @@ const bodyTypeGalleryMotion = {
 export function SizeCalculator({
   onComplete,
   onContinueWithoutPhoto,
+  heroFooterCTAs = false,
   primaryColor = '#810707',
   defaultGender = 'female',
   language = 'en',
@@ -395,8 +398,20 @@ export function SizeCalculator({
           type="button"
           onClick={handleContinueToPhoto}
           disabled={!height || !weight || bodyTypeIndex === null}
-          style={!height || !weight || bodyTypeIndex === null ? {} : { backgroundColor: primaryColor }}
-          className="w-full py-2 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
+          style={
+            heroFooterCTAs
+              ? undefined
+              : !height || !weight || bodyTypeIndex === null
+                ? {}
+                : { backgroundColor: primaryColor }
+          }
+          className={`w-full py-2 px-4 rounded-lg transition-all font-medium disabled:cursor-not-allowed ${
+            heroFooterCTAs
+              ? 'omafit-hero-calculator-primary-cta border border-white/95 shadow-sm hover:opacity-95 disabled:border-white/35'
+              : !height || !weight || bodyTypeIndex === null
+                ? 'text-white disabled:bg-gray-300'
+                : 'text-white hover:opacity-90 disabled:bg-gray-300'
+          }`}
         >
           {t('continueToPhotoSubmit')}
         </button>
@@ -405,8 +420,10 @@ export function SizeCalculator({
             type="button"
             onClick={handleContinueWithoutPhotoClick}
             disabled={!height || !weight || bodyTypeIndex === null}
-            className="w-full text-sm font-medium underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
-            style={{ color: primaryColor }}
+            className={`w-full text-sm font-medium underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer ${
+              heroFooterCTAs ? 'omafit-hero-calculator-skip-link' : ''
+            }`}
+            style={heroFooterCTAs ? undefined : { color: primaryColor }}
           >
             {t('continueWithoutPhotoLink')}
           </button>
