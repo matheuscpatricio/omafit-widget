@@ -602,6 +602,9 @@ export function TryOnWidget({
   const modelImageUploadPromiseRef = useRef<Promise<string | null> | null>(null);
   const posePreparationPromiseRef = useRef<Promise<PreparedPoseAnalysis | null> | null>(null);
   const activeModelImageJobRef = useRef(0);
+  /** Após «Continuar sem foto»: quando `loadSizeChart` terminar, calcular tamanho e ir para `result`. */
+  const formOnlySizingAfterChartRef = useRef(false);
+  const skipFormOnlySizingPayloadRef = useRef<SizeCalculatorData | null>(null);
 
   // Armazenar medidas do modelo corporal final para envio ao GPT
   const [finalBodyMeasurements, setFinalBodyMeasurements] = useState<{
@@ -2052,9 +2055,46 @@ export function TryOnWidget({
     };
   };
 
+  const handleCalculatorContinueWithoutPhoto = (data: SizeCalculatorData) => {
+    const cleanData: SizeCalculatorData = {
+      gender: data.gender,
+      height: data.height,
+      weight: data.weight,
+      bodyType: data.bodyType,
+      fit: data.fit,
+      bodyTypeIndex: data.bodyTypeIndex,
+      fitIndex: data.fitIndex,
+    };
+    skipFormOnlySizingPayloadRef.current = cleanData;
+    formOnlySizingAfterChartRef.current = true;
+    invalidatePreparedModelAssets();
+    revokePreviewObjectUrl();
+    setModelImage(null);
+    setImagePreview(null);
+    setFinalBodyMeasurements(null);
+    setResult(null);
+    setPredictionId(null);
+    setError('');
+    setLoading(false);
+    setSizeData(cleanData);
+  };
+
   useEffect(() => {
     const loadSizeChart = async () => {
       console.log('🔍 ===== TRYON WIDGET: CARREGANDO SIZE CHART =====');
+
+      const finalizeFormOnlyIfPending = (chartRows: SizeChartEntry[]) => {
+        if (!formOnlySizingAfterChartRef.current) return;
+        const payload = skipFormOnlySizingPayloadRef.current;
+        formOnlySizingAfterChartRef.current = false;
+        skipFormOnlySizingPayloadRef.current = null;
+        if (!payload?.gender) return;
+        const sizeResult = chartRows.length > 0 ? calculateRecommendedSize(payload, chartRows) : null;
+        const size = sizeResult?.size ?? 'M';
+        setRecommendedSize(size);
+        setCalculatedSize(size);
+        setStep('result');
+      };
 
       if (!sizeData?.gender) {
         console.log('❌ BLOQUEADO: Não há gender no sizeData');
@@ -2064,6 +2104,7 @@ export function TryOnWidget({
 
       if (!effectiveShopDomain) {
         console.log('❌ BLOQUEADO: Não há shopDomain');
+        finalizeFormOnlyIfPending([]);
         return;
       }
 
@@ -2188,6 +2229,7 @@ export function TryOnWidget({
 
         if (chartError) {
           console.error('❌ Erro ao buscar size_chart:', chartError);
+          finalizeFormOnlyIfPending([]);
           return;
         }
 
@@ -2231,6 +2273,7 @@ export function TryOnWidget({
 
           if (entriesError) {
             console.error('❌ Erro ao buscar entries:', entriesError);
+            finalizeFormOnlyIfPending([]);
             return;
           }
 
@@ -2402,8 +2445,13 @@ export function TryOnWidget({
           console.log('   - Tentou unisex: Sim');
           console.log('   ⚠️ AÇÃO: Verifique se a tabela existe no banco com esses critérios');
         }
+
+        const chartRowsForFinalize: SizeChartEntry[] =
+          sizeChartData && sizeChartData.length > 0 ? sizeChartData : [];
+        finalizeFormOnlyIfPending(chartRowsForFinalize);
       } catch (error) {
         console.error('❌ ERRO CRÍTICO ao carregar size chart:', error);
+        finalizeFormOnlyIfPending([]);
       }
 
       console.log('🔍 ===== FIM DO CARREGAMENTO DE SIZE CHART =====');
@@ -4125,7 +4173,7 @@ const handleSubmit = async () => {
               setSizeData(cleanData);
               setStep('photo');
             }}
-            onBack={() => setStep('info')}
+            onContinueWithoutPhoto={handleCalculatorContinueWithoutPhoto}
             primaryColor={primaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
             language={currentLanguage}

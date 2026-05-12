@@ -6,7 +6,10 @@ import { MANNEQUIN_URLS_FEMALE, MANNEQUIN_URLS_MALE, preloadMannequinsForGender 
 
 interface SizeCalculatorProps {
   onComplete: (data: SizeCalculatorData) => void;
-  onBack: () => void;
+  /** Rodapé sem «Voltar»; navegação fica a cargo do embed (ex. botão flutuante). */
+  onBack?: () => void;
+  /** Se definido, mostra o link «Continuar sem foto» abaixo do CTA principal. */
+  onContinueWithoutPhoto?: (data: SizeCalculatorData) => void;
   primaryColor?: string;
   defaultGender?: 'male' | 'female' | 'unisex';
   language?: 'pt' | 'es' | 'en';
@@ -60,7 +63,13 @@ const bodyTypeGalleryMotion = {
   },
 };
 
-export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', defaultGender = 'female', language = 'en' }: SizeCalculatorProps) {
+export function SizeCalculator({
+  onComplete,
+  onContinueWithoutPhoto,
+  primaryColor = '#810707',
+  defaultGender = 'female',
+  language = 'en',
+}: SizeCalculatorProps) {
   // Usar defaultGender como valor inicial, convertendo 'unisex' para 'female'
   const initialGender = (defaultGender === 'unisex' ? 'female' : defaultGender) as 'male' | 'female';
   const [gender, setGender] = useState<'male' | 'female'>(initialGender);
@@ -84,10 +93,10 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
     return () => clearTimeout(t);
   }, [gender]);
 
-  const handleSubmit = () => {
+  const getValidatedData = (): SizeCalculatorData | null => {
     if (!height || !weight || bodyTypeIndex === null) {
       alert(t('fillAllFields'));
-      return;
+      return null;
     }
 
     const heightNum = parseFloat(height);
@@ -95,23 +104,34 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
 
     if (heightNum < 100 || heightNum > 250) {
       alert(t('invalidHeight'));
-      return;
+      return null;
     }
 
     if (weightNum < 30 || weightNum > 300) {
       alert(t('invalidWeight'));
-      return;
+      return null;
     }
 
-    onComplete({
+    return {
       gender,
       height: heightNum,
       weight: weightNum,
       bodyType: bodyTypes[bodyTypeIndex].factor,
       fit: fitOptions[fitIndex].factor,
       bodyTypeIndex,
-      fitIndex
-    });
+      fitIndex,
+    };
+  };
+
+  const handleContinueToPhoto = () => {
+    const data = getValidatedData();
+    if (data) onComplete(data);
+  };
+
+  const handleContinueWithoutPhotoClick = () => {
+    if (!onContinueWithoutPhoto) return;
+    const data = getValidatedData();
+    if (data) onContinueWithoutPhoto(data);
   };
 
   return (
@@ -370,21 +390,27 @@ export function SizeCalculator({ onComplete, onBack, primaryColor = '#810707', d
         </div>
       </div>
 
-      <div className="border-t border-gray-200 p-4 flex gap-2">
+      <div className="border-t border-gray-200 p-4 flex flex-col items-stretch w-full max-w-sm mx-auto gap-3">
         <button
-          onClick={onBack}
-          className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-        >
-          {t('back')}
-        </button>
-        <button
-          onClick={handleSubmit}
+          type="button"
+          onClick={handleContinueToPhoto}
           disabled={!height || !weight || bodyTypeIndex === null}
           style={!height || !weight || bodyTypeIndex === null ? {} : { backgroundColor: primaryColor }}
-          className="flex-1 py-2 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
+          className="w-full py-2 px-4 text-white rounded-lg hover:opacity-90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-medium"
         >
-          {t('continue')}
+          {t('continueToPhotoSubmit')}
         </button>
+        {onContinueWithoutPhoto && (
+          <button
+            type="button"
+            onClick={handleContinueWithoutPhotoClick}
+            disabled={!height || !weight || bodyTypeIndex === null}
+            className="w-full text-sm font-medium underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
+            style={{ color: primaryColor }}
+          >
+            {t('continueWithoutPhotoLink')}
+          </button>
+        )}
       </div>
     </div>
   );
