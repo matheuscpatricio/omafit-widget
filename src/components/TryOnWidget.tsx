@@ -4242,16 +4242,16 @@ const handleSubmit = async () => {
                     <>
                       <button
                         onClick={prevImage}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
                       >
-                        <ArrowLeft className="h-5 w-5" />
+                        <ArrowLeft className="h-5 w-5" style={{ color: primaryColor }} />
                       </button>
 
                       <button
                         onClick={nextImage}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition hover:bg-white"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
                       >
-                        <ArrowRight className="h-5 w-5" />
+                        <ArrowRight className="h-5 w-5" style={{ color: primaryColor }} />
                       </button>
 
                       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
@@ -4372,16 +4372,16 @@ const handleSubmit = async () => {
 
                     <button
                       onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
                     >
-                      <ArrowLeft className="w-5 h-5" />
+                      <ArrowLeft className="w-5 h-5" style={{ color: primaryColor }} />
                     </button>
 
                     <button
                       onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
                     >
-                      <ArrowRight className="w-5 h-5" />
+                      <ArrowRight className="w-5 h-5" style={{ color: primaryColor }} />
                     </button>
 
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
@@ -4506,16 +4506,16 @@ const handleSubmit = async () => {
                         <button
                           type="button"
                           onClick={prevImage}
-                          className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                          className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
                         >
-                          <ArrowLeft className="h-4 w-4" />
+                          <ArrowLeft className="h-4 w-4" style={{ color: primaryColor }} />
                         </button>
                         <button
                           type="button"
                           onClick={nextImage}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-gray-800 shadow-md transition hover:bg-white"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
                         >
-                          <ArrowRight className="h-4 w-4" />
+                          <ArrowRight className="h-4 w-4" style={{ color: primaryColor }} />
                         </button>
                         <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
                           {availableImages.map((_, index) => (
