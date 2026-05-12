@@ -141,19 +141,10 @@ const tryonTextStaggerChild = {
   },
 } as const;
 
-/** Transição entre steps (entrada da seguinte + saída suave). */
-const tryonStepPresence = {
-  initial: { opacity: 0, y: 22 },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
-  },
-  exit: {
-    opacity: 0,
-    y: -14,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const },
-  },
+const tryonFadeUp = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
 } as const;
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
@@ -3680,19 +3671,16 @@ const handleSubmit = async () => {
           />
         )}
         <div className={embed ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'contents'}>
-      <AnimatePresence mode="wait" initial={false}>
       {step === 'result' ? (
         <motion.div
-          key="tryon-step-result"
           className={
             embed
               ? `relative flex min-h-0 flex-1 flex-col overflow-hidden ${heroChromeActive ? 'bg-transparent z-10' : 'bg-white'}`
               : 'fixed inset-0 z-50 flex flex-col bg-white'
           }
-          variants={tryonStepPresence}
-          initial="initial"
-          animate="animate"
-          exit="exit"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         >
           {embed ? (
             <button
@@ -3937,12 +3925,7 @@ const handleSubmit = async () => {
           )}
         </motion.div>
       ) : (
-        <motion.div
-          key="tryon-main-flow"
-          variants={tryonStepPresence}
-          initial="initial"
-          animate="animate"
-          exit="exit"
+        <div
           className={
             embed
               ? `relative flex min-h-0 flex-1 flex-col animate-fade-in transition-all duration-400 ease-in-out ${isVisible ? 'opacity-100' : 'opacity-0'} ${isHeroLayout ? 'bg-transparent' : 'bg-white'}`
@@ -4006,16 +3989,8 @@ const handleSubmit = async () => {
         }
       >
         {/* Coluna da imagem (só layout clássico desktop, etapa info) */}
-        <AnimatePresence mode="wait" initial={false}>
-          {step === 'info' && !embed && (
-            <motion.div
-              key="tryon-info-side-panel"
-              variants={tryonStepPresence}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center"
-            >
+        {step === 'info' && !embed && (
+          <div className="hidden md:flex md:w-1/2 bg-gray-50 p-4 md:p-8 items-center justify-center">
             <div className="w-full flex items-center justify-center">
               <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
               <img
@@ -4025,9 +4000,8 @@ const handleSubmit = async () => {
               />
               </div>
             </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
 
         {/* Coluna do conteúdo — z-10 no hero para ficar acima do fundo absoluto (TryOnLayoutShellHero) */}
         <div
@@ -4052,17 +4026,8 @@ const handleSubmit = async () => {
             </div>
           )}
 
-          <AnimatePresence mode="wait" initial={false}>
         {/* Step 1: Info — mobile igual ao layout clássico; desktop+embed = coluna compacta */}
         {step === 'info' && (
-          <motion.div
-            key="tryon-step-info"
-            className="min-h-0 flex w-full min-w-0 flex-1 flex-col"
-            variants={tryonStepPresence}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-          >
           <>
             <div
               className={
@@ -4186,18 +4151,14 @@ const handleSubmit = async () => {
               </motion.div>
             )}
           </>
-          </motion.div>
         )}
 
         {/* Step 2: Size Calculator */}
         {step === 'calculator' && (
           <motion.div
-            key="tryon-step-calculator"
-            className="min-h-0 flex w-full min-w-0 flex-1 flex-col"
-            variants={tryonStepPresence}
-            initial="initial"
-            animate="animate"
-            exit="exit"
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
           >
           <SizeCalculator
             key={`calculator-${step}`}
@@ -4236,15 +4197,13 @@ const handleSubmit = async () => {
           </motion.div>
         )}
 
-        {/* Step 3: foto — mobile: bloco único; desktop !embed: duas colunas; desktop embed (sidebar e hero): fila compacta com carrossel de imagens do produto */}
+        {/* Step 3: foto — mobile igual ao layout clássico; desktop !embed = split; desktop embed sidebar = fila compacta; desktop embed hero = duas colunas como !embed */}
         {step === 'photo' && (
           <motion.div
-            key="tryon-step-photo"
-            className="min-h-0 flex w-full min-w-0 flex-1 flex-col space-y-4"
-            variants={tryonStepPresence}
-            initial="initial"
-            animate="animate"
-            exit="exit"
+            className="space-y-4"
+            initial={tryonFadeUp.initial}
+            animate={tryonFadeUp.animate}
+            transition={tryonFadeUp.transition}
           >
             <div className="space-y-4 md:hidden">
               {/* Sempre mostrar imagem do produto no mobile */}
@@ -4381,7 +4340,7 @@ const handleSubmit = async () => {
               </motion.div>
             </div>
 
-            {(!embed) && (
+            {(!embed || (embed && isHeroLayout)) && (
             <div className="hidden md:flex md:gap-6">
               {/* Left Side: Product Carousel */}
               <div className="md:w-1/2">
@@ -4518,7 +4477,7 @@ const handleSubmit = async () => {
             </div>
             )}
 
-            {embed && (
+            {embed && !isHeroLayout && (
               <div className="hidden min-h-0 w-full flex-1 flex-row gap-2 overflow-hidden sm:gap-3 md:flex">
                 <div className="flex min-h-0 w-[min(56%,15.5rem)] shrink-0 flex-col justify-center border-r border-gray-100 pr-2 sm:w-[min(54%,18rem)] sm:pr-3">
                   <p className="mb-0.5 text-center text-[11px] font-semibold leading-tight text-gray-900 sm:text-xs">
@@ -4638,15 +4597,7 @@ const handleSubmit = async () => {
         {/* Step 4: Confirm */}
         {step === 'confirm' && (
           <motion.div
-            key="tryon-step-confirm"
-            className="min-h-0 flex w-full min-w-0 flex-1 flex-col"
-            variants={tryonStepPresence}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-          >
-          <motion.div
-            className="space-y-4 flex-1"
+            className="space-y-4"
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
@@ -4725,21 +4676,12 @@ const handleSubmit = async () => {
               </button>
             </motion.div>
           </motion.div>
-          </motion.div>
         )}
 
         {/* Step 5: Processing */}
         {step === 'processing' && (
           <motion.div
-            key="tryon-step-processing"
-            className="min-h-0 flex w-full min-w-0 flex-1 flex-col"
-            variants={tryonStepPresence}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-          >
-          <motion.div
-            className="text-center py-10 md:py-12 flex-1"
+            className="text-center py-10 md:py-12"
             variants={tryonTextStaggerParent}
             initial="hidden"
             animate="show"
@@ -4779,10 +4721,7 @@ const handleSubmit = async () => {
               </p>
             </motion.div>
           </motion.div>
-          </motion.div>
         )}
-
-        </AnimatePresence>
 
         </div>
         {heroChromeActive && (
@@ -4794,9 +4733,8 @@ const handleSubmit = async () => {
           />
         )}
       </div>
-    </motion.div>
+    </div>
       )}
-      </AnimatePresence>
         </div>
       </div>
     </motion.div>
