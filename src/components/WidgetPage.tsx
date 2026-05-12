@@ -710,8 +710,29 @@ export function WidgetPage() {
         }
       }
 
+      if (event.data.type === 'omafit-product-images' && Array.isArray(event.data.images)) {
+        const next = event.data.images
+          .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+          .filter(Boolean);
+        if (next.length > 0) {
+          console.log('📸 Lista completa de imagens do produto (postMessage):', next.length);
+          setProductImages(next);
+        }
+      }
+
       if (event.data.type === 'omafit-context') {
         console.log('🌐 Contexto recebido via postMessage:', event.data);
+        const ctxImages = (event.data as { productImages?: unknown; product_images?: unknown }).productImages ??
+          (event.data as { product_images?: unknown }).product_images;
+        if (Array.isArray(ctxImages) && ctxImages.length > 0) {
+          const next = ctxImages
+            .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+            .filter(Boolean);
+          if (next.length > 0) {
+            console.log('📸 Imagens do produto no contexto:', next.length);
+            setProductImages(next);
+          }
+        }
         if (event.data.defaultGender) {
           console.log('✅ Default Gender do contexto:', event.data.defaultGender);
           setDefaultGender(event.data.defaultGender);
