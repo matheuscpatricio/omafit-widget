@@ -8,7 +8,6 @@ import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
 import { PainSolutionVideo } from './landing/PainSolutionVideo';
 import { Solution } from './landing/Solution';
-import { LandingWidgetDemo } from './landing/LandingWidgetDemo';
 import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
 import { FAQ } from './landing/FAQ';
@@ -114,8 +113,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         <PainSolutionVideo />
 
         <Solution />
-
-        <LandingWidgetDemo />
 
         <ImpactStats />
 
