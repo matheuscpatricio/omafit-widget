@@ -62,7 +62,7 @@ const slides: Slide[] = [
       </>
     ),
     body:
-      'Nossa tecnologia de detecção corporal analisa o corpo do seu cliente com perfeição e indica o tamanho ideal',
+      'Nossa tecnologia de detecção corporal analisa o corpo do seu cliente com perfeição e indica o tamanho ideal.',
     topScrim: true,
     imageObjectPosition: 'top',
   },
