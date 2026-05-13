@@ -39,7 +39,27 @@
       ]
     },
     "wearAnchor": { "type": "object" },
-    "fitProxy": { "type": "object" },
+    "fitProxy": {
+      "type": "object",
+      "description": "Dimensões físicas de encaixe (prevalecem sobre heurística de geometria em runtime).",
+      "properties": {
+        "innerRadiusMm": { "type": "number", "minimum": 0.1 },
+        "innerDiameterMm": { "type": "number", "minimum": 0.2 },
+        "innerRadiusM": { "type": "number", "minimum": 1e-6 },
+        "ringHoleAxisLocal": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "axisLocal": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
     "occlusionProxy": { "type": "object" },
     "occlusionPolicy": {
       "type": "object",
@@ -73,6 +93,11 @@
           "type": "string",
           "enum": ["rigid", "adaptive"],
           "description": "rigid: pulseira como corpo rígido (escala uniforme, sem wrap procedural). adaptive: elipse + radial opcional + elos."
+        },
+        "braceletTopology": {
+          "type": "string",
+          "enum": ["auto", "bangle", "chain"],
+          "description": "auto: heurística. bangle|chain: força classificação (prevalece sobre detectBraceletBangle)."
         }
       }
     },

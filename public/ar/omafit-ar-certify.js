@@ -3,6 +3,11 @@
  * gizmos de debug. Activar com `?omafit_ar_certify=1` ou `data-ar-asset-certify="1"`.
  */
 
+import {
+  omafitArFitProxyInnerRadiusMeters,
+  omafitArMeshPolicyBraceletTopology,
+} from "./omafit-ar-fit-contract.js";
+
 /**
  * @param {(k: string, fb?: string) => string} cfgAttr
  */
@@ -86,6 +91,9 @@ export function omafitArCertifyConsoleLog(
     braceletProceduralRadial: Boolean(flags?.braceletProceduralRadial),
     braceletRigidFit: Boolean(flags?.braceletRigidFit),
     meshDeformationPolicy: manifest?.meshPolicy?.deformationPolicy,
+    braceletTopology: omafitArMeshPolicyBraceletTopology(manifest),
+    fitProxyInnerRadiusM:
+      omafitArFitProxyInnerRadiusMeters(manifest) ?? null,
     accessoryType: flags?.accessoryType,
   };
   console.info("[omafit-ar][certify] contract + resolve + fit", row);

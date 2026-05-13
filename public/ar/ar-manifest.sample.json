@@ -23,6 +23,11 @@
   },
   "meshPolicy": {
     "skinnedMesh": "warn_v1",
-    "deformationPolicy": "rigid"
+    "deformationPolicy": "rigid",
+    "braceletTopology": "auto"
+  },
+  "fitProxy": {
+    "innerDiameterMm": 62,
+    "ringHoleAxisLocal": [0, 0, 1]
   }
 }

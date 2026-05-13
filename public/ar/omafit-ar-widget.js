@@ -36,6 +36,11 @@ import {
 } from "./omafit-ar-runtime-core.js";
 import { omafitResolveAssetFrameAfterBake } from "./omafit-ar-resolve-frame.js";
 import {
+  omafitArFitProxyInnerRadiusMeters,
+  omafitArFitProxyRingHoleAxisLocalArray,
+  omafitArMeshPolicyBraceletTopology,
+} from "./omafit-ar-fit-contract.js";
+import {
   omafitArCertifyConsoleLog,
   omafitArCertifyInstallHandGizmos,
   omafitArManifestFallbackSummary,
@@ -512,7 +517,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-bracelet-rigid-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-fit-contract-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13379,23 +13384,43 @@ async function runHandArSession({
         : Math.max(medianDim / 2, 1e-6);
 
       /**
-       * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
-       *
-       * `localRingR` é o raio do EIXO central. A superfície INTERNA do
-       * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
-       * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
-       * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
-       * a superfície interna fica exactamente na pele (encaixe perfeito).
-       *
-       * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
-       * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
-       * de 10% de espessura radial).
+       * === Raio interno: contract `fitProxy` primeiro, geometria só fallback ===
        */
-      const computedInner = computeLocalInnerRadius(glbScene, bbox);
-      localInnerR =
-        computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
-          ? computedInner
-          : Math.max(localRingR * 0.9, 1e-6);
+      const contractInnerM =
+        accessoryType === "bracelet" || accessoryType === "watch"
+          ? omafitArFitProxyInnerRadiusMeters(handArManifest)
+          : null;
+      if (contractInnerM != null && contractInnerM > 1e-5) {
+        localInnerR = contractInnerM;
+        localRingR = Math.max(localInnerR * 1.015, localInnerR + 1e-5);
+        try {
+          console.info("[omafit-ar] fitProxy: inner radius from manifest (m)", {
+            localInnerR,
+            category: accessoryType,
+          });
+        } catch {
+          /* ignore */
+        }
+      } else {
+        /**
+         * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
+         *
+         * `localRingR` é o raio do EIXO central. A superfície INTERNA do
+         * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
+         * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
+         * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
+         * a superfície interna fica exactamente na pele (encaixe perfeito).
+         *
+         * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
+         * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
+         * de 10% de espessura radial).
+         */
+        const computedInner = computeLocalInnerRadius(glbScene, bbox);
+        localInnerR =
+          computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
+            ? computedInner
+            : Math.max(localRingR * 0.9, 1e-6);
+      }
     }
 
     /**
@@ -13752,6 +13777,17 @@ async function runHandArSession({
   const braceletRingHoleTmpMat = new THREE.Matrix4();
   /** Eixo do “furo” em espaço do GLB para pulseira procedural (anel em XZ). */
   const braceletRadialHoleAxisScene = new THREE.Vector3(0, 1, 0);
+  /** `fitProxy.ringHoleAxisLocal` em espaço local do GLB (prevalece sobre PCA). */
+  const braceletContractHoleAxisLocal =
+    accessoryType === "bracelet"
+      ? (() => {
+          const ar = omafitArFitProxyRingHoleAxisLocalArray(handArManifest);
+          if (!ar) return null;
+          const v = new THREE.Vector3(ar[0], ar[1], ar[2]);
+          if (v.lengthSq() < 1e-12) return null;
+          return v.normalize();
+        })()
+      : null;
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
@@ -13864,6 +13900,11 @@ async function runHandArSession({
         if (accessoryType === "bracelet") {
           upgradeHandArLuxuryJewelryMaterials(THREE, glbScene);
           braceletIsBangle = detectBraceletBangle(THREE, glbScene);
+          {
+            const topo = omafitArMeshPolicyBraceletTopology(handArManifest);
+            if (topo === "bangle") braceletIsBangle = true;
+            else if (topo === "chain") braceletIsBangle = false;
+          }
           if (!braceletIsBangle && !braceletProceduralRadial && !handBraceletRigidFit) {
             if (countHandArSolidMeshes(glbScene) === 1) {
               braceletVertexDeform = initBraceletLinkVertexDeformation(
@@ -13926,7 +13967,9 @@ async function runHandArSession({
             calibRot,
             braceletRingHoleAxisAlignLocal,
             braceletRingHoleTmpMat,
-            braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
+            braceletProceduralRadial
+              ? braceletRadialHoleAxisScene
+              : braceletContractHoleAxisLocal,
           );
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
@@ -15639,6 +15682,11 @@ async function runHandArSession({
               if (accessoryType === "bracelet") {
                 upgradeHandArLuxuryJewelryMaterials(THREE, next);
                 braceletIsBangle = detectBraceletBangle(THREE, next);
+                {
+                  const topo = omafitArMeshPolicyBraceletTopology(handArManifest);
+                  if (topo === "bangle") braceletIsBangle = true;
+                  else if (topo === "chain") braceletIsBangle = false;
+                }
                 if (!braceletIsBangle && !braceletProceduralRadial && !handBraceletRigidFit) {
                   if (countHandArSolidMeshes(next) === 1) {
                     braceletVertexDeform = initBraceletLinkVertexDeformation(
@@ -15662,7 +15710,9 @@ async function runHandArSession({
                   calibRot,
                   braceletRingHoleAxisAlignLocal,
                   braceletRingHoleTmpMat,
-                  braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
+                  braceletProceduralRadial
+                    ? braceletRadialHoleAxisScene
+                    : braceletContractHoleAxisLocal,
                 );
               } else if (accessoryType === "watch") {
                 if (countHandArSolidMeshes(next) === 1) {

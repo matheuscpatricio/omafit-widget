@@ -58,6 +58,16 @@ export interface OmafitArManifestV1 {
     skinnedMesh?: string;
     /** rigid = uniform scale only for wrist wearables; adaptive = legacy biometric ellipse / links */
     deformationPolicy?: 'rigid' | 'adaptive';
+    /** auto = bbox/name heuristic; bangle|chain = override detectBraceletBangle */
+    braceletTopology?: 'auto' | 'bangle' | 'chain';
+  };
+  /** Encaixe físico: prevalece sobre PCA / percentil de raio em runtime quando preenchido. */
+  fitProxy?: {
+    innerRadiusMm?: number;
+    innerDiameterMm?: number;
+    innerRadiusM?: number;
+    ringHoleAxisLocal?: [number, number, number];
+    axisLocal?: [number, number, number];
   };
   [key: string]: unknown;
 }

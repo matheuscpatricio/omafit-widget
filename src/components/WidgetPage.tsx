@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-13-ar-bracelet-rigid-v1';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-13-ar-fit-contract-v1';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
