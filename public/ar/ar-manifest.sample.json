@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "category": "bracelet",
+  "runtimeProfile": { "version": "ar-runtime-v1" },
+  "attachmentSpace": "wrist_local",
+  "scaleProfile": {
+    "assetScaleNormalization": 1,
+    "bodyFitScaleMultiplier": 1
+  },
+  "trackingRecovery": {
+    "lostFramesThreshold": 8,
+    "stableFramesThreshold": 5
+  },
+  "smoothing": {
+    "positionDecayPerSec": 12,
+    "rotationDecayPerSec": 8,
+    "scaleDecayPerSec": 6
+  },
+  "occlusionPolicy": {
+    "updateMode": "tracked",
+    "maxHz": 45,
+    "decoupleFromRender": true
+  }
+}

@@ -2,6 +2,8 @@
  * Copia os JS do AR do repositório tema `omafit` (irmão deste repo) para o widget.
  *
  * - `public/ar/` — `omafit-ar-widget.js` + módulos com imports relativos (`./…`).
+ *   Ficheiros adicionais versionados só no widget (não vêm do tema): `omafit-ar-manifest.js`,
+ *   `omafit-ar-runtime-core.js`, `omafit-ar-resolve-frame.js`, `ar-manifest.schema.json`, `ar-manifest.sample.json`.
  *   O `WidgetPage` carrega `/ar/omafit-ar-widget.js`; o browser resolve `./foo.js`
  *   relativamente a esse URL → `/ar/foo.js` (compatível com SPA redirects na raiz).
  * - `public/omafit-widget.js` — na raiz (sem imports relativos ao AR).

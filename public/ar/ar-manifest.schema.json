@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omafit.local/schemas/ar-manifest-v1.json",
+  "title": "Omafit AR manifest v1",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "category": { "type": "string" },
+    "runtimeProfile": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" }
+      }
+    },
+    "coordinateSystem": {
+      "type": "object",
+      "properties": {
+        "handedness": { "type": "string", "enum": ["right-handed", "left-handed"] },
+        "forwardAxis": { "type": "string" },
+        "upAxis": { "type": "string" }
+      }
+    },
+    "cameraSpace": {
+      "type": "object",
+      "properties": {
+        "mirroredInput": { "type": "boolean" },
+        "trackerSpace": { "type": "string" }
+      }
+    },
+    "attachmentSpace": {
+      "type": "string",
+      "enum": [
+        "wrist_local",
+        "face_bridge",
+        "neck_base",
+        "ear_lobe",
+        "finger_ring"
+      ]
+    },
+    "wearAnchor": { "type": "object" },
+    "fitProxy": { "type": "object" },
+    "occlusionProxy": { "type": "object" },
+    "occlusionPolicy": {
+      "type": "object",
+      "properties": {
+        "updateMode": { "type": "string" },
+        "maxHz": { "type": "number" },
+        "decoupleFromRender": { "type": "boolean" }
+      }
+    },
+    "scaleProfile": {
+      "type": "object",
+      "properties": {
+        "assetScaleNormalization": { "type": "number" },
+        "bodyFitScaleMultiplier": { "type": "number" }
+      }
+    },
+    "worldScaleContract": { "type": "object" },
+    "trackingProfile": { "type": "object" },
+    "trackingRecovery": { "type": "object" },
+    "smoothing": { "type": "object" },
+    "physicalConstraints": { "type": "object" },
+    "deviceTierPolicy": { "type": "object" },
+    "degradationUX": { "type": "object" },
+    "cameraDepthHints": { "type": "object" },
+    "memoryBudgetHint": { "type": "object" },
+    "meshPolicy": { "type": "object" },
+    "runtimeFallback": { "type": "object" }
+  }
+}
