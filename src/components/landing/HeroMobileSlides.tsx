@@ -73,7 +73,7 @@ const slides: Slide[] = [
       </>
     ),
     body:
-      'Medidas e proporções no navegador, sem apps pesados. Menos erro de tamanho, mais conversão no checkout.',
+      'Nossa tecnologia de detecção corporal analisa o corpo do seu cliente com perfeição e indica o tamanho ideal',
     topScrim: true,
   },
   {
@@ -81,7 +81,12 @@ const slides: Slide[] = [
     image: LANDING_IMAGES.heroLifestyleBeach,
     badge: 'Chat integrado',
     title: (
-      <span className="block text-balance">Chat integrado que aumenta ticket médio</span>
+      <span className="block text-balance">
+        Consultor de moda que aumenta{' '}
+        <span className="italic text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
+          ticket médio
+        </span>
+      </span>
     ),
     body:
       'Seu cliente experimenta um produto, o Omafit agirá como um consultor e indicará peças complementares para subir seu AOV.',
