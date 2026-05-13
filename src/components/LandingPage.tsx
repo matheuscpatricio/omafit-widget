@@ -8,10 +8,10 @@ import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
 import { PainSolutionVideo } from './landing/PainSolutionVideo';
 import { Solution } from './landing/Solution';
+import { LandingWidgetDemo } from './landing/LandingWidgetDemo';
 import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
 import { FAQ } from './landing/FAQ';
-import { FinalCTA } from './landing/FinalCTA';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
 import { InstallPlatformModal } from './landing/InstallPlatformModal';
@@ -90,8 +90,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
     window.location.href = `mailto:contato@omafit.co?subject=${subject}&body=${body}`;
   };
 
-  const handleScheduleDemo = handleRequestDemo;
-
   return (
     <div
       className="landing-page min-h-screen bg-oma-canvas text-oma-cream antialiased"
@@ -117,16 +115,13 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
         <Solution />
 
+        <LandingWidgetDemo />
+
         <ImpactStats />
 
         <Pricing onSelectFree={handleInstallShopify} onSelectPaidPlan={handleSelectPaidPlan} />
 
         <FAQ />
-
-        <FinalCTA
-          onOpenInstallModal={() => setInstallModalOpen(true)}
-          onScheduleDemo={handleScheduleDemo}
-        />
       </main>
 
       <Footer />
