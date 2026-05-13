@@ -22,9 +22,11 @@ type Slide = {
   showCtas?: boolean;
   subtleOverlay?: boolean;
   hideBadge?: boolean;
+  /** Recorte vertical da imagem (object-position); slide 2 favorece o topo. */
+  imageObjectPosition?: 'center' | 'top';
 };
 
-/** Mesmas três imagens/copy do hero mobile; desktop em 16:9 com autoplay. */
+/** Mesmas três imagens/copy do hero mobile; desktop em 5:2 com autoplay. */
 const slides: Slide[] = [
   {
     id: 'intro',
@@ -62,21 +64,17 @@ const slides: Slide[] = [
     body:
       'Medidas e proporções no navegador, sem apps pesados. Menos erro de tamanho, mais conversão no checkout.',
     topScrim: true,
+    imageObjectPosition: 'top',
   },
   {
-    id: 'tryon',
+    id: 'chat-aov',
     image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Try-on fotorrealista',
+    badge: 'Chat integrado',
     title: (
-      <>
-        Menos devoluções,{' '}
-        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-accent !to-oma-cream">
-          mais confiança
-        </ShimmerHeading>
-      </>
+      <span className="block text-balance">Chat integrado que aumenta ticket médio</span>
     ),
     body:
-      'Visualize roupas, calçados e acessórios no corpo com IA fotorrealista — o cliente compra sabendo como fica.',
+      'Seu cliente experimenta um produto, o Omafit agirá como um consultor e indicará peças complementares para subir seu AOV.',
     topScrim: true,
   },
 ];
@@ -117,7 +115,10 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
             <img
               src={slide.image}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              className={cn(
+                'absolute inset-0 h-full w-full object-cover',
+                slide.imageObjectPosition === 'top' ? 'object-top' : 'object-center',
+              )}
               decoding="async"
               draggable={false}
             />

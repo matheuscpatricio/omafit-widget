@@ -77,19 +77,14 @@ const slides: Slide[] = [
     topScrim: true,
   },
   {
-    id: 'tryon',
+    id: 'chat-aov',
     image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Try-on fotorrealista',
+    badge: 'Chat integrado',
     title: (
-      <>
-        Menos devoluções,{' '}
-        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-accent !to-oma-cream">
-          mais confiança
-        </ShimmerHeading>
-      </>
+      <span className="block text-balance">Chat integrado que aumenta ticket médio</span>
     ),
     body:
-      'Visualize roupas, calçados e acessórios no corpo com IA fotorrealista — o cliente compra sabendo como fica.',
+      'Seu cliente experimenta um produto, o Omafit agirá como um consultor e indicará peças complementares para subir seu AOV.',
     topScrim: true,
   },
 ];
