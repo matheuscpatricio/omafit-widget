@@ -517,7 +517,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-fit-contract-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-scale-ipd-fix-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10633,10 +10633,13 @@ async function runArSession({
                         : 1;
                     fa.eyeR.applyMatrix4(fa.faceWorld);
                     fa.eyeL.applyMatrix4(fa.faceWorld);
-                    const ipdMetric =
-                      st.glassesSimpleFaceOnly && glassesTrackingWrap
-                        ? ipdLandmark / faceScale
-                        : fa.eyeR.distanceTo(fa.eyeL);
+                    /**
+                     * Sempre `ipdLandmark / faceScale` (espaço métrico antes de world),
+                     * nunca só `distanceTo` após `applyMatrix4` — a matriz da face inclui
+                     * escala do modelo 468 e infla o IPD (armação gigante). Antes o ramo
+                     * “não simples” usava distância em mundo e repetia esse bug.
+                     */
+                    const ipdMetric = ipdLandmark / Math.max(1e-6, faceScale);
                     if (Number.isFinite(ipdMetric) && ipdMetric > 0) {
                       const ipdMul =
                         glassesTrackingWrap && st.glassesSimpleFaceOnly

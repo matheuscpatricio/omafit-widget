@@ -4,21 +4,47 @@
  */
 
 /**
+ * Joia adulta típica: rejeitar valores que claramente são typo/unidade errada.
+ * (Antes `innerRadiusMm: 1` passava o threshold >0,05 mm e gerava escala gigante.)
+ */
+const OMAFIT_FIT_PROXY_INNER_R_MM_MIN = 18;
+const OMAFIT_FIT_PROXY_INNER_R_MM_MAX = 85;
+const OMAFIT_FIT_PROXY_INNER_DIAM_MM_MIN = 36;
+const OMAFIT_FIT_PROXY_INNER_DIAM_MM_MAX = 170;
+const OMAFIT_FIT_PROXY_INNER_R_M_MIN = 0.018;
+const OMAFIT_FIT_PROXY_INNER_R_M_MAX = 0.085;
+
+/**
  * Raio interno de referência em **metros** a partir de `manifest.fitProxy`.
- * Ordem: `innerRadiusMm` → `innerDiameterMm`/2 → `innerRadiusM` (já em m).
- *
- * @param {Record<string, unknown>} manifest
- * @returns {number | null}
+ * Ordem: `innerRadiusMm` → `innerDiameterMm`/2 → `innerRadiusM`.
  */
 export function omafitArFitProxyInnerRadiusMeters(manifest) {
   const fp = manifest?.fitProxy;
   if (!fp || typeof fp !== "object") return null;
   const mmR = Number(fp.innerRadiusMm);
-  if (Number.isFinite(mmR) && mmR > 0.05) return mmR * 0.001;
+  if (
+    Number.isFinite(mmR) &&
+    mmR >= OMAFIT_FIT_PROXY_INNER_R_MM_MIN &&
+    mmR <= OMAFIT_FIT_PROXY_INNER_R_MM_MAX
+  ) {
+    return mmR * 0.001;
+  }
   const mmD = Number(fp.innerDiameterMm);
-  if (Number.isFinite(mmD) && mmD > 0.1) return (mmD * 0.001) / 2;
+  if (
+    Number.isFinite(mmD) &&
+    mmD >= OMAFIT_FIT_PROXY_INNER_DIAM_MM_MIN &&
+    mmD <= OMAFIT_FIT_PROXY_INNER_DIAM_MM_MAX
+  ) {
+    return (mmD * 0.001) / 2;
+  }
   const mR = Number(fp.innerRadiusM);
-  if (Number.isFinite(mR) && mR > 1e-5) return mR;
+  if (
+    Number.isFinite(mR) &&
+    mR >= OMAFIT_FIT_PROXY_INNER_R_M_MIN &&
+    mR <= OMAFIT_FIT_PROXY_INNER_R_M_MAX
+  ) {
+    return mR;
+  }
   return null;
 }
 

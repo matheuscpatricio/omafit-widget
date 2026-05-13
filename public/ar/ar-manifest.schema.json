@@ -43,9 +43,9 @@
       "type": "object",
       "description": "Dimensões físicas de encaixe (prevalecem sobre heurística de geometria em runtime).",
       "properties": {
-        "innerRadiusMm": { "type": "number", "minimum": 0.1 },
-        "innerDiameterMm": { "type": "number", "minimum": 0.2 },
-        "innerRadiusM": { "type": "number", "minimum": 1e-6 },
+        "innerRadiusMm": { "type": "number", "minimum": 18, "maximum": 85 },
+        "innerDiameterMm": { "type": "number", "minimum": 36, "maximum": 170 },
+        "innerRadiusM": { "type": "number", "minimum": 0.018, "maximum": 0.085 },
         "ringHoleAxisLocal": {
           "type": "array",
           "items": { "type": "number" },
