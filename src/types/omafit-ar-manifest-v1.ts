@@ -54,6 +54,10 @@ export interface OmafitArManifestV1 {
   degradationUX?: { onTrackingLost?: string; fadeMs?: number };
   deviceTierPolicy?: Record<string, Record<string, unknown>>;
   memoryBudgetHint?: { maxEstimatedVramMb?: number };
-  meshPolicy?: { skinnedMesh?: string };
+  meshPolicy?: {
+    skinnedMesh?: string;
+    /** rigid = uniform scale only for wrist wearables; adaptive = legacy biometric ellipse / links */
+    deformationPolicy?: 'rigid' | 'adaptive';
+  };
   [key: string]: unknown;
 }

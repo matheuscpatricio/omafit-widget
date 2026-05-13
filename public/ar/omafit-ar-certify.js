@@ -58,7 +58,11 @@ export function omafitArManifestFallbackSummary(manifest, loadMeta) {
  * @param {{ source: string }} loadMeta
  * @param {Record<string, unknown>} resolveResult
  * @param {Record<string, unknown>|null} fitRes
- * @param {{ braceletProceduralRadial?: boolean, accessoryType?: string }} flags
+ * @param {{
+ *   braceletProceduralRadial?: boolean,
+ *   accessoryType?: string,
+ *   braceletRigidFit?: boolean,
+ * }} flags
  */
 export function omafitArCertifyConsoleLog(
   manifest,
@@ -80,12 +84,15 @@ export function omafitArCertifyConsoleLog(
     fitLocalInnerR: fitRes?.localInnerR,
     fitDidBend: fitRes?.didBend,
     braceletProceduralRadial: Boolean(flags?.braceletProceduralRadial),
+    braceletRigidFit: Boolean(flags?.braceletRigidFit),
+    meshDeformationPolicy: manifest?.meshPolicy?.deformationPolicy,
     accessoryType: flags?.accessoryType,
   };
   console.info("[omafit-ar][certify] contract + resolve + fit", row);
   console.info("[omafit-ar][certify] manifest (subset)", {
     wearAnchor: manifest?.wearAnchor,
     scaleProfile: manifest?.scaleProfile,
+    meshPolicy: manifest?.meshPolicy,
     fitProxy: manifest?.fitProxy,
     occlusionProxy: manifest?.occlusionProxy,
   });

@@ -65,7 +65,17 @@
     "degradationUX": { "type": "object" },
     "cameraDepthHints": { "type": "object" },
     "memoryBudgetHint": { "type": "object" },
-    "meshPolicy": { "type": "object" },
+    "meshPolicy": {
+      "type": "object",
+      "properties": {
+        "skinnedMesh": { "type": "string" },
+        "deformationPolicy": {
+          "type": "string",
+          "enum": ["rigid", "adaptive"],
+          "description": "rigid: pulseira como corpo rígido (escala uniforme, sem wrap procedural). adaptive: elipse + radial opcional + elos."
+        }
+      }
+    },
     "runtimeFallback": { "type": "object" }
   }
 }

@@ -20,5 +20,9 @@
     "updateMode": "tracked",
     "maxHz": 45,
     "decoupleFromRender": true
+  },
+  "meshPolicy": {
+    "skinnedMesh": "warn_v1",
+    "deformationPolicy": "rigid"
   }
 }

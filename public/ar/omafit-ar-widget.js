@@ -512,7 +512,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-asset-certify-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-bracelet-rigid-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11946,6 +11946,30 @@ async function runHandArSession({
     );
   }
 
+  /** Manifest + opcional `data-ar-bracelet-deformation`: rigid | adaptive */
+  const handBraceletRigidFit =
+    accessoryType === "bracelet" &&
+    (() => {
+      const cfgO = String(cfgAttr("arBraceletDeformation", "") || "")
+        .trim()
+        .toLowerCase();
+      if (cfgO === "adaptive") return false;
+      if (cfgO === "rigid") return true;
+      const p = String(
+        handArManifest?.meshPolicy?.deformationPolicy ?? "adaptive",
+      )
+        .trim()
+        .toLowerCase();
+      return p === "rigid";
+    })();
+  if (debug && accessoryType === "bracelet") {
+    console.log("[omafit-ar] bracelet deformation policy", {
+      rigidFit: handBraceletRigidFit,
+      manifestPolicy: handArManifest?.meshPolicy?.deformationPolicy,
+      cfgOverride: String(cfgAttr("arBraceletDeformation", "") || "").trim() || "(none)",
+    });
+  }
+
   loading.textContent =
     accessoryType === "bracelet"
       ? "A preparar tracking da pulseira…"
@@ -12767,8 +12791,16 @@ async function runHandArSession({
    * Pulseira tipo Tripo (malha alongada): substitui por `InstancedMesh` radial —
    * distribui N cópias do mesmo visual ao redor do eixo no plano do pulso.
    * O raio da curva é **sempre procedural** (landmarks), nunca derivado do GLB.
+   *
+   * @param {boolean} [rigidBracelet] — `true`: nunca reconstruir (corpo rígido).
    */
-  function omafitBraceletRadialShouldRebuild(THREE, glbScene, modeRaw) {
+  function omafitBraceletRadialShouldRebuild(
+    THREE,
+    glbScene,
+    modeRaw,
+    rigidBracelet,
+  ) {
+    if (rigidBracelet) return false;
     const mode = String(modeRaw ?? "auto").trim().toLowerCase();
     if (/^(0|off|false|no)$/.test(mode)) return false;
     if (/^(1|on|true|yes)$/.test(mode)) return true;
@@ -12780,13 +12812,15 @@ async function runHandArSession({
     tb.getSize(sz);
     const d = [sz.x, sz.y, sz.z].sort((a, b) => a - b);
     const elong = d[2] / Math.max(1e-6, d[1]);
-    /** Auto agressivo: com malha sólida já preferimos radial; ratio serve só debug. */
-    const should = solidCount >= 1;
+    /** Malha “em tira” (Tripo) alonga um eixo; anel fechado típico fica ~1–1,6. */
+    const ELONG_AUTO_MIN = 2.35;
+    const should = solidCount >= 1 && elong >= ELONG_AUTO_MIN;
     console.log("[omafit-ar] bracelet radial gate(auto)", {
       mode,
       solidCount,
       size: { x: sz.x, y: sz.y, z: sz.z },
       elong,
+      elongMin: ELONG_AUTO_MIN,
       should,
     });
     return should;
@@ -13203,7 +13237,7 @@ async function runHandArSession({
         const braceletDims = [size.x, size.y, size.z].sort((a, b) => a - b);
         const braceletFlatRatio =
           braceletDims[2] / Math.max(1e-6, braceletDims[1]);
-        if (braceletFlatRatio > 1.85) {
+        if (braceletFlatRatio > 1.85 && !handBraceletRigidFit) {
           const wrapRadius = Math.max(1e-6, size.x * 0.5 * 1.1);
           wrapBraceletCylinderNormalized(glbScene, wrapRadius);
           glbScene.updateMatrixWorld(true);
@@ -13747,11 +13781,12 @@ async function runHandArSession({
         braceletRadialSegCount = 0;
         if (accessoryType === "bracelet") {
           omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot);
-          const radialMode = cfgAttr("arBraceletRadial", "on");
+          const radialMode = cfgAttr("arBraceletRadial", "auto");
           const radialShould = omafitBraceletRadialShouldRebuild(
             THREE,
             glbScene,
             radialMode,
+            handBraceletRigidFit,
           );
           if (radialShould) {
             const segRaw = Number(
@@ -13765,6 +13800,7 @@ async function runHandArSession({
             );
           }
           console.log("[omafit-ar] bracelet radial init", {
+            rigidFit: handBraceletRigidFit,
             radialMode,
             radialShould,
             activated: braceletProceduralRadial,
@@ -13828,7 +13864,7 @@ async function runHandArSession({
         if (accessoryType === "bracelet") {
           upgradeHandArLuxuryJewelryMaterials(THREE, glbScene);
           braceletIsBangle = detectBraceletBangle(THREE, glbScene);
-          if (!braceletIsBangle && !braceletProceduralRadial) {
+          if (!braceletIsBangle && !braceletProceduralRadial && !handBraceletRigidFit) {
             if (countHandArSolidMeshes(glbScene) === 1) {
               braceletVertexDeform = initBraceletLinkVertexDeformation(
                 THREE,
@@ -13945,6 +13981,7 @@ async function runHandArSession({
               fitRes,
               {
                 braceletProceduralRadial,
+                braceletRigidFit: handBraceletRigidFit,
                 accessoryType,
               },
             );
@@ -14972,7 +15009,11 @@ async function runHandArSession({
           wearBase: wearXYZ,
           slideZ: braceletSlideLag,
         });
-        glbRoot.scale.set(sw.sx, sw.sy, sw.sz);
+        if (handBraceletRigidFit) {
+          glbRoot.scale.setScalar(suBase * Wb);
+        } else {
+          glbRoot.scale.set(sw.sx, sw.sy, sw.sz);
+        }
         wearPosition.position.set(sw.wearX, sw.wearY, sw.wearZ);
         wearPosition.updateMatrixWorld(true);
         if (braceletWristAlignGroup) {
@@ -15056,6 +15097,7 @@ async function runHandArSession({
           (watchStrapRadial?.strap || watchVertexDeform)) ||
           (accessoryType === "bracelet" &&
             !braceletIsBangle &&
+            !handBraceletRigidFit &&
             (braceletLinkRadial || braceletVertexDeform)))
       ) {
         const su =
@@ -15529,11 +15571,12 @@ async function runHandArSession({
               braceletRadialSegCount = 0;
               if (accessoryType === "bracelet") {
                 omafitNormalizeBraceletTripoGlbScale(THREE, next, glbRoot);
-                const radialMode = cfgAttr("arBraceletRadial", "on");
+                const radialMode = cfgAttr("arBraceletRadial", "auto");
                 const radialShould = omafitBraceletRadialShouldRebuild(
                   THREE,
                   next,
                   radialMode,
+                  handBraceletRigidFit,
                 );
                 if (radialShould) {
                   const segRaw = Number(
@@ -15547,6 +15590,7 @@ async function runHandArSession({
                   );
                 }
                 console.log("[omafit-ar] bracelet radial switch", {
+                  rigidFit: handBraceletRigidFit,
                   radialMode,
                   radialShould,
                   activated: braceletProceduralRadial,
@@ -15595,7 +15639,7 @@ async function runHandArSession({
               if (accessoryType === "bracelet") {
                 upgradeHandArLuxuryJewelryMaterials(THREE, next);
                 braceletIsBangle = detectBraceletBangle(THREE, next);
-                if (!braceletIsBangle && !braceletProceduralRadial) {
+                if (!braceletIsBangle && !braceletProceduralRadial && !handBraceletRigidFit) {
                   if (countHandArSolidMeshes(next) === 1) {
                     braceletVertexDeform = initBraceletLinkVertexDeformation(
                       THREE,
@@ -15668,6 +15712,7 @@ async function runHandArSession({
                     fitRes,
                     {
                       braceletProceduralRadial,
+                      braceletRigidFit: handBraceletRigidFit,
                       accessoryType,
                     },
                   );
