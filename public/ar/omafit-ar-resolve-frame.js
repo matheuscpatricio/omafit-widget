@@ -14,9 +14,16 @@ import {
  * @param {Record<string, unknown>} manifest
  */
 export function omafitResolveAssetFrameAfterBake(THREE, glbScene, glbRoot, manifest) {
-  if (!THREE || !glbScene || !manifest) return { skinnedMeshes: 0 };
+  const out = {
+    skinnedMeshes: 0,
+    wearAnchorApplied: false,
+    assetScaleApplied: false,
+    bboxSize: null,
+  };
+  if (!THREE || !glbScene || !manifest) return out;
   const policy = String(manifest?.meshPolicy?.skinnedMesh || "warn_v1");
   const skinN = omafitCountSkinnedMeshesInScene(glbScene);
+  out.skinnedMeshes = skinN;
   if (skinN > 0 && policy === "reject_v1") {
     throw new Error(`omafit-ar: SkinnedMesh não suportado (manifest.meshPolicy.skinnedMesh=reject_v1) count=${skinN}`);
   }
@@ -29,6 +36,7 @@ export function omafitResolveAssetFrameAfterBake(THREE, glbScene, glbRoot, manif
   const sn = Number(manifest?.scaleProfile?.assetScaleNormalization);
   if (Number.isFinite(sn) && sn > 0 && sn !== 1) {
     glbScene.scale.multiplyScalar(sn);
+    out.assetScaleApplied = true;
   }
 
   const wa = manifest?.wearAnchor;
@@ -71,7 +79,17 @@ export function omafitResolveAssetFrameAfterBake(THREE, glbScene, glbRoot, manif
     glbScene.position.set(px, py, pz);
     glbScene.quaternion.copy(q);
     glbScene.updateMatrixWorld(true);
+    out.wearAnchorApplied = true;
   }
 
-  return { skinnedMeshes: skinN };
+  try {
+    const box = new THREE.Box3().setFromObject(glbScene);
+    const sz = new THREE.Vector3();
+    box.getSize(sz);
+    out.bboxSize = { x: sz.x, y: sz.y, z: sz.z };
+  } catch {
+    /* ignore */
+  }
+
+  return out;
 }

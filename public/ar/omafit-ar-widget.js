@@ -35,6 +35,12 @@ import {
   omafitSuggestHandCameraClipping,
 } from "./omafit-ar-runtime-core.js";
 import { omafitResolveAssetFrameAfterBake } from "./omafit-ar-resolve-frame.js";
+import {
+  omafitArCertifyConsoleLog,
+  omafitArCertifyInstallHandGizmos,
+  omafitArManifestFallbackSummary,
+  omafitArManifestLoadSource,
+} from "./omafit-ar-certify.js";
 /**
  * MindAR óculos no tema (via bloco Omafit embed) — etapa "info" alinhada ao TryOnWidget + link como omafit-widget.js.
  * Fluxo: (1) modal info → (2) AR com câmera (MindAR.js face tracking + Three.js).
@@ -506,7 +512,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-ar-manifest-runtime-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-asset-certify-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11787,6 +11793,10 @@ async function runHandArSession({
   });
 
   const debug = /[?&]omafit_ar_debug=1\b/.test(String(location?.search || ""));
+  const certify =
+    debug ||
+    /[?&]omafit_ar_certify=1\b/.test(String(location?.search || "")) ||
+    /^(1|true|on|yes)$/i.test(String(cfgAttr("arAssetCertify", "0")).trim());
 
   loading.textContent = t.loadingCamera || t.loading || "A carregar câmara...";
 
@@ -11924,6 +11934,17 @@ async function runHandArSession({
     ? Number(handDeviceTierFlags.occlusionMaxHz)
     : Number(occPolicy.maxHz) || 45;
   const handOccGate = omafitCreateOcclusionMaxHzGate(occMaxHz);
+
+  const handManifestLoadMeta = omafitArManifestLoadSource(cfgAttr);
+  let handResolveLastResult = null;
+  let handCertifyGizmosDispose = null;
+  if (certify) {
+    console.info("[omafit-ar][certify] manifestLoadSource", handManifestLoadMeta);
+    console.info(
+      "[omafit-ar][certify] fallbackSummary (pós-merge)",
+      omafitArManifestFallbackSummary(handArManifest, handManifestLoadMeta),
+    );
+  }
 
   loading.textContent =
     accessoryType === "bracelet"
@@ -13752,7 +13773,18 @@ async function runHandArSession({
           });
         }
         try {
-          omafitResolveAssetFrameAfterBake(THREE, glbScene, glbRoot, handArManifest);
+          handResolveLastResult = omafitResolveAssetFrameAfterBake(
+            THREE,
+            glbScene,
+            glbRoot,
+            handArManifest,
+          );
+          if (certify) {
+            console.info(
+              "[omafit-ar][certify] resolveAssetFrameAfterBake",
+              handResolveLastResult,
+            );
+          }
         } catch (eRes) {
           console.error("[omafit-ar] resolveAssetFrameAfterBake", eRes);
           reject(eRes);
@@ -13897,6 +13929,41 @@ async function runHandArSession({
             handMicroUxWrap.scale.setScalar(0.9);
           } catch {
             /* ignore */
+          }
+        }
+
+        if (certify) {
+          try {
+            if (typeof handCertifyGizmosDispose === "function") {
+              handCertifyGizmosDispose();
+              handCertifyGizmosDispose = null;
+            }
+            omafitArCertifyConsoleLog(
+              handArManifest,
+              handManifestLoadMeta,
+              handResolveLastResult,
+              fitRes,
+              {
+                braceletProceduralRadial,
+                accessoryType,
+              },
+            );
+            glbRoot.updateMatrixWorld(true);
+            glbScene.updateMatrixWorld(true);
+            console.info("[omafit-ar][certify] transforms post-fit", {
+              glbRootScale: glbRoot.scale?.toArray?.(),
+              glbScenePos: glbScene.position?.toArray?.(),
+              glbSceneScale: glbScene.scale?.toArray?.(),
+            });
+            const gizmoApi = omafitArCertifyInstallHandGizmos(
+              THREE,
+              anchor,
+              glbRoot,
+              glbScene,
+            );
+            handCertifyGizmosDispose = gizmoApi.dispose;
+          } catch (eC) {
+            console.warn("[omafit-ar][certify] gizmo/log", eC?.message || eC);
           }
         }
 
@@ -15488,7 +15555,18 @@ async function runHandArSession({
                 });
               }
               try {
-                omafitResolveAssetFrameAfterBake(THREE, next, glbRoot, handArManifest);
+                handResolveLastResult = omafitResolveAssetFrameAfterBake(
+                  THREE,
+                  next,
+                  glbRoot,
+                  handArManifest,
+                );
+                if (certify) {
+                  console.info(
+                    "[omafit-ar][certify] resolve (switch GLB)",
+                    handResolveLastResult,
+                  );
+                }
               } catch (eRes) {
                 console.warn("[omafit-ar] resolveAssetFrame (switch GLB)", eRes);
               }
@@ -15577,6 +15655,33 @@ async function runHandArSession({
                   /* ignore */
                 }
               }
+              if (certify) {
+                try {
+                  if (typeof handCertifyGizmosDispose === "function") {
+                    handCertifyGizmosDispose();
+                    handCertifyGizmosDispose = null;
+                  }
+                  omafitArCertifyConsoleLog(
+                    handArManifest,
+                    handManifestLoadMeta,
+                    handResolveLastResult,
+                    fitRes,
+                    {
+                      braceletProceduralRadial,
+                      accessoryType,
+                    },
+                  );
+                  const gizmoApi2 = omafitArCertifyInstallHandGizmos(
+                    THREE,
+                    anchor,
+                    glbRoot,
+                    next,
+                  );
+                  handCertifyGizmosDispose = gizmoApi2.dispose;
+                } catch (eCs) {
+                  console.warn("[omafit-ar][certify] switch", eCs?.message || eCs);
+                }
+              }
               resolve();
             },
             undefined,
@@ -15591,6 +15696,14 @@ async function runHandArSession({
 
   return function cleanupHand() {
     running = false;
+    try {
+      if (typeof handCertifyGizmosDispose === "function") {
+        handCertifyGizmosDispose();
+        handCertifyGizmosDispose = null;
+      }
+    } catch {
+      /* ignore */
+    }
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
     try {
