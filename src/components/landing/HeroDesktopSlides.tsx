@@ -59,6 +59,7 @@ const slides: Slide[] = [
         <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-tech !to-oma-cream">
           MediaPipe
         </ShimmerHeading>
+        .
       </>
     ),
     body:
@@ -76,6 +77,7 @@ const slides: Slide[] = [
         <span className="italic text-oma-accent [text-shadow:0_1px_14px_rgba(0,0,0,0.85)]">
           ticket médio
         </span>
+        .
       </span>
     ),
     body:
