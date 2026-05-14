@@ -98,6 +98,11 @@
           "type": "string",
           "enum": ["auto", "bangle", "chain"],
           "description": "auto: heurística. bangle|chain: força classificação (prevalece sobre detectBraceletBangle)."
+        },
+        "fittingMode": {
+          "type": "string",
+          "enum": ["hybrid", "strict"],
+          "description": "strict: sem rotação bbox/wrap pulseira, sem dobra relógio plano, sem radial instanced, sem percentil de vértices (só fitProxy + fallback bbox 0,92×)."
         }
       }
     },

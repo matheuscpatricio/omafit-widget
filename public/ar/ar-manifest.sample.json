@@ -24,7 +24,8 @@
   "meshPolicy": {
     "skinnedMesh": "warn_v1",
     "deformationPolicy": "rigid",
-    "braceletTopology": "auto"
+    "braceletTopology": "auto",
+    "fittingMode": "hybrid"
   },
   "fitProxy": {
     "innerDiameterMm": 62,

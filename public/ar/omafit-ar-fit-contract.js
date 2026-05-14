@@ -82,3 +82,17 @@ export function omafitArMeshPolicyBraceletTopology(manifest) {
   if (s === "bangle" || s === "chain") return s;
   return "auto";
 }
+
+/**
+ * `strict` — runtime não interpreta geometria agressiva (ver `fitWristGlb` + radial).
+ * `hybrid` (default) — heurísticas bbox/PCA/percentil como hoje quando contract incompleto.
+ *
+ * @param {Record<string, unknown>} manifest
+ * @returns {"strict" | "hybrid"}
+ */
+export function omafitArMeshPolicyFittingMode(manifest) {
+  const s = String(manifest?.meshPolicy?.fittingMode ?? "hybrid")
+    .trim()
+    .toLowerCase();
+  return s === "strict" ? "strict" : "hybrid";
+}

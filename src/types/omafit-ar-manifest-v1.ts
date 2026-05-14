@@ -56,10 +56,12 @@ export interface OmafitArManifestV1 {
   memoryBudgetHint?: { maxEstimatedVramMb?: number };
   meshPolicy?: {
     skinnedMesh?: string;
-    /** rigid = uniform scale only for wrist wearables; adaptive = legacy biometric ellipse / links */
+    /** `strict` = runtime mínimo em pulso (ver meshPolicy.fittingMode); `hybrid` = heurísticas em fitWristGlb */
     deformationPolicy?: 'rigid' | 'adaptive';
     /** auto = bbox/name heuristic; bangle|chain = override detectBraceletBangle */
     braceletTopology?: 'auto' | 'bangle' | 'chain';
+    /** hybrid (default) = inferência geométrica; strict = ingest-first, heurísticas pesadas desligadas */
+    fittingMode?: 'hybrid' | 'strict';
   };
   /** Encaixe físico: prevalece sobre PCA / percentil de raio em runtime quando preenchido. */
   fitProxy?: {

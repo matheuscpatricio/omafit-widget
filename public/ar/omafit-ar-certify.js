@@ -6,6 +6,7 @@
 import {
   omafitArFitProxyInnerRadiusMeters,
   omafitArMeshPolicyBraceletTopology,
+  omafitArMeshPolicyFittingMode,
 } from "./omafit-ar-fit-contract.js";
 
 /**
@@ -90,6 +91,7 @@ export function omafitArCertifyConsoleLog(
     fitDidBend: fitRes?.didBend,
     braceletProceduralRadial: Boolean(flags?.braceletProceduralRadial),
     braceletRigidFit: Boolean(flags?.braceletRigidFit),
+    meshPolicyFittingMode: omafitArMeshPolicyFittingMode(manifest),
     meshDeformationPolicy: manifest?.meshPolicy?.deformationPolicy,
     braceletTopology: omafitArMeshPolicyBraceletTopology(manifest),
     fitProxyInnerRadiusM:

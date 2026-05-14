@@ -39,6 +39,7 @@ import {
   omafitArFitProxyInnerRadiusMeters,
   omafitArFitProxyRingHoleAxisLocalArray,
   omafitArMeshPolicyBraceletTopology,
+  omafitArMeshPolicyFittingMode,
 } from "./omafit-ar-fit-contract.js";
 import {
   omafitArCertifyConsoleLog,
@@ -517,7 +518,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-scale-ipd-fix-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-13-ar-fitting-mode-strict-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12809,6 +12810,7 @@ async function runHandArSession({
     rigidBracelet,
   ) {
     if (rigidBracelet) return false;
+    if (omafitArMeshPolicyFittingMode(handArManifest) === "strict") return false;
     const mode = String(modeRaw ?? "auto").trim().toLowerCase();
     if (/^(0|off|false|no)$/.test(mode)) return false;
     if (/^(1|on|true|yes)$/.test(mode)) return true;
@@ -13207,6 +13209,7 @@ async function runHandArSession({
    *      do raio real detectado.
    */
   function fitWristGlb(glbScene, glbRoot, accessoryType, calScale) {
+    const wristStrict = omafitArMeshPolicyFittingMode(handArManifest) === "strict";
     let bbox = new THREE.Box3().setFromObject(glbScene);
     const size = new THREE.Vector3();
     bbox.getSize(size);
@@ -13215,7 +13218,7 @@ async function runHandArSession({
     let bendLocalR = 0;
 
     if (accessoryType === "bracelet") {
-      if (!braceletProceduralRadial) {
+      if (!braceletProceduralRadial && !wristStrict) {
         const sx = size.x;
         const sy = size.y;
         const sz = size.z;
@@ -13253,7 +13256,7 @@ async function runHandArSession({
           bbox.getSize(size);
         }
       }
-    } else {
+    } else if (!wristStrict) {
       /**
        * === DETECÇÃO DE RELÓGIO PLANO ===
        *
@@ -13401,6 +13404,16 @@ async function runHandArSession({
             localInnerR,
             category: accessoryType,
           });
+        } catch {
+          /* ignore */
+        }
+      } else if (wristStrict) {
+        localInnerR = Math.max(localRingR * 0.92, 1e-6);
+        try {
+          console.warn(
+            "[omafit-ar] meshPolicy.fittingMode=strict: sem fitProxy.inner* válido — localInnerR = 0,92×localRingR (bbox). Defina fitProxy.innerDiameterMm ou innerRadiusMm no ingest.",
+            { localRingR, localInnerR, category: accessoryType },
+          );
         } catch {
           /* ignore */
         }

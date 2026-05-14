@@ -107,6 +107,8 @@ export function omafitDefaultArManifestForAccessory(category) {
       skinnedMesh: "warn_v1",
       /** Pulseira: `rigid` = escala uniforme, sem radial instanced nem elipse sx≠sy. */
       deformationPolicy: cat === "bracelet" ? "rigid" : "adaptive",
+      /** `strict` = sem heurísticas pesadas em `fitWristGlb` (ingest deve certificar). */
+      fittingMode: "hybrid",
     },
   };
 }
