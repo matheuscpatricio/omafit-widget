@@ -8,14 +8,13 @@ import {
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 import { supabase } from '../lib/supabase';
-import { AR_BRACELET_CERTIFIED_BOOTSTRAP_MANIFEST_JSON } from '../constants/arBraceletCertifiedBootstrapManifest';
 
 /**
  * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-14-ar-template-certified-hand-v3';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-14-ar-bracelet-radial-default-auto-v1';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -387,16 +386,6 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   })();
 
   const linkTextFromQuery = pickQ(['linkText', 'link_text']);
-
-  const accResolved = (accessoryType || '').trim().toLowerCase();
-  if (
-    accResolved === 'bracelet' &&
-    !legacyBraceletFit &&
-    !arManifestJson.trim() &&
-    !arManifestUrl.trim()
-  ) {
-    arManifestJson = AR_BRACELET_CERTIFIED_BOOTSTRAP_MANIFEST_JSON;
-  }
 
   return {
     glbUrl,
