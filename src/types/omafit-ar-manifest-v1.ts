@@ -62,6 +62,17 @@ export interface OmafitArManifestV1 {
     braceletTopology?: 'auto' | 'bangle' | 'chain';
     /** hybrid (default) = inferência geométrica; strict = ingest-first, heurísticas pesadas desligadas */
     fittingMode?: 'hybrid' | 'strict';
+    /** default = legado; template_certified = GLB certificado + gate manifest */
+    runtimeMode?: 'default' | 'template_certified';
+    /** Com template_certified implícito true; false só debug interno */
+    templateLockTransform?: boolean;
+  };
+  /** Classe de wearable no ingest (ex. bracelet_bangle); alinhada a certifiedTemplate.id */
+  wearableClass?: string;
+  certifiedTemplate?: {
+    id: string;
+    version?: number;
+    geometryGlbUrl?: string;
   };
   /** Encaixe físico: prevalece sobre PCA / percentil de raio em runtime quando preenchido. */
   fitProxy?: {
@@ -70,6 +81,9 @@ export interface OmafitArManifestV1 {
     innerRadiusM?: number;
     ringHoleAxisLocal?: [number, number, number];
     axisLocal?: [number, number, number];
+    /** Centro do furo do anel no espaço local do GLB (metros) — ingest; evita assumir bbox≈furo */
+    ringCenterLocal?: [number, number, number];
+    holeCenterLocal?: [number, number, number];
   };
   [key: string]: unknown;
 }

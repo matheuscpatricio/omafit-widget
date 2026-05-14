@@ -6,6 +6,7 @@
   "scripts": {
     "sync:theme-ar": "node scripts/sync-ar-assets-from-theme.mjs",
     "ar:ingest-validate": "node scripts/ar-ingest-validate.mjs",
+    "ar:certified-manifest-stub": "node scripts/ar-certified-pipeline-stub.mjs",
     "ar:qa-matrix": "node scripts/ar-qa-matrix.mjs",
     "predev": "npm run sync:theme-ar",
     "dev": "vite",

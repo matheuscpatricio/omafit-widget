@@ -5,9 +5,15 @@
 
 import {
   omafitArFitProxyInnerRadiusMeters,
+  omafitArFitProxyRingCenterLocalArray,
   omafitArMeshPolicyBraceletTopology,
   omafitArMeshPolicyFittingMode,
 } from "./omafit-ar-fit-contract.js";
+import {
+  omafitArCertifiedTemplateGate,
+  omafitArTemplateCertifiedActive,
+  omafitArTemplateLockTransform,
+} from "./omafit-ar-certified-template.js";
 
 /**
  * @param {(k: string, fb?: string) => string} cfgAttr
@@ -68,6 +74,12 @@ export function omafitArManifestFallbackSummary(manifest, loadMeta) {
  *   braceletProceduralRadial?: boolean,
  *   accessoryType?: string,
  *   braceletRigidFit?: boolean,
+ *   templateCertifiedActive?: boolean,
+ *   templateLockTransform?: boolean,
+ *   templateCertifiedGateOk?: boolean,
+ *   wearableClass?: string,
+ *   certifiedTemplateId?: string,
+ *   effectiveGlbUrl?: string,
  * }} flags
  */
 export function omafitArCertifyConsoleLog(
@@ -78,6 +90,7 @@ export function omafitArCertifyConsoleLog(
   flags,
 ) {
   const fb = omafitArManifestFallbackSummary(manifest, loadMeta);
+  const gate = omafitArCertifiedTemplateGate(manifest);
   const row = {
     ...fb,
     resolveRan: Boolean(resolveResult),
@@ -92,13 +105,33 @@ export function omafitArCertifyConsoleLog(
     braceletProceduralRadial: Boolean(flags?.braceletProceduralRadial),
     braceletRigidFit: Boolean(flags?.braceletRigidFit),
     meshPolicyFittingMode: omafitArMeshPolicyFittingMode(manifest),
+    meshPolicyRuntimeMode: String(manifest?.meshPolicy?.runtimeMode ?? "default"),
     meshDeformationPolicy: manifest?.meshPolicy?.deformationPolicy,
     braceletTopology: omafitArMeshPolicyBraceletTopology(manifest),
     fitProxyInnerRadiusM:
       omafitArFitProxyInnerRadiusMeters(manifest) ?? null,
+    fitProxyRingCenterLocal: omafitArFitProxyRingCenterLocalArray(manifest),
     accessoryType: flags?.accessoryType,
+    templateCertifiedActive:
+      flags?.templateCertifiedActive ?? omafitArTemplateCertifiedActive(manifest),
+    templateLockTransform:
+      flags?.templateLockTransform ?? omafitArTemplateLockTransform(manifest),
+    templateCertifiedGateOk: flags?.templateCertifiedGateOk ?? gate.ok,
+    templateCertifiedGateReasons: gate.ok ? [] : gate.reasons,
+    wearableClass: flags?.wearableClass ?? manifest?.wearableClass,
+    certifiedTemplateId:
+      flags?.certifiedTemplateId ?? manifest?.certifiedTemplate?.id,
+    effectiveGlbUrl: flags?.effectiveGlbUrl ?? null,
   };
   console.info("[omafit-ar][certify] contract + resolve + fit", row);
+  console.info("[template-runtime]", {
+    templateCertifiedActive: row.templateCertifiedActive,
+    templateLockTransform: row.templateLockTransform,
+    templateCertifiedGateOk: row.templateCertifiedGateOk,
+    wearableClass: row.wearableClass,
+    certifiedTemplateId: row.certifiedTemplateId,
+    effectiveGlbUrl: row.effectiveGlbUrl,
+  });
   console.info("[omafit-ar][certify] manifest (subset)", {
     wearAnchor: manifest?.wearAnchor,
     scaleProfile: manifest?.scaleProfile,

@@ -71,6 +71,34 @@ export function omafitArFitProxyRingHoleAxisLocalArray(manifest) {
 }
 
 /**
+ * Centro do furo do anel em **espaço local do glbScene** (metros), p.ex. do ingest.
+ * Sem isto, `fitWristGlb` assume centro do bbox ≈ centro do furo (frequentemente falso).
+ *
+ * @param {Record<string, unknown>} manifest
+ * @returns {[number, number, number] | null}
+ */
+const OMAFIT_FIT_PROXY_RING_CENTER_ABS_MAX_M = 0.12;
+
+export function omafitArFitProxyRingCenterLocalArray(manifest) {
+  const fp = manifest?.fitProxy;
+  if (!fp || typeof fp !== "object") return null;
+  const raw = fp.ringCenterLocal ?? fp.holeCenterLocal;
+  if (!Array.isArray(raw) || raw.length !== 3) return null;
+  const x = Number(raw[0]);
+  const y = Number(raw[1]);
+  const z = Number(raw[2]);
+  if (![x, y, z].every((n) => Number.isFinite(n))) return null;
+  if (
+    Math.abs(x) > OMAFIT_FIT_PROXY_RING_CENTER_ABS_MAX_M ||
+    Math.abs(y) > OMAFIT_FIT_PROXY_RING_CENTER_ABS_MAX_M ||
+    Math.abs(z) > OMAFIT_FIT_PROXY_RING_CENTER_ABS_MAX_M
+  ) {
+    return null;
+  }
+  return [x, y, z];
+}
+
+/**
  * Override explícito da topologia da pulseira (evita bbox/nomes).
  *
  * @param {Record<string, unknown>} manifest

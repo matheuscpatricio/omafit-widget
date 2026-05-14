@@ -109,6 +109,7 @@ export function omafitDefaultArManifestForAccessory(category) {
       deformationPolicy: cat === "bracelet" ? "rigid" : "adaptive",
       /** `strict` = sem heurísticas pesadas em `fitWristGlb` (ingest deve certificar). */
       fittingMode: "hybrid",
+      runtimeMode: "default",
     },
   };
 }

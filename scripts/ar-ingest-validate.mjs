@@ -3,6 +3,12 @@
  * Validação de ingest AR: GLB (chunk JSON), skins, meshes; opcional Khronos gltf-validator.
  *
  * Uso: node scripts/ar-ingest-validate.mjs <ficheiro.glb>
+ *
+ * Certified templates (Fase 1.5): pipeline desejado Tripo GLB → Blender (escala m,
+ * pivô, medir diâmetro interno, eixo, ringCenterLocal) → export GLB certificado →
+ * manifest com `meshPolicy.runtimeMode: "template_certified"`, `wearableClass`,
+ * `certifiedTemplate`, `fitProxy` completo, `wearAnchor`. Validação JSON do manifest
+ * pode ser acrescentada aqui no futuro (p.ex. Ajv contra `ar-manifest.schema.json`).
  */
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";

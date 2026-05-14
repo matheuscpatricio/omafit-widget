@@ -57,7 +57,33 @@
           "items": { "type": "number" },
           "minItems": 3,
           "maxItems": 3
+        },
+        "ringCenterLocal": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Centro do furo em espaço local do GLB (m); recentramento em fitWristGlb."
+        },
+        "holeCenterLocal": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Alias de ringCenterLocal."
         }
+      }
+    },
+    "wearableClass": {
+      "type": "string",
+      "description": "Classe decidida no ingest (ex. bracelet_bangle). Usado com template_certified."
+    },
+    "certifiedTemplate": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "integer" },
+        "geometryGlbUrl": { "type": "string" }
       }
     },
     "occlusionProxy": { "type": "object" },
@@ -103,6 +129,15 @@
           "type": "string",
           "enum": ["hybrid", "strict"],
           "description": "strict: sem rotação bbox/wrap pulseira, sem dobra relógio plano, sem radial instanced, sem percentil de vértices (só fitProxy + fallback bbox 0,92×)."
+        },
+        "runtimeMode": {
+          "type": "string",
+          "enum": ["default", "template_certified"],
+          "description": "template_certified: GLB certificado + manifest gate; sem heurísticas destrutivas quando lock activo."
+        },
+        "templateLockTransform": {
+          "type": "boolean",
+          "description": "Se true (ou implícito com template_certified): sem 2º reset bbox/quat, sem elipse adaptativa. false só debug interno."
         }
       }
     },
