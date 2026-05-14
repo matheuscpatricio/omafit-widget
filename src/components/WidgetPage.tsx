@@ -8,13 +8,14 @@ import {
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 import { supabase } from '../lib/supabase';
+import { AR_BRACELET_CERTIFIED_BOOTSTRAP_MANIFEST_JSON } from '../constants/arBraceletCertifiedBootstrapManifest';
 
 /**
  * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-14-ar-template-certified-hand-v2';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-14-ar-template-certified-hand-v3';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -147,6 +148,10 @@ type EyewearArBootstrap = {
   preferredCamera?: string;
   mindarAnchor?: string;
   calibration?: string;
+  /** Manifest AR v1 (JSON inline) — `data-ar-manifest-json` no `#omafit-ar-root`. */
+  arManifestJson?: string;
+  /** URL do manifest AR (CORS) — `data-ar-manifest-url`. */
+  arManifestUrl?: string;
   /** ID da variante Shopify (numérico) — obrigatório para carrinho / miniatura no iframe Netlify. */
   variantId?: string;
   /** Domínio da loja (`loja.myshopify.com`) — `fetch` do carrinho usa `https://{domínio}/cart/add.js`. */
@@ -247,6 +252,12 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   const calibrationRaw = pickQ(['arOmafitCalibration', 'ar_omafit_calibration']);
   const calibration = sanitizeArCalibrationQuery(calibrationRaw);
 
+  let arManifestJson = pickQ(['arManifestJson', 'ar_manifest_json']);
+  let arManifestUrl = pickQ(['arManifestUrl', 'ar_manifest_url']);
+  let legacyBraceletFit = /^1|true|on|yes$/i.test(
+    pickQ(['arLegacyBraceletFit', 'ar_legacy_bracelet_fit']).trim(),
+  );
+
   let variantId = pickQ(['variant', 'variant_id', 'variantId']);
   let shopDomain = pickQ(['shopDomain', 'shop_domain', 'shop']);
   let productIdBootstrap = pickQ(['productId', 'product_id']);
@@ -280,6 +291,34 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
       String((configFromUrl as { product_handle?: unknown }).product_handle).trim()
     ) {
       productHandleBootstrap = String((configFromUrl as { product_handle?: unknown }).product_handle).trim();
+    }
+
+    const cfgLegacy =
+      (configFromUrl as { arLegacyBraceletFit?: unknown }).arLegacyBraceletFit ??
+      (configFromUrl as { ar_legacy_bracelet_fit?: unknown }).ar_legacy_bracelet_fit;
+    if (!legacyBraceletFit && cfgLegacy != null && String(cfgLegacy).trim() !== '') {
+      legacyBraceletFit = /^1|true|on|yes$/i.test(String(cfgLegacy).trim());
+    }
+
+    const mj =
+      (configFromUrl as { arManifestJson?: unknown }).arManifestJson ??
+      (configFromUrl as { ar_manifest_json?: unknown }).ar_manifest_json;
+    if (!arManifestJson.trim() && mj != null) {
+      if (typeof mj === 'string' && mj.trim() !== '') {
+        arManifestJson = mj.trim();
+      } else if (typeof mj === 'object' && mj !== null) {
+        try {
+          arManifestJson = JSON.stringify(mj);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    const mu =
+      (configFromUrl as { arManifestUrl?: unknown }).arManifestUrl ??
+      (configFromUrl as { ar_manifest_url?: unknown }).ar_manifest_url;
+    if (!arManifestUrl.trim() && typeof mu === 'string' && mu.trim() !== '') {
+      arManifestUrl = mu.trim();
     }
   }
 
@@ -349,6 +388,16 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
 
   const linkTextFromQuery = pickQ(['linkText', 'link_text']);
 
+  const accResolved = (accessoryType || '').trim().toLowerCase();
+  if (
+    accResolved === 'bracelet' &&
+    !legacyBraceletFit &&
+    !arManifestJson.trim() &&
+    !arManifestUrl.trim()
+  ) {
+    arManifestJson = AR_BRACELET_CERTIFIED_BOOTSTRAP_MANIFEST_JSON;
+  }
+
   return {
     glbUrl,
     productTitle,
@@ -367,6 +416,8 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     preferredCamera: preferredCamera || undefined,
     mindarAnchor: mindarAnchor || undefined,
     calibration: (calibration && calibration.trim()) || undefined,
+    arManifestJson: arManifestJson.trim() || undefined,
+    arManifestUrl: arManifestUrl.trim() || undefined,
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
@@ -1096,6 +1147,12 @@ export function WidgetPage() {
     if (eyewearBootstrap.preferredCamera) arExtraAttrs['data-ar-preferred-camera'] = eyewearBootstrap.preferredCamera;
     if (eyewearBootstrap.mindarAnchor) arExtraAttrs['data-ar-mindar-anchor'] = eyewearBootstrap.mindarAnchor;
     if (eyewearBootstrap.calibration) arExtraAttrs['data-ar-omafit-calibration'] = eyewearBootstrap.calibration;
+    if (eyewearBootstrap.arManifestJson) {
+      arExtraAttrs['data-ar-manifest-json'] = eyewearBootstrap.arManifestJson;
+    }
+    if (eyewearBootstrap.arManifestUrl) {
+      arExtraAttrs['data-ar-manifest-url'] = eyewearBootstrap.arManifestUrl;
+    }
 
     return (
       <div className="min-h-screen bg-white" onContextMenu={(e) => e.preventDefault()}>

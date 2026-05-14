@@ -19,37 +19,6 @@ import {
   mindarGlassesPivotSmootherStep,
   resetMindarGlassesPivotSmoother,
 } from "./omafit-mindar-glasses-pivot-rig.js";
-import {
-  omafitDefaultArManifestForAccessory,
-  omafitLoadArManifestFromCfg,
-} from "./omafit-ar-manifest.js";
-import {
-  omafitApplyDeviceTierFlags,
-  omafitApplyWearableMaterialRenderDefaults,
-  omafitDetectDeviceTier,
-} from "./omafit-ar-runtime-core.js";
-import { omafitResolveAssetFrameAfterBake } from "./omafit-ar-resolve-frame.js";
-import {
-  omafitArFitProxyInnerRadiusMeters,
-  omafitArFitProxyRingCenterLocalArray,
-  omafitArFitProxyRingHoleAxisLocalArray,
-  omafitArMeshPolicyBraceletTopology,
-  omafitArMeshPolicyFittingMode,
-} from "./omafit-ar-fit-contract.js";
-import {
-  omafitArCertifyConsoleLog,
-  omafitArCertifyInstallHandGizmos,
-  omafitArManifestFallbackSummary,
-  omafitArManifestLoadSource,
-} from "./omafit-ar-certify.js";
-import {
-  omafitArCertifiedTemplateGeometryUrl,
-  omafitArCertifiedTemplateGate,
-  omafitArCertifiedTemplateLogBypass,
-  omafitArTemplateCertifiedActive,
-  omafitArTemplateCertifiedRequested,
-  omafitArTemplateLockTransform,
-} from "./omafit-ar-certified-template.js";
 /**
  * MindAR óculos no tema (via bloco Omafit embed) — etapa "info" alinhada ao TryOnWidget + link como omafit-widget.js.
  * Fluxo: (1) modal info → (2) AR com câmera (MindAR.js face tracking + Three.js).
@@ -521,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-14-ar-template-certified-hand-v2";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-11-bracelet-bake-world-scale-v1";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11802,11 +11771,6 @@ async function runHandArSession({
   });
 
   const debug = /[?&]omafit_ar_debug=1\b/.test(String(location?.search || ""));
-  const certify =
-    debug ||
-    /[?&]omafit_ar_certify=1\b/.test(String(location?.search || "")) ||
-    /^(1|true|on|yes)$/i.test(String(cfgAttr("arAssetCertify", "0")).trim());
-  let handCertifyGizmosDispose = null;
 
   loading.textContent = t.loadingCamera || t.loading || "A carregar câmara...";
 
@@ -11913,92 +11877,6 @@ async function runHandArSession({
     mirrorVideoX,
     arDeviceProfile: handArProfile,
   });
-
-  let handArManifest = omafitDefaultArManifestForAccessory(accessoryType);
-  let handDeviceTierFlags = omafitApplyDeviceTierFlags(
-    handArManifest,
-    omafitDetectDeviceTier(),
-  );
-  try {
-    handArManifest = await omafitLoadArManifestFromCfg(cfgAttr, accessoryType);
-    handDeviceTierFlags = omafitApplyDeviceTierFlags(
-      handArManifest,
-      omafitDetectDeviceTier(),
-    );
-    if (debug) {
-      console.info("[omafit-ar] manifest loaded", {
-        schemaVersion: handArManifest?.schemaVersion,
-        runtimeMode: handArManifest?.meshPolicy?.runtimeMode,
-      });
-    }
-  } catch (eMan) {
-    console.warn("[omafit-ar] manifest: usando defaults", eMan?.message || eMan);
-  }
-
-  const handManifestLoadMeta = omafitArManifestLoadSource(cfgAttr);
-  const handCertifiedTemplateGate = omafitArCertifiedTemplateGate(handArManifest);
-  const handTemplateCertifiedActive = omafitArTemplateCertifiedActive(handArManifest);
-  const handTemplateLockTransform = omafitArTemplateLockTransform(handArManifest);
-  let handEffectiveGlbUrl = glbUrl;
-  if (handTemplateCertifiedActive) {
-    const geo = omafitArCertifiedTemplateGeometryUrl(
-      handArManifest,
-      typeof location !== "undefined" ? location.origin : "",
-    );
-    if (geo) handEffectiveGlbUrl = geo;
-    try {
-      console.info("[template-certified]", {
-        templateId: handArManifest?.certifiedTemplate?.id,
-        wearableClass: handArManifest?.wearableClass,
-        templateLockTransform: handTemplateLockTransform,
-        effectiveGlbUrl: String(handEffectiveGlbUrl || "").slice(0, 260),
-      });
-    } catch {
-      /* ignore */
-    }
-  } else {
-    omafitArCertifiedTemplateLogBypass(handArManifest, handCertifiedTemplateGate);
-  }
-
-  try {
-    const certifiedRequested = omafitArTemplateCertifiedRequested(handArManifest);
-    console.info("[omafit-ar] hand certified-path", {
-      runtimeMode: String(handArManifest?.meshPolicy?.runtimeMode ?? "default"),
-      certifiedRequested,
-      certifiedActive: handTemplateCertifiedActive,
-      templateLockTransform: handTemplateLockTransform,
-      ...(certifiedRequested && !handCertifiedTemplateGate.ok
-        ? { gateReasons: handCertifiedTemplateGate.reasons }
-        : {}),
-    });
-  } catch {
-    /* ignore */
-  }
-
-  const handBraceletRigidFit =
-    accessoryType === "bracelet" &&
-    (() => {
-      const cfgO = String(cfgAttr("arBraceletDeformation", "") || "")
-        .trim()
-        .toLowerCase();
-      if (cfgO === "adaptive") return false;
-      if (cfgO === "rigid") return true;
-      const p = String(
-        handArManifest?.meshPolicy?.deformationPolicy ?? "adaptive",
-      )
-        .trim()
-        .toLowerCase();
-      return p === "rigid";
-    })();
-
-  let handResolveLastResult = null;
-  if (certify) {
-    console.info("[omafit-ar][certify] manifestLoadSource", handManifestLoadMeta);
-    console.info(
-      "[omafit-ar][certify] fallbackSummary (pós-merge)",
-      omafitArManifestFallbackSummary(handArManifest, handManifestLoadMeta),
-    );
-  }
 
   loading.textContent =
     accessoryType === "bracelet"
@@ -12822,10 +12700,8 @@ async function runHandArSession({
    * O raio da curva é **sempre procedural** (landmarks), nunca derivado do GLB.
    */
   function omafitBraceletRadialShouldRebuild(THREE, glbScene, modeRaw) {
-    if (handTemplateLockTransform) return false;
-    if (omafitArMeshPolicyFittingMode(handArManifest) === "strict") return false;
-    if (handBraceletRigidFit) return false;
     const mode = String(modeRaw ?? "auto").trim().toLowerCase();
+    if (/^(0|off|false|no)$/.test(mode)) return false;
     if (/^(1|on|true|yes)$/.test(mode)) return true;
     const solidCount = countHandArSolidMeshes(glbScene);
     if (solidCount < 1) return false;
@@ -13220,15 +13096,6 @@ async function runHandArSession({
    *      do raio real detectado.
    */
   function fitWristGlb(glbScene, glbRoot, accessoryType, calScale) {
-    const wristStrict = omafitArMeshPolicyFittingMode(handArManifest) === "strict";
-    const templateLock = Boolean(handTemplateLockTransform);
-    if (templateLock && accessoryType === "bracelet") {
-      try {
-        console.info("[template-fit]", { branch: "templateLockTransform" });
-      } catch {
-        /* ignore */
-      }
-    }
     let bbox = new THREE.Box3().setFromObject(glbScene);
     const size = new THREE.Vector3();
     bbox.getSize(size);
@@ -13237,7 +13104,7 @@ async function runHandArSession({
     let bendLocalR = 0;
 
     if (accessoryType === "bracelet") {
-      if (!braceletProceduralRadial && !wristStrict && !templateLock) {
+      if (!braceletProceduralRadial) {
         const sx = size.x;
         const sy = size.y;
         const sz = size.z;
@@ -13267,7 +13134,7 @@ async function runHandArSession({
         const braceletDims = [size.x, size.y, size.z].sort((a, b) => a - b);
         const braceletFlatRatio =
           braceletDims[2] / Math.max(1e-6, braceletDims[1]);
-        if (braceletFlatRatio > 1.85 && !handBraceletRigidFit) {
+        if (braceletFlatRatio > 1.85) {
           const wrapRadius = Math.max(1e-6, size.x * 0.5 * 1.1);
           wrapBraceletCylinderNormalized(glbScene, wrapRadius);
           glbScene.updateMatrixWorld(true);
@@ -13275,7 +13142,7 @@ async function runHandArSession({
           bbox.getSize(size);
         }
       }
-    } else if (!wristStrict && !templateLock) {
+    } else {
       /**
        * === DETECÇÃO DE RELÓGIO PLANO ===
        *
@@ -13409,37 +13276,23 @@ async function runHandArSession({
         : Math.max(medianDim / 2, 1e-6);
 
       /**
-       * === Raio interno: contract `fitProxy` primeiro; strict/templateLock sem percentil ===
+       * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
+       *
+       * `localRingR` é o raio do EIXO central. A superfície INTERNA do
+       * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
+       * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
+       * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
+       * a superfície interna fica exactamente na pele (encaixe perfeito).
+       *
+       * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
+       * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
+       * de 10% de espessura radial).
        */
-      const contractInnerM =
-        accessoryType === "bracelet" || accessoryType === "watch"
-          ? omafitArFitProxyInnerRadiusMeters(handArManifest)
-          : null;
-      if (contractInnerM != null && contractInnerM > 1e-5) {
-        localInnerR = contractInnerM;
-        localRingR = Math.max(localInnerR * 1.015, localInnerR + 1e-5);
-      } else if (wristStrict || templateLock) {
-        localInnerR = Math.max(localRingR * 0.92, 1e-6);
-      } else {
-        /**
-         * === MEDIR O RAIO INTERNO REAL DO ANEL (v11.2) ===
-         *
-         * `localRingR` é o raio do EIXO central. A superfície INTERNA do
-         * anel (a que toca a pele) fica em `localRingR − espessura_radial`.
-         * Se escalarmos por `localRingR`, a superfície interna fica DENTRO
-         * do pulso (enterrada ~1-5 mm). Se escalarmos por `localInnerR`,
-         * a superfície interna fica exactamente na pele (encaixe perfeito).
-         *
-         * Usamos o mínimo real da geometria (2º percentil p/ ignorar outliers).
-         * Se falhar, fallback para `localRingR * 0.90` (estimativa conservadora
-         * de 10% de espessura radial).
-         */
-        const computedInner = computeLocalInnerRadius(glbScene, bbox);
-        localInnerR =
-          computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
-            ? computedInner
-            : Math.max(localRingR * 0.9, 1e-6);
-      }
+      const computedInner = computeLocalInnerRadius(glbScene, bbox);
+      localInnerR =
+        computedInner && computedInner > localRingR * 0.5 && computedInner < localRingR * 0.99
+          ? computedInner
+          : Math.max(localRingR * 0.9, 1e-6);
     }
 
     /**
@@ -13465,26 +13318,15 @@ async function runHandArSession({
     glbRoot.scale.setScalar(calcBaseScale * finalMul);
 
     const center = new THREE.Vector3();
-    const ringCtr = omafitArFitProxyRingCenterLocalArray(handArManifest);
-    if (
-      ringCtr &&
-      (accessoryType === "bracelet" || accessoryType === "watch")
-    ) {
-      const L = new THREE.Vector3(ringCtr[0], ringCtr[1], ringCtr[2]);
-      glbScene.updateMatrixWorld(true);
-      center.copy(L).applyMatrix4(glbScene.matrixWorld);
-    } else {
-      bbox.getCenter(center);
-    }
+    bbox.getCenter(center);
     glbScene.position.sub(center);
     /**
      * Pulseira: segunda passagem `setFromObject` + recentrar — pivots GLB
      * assimétricos (fecho, charms) deixam o anel deslocado do centro do bbox
      * na primeira iteração; o landmark 0 da âncora deve coincidir com o eixo
      * médio do anel no plano XY (eixo Z = braço após `fit`).
-     * Com `templateLockTransform`: OFF (geometria certificada no ingest).
      */
-    if (accessoryType === "bracelet" && !templateLock) {
+    if (accessoryType === "bracelet") {
       glbScene.rotation.set(0, 0, 0);
       glbScene.quaternion.identity();
       glbScene.updateMatrixWorld(true);
@@ -13493,11 +13335,6 @@ async function runHandArSession({
       if (center.lengthSq() > 1e-14) {
         glbScene.position.sub(center);
       }
-      glbScene.updateMatrixWorld(true);
-      bbox.setFromObject(glbScene);
-      bbox.getSize(size);
-    }
-    if (accessoryType === "bracelet" && templateLock) {
       glbScene.updateMatrixWorld(true);
       bbox.setFromObject(glbScene);
       bbox.getSize(size);
@@ -13745,12 +13582,11 @@ async function runHandArSession({
   if (dracoLoaderHand) glbLoader.setDRACOLoader(dracoLoaderHand);
   const versionHint =
     arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "";
-  const finalGlbUrl = buildGlbLoaderUrl(omafitAbsolutizeGlbUrlMaybe(handEffectiveGlbUrl), versionHint);
+  const finalGlbUrl = buildGlbLoaderUrl(omafitAbsolutizeGlbUrlMaybe(glbUrl), versionHint);
   braceletHandLog("glb:load_start", {
     finalGlbUrl: String(finalGlbUrl || "").slice(0, 260),
     glbVersionHint: String(versionHint || "").slice(0, 32),
     dracoLoader: Boolean(dracoLoaderHand),
-    templateCertifiedActive: handTemplateCertifiedActive,
   });
   let baseScale = 0.1;
   /** Raio local do anel/cilindro wrap (EIXO), em unidades GLB (pré-scale). */
@@ -13813,17 +13649,6 @@ async function runHandArSession({
   const braceletRingHoleTmpMat = new THREE.Matrix4();
   /** Eixo do “furo” em espaço do GLB para pulseira procedural (anel em XZ). */
   const braceletRadialHoleAxisScene = new THREE.Vector3(0, 1, 0);
-  /** `fitProxy.ringHoleAxisLocal` em espaço local do GLB (prevalece sobre PCA). */
-  const braceletContractHoleAxisLocal =
-    accessoryType === "bracelet"
-      ? (() => {
-          const ar = omafitArFitProxyRingHoleAxisLocalArray(handArManifest);
-          if (!ar) return null;
-          const v = new THREE.Vector3(ar[0], ar[1], ar[2]);
-          if (v.lengthSq() < 1e-12) return null;
-          return v.normalize();
-        })()
-      : null;
   /** Escala radial suavizada [kFloor, 1] — mostrador permanece fora deste grupo. */
   let smoothedStrapK = 1;
   dbgBraceletAr("H1", "glb:before_await_load", "await_glb_promise", {
@@ -13848,32 +13673,12 @@ async function runHandArSession({
             `[omafit-ar] hand GLB baked meshes=${baked} skipped=${skipped}`,
           );
         });
-        try {
-          handResolveLastResult = omafitResolveAssetFrameAfterBake(
-            THREE,
-            glbScene,
-            glbRoot,
-            handArManifest,
-          );
-          if (certify) {
-            console.info(
-              "[omafit-ar][certify] resolveAssetFrameAfterBake",
-              handResolveLastResult,
-            );
-          }
-        } catch (eRes) {
-          console.error("[omafit-ar] resolveAssetFrameAfterBake", eRes);
-          reject(eRes);
-          return;
-        }
         braceletProceduralRadial = false;
         braceletRadialInstMesh = null;
         braceletRadialSegCount = 0;
         if (accessoryType === "bracelet") {
-          if (!handTemplateCertifiedActive) {
-            omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot);
-          }
-          const radialMode = cfgAttr("arBraceletRadial", "auto");
+          omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot);
+          const radialMode = cfgAttr("arBraceletRadial", "on");
           const radialShould = omafitBraceletRadialShouldRebuild(
             THREE,
             glbScene,
@@ -13912,15 +13717,6 @@ async function runHandArSession({
         }
         glbRoot.add(glbScene);
         upgradeHandArGlassMaterials(THREE, glbScene);
-        try {
-          omafitApplyWearableMaterialRenderDefaults(
-            THREE,
-            glbScene,
-            handDeviceTierFlags,
-          );
-        } catch {
-          /* ignore */
-        }
 
         const fitRes = fitWristGlb(glbScene, glbRoot, accessoryType, userScale);
         baseScale = fitRes.baseScale;
@@ -13936,17 +13732,7 @@ async function runHandArSession({
         if (accessoryType === "bracelet") {
           upgradeHandArLuxuryJewelryMaterials(THREE, glbScene);
           braceletIsBangle = detectBraceletBangle(THREE, glbScene);
-          {
-            const topo = omafitArMeshPolicyBraceletTopology(handArManifest);
-            if (topo === "bangle") braceletIsBangle = true;
-            else if (topo === "chain") braceletIsBangle = false;
-          }
-          if (
-            !braceletIsBangle &&
-            !braceletProceduralRadial &&
-            !handBraceletRigidFit &&
-            !handTemplateLockTransform
-          ) {
+          if (!braceletIsBangle && !braceletProceduralRadial) {
             if (countHandArSolidMeshes(glbScene) === 1) {
               braceletVertexDeform = initBraceletLinkVertexDeformation(
                 THREE,
@@ -14008,9 +13794,7 @@ async function runHandArSession({
             calibRot,
             braceletRingHoleAxisAlignLocal,
             braceletRingHoleTmpMat,
-            braceletProceduralRadial
-              ? braceletRadialHoleAxisScene
-              : braceletContractHoleAxisLocal,
+            braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
           );
         } else if (accessoryType === "watch") {
           if (countHandArSolidMeshes(glbScene) === 1) {
@@ -14049,48 +13833,6 @@ async function runHandArSession({
             handMicroUxWrap.scale.setScalar(0.9);
           } catch {
             /* ignore */
-          }
-        }
-
-        if (certify) {
-          try {
-            if (typeof handCertifyGizmosDispose === "function") {
-              handCertifyGizmosDispose();
-              handCertifyGizmosDispose = null;
-            }
-            omafitArCertifyConsoleLog(
-              handArManifest,
-              handManifestLoadMeta,
-              handResolveLastResult,
-              fitRes,
-              {
-                braceletProceduralRadial,
-                braceletRigidFit: handBraceletRigidFit,
-                accessoryType,
-                templateCertifiedActive: handTemplateCertifiedActive,
-                templateLockTransform: handTemplateLockTransform,
-                templateCertifiedGateOk: handCertifiedTemplateGate.ok,
-                wearableClass: handArManifest?.wearableClass,
-                certifiedTemplateId: handArManifest?.certifiedTemplate?.id,
-                effectiveGlbUrl: String(handEffectiveGlbUrl || "").slice(0, 260),
-              },
-            );
-            glbRoot.updateMatrixWorld(true);
-            glbScene.updateMatrixWorld(true);
-            console.info("[omafit-ar][certify] transforms post-fit", {
-              glbRootScale: glbRoot.scale?.toArray?.(),
-              glbScenePos: glbScene.position?.toArray?.(),
-              glbSceneScale: glbScene.scale?.toArray?.(),
-            });
-            const gizmoApi = omafitArCertifyInstallHandGizmos(
-              THREE,
-              anchor,
-              glbRoot,
-              glbScene,
-            );
-            handCertifyGizmosDispose = gizmoApi.dispose;
-          } catch (eC) {
-            console.warn("[omafit-ar][certify] gizmo/log", eC?.message || eC);
           }
         }
 
@@ -14685,10 +14427,6 @@ async function runHandArSession({
       Math.max(1e-6, wristExpandMul * OMAFIT_BRACELET_ELLIPSE_X * wideLatBoost) *
         Math.max(1e-6, wristExpandMul * OMAFIT_BRACELET_ELLIPSE_DEPTH),
     );
-    const braceletRingScaleForOccl =
-      handTemplateLockTransform && accessoryType === "bracelet"
-        ? wristExpandMul
-        : braceletRingGeomMean;
     const aSpanRef =
       1 - Math.exp(-clampDt / OMAFIT_HAND_KNUCKLE_SPAN_REF_TAU_MS);
     if (handKnuckleSpanRef <= 1e-8) {
@@ -14805,7 +14543,7 @@ async function runHandArSession({
         userMulOc *
         adaptMulOc *
         perspMul *
-        braceletRingScaleForOccl;
+        braceletRingGeomMean;
       occluderR = Math.max(
         0.0105,
         innerWorldR * OMAFIT_BRACELET_OCCLUDER_VS_INNER,
@@ -15056,11 +14794,7 @@ async function runHandArSession({
           wearBase: wearXYZ,
           slideZ: braceletSlideLag,
         });
-        if (handBraceletRigidFit || handTemplateLockTransform) {
-          glbRoot.scale.setScalar(suBase * Wb);
-        } else {
-          glbRoot.scale.set(sw.sx, sw.sy, sw.sz);
-        }
+        glbRoot.scale.set(sw.sx, sw.sy, sw.sz);
         wearPosition.position.set(sw.wearX, sw.wearY, sw.wearZ);
         wearPosition.updateMatrixWorld(true);
         if (braceletWristAlignGroup) {
@@ -15140,7 +14874,6 @@ async function runHandArSession({
        */
       if (
         localInnerR > 1e-6 &&
-        !handTemplateLockTransform &&
         ((accessoryType === "watch" &&
           (watchStrapRadial?.strap || watchVertexDeform)) ||
           (accessoryType === "bracelet" &&
@@ -15585,32 +15318,20 @@ async function runHandArSession({
           const Wcal =
             (OMAFIT_BRACELET_EXPAND_THIN + OMAFIT_BRACELET_EXPAND_WIDE) / 2;
           if (accessoryType === "bracelet") {
-            if (handTemplateLockTransform) {
-              glbRoot.scale.setScalar(cu * Wcal);
-            } else {
-              glbRoot.scale.set(
-                cu * Wcal * OMAFIT_BRACELET_ELLIPSE_X,
-                cu * Wcal * OMAFIT_BRACELET_ELLIPSE_DEPTH,
-                cu,
-              );
-            }
+            glbRoot.scale.set(
+              cu * Wcal * OMAFIT_BRACELET_ELLIPSE_X,
+              cu * Wcal * OMAFIT_BRACELET_ELLIPSE_DEPTH,
+              cu,
+            );
           } else {
             glbRoot.scale.setScalar(cu * Wcal);
           }
         }
       }
       if (nextUrl && typeof nextUrl === "string") {
-        let switchLoadUrl = nextUrl;
-        if (handTemplateCertifiedActive) {
-          const geoSw = omafitArCertifiedTemplateGeometryUrl(
-            handArManifest,
-            typeof location !== "undefined" ? location.origin : "",
-          );
-          if (geoSw) switchLoadUrl = geoSw;
-        }
         await new Promise((resolve) => {
           glbLoader.load(
-            buildGlbLoaderUrl(omafitAbsolutizeGlbUrlMaybe(switchLoadUrl), versionHint),
+            buildGlbLoaderUrl(nextUrl, versionHint),
             (gltf) => {
               const next = gltf.scene || gltf.scenes?.[0];
               if (!next) return resolve();
@@ -15625,30 +15346,12 @@ async function runHandArSession({
                 }
               }
               bakeGLBTransforms(THREE, next, () => {});
-              try {
-                handResolveLastResult = omafitResolveAssetFrameAfterBake(
-                  THREE,
-                  next,
-                  glbRoot,
-                  handArManifest,
-                );
-                if (certify) {
-                  console.info(
-                    "[omafit-ar][certify] resolve (switch GLB)",
-                    handResolveLastResult,
-                  );
-                }
-              } catch (eRes) {
-                console.warn("[omafit-ar] resolveAssetFrame (switch GLB)", eRes);
-              }
               braceletProceduralRadial = false;
               braceletRadialInstMesh = null;
               braceletRadialSegCount = 0;
               if (accessoryType === "bracelet") {
-                if (!handTemplateCertifiedActive) {
-                  omafitNormalizeBraceletTripoGlbScale(THREE, next, glbRoot);
-                }
-                const radialMode = cfgAttr("arBraceletRadial", "auto");
+                omafitNormalizeBraceletTripoGlbScale(THREE, next, glbRoot);
+                const radialMode = cfgAttr("arBraceletRadial", "on");
                 const radialShould = omafitBraceletRadialShouldRebuild(
                   THREE,
                   next,
@@ -15676,15 +15379,6 @@ async function runHandArSession({
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
               upgradeHandArGlassMaterials(THREE, next);
-              try {
-                omafitApplyWearableMaterialRenderDefaults(
-                  THREE,
-                  next,
-                  handDeviceTierFlags,
-                );
-              } catch {
-                /* ignore */
-              }
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
               baseScale = fitRes.baseScale;
               localRingR = fitRes.localRingR;
@@ -15698,17 +15392,7 @@ async function runHandArSession({
               if (accessoryType === "bracelet") {
                 upgradeHandArLuxuryJewelryMaterials(THREE, next);
                 braceletIsBangle = detectBraceletBangle(THREE, next);
-                {
-                  const topo = omafitArMeshPolicyBraceletTopology(handArManifest);
-                  if (topo === "bangle") braceletIsBangle = true;
-                  else if (topo === "chain") braceletIsBangle = false;
-                }
-                if (
-                  !braceletIsBangle &&
-                  !braceletProceduralRadial &&
-                  !handBraceletRigidFit &&
-                  !handTemplateLockTransform
-                ) {
+                if (!braceletIsBangle && !braceletProceduralRadial) {
                   if (countHandArSolidMeshes(next) === 1) {
                     braceletVertexDeform = initBraceletLinkVertexDeformation(
                       THREE,
@@ -15731,9 +15415,7 @@ async function runHandArSession({
                   calibRot,
                   braceletRingHoleAxisAlignLocal,
                   braceletRingHoleTmpMat,
-                  braceletProceduralRadial
-                    ? braceletRadialHoleAxisScene
-                    : braceletContractHoleAxisLocal,
+                  braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
                 );
               } else if (accessoryType === "watch") {
                 if (countHandArSolidMeshes(next) === 1) {
@@ -15770,40 +15452,6 @@ async function runHandArSession({
                   /* ignore */
                 }
               }
-              if (certify) {
-                try {
-                  if (typeof handCertifyGizmosDispose === "function") {
-                    handCertifyGizmosDispose();
-                    handCertifyGizmosDispose = null;
-                  }
-                  omafitArCertifyConsoleLog(
-                    handArManifest,
-                    handManifestLoadMeta,
-                    handResolveLastResult,
-                    fitRes,
-                    {
-                      braceletProceduralRadial,
-                      braceletRigidFit: handBraceletRigidFit,
-                      accessoryType,
-                      templateCertifiedActive: handTemplateCertifiedActive,
-                      templateLockTransform: handTemplateLockTransform,
-                      templateCertifiedGateOk: handCertifiedTemplateGate.ok,
-                      wearableClass: handArManifest?.wearableClass,
-                      certifiedTemplateId: handArManifest?.certifiedTemplate?.id,
-                      effectiveGlbUrl: String(handEffectiveGlbUrl || "").slice(0, 260),
-                    },
-                  );
-                  const gizmoApi2 = omafitArCertifyInstallHandGizmos(
-                    THREE,
-                    anchor,
-                    glbRoot,
-                    next,
-                  );
-                  handCertifyGizmosDispose = gizmoApi2.dispose;
-                } catch (eCs) {
-                  console.warn("[omafit-ar][certify] switch", eCs?.message || eCs);
-                }
-              }
               resolve();
             },
             undefined,
@@ -15818,14 +15466,6 @@ async function runHandArSession({
 
   return function cleanupHand() {
     running = false;
-    try {
-      if (typeof handCertifyGizmosDispose === "function") {
-        handCertifyGizmosDispose();
-        handCertifyGizmosDispose = null;
-      }
-    } catch {
-      /* ignore */
-    }
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
     try {
