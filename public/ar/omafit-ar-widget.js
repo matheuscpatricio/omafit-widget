@@ -47,6 +47,7 @@ import {
   omafitArCertifiedTemplateGate,
   omafitArCertifiedTemplateLogBypass,
   omafitArTemplateCertifiedActive,
+  omafitArTemplateCertifiedRequested,
   omafitArTemplateLockTransform,
 } from "./omafit-ar-certified-template.js";
 /**
@@ -520,7 +521,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-14-ar-template-certified-hand-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-14-ar-template-certified-hand-v2";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11957,6 +11958,21 @@ async function runHandArSession({
     }
   } else {
     omafitArCertifiedTemplateLogBypass(handArManifest, handCertifiedTemplateGate);
+  }
+
+  try {
+    const certifiedRequested = omafitArTemplateCertifiedRequested(handArManifest);
+    console.info("[omafit-ar] hand certified-path", {
+      runtimeMode: String(handArManifest?.meshPolicy?.runtimeMode ?? "default"),
+      certifiedRequested,
+      certifiedActive: handTemplateCertifiedActive,
+      templateLockTransform: handTemplateLockTransform,
+      ...(certifiedRequested && !handCertifiedTemplateGate.ok
+        ? { gateReasons: handCertifiedTemplateGate.reasons }
+        : {}),
+    });
+  } catch {
+    /* ignore */
   }
 
   const handBraceletRigidFit =
