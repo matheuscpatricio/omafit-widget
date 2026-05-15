@@ -3691,17 +3691,18 @@ const handleSubmit = async (
       const canOmafitSearch =
         hasOmafitUrl && hasOmafitSecret && hasShopDomain && hasPublicId;
 
-      const collectionHandlesLine = [
+      const shopifyCollectionHandles = [
         ...(collectionHandles || []).map((h) => String(h || '').trim()).filter(Boolean),
         String(collectionHandle || '').trim(),
-      ]
-        .filter((h, i, a) => h && a.indexOf(h) === i)
-        .join(', ');
+      ].filter((h, i, a) => h && a.indexOf(h) === i);
+
+      const collectionHandlesLine = shopifyCollectionHandles.join(', ');
 
       let lastCatalogSearch: {
         diagnostic?: string;
         error: string | null;
         httpStatus: number;
+        debug?: Record<string, unknown>;
       } | null = null;
 
       const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
@@ -3717,11 +3718,13 @@ const handleSubmit = async (
           collectionType: localCollectionType || 'upper',
           shopperGender: sizeData?.gender || 'unisex',
           chartGenderScope,
+          collectionHandles: shopifyCollectionHandles,
         });
         lastCatalogSearch = {
           diagnostic: searchRes.diagnostic,
           error: searchRes.error,
           httpStatus: searchRes.httpStatus,
+          debug: searchRes.debug,
         };
         if (searchRes.candidates.length) {
           candidate_products = searchRes.candidates;
@@ -3775,9 +3778,10 @@ const handleSubmit = async (
           shopDomain: effectiveShopDomain,
           publicId,
           excludeHandle: (localProductHandle || productHandle || '').trim(),
+          collectionHandlesEnviados: shopifyCollectionHandles,
           resposta: lastCatalogSearch,
           checklist:
-            '1) Na app Omafit: public_id e shop_domain ligados ao catálogo certo. 2) Há outros produtos na coleção (o atual é excluído por handle). 3) O JSON da API usa candidates|data.candidates|products. 4) Ver logs do servidor na rota /api/widget/catalog-search.',
+            '1) Deploy da app Omafit com COLLECTION_PRODUCTS + inferência de coleções. 2) Outros produtos na coleção (só o handle atual é excluído). 3) Imagem destacada ou 1ª imagem do produto. 4) Filtro de género (ver debug.target_gender). 5) Logs Railway em /api/widget/catalog-search.',
         });
       } else {
         console.log('🛍️ Omafit candidatos para o consultor:', nOmafitCandidates);

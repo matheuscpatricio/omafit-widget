@@ -12,6 +12,8 @@ export type OmafitCatalogSearchResult = {
   httpStatus: number;
   /** Resumo para logs (chaves JSON, mensagem de erro do servidor, etc.). */
   diagnostic?: string;
+  /** Preenchido pelo servidor quando candidates=[] (só diagnóstico). */
+  debug?: Record<string, unknown>;
 };
 
 function pickString(v: unknown): string {
@@ -110,6 +112,8 @@ export async function fetchOmafitCatalogSearch(params: {
   shopperGender?: string;
   /** Escopo da tabela de medidas do lojista: both | male | female */
   chartGenderScope?: string;
+  /** Handles Shopify das coleções do produto em try-on (inclui produtos da mesma coleção). */
+  collectionHandles?: string[];
 }): Promise<OmafitCatalogSearchResult> {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const collection_type = String(params.collectionType || 'upper');
@@ -120,8 +124,16 @@ export async function fetchOmafitCatalogSearch(params: {
   const user_message = String(params.userMessage || '');
   const shopper_gender = String(params.shopperGender || '').trim();
   const chart_gender_scope = String(params.chartGenderScope || 'both').trim();
+  const collection_handles = [
+    ...new Set(
+      (params.collectionHandles || [])
+        .map((h) => String(h || '').trim())
+        .filter(Boolean)
+    ),
+  ].join(',');
 
   const canonical = [
+    `collection_handles=${collection_handles}`,
     `collection_type=${collection_type}`,
     `exclude_handle=${exclude_handle}`,
     `product_name=${product_name}`,
@@ -136,6 +148,7 @@ export async function fetchOmafitCatalogSearch(params: {
   const signature = await hmacSha256Hex(params.secret, canonical);
 
   const body = new URLSearchParams({
+    collection_handles,
     collection_type,
     exclude_handle,
     product_name,
@@ -166,6 +179,10 @@ export async function fetchOmafitCatalogSearch(params: {
   const root = json && typeof json === 'object' ? (json as Record<string, unknown>) : {};
   const serverError = root.error != null ? String(root.error) : null;
   const candidates = extractCandidatesFromJson(json);
+  const debug =
+    root.debug && typeof root.debug === 'object'
+      ? (root.debug as Record<string, unknown>)
+      : undefined;
 
   if (!res.ok) {
     const err = serverError || `http_${res.status}`;
@@ -177,11 +194,18 @@ export async function fetchOmafitCatalogSearch(params: {
     };
   }
 
+  const diagnostic = buildCatalogSearchDiagnostic(res.status, json, serverError);
+  const debugSuffix =
+    debug && candidates.length === 0
+      ? ` | debug=${JSON.stringify(debug)}`
+      : '';
+
   return {
     candidates,
     error: serverError,
     httpStatus: res.status,
-    diagnostic: buildCatalogSearchDiagnostic(res.status, json, serverError),
+    diagnostic: diagnostic + debugSuffix,
+    debug,
   };
 }
 
