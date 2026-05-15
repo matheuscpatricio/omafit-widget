@@ -84,6 +84,36 @@ function buildCatalogSearchDiagnostic(
   return parts.join(' | ');
 }
 
+/**
+ * Canonical HMAC para POST /api/widget/catalog-search.
+ * Deve coincidir com `buildCatalogSearchCanonicalStrings` na app Omafit.
+ */
+export function buildCatalogSearchCanonical(params: {
+  collection_handles: string;
+  collection_type: string;
+  exclude_handle: string;
+  product_name: string;
+  public_id: string;
+  shop_domain: string;
+  timestamp: string;
+  user_message: string;
+  shopper_gender: string;
+  chart_gender_scope: string;
+}): string {
+  return [
+    `collection_handles=${params.collection_handles}`,
+    `collection_type=${params.collection_type}`,
+    `exclude_handle=${params.exclude_handle}`,
+    `product_name=${params.product_name}`,
+    `public_id=${params.public_id}`,
+    `shop_domain=${params.shop_domain}`,
+    `timestamp=${params.timestamp}`,
+    `user_message=${params.user_message}`,
+    `shopper_gender=${params.shopper_gender}`,
+    `chart_gender_scope=${params.chart_gender_scope}`,
+  ].join('|');
+}
+
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -132,18 +162,18 @@ export async function fetchOmafitCatalogSearch(params: {
     ),
   ].join(',');
 
-  const canonical = [
-    `collection_handles=${collection_handles}`,
-    `collection_type=${collection_type}`,
-    `exclude_handle=${exclude_handle}`,
-    `product_name=${product_name}`,
-    `public_id=${public_id}`,
-    `shop_domain=${shop_domain}`,
-    `timestamp=${timestamp}`,
-    `user_message=${user_message}`,
-    `shopper_gender=${shopper_gender}`,
-    `chart_gender_scope=${chart_gender_scope}`,
-  ].join('|');
+  const canonical = buildCatalogSearchCanonical({
+    collection_handles,
+    collection_type,
+    exclude_handle,
+    product_name,
+    public_id,
+    shop_domain,
+    timestamp,
+    user_message,
+    shopper_gender,
+    chart_gender_scope,
+  });
 
   const signature = await hmacSha256Hex(params.secret, canonical);
 
@@ -186,11 +216,15 @@ export async function fetchOmafitCatalogSearch(params: {
 
   if (!res.ok) {
     const err = serverError || `http_${res.status}`;
+    const hint =
+      err === 'bad_signature'
+        ? ' | dica=confirme VITE_OMAFIT_WIDGET_HMAC_SECRET igual a WIDGET_CATALOG_HMAC_SECRET no Railway e redeploy da app Omafit'
+        : '';
     return {
       candidates: [],
       error: err,
       httpStatus: res.status,
-      diagnostic: buildCatalogSearchDiagnostic(res.status, json, err),
+      diagnostic: buildCatalogSearchDiagnostic(res.status, json, err) + hint,
     };
   }
 

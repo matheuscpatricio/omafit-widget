@@ -18,7 +18,11 @@ import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
 import { contrastTextOnHex } from '../utils/contrastText';
-import { ensureMannequinPreconnect, preloadAllMannequinSilhouettes } from '../utils/mannequinAssets';
+import {
+  ensureMannequinPreconnect,
+  preloadAllMannequinSilhouettes,
+  preloadMannequinsForGender,
+} from '../utils/mannequinAssets';
 import {
   fetchOmafitCatalogSearch,
   fetchOmafitProductByHandle,
@@ -532,30 +536,6 @@ export function TryOnWidget({
   const [error, setError] = useState('');
   const [step, setStep] = useState<'info' | 'calculator' | 'photo' | 'processing' | 'result'>('info');
 
-  useEffect(() => {
-    if (step === 'calculator') {
-      ensureMannequinPreconnect();
-      preloadAllMannequinSilhouettes();
-      return;
-    }
-    if (step !== 'info') return;
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(
-        () => {
-          ensureMannequinPreconnect();
-          preloadAllMannequinSilhouettes();
-        },
-        { timeout: 2500 }
-      );
-      return () => window.cancelIdleCallback(id);
-    }
-    const t = window.setTimeout(() => {
-      ensureMannequinPreconnect();
-      preloadAllMannequinSilhouettes();
-    }, 500);
-    return () => clearTimeout(t);
-  }, [step]);
-
   const layoutFromUrl = React.useMemo(() => parseTryonLayoutFromLocation(), []);
   const [tryonLayout, setTryonLayout] = React.useState<TryonLayoutState>(() => {
     if (layoutFromUrl !== undefined) return layoutFromUrl;
@@ -711,6 +691,9 @@ export function TryOnWidget({
    * calculadora para evitar o flash do seletor de gênero antes de cair em `male`/`female`.
    */
   const [chartGenderScopeResolved, setChartGenderScopeResolved] = useState<boolean>(false);
+  const chartGenderScopeCacheKeyRef = useRef('');
+  const chartGenderScopeResolvedRef = useRef(false);
+  chartGenderScopeResolvedRef.current = chartGenderScopeResolved;
   const [localProductDescription, setLocalProductDescription] = useState<string>('');
   const [localShopDomain, setLocalShopDomain] = useState<string>(shopDomain || '');
   const [localHeroBackgroundImage, setLocalHeroBackgroundImage] = useState<string>(tryonLayoutBackgroundImage || '');
@@ -1213,14 +1196,31 @@ export function TryOnWidget({
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseKey) {
-      // Sem Supabase configurado, libera a calculadora com 'both' para não bloquear o fluxo.
       setChartGenderScopeResolved(true);
       return;
     }
 
-    // Recomeçar a busca cancela o estado anterior — evita que uma resolução antiga
-    // libere a etapa 2 antes da nova busca terminar.
-    setChartGenderScopeResolved(false);
+    const handle = (localProductHandle || productHandle || '').trim();
+    const colls = Array.from(
+      new Set(
+        [
+          ...(collectionHandles || []).map((c) => String(c || '').trim()).filter(Boolean),
+          String(collectionHandle || '').trim(),
+        ].filter(Boolean)
+      )
+    );
+    const cacheKey = `${shop}|${handle}|${colls.join(',')}`;
+
+    if (cacheKey === chartGenderScopeCacheKeyRef.current && chartGenderScopeResolvedRef.current) {
+      return;
+    }
+
+    chartGenderScopeCacheKeyRef.current = cacheKey;
+
+    // Só mostra spinner na etapa 2 se o utilizador já está na calculadora.
+    if (step === 'calculator') {
+      setChartGenderScopeResolved(false);
+    }
 
     let cancelled = false;
 
@@ -1229,7 +1229,10 @@ export function TryOnWidget({
       return v === 'male' || v === 'female' ? v : 'both';
     };
 
-    const fetchScope = async (productHandleQuery: string, collectionHandleQuery: string) => {
+    const fetchScope = async (
+      productHandleQuery: string,
+      collectionHandleQuery: string
+    ): Promise<'both' | 'male' | 'female' | null> => {
       const params = new URLSearchParams();
       params.set('shop_domain', `eq.${shop}`);
       params.set('product_handle', `eq.${productHandleQuery}`);
@@ -1246,7 +1249,9 @@ export function TryOnWidget({
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         if (errText && errText.toLowerCase().includes('gender_scope')) {
-          console.warn('⚠️ Coluna gender_scope ausente em size_charts — execute supabase_add_gender_scope_to_size_charts.sql');
+          console.warn(
+            '⚠️ Coluna gender_scope ausente em size_charts — execute supabase_add_gender_scope_to_size_charts.sql'
+          );
         }
         return null;
       }
@@ -1255,51 +1260,76 @@ export function TryOnWidget({
       return normalize(rows[0]?.gender_scope);
     };
 
+    type ScopeTask = {
+      priority: number;
+      productHandle: string;
+      collectionHandle: string;
+      label: string;
+    };
+
+    const tasks: ScopeTask[] = [];
+    if (handle) {
+      colls.forEach((coll, i) => {
+        tasks.push({
+          priority: i,
+          productHandle: handle,
+          collectionHandle: coll,
+          label: `produto+coleção:${coll}`,
+        });
+      });
+      tasks.push({
+        priority: colls.length,
+        productHandle: handle,
+        collectionHandle: '',
+        label: 'produto',
+      });
+    }
+    colls.forEach((coll, i) => {
+      tasks.push({
+        priority: 100 + i,
+        productHandle: '',
+        collectionHandle: coll,
+        label: `coleção:${coll}`,
+      });
+    });
+    tasks.push({
+      priority: 200,
+      productHandle: '',
+      collectionHandle: '',
+      label: 'global',
+    });
+
     (async () => {
       try {
-        const handle = (localProductHandle || productHandle || '').trim();
-        const colls = [
-          ...(collectionHandles || []).map((c) => String(c || '').trim()).filter(Boolean),
-          String(collectionHandle || '').trim(),
-        ].filter(Boolean);
-
-        if (handle) {
-          for (const coll of [...colls, '']) {
-            const scope = await fetchScope(handle, coll);
-            if (cancelled) return;
-            if (scope) {
-              console.log('👤 gender_scope encontrado por produto:', { handle, coll, scope });
-              setChartGenderScope(scope);
-              setChartGenderScopeResolved(true);
-              return;
-            }
-          }
-        }
-
-        for (const coll of colls) {
-          const scope = await fetchScope('', coll);
-          if (cancelled) return;
-          if (scope) {
-            console.log('👤 gender_scope encontrado por coleção:', { coll, scope });
-            setChartGenderScope(scope);
-            setChartGenderScopeResolved(true);
-            return;
-          }
-        }
-
-        const globalScope = await fetchScope('', '');
+        const results = await Promise.all(
+          tasks.map(async (task) => ({
+            priority: task.priority,
+            label: task.label,
+            scope: await fetchScope(task.productHandle, task.collectionHandle),
+          }))
+        );
         if (cancelled) return;
-        if (globalScope) {
-          console.log('👤 gender_scope encontrado global:', globalScope);
-          setChartGenderScope(globalScope);
+
+        const hit = results
+          .filter((r) => r.scope === 'male' || r.scope === 'female')
+          .sort((a, b) => a.priority - b.priority)[0];
+
+        if (hit?.scope) {
+          console.log('👤 gender_scope (paralelo):', hit.label, hit.scope);
+          setChartGenderScope(hit.scope);
         } else {
-          console.log('👤 Nenhum gender_scope encontrado para esse produto/coleção — usando "both"');
-          setChartGenderScope('both');
+          const globalRow = results.find((r) => r.label === 'global');
+          if (globalRow?.scope) {
+            console.log('👤 gender_scope global:', globalRow.scope);
+            setChartGenderScope(globalRow.scope);
+          } else {
+            console.log('👤 Nenhum gender_scope — usando "both"');
+            setChartGenderScope('both');
+          }
         }
         setChartGenderScopeResolved(true);
       } catch (err) {
         console.warn('⚠️ Erro ao buscar gender_scope da size_charts:', err);
-        // Em erro de rede, libera o fluxo com 'both' para não travar a UX.
         if (!cancelled) setChartGenderScopeResolved(true);
       }
     })();
@@ -1314,7 +1344,36 @@ export function TryOnWidget({
     productHandle,
     collectionHandle,
     collectionHandles,
+    step,
   ]);
+
+  useEffect(() => {
+    if (step === 'calculator') {
+      ensureMannequinPreconnect();
+      if (chartGenderScope === 'male' || chartGenderScope === 'female') {
+        preloadMannequinsForGender(chartGenderScope);
+      } else {
+        preloadAllMannequinSilhouettes();
+      }
+      return;
+    }
+    if (step !== 'info') return;
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(
+        () => {
+          ensureMannequinPreconnect();
+          preloadAllMannequinSilhouettes();
+        },
+        { timeout: 2500 }
+      );
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(() => {
+      ensureMannequinPreconnect();
+      preloadAllMannequinSilhouettes();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [step, chartGenderScope]);
 
   // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
   useEffect(() => {
