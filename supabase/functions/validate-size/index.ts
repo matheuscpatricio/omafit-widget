@@ -53,6 +53,15 @@ interface ValidateSizeRequest {
     url?: string;
     image_url?: string;
   }>;
+  /** Perfil de género do cliente no provador (male | female | unisex). */
+  genero?: string;
+  /**
+   * Escopo da tabela de medidas definido pelo lojista na size chart (coleção/produto/global):
+   * both = aceita ambos; male/female = linha orientada a esse perfil.
+   */
+  chart_gender_scope?: "both" | "male" | "female" | string;
+  tipo_corpo?: string;
+  ajuste_preferido?: string;
 }
 
 interface GPTResponse {
@@ -767,6 +776,7 @@ function getStylistSystemExtra(language: string): string {
 - Você é um estilista profissional da loja: tom caloroso, claro e pessoal ("para você", "no seu caso"); use o espaço que precisar, sem tom de "vendedor genérico" ou jargão vazio.
 - Só pode mencionar produtos cujo "handle" apareça na lista CANDIDATOS abaixo. Nunca invente URLs, nomes ou peças fora da lista.
 - Critérios de styling (use os que fizerem sentido): harmonia de cor (contraste ou tonalidade intencional); proporção e silhueta em relação ao tipo de peça em try-on (categoria: upper/lower/full); ocasião (mais casual vs mais arrumado); coerência entre categorias (ex.: topo escuro + base mais clara quando adequado).
+- GÉNERO (obrigatório): respeite o perfil do cliente e o escopo da loja descritos no bloco "CONTEXTO DE GÉNERO" do prompt. Não sugira peças tipicamente femininas (ex.: saia, vestido) para perfil masculino, nem o inverso de forma incoerente; com perfil unissex prefira peças neutras/unissex salvo quando o título do candidato deixar claro que serve para todos.
 - Explique de forma clara POR QUE a peça combina antes de citar o nome.
 - Se o cliente pedir outro tipo de peça ou estilo diferente das sugestões anteriores (ex.: casaco em vez de calça), acolha a preferência: os CANDIDATOS já foram renovados pelo sistema — escolha só entre eles; não insista no que deixou de fazer sentido.
 - Se a lista não tiver o que o cliente pediu, seja honesto: diga que nesta busca não apareceu e sugira reformular ou explorar a loja — sem inventar produtos.
@@ -775,6 +785,7 @@ function getStylistSystemExtra(language: string): string {
 - Eres un/a estilista profesional de la tienda: tono cálido, claro y personal ("para ti", "en tu caso"); usa el espacio que necesites; evita tono de "vendedor genérico".
 - Solo puedes mencionar productos cuyo "handle" esté en CANDIDATOS. Nunca inventes URLs ni prendas fuera de la lista.
 - Criterios: armonía de color (contraste o tonalidad); proporción y silueta según la prenda en prueba (categoría upper/lower/full); ocasión (casual vs más arreglada); coherencia entre categorías.
+- GÉNERO (obligatorio): respeta el perfil del cliente y el alcance de la tienda en el bloque "CONTEXTO DE GÉNERO". No sugieras prendas típicamente femeninas (p. ej., falda, vestido) a un perfil masculino, ni lo contrario de forma incoherente; con perfil unisex prioriza piezas neutras/unisex salvo que el título del candidato indique claramente apropiación para todos.
 - Explica con claridad POR QUÉ combina antes de nombrar.
 - Si el cliente pide otra categoría o estilo (ej. abrigo en vez de pantalón), acoge la preferencia: los CANDIDATOS ya se actualizaron — elige solo entre ellos.
 - Si no hay nada adecuado en la lista, dilo con honestidad — sin inventar.
@@ -783,12 +794,81 @@ function getStylistSystemExtra(language: string): string {
 - You are a professional in-store stylist: warm, clear, and personal ("for you", "in your case"); take the room you need. Avoid generic "salesy" tone.
 - You may ONLY mention products whose "handle" is in CANDIDATES. Never invent URLs or items outside the list.
 - Criteria: color harmony (contrast or intentional tone); proportion and silhouette vs the try-on garment category (upper/lower/full); occasion (casual vs dressier); sensible category pairing.
+- GENDER (mandatory): follow the shopper profile and the store scope in the "GENDER CONTEXT" block. Do not suggest typically women's-only items (e.g. skirts, dresses) to a male profile, or incoherent men's-only pieces to a female profile; for unisex profile prefer neutral/unisex candidates unless a title clearly signals inclusive styling.
 - Explain clearly WHY pieces work before naming them.
 - If the shopper asks for a different category or vibe (e.g. coat instead of pants), embrace it: CANDIDATES were refreshed — pick only from the current list.
 - If nothing matches, say so honestly — do not invent products.
 - Valid JSON with "suggested_products": 0–3 items {"handle":"...","rationale":"..."} from the list only.`,
   };
   return blocks[language] || blocks.en;
+}
+
+function normalizeGenderToken(v: string): string {
+  const s = String(v || "").trim().toLowerCase();
+  if (s === "m" || s === "man" || s === "men" || s === "homem" || s === "hombre" || s === "masculino") return "male";
+  if (s === "f" || s === "woman" || s === "women" || s === "mulher" || s === "mujer" || s === "feminino") return "female";
+  if (s === "unisex" || s === "neutro") return "unisex";
+  return s || "unspecified";
+}
+
+/** Contexto de género para o consultor (evita sugestões incoerentes, ex.: saia para perfil masculino). */
+function buildGenderContextForStylist(data: ValidateSizeRequest, language: string): string {
+  const shopper = normalizeGenderToken(String(data.genero || ""));
+  const scopeRaw = String(data.chart_gender_scope || "both").trim().toLowerCase();
+  const scope =
+    scopeRaw === "male" || scopeRaw === "female" || scopeRaw === "both" ? scopeRaw : "both";
+
+  if (language === "es") {
+    const perfil =
+      shopper === "male"
+        ? "masculino (hombre)"
+        : shopper === "female"
+          ? "femenino (mujer)"
+          : shopper === "unisex"
+            ? "unisex"
+            : "no especificado";
+    const tienda =
+      scope === "male"
+        ? "masculino: el comerciante configuró la guía de tallas de esta línea/colección para público masculino."
+        : scope === "female"
+          ? "femenino: el comerciante configuró la guía de tallas para público femenino."
+          : "ambos: la tienda admite tallas para hombre y mujer en esta línea; el perfil concreto viene de lo elegido en el probador.";
+    return `CONTEXTO DE GÉNERO (obligatorio para combinar prendas sugeridas):\n- Perfil elegido por el cliente en el probador: ${perfil} (valor técnico: ${shopper}).\n- Alcance de la guía de tallas configurado por el comerciante (colección/producto): ${tienda}\n- Reglas: solo recomienda candidatos coherentes con este perfil; no propongas prendas típicamente femeninas a un perfil masculino ni al revés de forma incoherente; con unisex prioriza piezas neutras/unisex salvo que el título indique claramente validez para todos.\n`;
+  }
+
+  if (language === "en") {
+    const profile =
+      shopper === "male"
+        ? "male"
+        : shopper === "female"
+          ? "female"
+          : shopper === "unisex"
+            ? "unisex"
+            : "not specified";
+    const store =
+      scope === "male"
+        ? "male: the merchant configured the size chart for this line/collection for a male audience."
+        : scope === "female"
+          ? "female: the merchant configured the size chart for a female audience."
+          : "both: the store supports male and female sizing on this line; the shopper’s chosen profile in the fitting flow is authoritative.";
+    return `GENDER CONTEXT (mandatory for suggested pairings):\n- Shopper profile selected in the try-on flow: ${profile} (raw: ${shopper}).\n- Merchant size-chart scope (collection/product): ${store}\n- Rules: only recommend candidates that fit this profile; do not suggest typically women-only garments to a male profile or incoherent men-only pieces to a female profile; for unisex prefer neutral/unisex items unless titles clearly show inclusive styling.\n`;
+  }
+
+  const perfil =
+    shopper === "male"
+      ? "masculino (homem)"
+      : shopper === "female"
+        ? "feminino (mulher)"
+        : shopper === "unisex"
+          ? "unissex"
+          : "não especificado";
+  const loja =
+    scope === "male"
+      ? "masculino — o lojista definiu a tabela de medidas desta linha/coleção para o público masculino."
+      : scope === "female"
+        ? "feminino — o lojista definiu a tabela de medidas para o público feminino."
+        : "ambos — a loja admite medidas para homem e mulher nesta linha; o perfil efectivo é o que o cliente escolheu no provador.";
+  return `CONTEXTO DE GÉNERO (obrigatório para combinar peças sugeridas):\n- Perfil que o cliente indicou no provador: ${perfil} (valor técnico: ${shopper}).\n- Âmbito da tabela de medidas configurado pelo lojista (coleção/produto): ${loja}\n- Regras: só recomende candidatos coerentes com este perfil; não sugira peças tipicamente femininas a perfil masculino nem o contrário de forma incoerente; com unissex prefira peças neutras/unissex salvo o título do candidato deixar claro que serve para todos.\n`;
 }
 
 function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: string): string {
@@ -798,6 +878,7 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
     .join("\n");
 
   const productCatalogContext = buildProductCatalogContext(data, language);
+  const genderCtx = buildGenderContextForStylist(data, language);
   const chatHistory = Array.isArray(data.chat_history) ? data.chat_history : [];
   const chatHistoryText = chatHistory.length > 0
     ? `\nCONVERSATION CONTEXT:\n${chatHistory
@@ -829,12 +910,12 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
         : "(upper = tops; think bottoms/accessories for silhouette and color.)";
 
   if (language === "es") {
-    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista con tono personal ("tú", "para ti", "en tu caso"); desarrolla lo que haga falta en explicacao.\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista con tono personal ("tú", "para ti", "en tu caso"); desarrolla lo que haga falta en explicacao.\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
   }
   if (language === "en") {
-    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist with a personal tone ("you", "for you", "in your case"); use the space you need in explicacao.\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist with a personal tone ("you", "for you", "in your case"); use the space you need in explicacao.\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
   }
-  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); desenvolva o que precisar em explicacao.\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); desenvolva o que precisar em explicacao.\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -1251,7 +1332,8 @@ Deno.serve(async (req: Request) => {
     console.log('   • tamanho_calculado:', data.tamanho_calculado_algoritmo);
     console.log('   • intencao_usuario:', data.intencao_usuario || 'validar tamanho');
     console.log('   • custom_message:', data.custom_message || 'não fornecido');
-    console.log('   • language:', data.language || 'pt');
+    console.log('   • genero (cliente):', data.genero || 'não fornecido');
+    console.log('   • chart_gender_scope (loja):', data.chart_gender_scope || 'não fornecido');
     console.log('   • session_id:', data.session_id || 'não fornecido');
     console.log('   • interaction_count:', data.interaction_count || 0);
     console.log('   • available_sizes:', Array.isArray(data.available_sizes) ? data.available_sizes.length : 0, data.available_sizes || []);

@@ -106,6 +106,10 @@ export async function fetchOmafitCatalogSearch(params: {
   excludeHandle: string;
   productName: string;
   collectionType: string;
+  /** Perfil no provador: male | female | unisex */
+  shopperGender?: string;
+  /** Escopo da tabela de medidas do lojista: both | male | female */
+  chartGenderScope?: string;
 }): Promise<OmafitCatalogSearchResult> {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const collection_type = String(params.collectionType || 'upper');
@@ -114,6 +118,8 @@ export async function fetchOmafitCatalogSearch(params: {
   const public_id = String(params.publicId || '');
   const shop_domain = String(params.shopDomain || '');
   const user_message = String(params.userMessage || '');
+  const shopper_gender = String(params.shopperGender || '').trim();
+  const chart_gender_scope = String(params.chartGenderScope || 'both').trim();
 
   const canonical = [
     `collection_type=${collection_type}`,
@@ -123,6 +129,8 @@ export async function fetchOmafitCatalogSearch(params: {
     `shop_domain=${shop_domain}`,
     `timestamp=${timestamp}`,
     `user_message=${user_message}`,
+    `shopper_gender=${shopper_gender}`,
+    `chart_gender_scope=${chart_gender_scope}`,
   ].join('|');
 
   const signature = await hmacSha256Hex(params.secret, canonical);
@@ -135,6 +143,8 @@ export async function fetchOmafitCatalogSearch(params: {
     shop_domain,
     timestamp,
     user_message,
+    shopper_gender,
+    chart_gender_scope,
     signature,
   });
 
@@ -173,6 +183,138 @@ export async function fetchOmafitCatalogSearch(params: {
     httpStatus: res.status,
     diagnostic: buildCatalogSearchDiagnostic(res.status, json, serverError),
   };
+}
+
+export type OmafitSuggestionEventType = 'impression' | 'stylist_click' | 'atc';
+
+function buildSuggestionEventCanonical(params: {
+  event: OmafitSuggestionEventType;
+  shop_domain: string;
+  public_id: string;
+  timestamp: string;
+  impression_id: string;
+  anchor_handle: string;
+  suggested_handles?: string;
+  suggested_handle?: string;
+}): string | null {
+  const types: OmafitSuggestionEventType[] = ['impression', 'stylist_click', 'atc'];
+  if (!types.includes(params.event)) return null;
+  if (params.event === 'impression') {
+    const suggested_handles = String(params.suggested_handles ?? '');
+    return [
+      'suggestion_event_v1',
+      `event=${params.event}`,
+      `anchor_handle=${params.anchor_handle}`,
+      `impression_id=${params.impression_id}`,
+      `public_id=${params.public_id}`,
+      `shop_domain=${params.shop_domain}`,
+      `suggested_handles=${suggested_handles}`,
+      `timestamp=${params.timestamp}`,
+    ].join('|');
+  }
+  const suggested_handle = String(params.suggested_handle ?? '');
+  return [
+    'suggestion_event_v1',
+    `event=${params.event}`,
+    `anchor_handle=${params.anchor_handle}`,
+    `impression_id=${params.impression_id}`,
+    `public_id=${params.public_id}`,
+    `shop_domain=${params.shop_domain}`,
+    `suggested_handle=${suggested_handle}`,
+    `timestamp=${params.timestamp}`,
+  ].join('|');
+}
+
+/**
+ * Telemetria de sugestões estilista (app Omafit /api/widget/suggestion-events).
+ */
+export async function postOmafitSuggestionEvent(params: {
+  baseUrl: string;
+  secret: string;
+  shopDomain: string;
+  publicId: string;
+  event: OmafitSuggestionEventType;
+  impressionId: string;
+  anchorHandle: string;
+  /** Só para event=impression — handles normalizados e ordenados no corpo. */
+  suggestedHandles?: string[];
+  /** Só para stylist_click / atc */
+  suggestedHandle?: string;
+}): Promise<{ ok: boolean; httpStatus: number; error?: string }> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const shop_domain = String(params.shopDomain || '').trim();
+  const public_id = String(params.publicId || '').trim();
+  const impression_id = String(params.impressionId || '').trim();
+  const anchor_handle = String(params.anchorHandle || '').trim();
+
+  let suggested_handles: string | undefined;
+  let suggested_handle: string | undefined;
+  if (params.event === 'impression') {
+    const sorted = [
+      ...new Set(
+        (params.suggestedHandles || [])
+          .map((h) => String(h || '').trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    ].sort();
+    suggested_handles = JSON.stringify(sorted);
+  } else {
+    suggested_handle = String(params.suggestedHandle || '').trim();
+  }
+
+  const canonical = buildSuggestionEventCanonical({
+    event: params.event,
+    shop_domain,
+    public_id,
+    timestamp,
+    impression_id,
+    anchor_handle,
+    suggested_handles,
+    suggested_handle,
+  });
+  if (!canonical) {
+    return { ok: false, httpStatus: 0, error: 'bad_event' };
+  }
+
+  const signature = await hmacSha256Hex(params.secret, canonical);
+
+  const body = new URLSearchParams({
+    event: params.event,
+    shop_domain,
+    public_id,
+    timestamp,
+    impression_id,
+    anchor_handle,
+    signature,
+  });
+  if (params.event === 'impression') {
+    body.set('suggested_handles', suggested_handles || '[]');
+  } else {
+    body.set('suggested_handle', suggested_handle || '');
+  }
+
+  const url = `${params.baseUrl.replace(/\/$/, '')}/api/widget/suggestion-events`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  let json: { ok?: boolean; error?: string } = {};
+  try {
+    json = (await res.json()) as { ok?: boolean; error?: string };
+  } catch {
+    json = {};
+  }
+
+  if (!res.ok || json.ok === false) {
+    return {
+      ok: false,
+      httpStatus: res.status,
+      error: json.error || `http_${res.status}`,
+    };
+  }
+  return { ok: true, httpStatus: res.status };
 }
 
 export async function fetchOmafitProductByHandle(params: {

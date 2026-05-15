@@ -22,6 +22,7 @@ import { ensureMannequinPreconnect, preloadAllMannequinSilhouettes } from '../ut
 import {
   fetchOmafitCatalogSearch,
   fetchOmafitProductByHandle,
+  postOmafitSuggestionEvent,
   type OmafitCatalogCandidate,
 } from '../utils/omafitCatalogClient';
 import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
@@ -604,6 +605,9 @@ export function TryOnWidget({
     role: 'assistant' | 'user';
     content: string;
     timestamp: number;
+    /** Telemetria sugestões estilista (par âncora PDP → sugerido). */
+    stylistImpressionId?: string;
+    stylistAnchorHandle?: string;
     suggestedProducts?: Array<{
       handle: string;
       title: string;
@@ -635,6 +639,23 @@ export function TryOnWidget({
   const lastStylistSuggestionsRef = useRef<
     Array<{ handle: string; title: string; image_url?: string; rationale?: string }>
   >([]);
+  /** Meta da última resposta com sugestões (para try-on por texto sem closure da mensagem). */
+  const lastStylistImpressionMetaRef = useRef<{ impressionId: string; anchorHandle: string } | null>(null);
+  /** Handle âncora usado no último catalog-search deste turno GPT (exclude_handle). */
+  const stylistSearchAnchorRef = useRef('');
+  const stylistImpressionSentRef = useRef<Set<string>>(new Set());
+  /** Se o produto atual foi aberto a partir de uma sugestão — para atribuir ATC. */
+  const suggestionAttributionRef = useRef<{
+    impressionId: string;
+    anchorHandle: string;
+    suggestedHandle: string;
+    suggestedProductId: string;
+  } | null>(null);
+  /** Try-on disparado a partir de sugestão no chat: UI de progresso fica no chat, sem step `processing`. */
+  const embedTryOnInChatActiveRef = useRef(false);
+  const [tryOnLoadingInChat, setTryOnLoadingInChat] = useState(false);
+  const publicIdRef = useRef<string | undefined>(publicId);
+  const effectiveShopDomainRef = useRef('');
   const touchStartX = useRef<number>(0);
   const pollingTimeoutRef = useRef<number | null>(null);
   const pollingDeadlineRef = useRef<number | null>(null);
@@ -701,6 +722,54 @@ export function TryOnWidget({
     Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''),
   );
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
+
+  React.useEffect(() => {
+    publicIdRef.current = publicId;
+    effectiveShopDomainRef.current = effectiveShopDomain;
+  }, [publicId, effectiveShopDomain]);
+
+  const cartAttributionProductRef = useRef({
+    localProductHandle: '',
+    productId: '',
+  });
+  React.useEffect(() => {
+    cartAttributionProductRef.current = {
+      localProductHandle: (localProductHandle || productHandle || '').trim(),
+      productId: String(product?.id || productId || '').trim(),
+    };
+  }, [localProductHandle, productHandle, product, productId]);
+
+  /** Impressões de sugestões estilista (uma vez por stylistImpressionId, após sucesso). */
+  React.useEffect(() => {
+    const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!isReady || !effectiveShopDomain || !publicId || !secret) return;
+
+    for (const m of chatMessages) {
+      if (m.role !== 'assistant' || !m.stylistImpressionId || !m.stylistAnchorHandle || !m.suggestedProducts?.length) {
+        continue;
+      }
+      const id = m.stylistImpressionId;
+      if (stylistImpressionSentRef.current.has(id)) continue;
+
+      const handles = m.suggestedProducts.map((s) => s.handle).filter(Boolean);
+      if (!handles.length) continue;
+
+      void postOmafitSuggestionEvent({
+        baseUrl,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        event: 'impression',
+        impressionId: id,
+        anchorHandle: m.stylistAnchorHandle,
+        suggestedHandles: handles,
+      })
+        .then((r) => {
+          if (r.ok) stylistImpressionSentRef.current.add(id);
+        })
+        .catch(() => {});
+    }
+  }, [chatMessages, effectiveShopDomain, publicId]);
 
   /** Quando `shopDomain` / `localShopDomain` fica disponível, aplicar cache e sair de `pending` sem flash. */
   React.useEffect(() => {
@@ -1279,7 +1348,7 @@ export function TryOnWidget({
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [chatMessages, gptLoading]);
+  }, [chatMessages, gptLoading, tryOnLoadingInChat, processingMessage]);
 
   // ═══════════════════════════════════════════════════════════════════
   // 🔹 LISTENER: postMessage para receber collectionType e collectionElasticity
@@ -1323,6 +1392,10 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
+          const attr = suggestionAttributionRef.current;
+          if (attr && handle.toLowerCase() !== attr.suggestedHandle.toLowerCase()) {
+            suggestionAttributionRef.current = null;
+          }
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -1415,6 +1488,10 @@ export function TryOnWidget({
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('✅ Atualizando productHandle:', handle);
           setLocalProductHandle(handle);
+          const attr = suggestionAttributionRef.current;
+          if (attr && handle.toLowerCase() !== attr.suggestedHandle.toLowerCase()) {
+            suggestionAttributionRef.current = null;
+          }
         }
 
         if (event.data.productDescription || event.data.product_description) {
@@ -1461,6 +1538,39 @@ export function TryOnWidget({
           ? event.data.payload
           : event.data;
         setAddToCartFeedback(resolveAddToCartFeedback(responsePayload));
+
+        const isSuccess =
+          responsePayload &&
+          (responsePayload.success === true || responsePayload.ok === true);
+        if (isSuccess) {
+          const attr = suggestionAttributionRef.current;
+          if (attr) {
+            const cur = cartAttributionProductRef.current;
+            const ph = cur.localProductHandle.toLowerCase();
+            const pid = cur.productId;
+            const match =
+              ph === attr.suggestedHandle.toLowerCase() ||
+              (Boolean(pid) && pid === attr.suggestedProductId);
+            if (match) {
+              const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
+              const shop = effectiveShopDomainRef.current;
+              const pub = publicIdRef.current;
+              if (isReady && shop && pub && secret) {
+                void postOmafitSuggestionEvent({
+                  baseUrl,
+                  secret,
+                  shopDomain: shop,
+                  publicId: pub,
+                  event: 'atc',
+                  impressionId: attr.impressionId,
+                  anchorHandle: attr.anchorHandle,
+                  suggestedHandle: attr.suggestedHandle,
+                }).catch(() => {});
+              }
+              suggestionAttributionRef.current = null;
+            }
+          }
+        }
       }
     };
 
@@ -2783,7 +2893,27 @@ const validatePhotoForCollection = (
   return { valid: true };
 };
 
-const handleSubmit = async (modelFileOverride?: File | null) => {
+  const clearEmbedTryOnChatLoading = () => {
+    if (!embedTryOnInChatActiveRef.current) return;
+    embedTryOnInChatActiveRef.current = false;
+    setTryOnLoadingInChat(false);
+  };
+
+  /** Após erro no try-on: volta à foto ou mantém no resultado (fluxo embutido no chat). */
+  const leaveTryOnErrorStep = () => {
+    if (embedTryOnInChatActiveRef.current) {
+      embedTryOnInChatActiveRef.current = false;
+      setTryOnLoadingInChat(false);
+      setStep('result');
+    } else {
+      setStep('photo');
+    }
+  };
+
+const handleSubmit = async (
+  modelFileOverride?: File | null,
+  tryOnOpts?: { embedTryOnInChat?: boolean }
+) => {
   const modelFile = modelFileOverride ?? modelImage;
   if (!modelFile || !product) {
     setError(t('selectProductAndPhoto'));
@@ -2791,7 +2921,12 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
   }
 
   setLoading(true);
-  setStep('processing');
+  embedTryOnInChatActiveRef.current = Boolean(tryOnOpts?.embedTryOnInChat);
+  if (embedTryOnInChatActiveRef.current) {
+    setTryOnLoadingInChat(true);
+  } else {
+    setStep('processing');
+  }
   setError('');
   setProcessingMessage(t('sendingImages'));
 
@@ -2829,7 +2964,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
       console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
       setError(preparedPoseAnalysis.validationMessage);
       setLoading(false);
-      setStep('photo');
+      leaveTryOnErrorStep();
       return;
     }
 
@@ -2855,7 +2990,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
         console.error('   weight:', sizeData?.weight);
         setError(t('requiredBodyData'));
         setLoading(false);
-        setStep('photo');
+        leaveTryOnErrorStep();
         return;
       }
     }
@@ -2969,6 +3104,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
       setError('');
       setStep('result');
       setLoading(false);
+      clearEmbedTryOnChatLoading();
       return;
     }
 
@@ -3095,6 +3231,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
       setError('');
       setStep('result');
       setLoading(false);
+      clearEmbedTryOnChatLoading();
       return;
     }
 
@@ -3156,12 +3293,13 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
   } catch (error: any) {
     console.error('Erro no try-on:', error);
     setError(error.message || t('processingError'));
-    setStep('photo');
+    leaveTryOnErrorStep();
     setLoading(false);
   }
 };
 
   const openFinalStepWithoutImage = () => {
+    clearEmbedTryOnChatLoading();
     setError('');
     setResult(null);
     setStep('result');
@@ -3251,6 +3389,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
             setLoading(false);
+            clearEmbedTryOnChatLoading();
             return;
           }
         }
@@ -3312,6 +3451,12 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
     setInteractionCount(0);
     setPendingSuggestedHandle(null);
     lastStylistSuggestionsRef.current = [];
+    lastStylistImpressionMetaRef.current = null;
+    suggestionAttributionRef.current = null;
+    stylistSearchAnchorRef.current = '';
+    stylistImpressionSentRef.current = new Set();
+    embedTryOnInChatActiveRef.current = false;
+    setTryOnLoadingInChat(false);
   };
 
   useEffect(() => {
@@ -3324,7 +3469,11 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
 
   const handleSuggestedProductTryOn = async (
     handle: string,
-    options?: { autoSubmitTryOn?: boolean }
+    options?: {
+      autoSubmitTryOn?: boolean;
+      stylistImpressionId?: string;
+      stylistAnchorHandle?: string;
+    }
   ) => {
     const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
     if (!isReady || !effectiveShopDomain || !publicId) {
@@ -3332,6 +3481,31 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
     }
     const h = String(handle || '').trim();
     if (!h) return;
+
+    const meta =
+      options?.stylistImpressionId &&
+      String(options.stylistImpressionId).trim() &&
+      String(options.stylistAnchorHandle || stylistSearchAnchorRef.current || '').trim()
+        ? {
+            impressionId: String(options.stylistImpressionId).trim(),
+            anchorHandle: String(
+              options.stylistAnchorHandle || stylistSearchAnchorRef.current || ''
+            ).trim(),
+          }
+        : lastStylistImpressionMetaRef.current;
+
+    if (meta?.impressionId && meta.anchorHandle) {
+      void postOmafitSuggestionEvent({
+        baseUrl: base,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        event: 'stylist_click',
+        impressionId: meta.impressionId,
+        anchorHandle: meta.anchorHandle,
+        suggestedHandle: h,
+      }).catch(() => {});
+    }
 
     setPendingSuggestedHandle(h);
     try {
@@ -3349,6 +3523,17 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
           { role: 'assistant', content: t('suggestedProductLoadError'), timestamp: Date.now() },
         ]);
         return;
+      }
+
+      if (meta?.impressionId && meta.anchorHandle) {
+        suggestionAttributionRef.current = {
+          impressionId: meta.impressionId,
+          anchorHandle: meta.anchorHandle,
+          suggestedHandle: String(product.handle || h).trim(),
+          suggestedProductId: String(product.id || '').trim(),
+        };
+      } else {
+        suggestionAttributionRef.current = null;
       }
 
       setLocalProductHandle(product.handle);
@@ -3385,7 +3570,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
       invalidatePreparedModelAssets();
       if (options?.autoSubmitTryOn) {
         window.setTimeout(() => {
-          void handleSubmit();
+          void handleSubmit(undefined, { embedTryOnInChat: true });
         }, 80);
       } else {
         setStep('photo');
@@ -3420,6 +3605,8 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
     }
 
     if (!sizeData) return;
+
+    stylistSearchAnchorRef.current = (localProductHandle || productHandle || '').trim();
 
     setGptLoading(true);
 
@@ -3528,6 +3715,8 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
           excludeHandle: (localProductHandle || productHandle || '').trim(),
           productName: localProductName,
           collectionType: localCollectionType || 'upper',
+          shopperGender: sizeData?.gender || 'unisex',
+          chartGenderScope,
         });
         lastCatalogSearch = {
           diagnostic: searchRes.diagnostic,
@@ -3603,6 +3792,7 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
         tipo_corpo: sizeData.bodyType || 'regular',
         ajuste_preferido: sizeData.fit || 'regular',
         genero: sizeData.gender || 'unisex',
+        chart_gender_scope: chartGenderScope,
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
         tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
@@ -3731,16 +3921,40 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
           suggestedProductsBlock = mapped.length ? mapped : undefined;
         }
 
+        let stylistImpressionId: string | undefined;
+        let anchorForStylistMsg: string | undefined;
+        if (suggestedProductsBlock?.length && stylistSearchAnchorRef.current.trim()) {
+          stylistImpressionId =
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `imp_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          anchorForStylistMsg = stylistSearchAnchorRef.current.trim();
+        }
+
         if (requestSeq !== gptAssistSeqRef.current) return;
-        setChatMessages(prev => [...prev, {
-          role: 'assistant',
-          content: explicacao,
-          timestamp: Date.now(),
-          ...(suggestedProductsBlock?.length ? { suggestedProducts: suggestedProductsBlock } : {}),
-        }]);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: explicacao,
+            timestamp: Date.now(),
+            ...(suggestedProductsBlock?.length ? { suggestedProducts: suggestedProductsBlock } : {}),
+            ...(stylistImpressionId && anchorForStylistMsg
+              ? { stylistImpressionId, stylistAnchorHandle: anchorForStylistMsg }
+              : {}),
+          },
+        ]);
 
         if (suggestedProductsBlock?.length) {
           lastStylistSuggestionsRef.current = suggestedProductsBlock;
+          if (stylistImpressionId && anchorForStylistMsg) {
+            lastStylistImpressionMetaRef.current = {
+              impressionId: stylistImpressionId,
+              anchorHandle: anchorForStylistMsg,
+            };
+          }
+        } else {
+          lastStylistImpressionMetaRef.current = null;
         }
 
         setInteractionCount(
@@ -4250,39 +4464,47 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
                           key={sp.handle}
                           className="flex gap-3 rounded-xl border border-gray-200 bg-white p-2 shadow-sm"
                         >
-                          {sp.image_url ? (
-                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                              <img
-                                src={sp.image_url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
-                              …
-                            </div>
-                          )}
+                          <div className="flex w-[5.25rem] shrink-0 flex-col items-stretch gap-1.5">
+                            {sp.image_url ? (
+                              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                                <img
+                                  src={sp.image_url}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
+                                …
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              disabled={
+                                tryOnLoadingInChat ||
+                                Boolean(pendingSuggestedHandle) ||
+                                loading
+                              }
+                              onClick={() =>
+                                void handleSuggestedProductTryOn(sp.handle, {
+                                  autoSubmitTryOn: true,
+                                  stylistImpressionId: message.stylistImpressionId,
+                                  stylistAnchorHandle: message.stylistAnchorHandle,
+                                })
+                              }
+                              className="w-full rounded-md border border-gray-300 bg-white px-1 py-1.5 text-center text-[11px] font-semibold leading-tight text-gray-800 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {pendingSuggestedHandle === sp.handle
+                                ? t('loadingSuggestedProduct')
+                                : t('suggestedExperimentarCta')}
+                            </button>
+                          </div>
                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
                             <p className="text-sm font-semibold text-gray-900 line-clamp-2">{sp.title}</p>
                             {sp.rationale ? (
                               <p className="text-xs text-gray-600 line-clamp-2">{sp.rationale}</p>
                             ) : null}
-                            <button
-                              type="button"
-                              disabled={Boolean(pendingSuggestedHandle)}
-                              onClick={() => void handleSuggestedProductTryOn(sp.handle, { autoSubmitTryOn: true })}
-                              className="mt-1 w-full max-w-[220px] rounded-lg px-3 py-2 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
-                              style={{
-                                backgroundColor: localPrimaryColor,
-                                color: getContrastTextColor(localPrimaryColor),
-                              }}
-                            >
-                              {pendingSuggestedHandle === sp.handle
-                                ? t('loadingSuggestedProduct')
-                                : t('suggestedTryOnCta')}
-                            </button>
                           </div>
                         </div>
                       ))}
@@ -4291,6 +4513,68 @@ const handleSubmit = async (modelFileOverride?: File | null) => {
                 </div>
               </motion.div>
             ))}
+            </AnimatePresence>
+
+            <AnimatePresence initial={false}>
+              {tryOnLoadingInChat && (
+                <motion.div
+                  key="chat-tryon-loading"
+                  className="flex gap-2 justify-start"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                >
+                  {localStoreLogo && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center p-1">
+                      <img
+                        src={localStoreLogo}
+                        alt={localStoreName}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  )}
+                  <div className="max-w-[85%] flex-1 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-center gap-2">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full animate-bounce"
+                        style={{
+                          backgroundColor: localPrimaryColor,
+                          animationDelay: '0ms',
+                          animationDuration: '1.4s',
+                        }}
+                      />
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full animate-bounce"
+                        style={{
+                          backgroundColor: localPrimaryColor,
+                          animationDelay: '200ms',
+                          animationDuration: '1.4s',
+                        }}
+                      />
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full animate-bounce"
+                        style={{
+                          backgroundColor: localPrimaryColor,
+                          animationDelay: '400ms',
+                          animationDuration: '1.4s',
+                        }}
+                      />
+                    </div>
+                    <p
+                      className="text-center text-base font-semibold leading-snug md:text-lg"
+                      style={{ color: localPrimaryColor }}
+                    >
+                      {processingMessage}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-2.5 md:p-3">
+                      <p className="text-center text-xs font-medium leading-snug text-yellow-900 md:text-sm">
+                        {t('estimatedTime')}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Loading Indicator */}
