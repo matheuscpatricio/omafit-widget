@@ -3785,6 +3785,12 @@ const handleSubmit = async (
           httpStatus: searchRes.httpStatus,
           debug: searchRes.debug,
         };
+        if (searchRes.error === 'no_session') {
+          console.warn(
+            '[Omafit catalog-search] no_session — a app Omafit no Railway não tem sessão Shopify para esta loja. Abra o app no admin Shopify da loja (produção).',
+            searchRes.debug || ''
+          );
+        }
         if (searchRes.candidates.length) {
           candidate_products = searchRes.candidates;
         }

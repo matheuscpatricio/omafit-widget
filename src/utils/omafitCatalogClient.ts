@@ -209,17 +209,21 @@ export async function fetchOmafitCatalogSearch(params: {
   const root = json && typeof json === 'object' ? (json as Record<string, unknown>) : {};
   const serverError = root.error != null ? String(root.error) : null;
   const candidates = extractCandidatesFromJson(json);
-  const debug =
+  const debug: Record<string, unknown> | undefined =
     root.debug && typeof root.debug === 'object'
       ? (root.debug as Record<string, unknown>)
       : undefined;
 
   if (!res.ok) {
     const err = serverError || `http_${res.status}`;
-    const hint =
-      err === 'bad_signature'
-        ? ' | dica=confirme VITE_OMAFIT_WIDGET_HMAC_SECRET igual a WIDGET_CATALOG_HMAC_SECRET no Railway e redeploy da app Omafit'
-        : '';
+    let hint = '';
+    if (err === 'bad_signature') {
+      hint =
+        ' | dica=confirme VITE_OMAFIT_WIDGET_HMAC_SECRET igual a WIDGET_CATALOG_HMAC_SECRET no Railway e redeploy da app Omafit';
+    } else if (err === 'no_session') {
+      hint =
+        ' | dica=abra o app Omafit no admin Shopify desta loja (produção Railway) para criar sessão offline; confira DATABASE_URL no Railway';
+    }
     return {
       candidates: [],
       error: err,
@@ -229,10 +233,7 @@ export async function fetchOmafitCatalogSearch(params: {
   }
 
   const diagnostic = buildCatalogSearchDiagnostic(res.status, json, serverError);
-  const debugSuffix =
-    debug && candidates.length === 0
-      ? ` | debug=${JSON.stringify(debug)}`
-      : '';
+  const debugSuffix = debug ? ` | debug=${JSON.stringify(debug)}` : '';
 
   return {
     candidates,
