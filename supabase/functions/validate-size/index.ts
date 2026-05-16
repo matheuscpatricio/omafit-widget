@@ -155,10 +155,10 @@ function defaultSuggestedFromCandidates(
 ): Array<{ handle: string; rationale: string }> {
   const rationale =
     language === "es"
-      ? "Buena combinación con lo que tienes en el probador."
+      ? "Buena combinación con tu look actual."
       : language === "en"
-        ? "Pairs nicely with your try-on piece."
-        : "Combina bem com a peça que está a experimentar no provador.";
+        ? "Pairs well with your outfit."
+        : "Combina bem com o seu look atual.";
   return candidates
     .slice(0, 3)
     .map((c) => ({ handle: String(c.handle || "").trim(), rationale }))
@@ -181,7 +181,7 @@ function sanitizeSuggestedProducts(
     const rationale = String((item as { rationale?: string }).rationale || "").trim();
     out.push({
       handle: h,
-      ...(rationale ? { rationale: rationale.slice(0, 220) } : {}),
+      ...(rationale ? { rationale: rationale.slice(0, 100) } : {}),
     });
     if (out.length >= 3) break;
   }
@@ -371,6 +371,62 @@ function escapeRegexSegment(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Remove diacríticos para matching fiável (\\b em JS não trata bem acentos como \\w). */
+function foldAscii(s: string): string {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+}
+
+/**
+ * Calçado/acessório na frase — usa texto dobrado + \\p{L} (Unicode), não \\b antes de óculos/Óculos.
+ */
+const NON_GARMENT_FOLDED_RE =
+  /(?:^|[^\p{L}])(?:sapatos?|calcados?|tenis|trainers?|sneakers?|sandalias?|chinelos?|slides?|boots?|heels?|loafers?|zapatos?|zapatillas?|botas?|chanclas?|calzado|oculos(?:\s+de\s+sol)?|sunglasses?|gafas?(?:\s+de\s+sol)?|reloj(?:es)?|relogio|smartwatch|watches?|cinto|cinturon|belts?|carteira|carteiras|bolsas?|mochila|backpack|handbag|clutch|pulseiras?|colares?|brincos?|earrings?|gorros?|bones?|chapeus?|cachecol|pa[nñ]uelo|jewelry|necklaces?|bracelets?)(?:[^\p{L}]|$)/u;
+
+function sentenceMentionsNonGarmentFolded(sentence: string): boolean {
+  return NON_GARMENT_FOLDED_RE.test(foldAscii(sentence));
+}
+
+/** Remove blocos típicos do GPT ("Não se esqueça… óculos…") antes do split em frases. */
+function scrubInvitationAccessoryTails(text: string, language: string): string {
+  const endClause = '(?=[.!?]|$)';
+  const runPt = (raw: string) =>
+    raw.replace(new RegExp(`\\s+Não se esqueça(?: de)?[\\s\\S]*?${endClause}`, 'giu'), (block) =>
+      /oculos|relogio|cinto|bolsa|sapato|tenis|sandalia|mochila|bone|chapeu/.test(foldAscii(block)) ? '' : block
+    );
+  if (language === 'es') {
+    return text.replace(new RegExp(`\\s+No te olvides[\\s\\S]*?${endClause}`, 'giu'), (block) =>
+      /gafas|reloj|zapatos|bolso|cinturon|gorra/.test(foldAscii(block)) ? '' : block
+    );
+  }
+  if (language === 'en') {
+    return text.replace(new RegExp(`\\s+Don['’]t forget[\\s\\S]*?${endClause}`, 'giu'), (block) =>
+      /sunglasses|eyewear|watch|shoes|sneakers|boots|belt|bag|handbag/.test(foldAscii(block)) ? '' : block
+    );
+  }
+  return runPt(text);
+}
+
+function buildStylistSizeLead(language: string, size: string, productName?: string): string {
+  const sz = normalizeSizeLabel(size);
+  const pn = String(productName || '').trim();
+  if (language === 'es') {
+    return pn
+      ? `Para la prenda en prueba (${pn}), tu talla ideal es ${sz}.`
+      : `Tu talla ideal para esta prenda es ${sz}.`;
+  }
+  if (language === 'en') {
+    return pn
+      ? `For the try-on piece (${pn}), your ideal size is ${sz}.`
+      : `Your ideal size for this garment is ${sz}.`;
+  }
+  return pn
+    ? `Para a peça em try-on (${pn}), seu tamanho ideal é ${sz}.`
+    : `Seu tamanho ideal para esta peça é ${sz}.`;
+}
+
 /** Detecta se explicacao já menciona o tamanho final (evita duplicar ao prefixar). */
 function explanationMentionsSize(text: string, sizeLabel: string): boolean {
   const s = normalizeSizeLabel(sizeLabel).trim();
@@ -401,8 +457,22 @@ function enforceSizeFirstMessage(
 
   let cleanedBody = withoutCatalog.trim();
 
-  // Modo estilista: o cliente precisa ver o tamanho ideal da peça em try-on na própria mensagem.
-  if (options?.stylistMode && cleanedBody && !explanationMentionsSize(cleanedBody, size)) {
+  // Modo estilista: primeira frase obrigatória com tamanho do sistema + peça em try-on (evita omitir).
+  if (options?.stylistMode && cleanedBody) {
+    const lead = buildStylistSizeLead(language, size, data.product_name);
+    let body = cleanedBody;
+    body = body
+      .replace(
+        /^\s*Para (?:a peça em try-on|la prenda en prueba|the try-on piece)\s*\([^)]+\)\s*,?\s*(?:seu tamanho ideal é|tu talla ideal es|your ideal size is)\s*[^.!?]+[.!?]\s*/iu,
+        ''
+      )
+      .trim();
+    body = body.replace(/^\s*Seu tamanho ideal (?:é|para)[^.!?]+[.!?]\s*/iu, '').trim();
+    body = body.replace(/^\s*Tu talla ideal[^.!?]+[.!?]\s*/iu, '').trim();
+    body = body.replace(/^\s*Your ideal size[^.!?]+[.!?]\s*/iu, '').trim();
+    body = body.replace(/^\s*Seu tamanho ideal é\s+\S+[!.]?\s*/iu, '').trim();
+    cleanedBody = `${lead} ${body}`.trim();
+  } else if (cleanedBody && !explanationMentionsSize(cleanedBody, size)) {
     cleanedBody = `${buildSizeFirstSentence(language, size)} ${cleanedBody}`.trim();
   }
 
@@ -439,7 +509,7 @@ function buildOldStyleResponse(data: ValidateSizeRequest, normalizedSize: string
   if (language === 'es') {
     return {
       tamanho_final: canonicalSize,
-      explicacao: `¡Hola! Tu talla ideal para ${productName} es ${canonicalSize}, te quedará genial. ¿Lo añadimos al carrito?`,
+      explicacao: `¡Hola! Talla ideal: ${canonicalSize}. Te sentará genial — ¿la añadimos al carrito?`,
       coerencia: 'alta',
       confianca: 0.98,
     };
@@ -448,7 +518,7 @@ function buildOldStyleResponse(data: ValidateSizeRequest, normalizedSize: string
   if (language === 'en') {
     return {
       tamanho_final: canonicalSize,
-      explicacao: `Hi! Your ideal size for ${productName} is ${canonicalSize} — it will look great on you. Want to add it to cart?`,
+      explicacao: `Hi! Ideal size: ${canonicalSize} — great fit for you. Add to cart?`,
       coerencia: 'high',
       confianca: 0.98,
     };
@@ -456,7 +526,7 @@ function buildOldStyleResponse(data: ValidateSizeRequest, normalizedSize: string
 
   return {
     tamanho_final: canonicalSize,
-    explicacao: `Olá! Seu tamanho ideal para o ${productName} é ${canonicalSize}, vai ficar ótimo nas suas proporções. Que tal adicionar ao carrinho?`,
+    explicacao: `Olá! Tamanho ideal: ${canonicalSize}. Fica ótimo nas suas proporções — que tal no carrinho?`,
     coerencia: 'alta',
     confianca: 0.98,
   };
@@ -483,8 +553,8 @@ SUA FUNÇÃO:
 REGRAS DE COMUNICAÇÃO:
 - Seja conversacional e caloroso, não robótico
 - Tom pessoal: fale com a pessoa usando "você" e expressões como "no seu caso", "para você", "eu sugeriria…" quando fizer sentido
-- Pode desenvolver a resposta com o detalhe necessário; não se prenda a respostas artificialmente curtas
-- Celebre características únicas do corpo de forma positiva
+- BREVIDADE (obrigatório): explicacao CURTA — no máximo ~3 frases curtas ou ~400 caracteres no total; vá direto ao ponto; sem repetir ideias nem enrolar
+- Celebre características únicas do corpo de forma positiva (mas sem texto longo)
 - Transmita confiança mas sem arrogância
 - Foque em como a peça vai valorizar o cliente
 - Use o CONTEXTO DE GÉNERO do prompt para combinações de roupa (não chame o cliente de "homem/mulher" sem necessidade, mas respeite o perfil nas sugestões de peças)
@@ -504,7 +574,7 @@ REGRA CRÍTICA SOBRE MEDIDAS:
 IMPORTANTE: Retorne JSON válido com esta estrutura:
 {
   "tamanho_final": "P/M/G/GG/etc",
-  "explicacao": "explicação calorosa, confiante e envolvente",
+  "explicacao": "explicação curta, calorosa e direta",
   "coerencia": "alta/média/baixa",
   "confianca": 0.0-1.0
 }`,
@@ -527,8 +597,8 @@ TU FUNCIÓN:
 REGLAS DE COMUNICACIÓN:
 - Sé conversacional y cálido, no robótico
 - Tono personal: usa "tú" y frases como "para ti", "en tu caso", "te recomendaría…" cuando encaje
-- Puedes desarrollar la respuesta con el detalle que haga falta; no te limites a respuestas artificialmente cortas
-- Celebra características únicas del cuerpo de forma positiva
+- BREVEDAD (obligatorio): explicacion BREVE — máximo ~3 frases cortas o ~400 caracteres en total; ve al grano; sin repeticiones ni párrafos largos
+- Celebra características únicas del cuerpo de forma positiva (sin extenderte)
 - Transmite confianza pero sin arrogancia
 - Enfócate en cómo la prenda va a realzar al cliente
 - Usa el CONTEXTO DE GÉNERO del prompt para combinaciones (no llames al cliente "hombre/mujer" sin necesidad, pero respeta el perfil al sugerir prendas)
@@ -548,7 +618,7 @@ REGLA CRÍTICA SOBRE MEDIDAS:
 IMPORTANTE: Retorna JSON válido con esta estructura:
 {
   "tamanho_final": "S/M/L/XL/etc",
-  "explicacao": "explicación cálida, confiada y atractiva",
+  "explicacao": "explicación breve, cálida y directa",
   "coerencia": "alta/media/baja",
   "confianca": 0.0-1.0
 }`,
@@ -571,8 +641,8 @@ YOUR FUNCTION:
 COMMUNICATION RULES:
 - Be conversational and warm, not robotic
 - Personal tone: address them as "you" with natural phrasing like "for you", "in your case", "I'd suggest…"
-- Take the space you need to be genuinely helpful; do not force artificially short replies
-- Celebrate unique body characteristics in a positive way
+- BREVITY (mandatory): keep explicacao SHORT — at most ~3 short sentences or ~400 characters total; get to the point; no repetition or long paragraphs
+- Celebrate unique body characteristics positively (without dragging on)
 - Convey confidence without arrogance
 - Focus on how the piece will enhance the client
 - Use GENDER CONTEXT from the prompt for outfit pairing (avoid labeling the shopper "man/woman" unnecessarily, but respect profile in garment suggestions)
@@ -592,7 +662,7 @@ CRITICAL RULE ABOUT MEASUREMENTS:
 IMPORTANT: Return valid JSON with this structure:
 {
   "tamanho_final": "XS/S/M/L/XL/etc",
-  "explicacao": "warm, confident and engaging explanation",
+  "explicacao": "short warm explanation",
   "coerencia": "high/medium/low",
   "confianca": 0.0-1.0
 }`
@@ -660,7 +730,7 @@ async function callOpenAI(
 ): Promise<GPTResponse> {
   const defaultTamanho = normalizeSizeLabel(opts?.defaultTamanho || "M") || "M";
   const requested = opts?.maxTokens ?? 1200;
-  const attempts = [requested, Math.min(Math.max(requested * 2, 1800), 4096)];
+  const attempts = [requested, Math.min(Math.max(requested * 2, 1100), 4096)];
 
   let lastError: unknown;
   for (let i = 0; i < attempts.length; i++) {
@@ -704,7 +774,7 @@ function buildComplementaryPrompt(data: ValidateSizeRequest, language: string): 
 
   if (!product) {
     return `${genderCtx}
-Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira um tipo de peça complementar${storeContext} que combinaria bem e explique o porquê da combinação com tom pessoal ("para você", "no seu caso").${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}
+Com base no perfil do usuário (Altura: ${data.altura_cm}cm, tamanho ${data.tamanho_calculado_algoritmo}), sugira uma peça complementar${storeContext} em texto CURTO (máx. ~3 frases): por que combina + convite leve.${data.shop_name ? ` Pode mencionar "${data.shop_name}" se couber.` : ''}
 ${productCatalogContext}`;
   }
 
@@ -715,7 +785,7 @@ Produto: ${product.name}
 Categoria: ${product.category}
 ${productCatalogContext}
 
-Explique de forma clara e pessoal por que esta peça combina bem com o perfil do usuário e crie um texto persuasivo mas profissional para incentivá-lo a conhecer o produto; desenvolva o quanto fizer sentido.${data.shop_name ? ` Você pode mencionar a loja "${data.shop_name}" de forma natural se for relevante.` : ''}
+Explique em texto CURTO e pessoal (máx. ~3 frases) por que esta peça combina; convite discreto a conhecer o produto.${data.shop_name ? ` Pode mencionar "${data.shop_name}" se couber.` : ''}
 
 Retorne no formato JSON:
 {
@@ -802,38 +872,35 @@ function buildCatalogHardRules(data: ValidateSizeRequest, language: string): str
 function getStylistSystemExtra(language: string): string {
   const blocks: Record<string, string> = {
     pt: `MODO CONSULTOR DE MODA (catálogo limitado):
-- Você é um estilista profissional da loja: tom caloroso, claro e pessoal ("para você", "no seu caso"); use o espaço que precisar, sem tom de "vendedor genérico" ou jargão vazio.
-- TAMANHO DA PEÇA EM TRY-ON (obrigatório): na primeira frase de explicacao, diga explicitamente o tamanho ideal para a peça em provador usando exatamente o valor de tamanho_final (ex.: "Seu tamanho ideal é M para o suéter…"). Depois pode desenvolver combinações; não repita o tamanho no resto do texto.
-- Só pode mencionar produtos cujo "handle" apareça na lista CANDIDATOS abaixo. Nunca invente URLs, nomes ou peças fora da lista.
-- Critérios de styling (use os que fizerem sentido): harmonia de cor (contraste ou tonalidade intencional); proporção e silhueta em relação ao tipo de peça em try-on (categoria: upper/lower/full); ocasião (mais casual vs mais arrumado); coerência entre categorias (ex.: topo escuro + base mais clara quando adequado).
-- SÓ VESTUÁRIO: é PROIBIDO na explicacao e em suggested_products sugerir ou mencionar calçados (sapatos, tênis, botas, sandálias, etc.) ou acessórios (óculos, relógio, bolsa, cinto, chapéu/boné como complemento, bijuteria). Use apenas peças de roupa (tops, bases, casacos, vestidos/saias quando o perfil for feminino, etc.).
-- GÉNERO (obrigatório): siga o bloco CONTEXTO DE GÉNERO e as REGRAS DE COMBINAÇÃO NA explicacao. Para perfil masculino é PROIBIDO na explicacao mencionar saias, vestidos ou equivalentes — só calças, bermudas, shorts, etc.
-- Explique de forma clara POR QUE a peça combina antes de citar o nome.
-- Se o cliente pedir outro tipo de peça ou estilo diferente das sugestões anteriores (ex.: casaco em vez de calça), acolha a preferência: os CANDIDATOS já foram renovados pelo sistema — escolha só entre eles; não insista no que deixou de fazer sentido.
-- Se a lista não tiver o que o cliente pediu, seja honesto: diga que nesta busca não apareceu e sugira reformular ou explorar a loja — sem inventar produtos.
-- Responda em JSON válido incluindo "suggested_products": array (0 a 3 itens) com {"handle":"...","rationale":"opcional, em tom pessoal"} — apenas handles da lista.`,
+- Tom caloroso e pessoal ("para você", "no seu caso"), mas SEMPRE conciso — sem "vendedor genérico".
+- TAMANHO (obrigatório): primeira frase exatamente: "Para a peça em try-on (NOME_DA_PEÇA), seu tamanho ideal é TAMANHO_FINAL." Depois, no máximo 2–3 frases curtas para combinações; não repita o tamanho.
+- Só mencione produtos cujo "handle" está em CANDIDATOS. Nunca invente URLs ou peças fora da lista.
+- Critérios (cite só o essencial): cor/silhueta/ocasião vs categoria upper/lower/full.
+- SÓ VESTUÁRIO: proibido calçados e acessórios na explicacao e em suggested_products.
+- GÉNERO: siga CONTEXTO DE GÉNERO e regras de combinação (perfil masculino: sem saias/vestidos).
+- Uma ideia por candidato; rationale em suggested_products: no máximo uma frase curta (~90 caracteres) por item.
+- Se o cliente mudar de ideia, escolha só entre CANDIDATOS atualizados; se não houver fit, diga em uma frase — sem inventar.
+- JSON com "suggested_products": 0–3 itens {"handle":"...","rationale":"opcional curto"} apenas da lista.`,
     es: `MODO ESTILISTA (catálogo limitado):
-- Eres un/a estilista profesional de la tienda: tono cálido, claro y personal ("para ti", "en tu caso"); usa el espacio que necesites; evita tono de "vendedor genérico".
-- TALLA DE LA PRENDA EN PRUEBA (obligatorio): en la primera frase de explicacao indica explícitamente la talla ideal usando exactamente el valor de tamanho_final (ej.: "Tu talla ideal es M para el jersey…"). Luego desarrolla combinaciones; no repitas la talla en el resto del texto.
-- Solo puedes mencionar productos cuyo "handle" esté en CANDIDATOS. Nunca inventes URLs ni prendas fuera de la lista.
-- Criterios: armonía de color (contraste o tonalidad); proporción y silueta según la prenda en prueba (categoría upper/lower/full); ocasión (casual vs más arreglada); coherencia entre categorías.
-- SOLO ROPA: PROHIBIDO en explicacao y suggested_products mencionar o sugerir calzado (zapatos, zapatillas, botas, sandalias…) ni accesorios (gafas, reloj, bolso, cinturón, gorra como complemento, bisutería). Solo prendas de vestir (partes de arriba/abajo, abrigos, vestidos/faldas si el perfil es femenino, etc.).
-- GÉNERO (obligatorio): respeta el perfil del cliente y el alcance de la tienda en el bloque "CONTEXTO DE GÉNERO". No sugieras prendas típicamente femeninas (p. ej., falda, vestido) a un perfil masculino, ni lo contrario de forma incoherente; con perfil unisex prioriza piezas neutras/unisex salvo que el título del candidato indique claramente apropiación para todos.
-- Explica con claridad POR QUÉ combina antes de nombrar.
-- Si el cliente pide otra categoría o estilo (ej. abrigo en vez de pantalón), acoge la preferencia: los CANDIDATOS ya se actualizaron — elige solo entre ellos.
-- Si no hay nada adecuado en la lista, dilo con honestidad — sin inventar.
-- JSON válido con "suggested_products": 0–3 elementos {"handle":"...","rationale":"..."} solo de la lista.`,
+- Tono cálido y personal ("para ti", "en tu caso"), pero SIEMPRE breve.
+- TALLA (obligatorio): primera frase exactamente: "Para la prenda en prueba (NOMBRE), tu talla ideal es TALLA." Luego, máximo 2–3 frases cortas para combinaciones; no repitas la talla.
+- Solo handles de CANDIDATOS. Sin inventar.
+- Criterios (solo lo esencial): color/silueta/ocasión vs upper/lower/full.
+- SOLO ROPA: prohibido calzado y accesorios en explicacao y suggested_products.
+- GÉNERO: respeta CONTEXTO DE GÉNERO (perfil masculino: sin faldas/vestidos).
+- rationale por ítem: una frase muy corta (~90 caracteres).
+- Si no encaja nada, dilo en una frase.
+- JSON "suggested_products": 0–3 {"handle":"...","rationale":"opcional corto"} solo de la lista.`,
     en: `STYLIST MODE (limited catalog):
-- You are a professional in-store stylist: warm, clear, and personal ("for you", "in your case"); take the room you need. Avoid generic "salesy" tone.
-- TRY-ON GARMENT SIZE (mandatory): in the first sentence of explicacao, state the ideal size explicitly using exactly the tamanho_final value (e.g. "Your ideal size is M for this sweater…"). Then develop outfit ideas; do not repeat the size again in the rest of the message.
-- You may ONLY mention products whose "handle" is in CANDIDATES. Never invent URLs or items outside the list.
-- Criteria: color harmony (contrast or intentional tone); proportion and silhouette vs the try-on garment category (upper/lower/full); occasion (casual vs dressier); sensible category pairing.
-- CLOTHING ONLY: FORBIDDEN in explicacao and suggested_products to mention or suggest footwear (shoes, sneakers, boots, sandals…) or accessories (sunglasses, watch, bag, belt, hat as an add-on, jewelry). Only actual garments (tops, bottoms, outerwear, dresses/skirts when the profile is female, etc.).
-- GENDER (mandatory): follow the shopper profile and the store scope in the "GENDER CONTEXT" block. Do not suggest typically women's-only items (e.g. skirts, dresses) to a male profile, or incoherent men's-only pieces to a female profile; for unisex profile prefer neutral/unisex candidates unless a title clearly signals inclusive styling.
-- Explain clearly WHY pieces work before naming them.
-- If the shopper asks for a different category or vibe (e.g. coat instead of pants), embrace it: CANDIDATES were refreshed — pick only from the current list.
-- If nothing matches, say so honestly — do not invent products.
-- Valid JSON with "suggested_products": 0–3 items {"handle":"...","rationale":"..."} from the list only.`,
+- Warm personal tone ("for you", "in your case"), but ALWAYS brief — no generic sales pitch.
+- SIZE (mandatory): first sentence exactly: "For the try-on piece (NAME), your ideal size is SIZE." Then at most 2–3 short sentences for pairings; do not repeat the size.
+- Only handles from CANDIDATES. Never invent items.
+- Criteria (state only essentials): color/silhouette/occasion vs upper/lower/full.
+- CLOTHING ONLY: no footwear or accessories in explicacao or suggested_products.
+- GENDER: follow GENDER CONTEXT (male profile: no skirts/dresses).
+- Per-item rationale: one very short sentence (~90 characters).
+- If nothing fits, say so in one sentence.
+- JSON "suggested_products": 0–3 {"handle":"...","rationale":"optional short"} from list only.`,
   };
   return blocks[language] || blocks.en;
 }
@@ -858,10 +925,6 @@ function resolveEffectiveTargetGender(data: ValidateSizeRequest): "male" | "fema
 const FEMALE_GARMENT_IN_EXPLICACAO =
   /\b(saia?s?|skirts?|vestidos?|dresses?|faldas?|maxi\s+skirts?|midi\s+skirts?)\b/i;
 const MALE_GARMENT_IN_EXPLICACAO = /\b(gravatas?|smokings?)\b/i;
-
-/** Modo estilista: remover da explicacao frases que mencionam calçado ou acessórios. */
-const FOOTWEAR_ACCESSORY_IN_EXPLICACAO =
-  /\b(?:sapatos?|cal[cç]ados?|t[eê]nis|tenis|trainer|trainers|sneaker|sneakers|sand[aá]lias?|chinelos?|slides?|boots?|heels?|loafers?|zapatos?|zapatillas?|botas?|calzado|[oó]culos|sunglass|rel[oó]gio|relogio|reloj|cinto|cintur[oó]n|\bbelts?\b|carteira|bols[ao]s?|mochila|backpack|handbag|clutch|pulseira|colar|brinco|gorro|bon[eé]|chap[eé]u|cachecol|pa[nñ]uelo|jewelry|necklace|bracelet|earrings?)\b/i;
 
 function genderOutfitRulesAppendix(target: "male" | "female" | "unisex", language: string): string {
   if (target === "unisex") return "";
@@ -939,10 +1002,10 @@ function sanitizeExplicacaoForClothingOnly(
   language: string,
   productName?: string
 ): string {
-  const text = String(explicacao || '').trim();
+  let text = scrubInvitationAccessoryTails(String(explicacao || '').trim(), language);
   if (!text) return text;
   const sentences = text.split(/(?<=[.!?…])\s+/).filter((s) => s.trim().length > 0);
-  const filtered = sentences.filter((s) => !FOOTWEAR_ACCESSORY_IN_EXPLICACAO.test(s));
+  const filtered = sentences.filter((s) => !sentenceMentionsNonGarmentFolded(s));
   if (filtered.length > 0) return filtered.join(' ').trim();
 
   const pn =
@@ -1058,12 +1121,12 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
         : "(upper = tops; think bottoms (jeans, trousers…) for silhouette and color — clothing only.)";
 
   if (language === "es") {
-    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde al cliente como estilista con tono personal ("tú", "para ti", "en tu caso"); desarrolla lo que haga falta en explicacao.\nOBLIGATORIO — primera frase de explicacao: incluye la talla ideal para la prenda en prueba (usa exactamente tamanho_final; debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO en explicacao: solo prendas de vestir — prohibido calzado y accesorios. Respeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde como estilista ("tú", "para ti", "en tu caso"); mantén explicacao breve — máximo ~4 frases cortas en total (incluida la primera obligatoria).\nOBLIGATORIO — primera frase de explicacao: debe ser exactamente del tipo: "Para la prenda en prueba (NOMBRE_EN_PRUEBA), tu talla ideal es TALLA" usando el nombre de la prenda en prueba del contexto y exactamente el valor tamanho_final (debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO en explicacao: solo prendas de vestir — prohibido calzado y accesorios. Respeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
   }
   if (language === "en") {
-    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist with a personal tone ("you", "for you", "in your case"); use the space you need in explicacao.\nMANDATORY — first sentence of explicacao: include the ideal size for the try-on garment (use exactly tamanho_final; it must match the recommended size in context).\nMANDATORY in explicacao: clothing only — no footwear or accessories. Respect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist ("you", "for you", "in your case"); keep explicacao brief — at most ~4 short sentences total (including the mandatory opening sentence).\nMANDATORY — first sentence of explicacao: must follow exactly: "For the try-on piece (TRY_ON_PRODUCT_NAME), your ideal size is SIZE" using the try-on product name from context and exactly tamanho_final (must match recommended size in context).\nMANDATORY in explicacao: clothing only — no footwear or accessories. Respect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
   }
-  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); desenvolva o que precisar em explicacao.\nOBRIGATÓRIO — primeira frase da explicacao: mencione o tamanho ideal para a peça em try-on (use exactamente tamanho_final; deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO na explicacao: só vestuário — proibido calçados e acessórios. Respeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); seja breve em explicacao — no máximo ~4 frases curtas no total (incluindo a primeira obrigatória).\nOBRIGATÓRIO — primeira frase da explicacao: deve seguir exatamente o formato: "Para a peça em try-on (NOME_DA_PEÇA_EM_TRY_ON), seu tamanho ideal é TAMANHO" usando o nome da peça em try-on do contexto e exatamente tamanho_final (deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO na explicacao: só vestuário — proibido calçados e acessórios. Respeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -1194,20 +1257,18 @@ ${genderCtx}${productCatalogContext}
 ${chatHistoryText}
 
 REGRAS IMPORTANTES:
-1. Se a pergunta for sobre o produto/descrição, use as informações acima para responder de forma útil
-2. Se mencionar o tamanho, faça APENAS UMA VEZ no início da resposta
-3. Depois continue naturalmente SEM repetir o tamanho
-4. Se a pergunta for sobre a marca/loja, mencione "${data.shop_name}" de forma natural e positiva
-5. Tom pessoal: "você", "no seu caso", "para você" quando fizer sentido; desenvolva o quanto precisar para ser útil e persuasivo
-6. Sempre induza à compra de forma sutil ao final
-7. Mantenha o foco em ajudar o usuário a tomar a decisão de compra
-8. Respeite o CONTEXTO DE GÉNERO nas sugestões de combinação (perfil masculino: nunca mencione saias/vestidos na explicacao)
-9. ${catalogHardRules}
+1. Use o contexto acima para responder de forma útil (produto, descrição, catálogo)
+2. Se mencionar tamanho: APENAS UMA VEZ no início; depois não volte a citar o valor
+3. BREVIDADE: explicacao com no máximo ~3–4 frases curtas no total (~450 caracteres)
+4. Tom pessoal ("você", "no seu caso"); convite breve ao carrinho ou próximo passo no final (uma frase)
+5. Se fizer sentido, mencione a loja/marca do contexto de forma breve e positiva
+6. Respeite o CONTEXTO DE GÉNERO (perfil masculino: nunca mencione saias/vestidos na explicacao)
+7. ${catalogHardRules}
 
 Retorne no formato JSON:
 {
   "tamanho_final": "${data.tamanho_calculado_algoritmo}",
-  "explicacao": "sua resposta persuasiva à pergunta do usuário",
+  "explicacao": "resposta curta e persuasiva à pergunta",
   "coerencia": "alta",
   "confianca": 1.0
 }`,
@@ -1224,9 +1285,9 @@ ${chatHistoryText}
 
 REGLAS IMPORTANTES:
 1. Si mencionas la talla, hazlo SOLO UNA VEZ al inicio de la respuesta
-2. Después continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante)` : ''}
-3. Tono personal: "tú", "para ti", "en tu caso" cuando encaje; desarrolla lo que haga falta para ser útil y persuasivo
-4. Mantén el foco en ayudar al usuario a tomar la decisión de compra
+2. Después continúa naturalmente SIN repetir la talla${data.shop_name ? ` (puedes mencionar la tienda "${data.shop_name}" de forma breve si es relevante)` : ''}
+3. Tono personal pero BREVE: máximo ~3–4 frases en total en explicacao
+4. Mantén el foco en ayudar al usuario a decidir
 5. Respeta el CONTEXTO DE GÉNERO en las combinaciones (perfil masculino: nunca menciones faldas/vestidos en explicacao)
 6. ${catalogHardRules}
 
@@ -1250,9 +1311,9 @@ ${chatHistoryText}
 
 IMPORTANT RULES:
 1. If you mention the size, do it ONLY ONCE at the beginning of your response
-2. Then continue naturally WITHOUT repeating the size${data.shop_name ? ` (you can mention the store "${data.shop_name}" naturally if relevant)` : ''}
-3. Personal tone: "you", "for you", "in your case" when natural; take the space you need to be helpful and persuasive
-4. Keep focus on helping the user make the purchase decision
+2. Then continue naturally WITHOUT repeating the size${data.shop_name ? ` (mention "${data.shop_name}" briefly if relevant)` : ''}
+3. Personal tone but BRIEF: at most ~3–4 short sentences total in explicacao
+4. Keep focus on helping the user decide
 5. Follow GENDER CONTEXT for outfit pairings (male profile: never mention skirts/dresses in explicacao)
 6. ${catalogHardRules}
 
@@ -1294,17 +1355,17 @@ CONTEXTO DO PRODUTO:
 - Elasticidade: ${data.elasticidade}${productInfo}${productDesc}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}
 ${productCatalogContext}
 
-ESTRUTURA DA MENSAGEM:
-- Abra confirmando o tamanho ideal (única menção ao tamanho no texto) e o motivo em linguagem qualitativa (proporções, silhueta, tipo de corpo — sem cm).
-- Continue com benefícios e tom pessoal ("para você", "no seu caso"); pode usar quantas frases forem necessárias.
-- Feche induzindo ao carrinho.
+ESTRUTURA DA MENSAGEM (curta):
+- Abra com o tamanho ideal (única menção ao tamanho) + uma frase qualitativa (silhueta/proporções — sem cm).
+- Mais UMA frase com benefício/tom pessoal.
+- Feche com indução ao carrinho (uma frase).
 
 REGRAS CRÍTICAS (NÃO IGNORE!):
 1. A palavra "tamanho" ou o valor "${data.tamanho_calculado_algoritmo}" deve aparecer APENAS UMA VEZ em toda a mensagem
-2. Coloque o tamanho SOMENTE no início (primeira frase ou primeiro parágrafo)
-3. Na abertura, explique de forma qualitativa o motivo (ex: "combina com suas proporções", "ideal para seu tipo de corpo atlético", "perfeito para sua silhueta")
+2. Coloque o tamanho SOMENTE no início (primeira frase)
+3. Na abertura, explique de forma qualitativa o motivo (ex.: proporções, silhueta)
 4. NUNCA mencione medidas em centímetros - use descrições qualitativas
-5. Tom conversacional, persuasivo e pessoal; não se limite artificialmente a poucas linhas
+5. Máximo ~4 frases curtas no total na explicacao; tom conversacional
 6. Não use asteriscos, negrito ou formatação especial
 7. Sempre induza ao carrinho no final
 
@@ -1332,7 +1393,7 @@ REGLAS CRÍTICAS (¡NO IGNORES!):
 1. La palabra "talla" o el valor "${data.tamanho_calculado_algoritmo}" debe aparecer SOLO UNA VEZ en todo el mensaje
 2. Coloca la talla SOLAMENTE al inicio (primera frase o primer párrafo; ejemplo: "¡Tu talla ideal es ${data.tamanho_calculado_algoritmo}!")
 3. Después, NUNCA MÁS menciones la talla o números de talla
-4. Continúa con beneficios y tono personal ("para ti", "en tu caso"): confianza, experiencia try-on, ajuste perfecto; usa las frases que necesites${data.shop_name ? `. Puedes mencionar la tienda "${data.shop_name}" de forma natural si es relevante` : ''}
+4. Continúa con beneficios en frases CORTAS (máximo ~3 frases en total después de la primera)${data.shop_name ? `. Puedes mencionar "${data.shop_name}" brevemente si aplica` : ''}
 5. No uses asteriscos, negrita o formato especial
 6. Tono conversacional, persuasivo y profesional; cierra invitando al carrito
 
@@ -1360,7 +1421,7 @@ CRITICAL RULES (DO NOT IGNORE!):
 1. The word "size" or the value "${data.tamanho_calculado_algoritmo}" must appear ONLY ONCE in the entire message
 2. Put the size ONLY at the opening (first sentence or short first paragraph; example: "Your ideal size is ${data.tamanho_calculado_algoritmo}!")
 3. After that, NEVER mention the size or size numbers again
-4. Continue with benefits and a personal tone ("for you", "in your case"): confidence, try-on experience, perfect fit; use as many sentences as you need${data.shop_name ? `. You can mention the store "${data.shop_name}" naturally if relevant` : ''}
+4. Continue with benefits in SHORT sentences (at most ~3 sentences after the opening)${data.shop_name ? `. Mention "${data.shop_name}" briefly if relevant` : ''}
 5. Don't use asterisks, bold or special formatting
 6. Conversational, persuasive, professional tone; close by nudging toward cart
 
@@ -1394,7 +1455,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
       return {
         tamanho_final: sizeHint,
         explicacao:
-          `Tu talla sugerida para ${productName} es ${sizeHint}. Con esta prenda puedes equilibrar el look con una base más clara, denim o textura distinta (camisa, chaqueta ligera). Dime la ocasión (trabajo, día a día, salir) y lo afinamos.`,
+          `Talla sugerida para ${productName}: ${sizeHint}. Equilibra con una base más clara o denim. ¿Ocasión trabajo o día a día?`,
         coerencia: "alta",
         confianca: 0.72,
       };
@@ -1403,7 +1464,7 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
       return {
         tamanho_final: sizeHint,
         explicacao:
-          `Your suggested size for ${productName} is ${sizeHint}. You can balance the outfit with lighter bottoms, denim, or a different texture (shirt, light jacket). Tell me the occasion (work, everyday, going out) and I will narrow it down.`,
+          `Suggested size for ${productName}: ${sizeHint}. Balance with lighter bottoms or denim. Work or casual?`,
         coerencia: "high",
         confianca: 0.72,
       };
@@ -1411,39 +1472,39 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
     return {
       tamanho_final: sizeHint,
       explicacao:
-        `Para o ${productName}, o tamanho sugerido para você é ${sizeHint}. No seu caso costuma funcionar equilibrar o preto com calça mais clara, jeans ou uma camada com textura diferente (camisa, jaqueta leve). Se disser a ocasião — trabalho, dia a dia, sair à noite — afunilo melhor as ideias.`,
+        `Tamanho sugerido para ${productName}: ${sizeHint}. Equilibre com calça mais clara ou jeans. Ocasião: trabalho ou dia a dia?`,
       coerencia: "alta",
       confianca: 0.72,
     };
   }
 
   if (language === 'es') {
-    const colorLine = colors.length > 0 ? ` Colores disponibles: ${colors.join(', ')}.` : '';
-    const sizeLine = sizes.length > 0 ? ` Tallas disponibles: ${sizes.join(', ')}.` : '';
+    const colorLine = colors.length > 0 ? ` Colores: ${colors.join(', ')}.` : '';
+    const sizeLine = sizes.length > 0 ? ` Tallas: ${sizes.join(', ')}.` : '';
     return {
       tamanho_final: sizeHint,
-      explicacao: `Para ${productName}, tu talla sugerida es ${sizeHint}. Te queda excelente para el estilo que buscas.${colorLine}${sizeLine} Si te gusta, agrégalo al carrito ahora para no perderlo.`,
+      explicacao: `Tu talla sugerida es ${sizeHint}.${colorLine}${sizeLine} Si te gusta, al carrito.`,
       coerencia: "alta",
       confianca: 0.92,
     };
   }
 
   if (language === 'en') {
-    const colorLine = colors.length > 0 ? ` Available colors: ${colors.join(', ')}.` : '';
-    const sizeLine = sizes.length > 0 ? ` Available sizes: ${sizes.join(', ')}.` : '';
+    const colorLine = colors.length > 0 ? ` Colors: ${colors.join(', ')}.` : '';
+    const sizeLine = sizes.length > 0 ? ` Sizes: ${sizes.join(', ')}.` : '';
     return {
       tamanho_final: sizeHint,
-      explicacao: `For ${productName}, your suggested size is ${sizeHint}. It is a great match for your look.${colorLine}${sizeLine} If you like it, add it to cart now so you do not miss it.`,
+      explicacao: `Your suggested size is ${sizeHint}.${colorLine}${sizeLine} Add to cart if you like it.`,
       coerencia: "high",
       confianca: 0.92,
     };
   }
 
-  const colorLine = colors.length > 0 ? ` Cores disponíveis: ${colors.join(', ')}.` : '';
-  const sizeLine = sizes.length > 0 ? ` Tamanhos disponíveis: ${sizes.join(', ')}.` : '';
+  const colorLine = colors.length > 0 ? ` Cores: ${colors.join(', ')}.` : '';
+  const sizeLine = sizes.length > 0 ? ` Tamanhos: ${sizes.join(', ')}.` : '';
   return {
     tamanho_final: sizeHint,
-    explicacao: `Para o ${productName}, o tamanho sugerido para o seu perfil é ${sizeHint}. A peça combina com o estilo que você procura.${colorLine}${sizeLine} Se gostou, adicione ao carrinho agora para garantir.`,
+    explicacao: `Tamanho sugerido: ${sizeHint}.${colorLine}${sizeLine} Adicione ao carrinho se curtir.`,
     coerencia: "alta",
     confianca: 0.92,
   };
@@ -1569,7 +1630,7 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: combinedSystemExtra || undefined,
-        maxTokens: hasStylistCandidates ? 1800 : 1400,
+        maxTokens: hasStylistCandidates ? 850 : 600,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
       });
     } catch (aiErr) {
@@ -1579,10 +1640,10 @@ Deno.serve(async (req: Request) => {
         const lang = language;
         const emptyHint =
           lang === "es"
-            ? "No encontré sugerencias en el catálogo filtrado para esta búsqueda. Prueba reformular o explora la tienda."
+            ? "Sin coincidencias claras en esta búsqueda. Reformula o mira más productos."
             : lang === "en"
-              ? "I could not find strong matches in this catalog search. Try rephrasing or browse the store."
-              : "Não encontrei sugestões fortes nesta busca do catálogo. Tente reformular ou explore a loja.";
+              ? "No strong matches in this search. Try rephrasing or browse."
+              : "Sem boas coincidências nesta busca. Reformule ou veja mais produtos.";
         gptResponse = {
           tamanho_final: normalizeSizeLabel(data.tamanho_calculado_algoritmo || "M"),
           explicacao: emptyHint,
@@ -1660,7 +1721,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-15-clothing-only-stylist",
+        _validate_size_rev: "2026-05-15-shorter-consultant-copy",
       }),
       {
         headers: {
@@ -1683,7 +1744,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-15-clothing-only-stylist",
+        _validate_size_rev: "2026-05-15-shorter-consultant-copy",
       }),
       {
         headers: {

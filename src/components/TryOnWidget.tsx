@@ -585,6 +585,8 @@ export function TryOnWidget({
     role: 'assistant' | 'user';
     content: string;
     timestamp: number;
+    /** Imagem do provador quando o try-on veio de uma sugestão no chat (fica visível no thread). */
+    tryOnImageUrl?: string;
     /** Telemetria sugestões estilista (par âncora PDP → sugerido). */
     stylistImpressionId?: string;
     stylistAnchorHandle?: string;
@@ -3439,6 +3441,7 @@ const handleSubmit = async (
             console.log('✅ Setting result image:', imageUrl);
             console.log('✅ TRY-ON concluído com timings finais:');
             logTryOnTimings('Job concluído', statusData.timings || null);
+            const embeddedInChat = embedTryOnInChatActiveRef.current;
             setResult(imageUrl);
 
             console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
@@ -3448,6 +3451,28 @@ const handleSubmit = async (
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
             setLoading(false);
+            if (embeddedInChat) {
+              const pname = String(product?.name || '').trim();
+              const fallbackPn =
+                currentLanguage === 'es'
+                  ? 'esta prenda'
+                  : currentLanguage === 'en'
+                    ? 'this garment'
+                    : 'esta peça';
+              const caption = t('embeddedSuggestionTryOnCaption').replace(
+                /\{productName\}/g,
+                pname || fallbackPn
+              );
+              setChatMessages((prev) => [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: caption,
+                  timestamp: Date.now(),
+                  tryOnImageUrl: imageUrl,
+                },
+              ]);
+            }
             clearEmbedTryOnChatLoading();
             return;
           }
@@ -3942,9 +3967,9 @@ const handleSubmit = async (
         let explicacao = typeof data.explicacao === 'string' ? data.explicacao.trim() : '';
         if (!explicacao && tamanhoFinal) {
           const sizeFallback = {
-            pt: `O seu tamanho sugerido é ${tamanhoFinal}. Veja o resultado no espelho virtual e, se curtir, pode adicionar ao carrinho.`,
-            es: `Tu talla sugerida es ${tamanhoFinal}. Mira el resultado en el espejo virtual y, si te gusta, añádelo al carrito.`,
-            en: `Your suggested size is ${tamanhoFinal}. Check the virtual mirror result and add to cart when you are ready.`,
+            pt: `Tamanho sugerido: ${tamanhoFinal}. Veja o espelho virtual e adicione ao carrinho se quiser.`,
+            es: `Talla sugerida: ${tamanhoFinal}. Mira el espejo virtual y añade al carrito si te encaja.`,
+            en: `Suggested size: ${tamanhoFinal}. Check the mirror and add to cart if you like it.`,
           };
           explicacao = sizeFallback[currentLanguage] || sizeFallback.en;
         }
@@ -4038,14 +4063,14 @@ const handleSubmit = async (
       const sz = String(calculatedSize || recommendedSize || '').trim();
       const fallbackMessages = {
         pt: sz
-          ? `Não consegui carregar a mensagem do assistente agora. Com base no seu perfil, o tamanho sugerido é ${sz}. ${localProductName ? `${localProductName} ` : 'A peça '}fica ótima no espelho virtual — adicione ao carrinho quando quiser.`
-          : `Essa peça combina muito bem com seu perfil. ${localProductName ? `${localProductName} ` : 'Ela '}é uma excelente escolha - adicione ao carrinho para garantir!`,
+          ? `Assistência instável. Tamanho sugerido: ${sz}. Veja o espelho e adicione ao carrinho se quiser.`
+          : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`,
         es: sz
-          ? `No pude cargar el mensaje del asistente. Tu talla sugerida es ${sz}. ${localProductName ? localProductName + ' ' : 'La prenda '}queda genial en el espejo virtual — agrégalo al carrito cuando quieras.`
-          : `${localProductName ? localProductName + ' ' : 'Esta prenda '}combina muy bien contigo. Agrega al carrito para asegurar tu compra.`,
+          ? `Sin asistente por ahora. Talla sugerida: ${sz}. Mira el espejo y añade al carrito si te encaja.`
+          : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`,
         en: sz
-          ? `I could not load the assistant message right now. Your suggested size is ${sz}. ${localProductName ? localProductName + ' ' : 'This item '}looks great in the virtual mirror — add to cart when you are ready.`
-          : `${localProductName ? localProductName + ' ' : 'This item '}fits your style very well. Add it to cart to secure your purchase.`
+          ? `Assistant unavailable. Suggested size: ${sz}. Check the mirror and add to cart if you like it.`
+          : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`,
       };
 
       if (requestSeq !== gptAssistSeqRef.current) return;
@@ -4526,6 +4551,15 @@ const handleSubmit = async (
                   style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
                 >
                   <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                  {message.tryOnImageUrl ? (
+                    <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                      <img
+                        src={message.tryOnImageUrl}
+                        alt=""
+                        className="mx-auto block max-h-[min(420px,55vh)] w-full max-w-[280px] object-contain md:max-w-[320px]"
+                      />
+                    </div>
+                  ) : null}
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
                       {message.suggestedProducts.map((sp) => (
