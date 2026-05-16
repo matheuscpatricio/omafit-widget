@@ -383,6 +383,59 @@ const normalizeSizeToken = (value: unknown): string =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/g, '');
 
+function escapeRegexSegmentAssistant(sizeLabel: string): string {
+  return String(sizeLabel || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Detecta se o texto já menciona explicitamente o tamanho do algoritmo (espelha a heurística do validate-size). */
+function assistantReplyMissingExplicitSize(text: string, sizeLabel: string): boolean {
+  const s = String(sizeLabel || '').trim();
+  if (!s) return false;
+  const body = String(text || '');
+  if (
+    /\b(tamanho|talla|size)\s*ideal\b/i.test(body) &&
+    new RegExp(`\\b${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)
+  ) {
+    return false;
+  }
+  if (
+    new RegExp(`\\b(tamanho|talla|size)\\s*[:,\\-]?\\s*${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)
+  ) {
+    return false;
+  }
+  if (s.length >= 2 || /^\d{2,3}$/.test(s)) {
+    if (new RegExp(`\\b${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)) return false;
+  }
+  return true;
+}
+
+function prependIdealSizeLeadIfMissing(
+  explicacao: string,
+  sizeLabel: string,
+  productName: string,
+  lang: 'pt' | 'es' | 'en'
+): string {
+  const sz = String(sizeLabel || '').trim();
+  const body = String(explicacao || '').trim();
+  if (!sz || !assistantReplyMissingExplicitSize(body, sz)) return body;
+  const pn = String(productName || '').trim();
+  let lead = '';
+  if (lang === 'es') {
+    lead = pn
+      ? `Tu talla ideal para ${pn} es ${sz}. `
+      : `Tu talla ideal para esta prenda es ${sz}. `;
+  } else if (lang === 'en') {
+    lead = pn
+      ? `Your ideal size for ${pn} is ${sz}. `
+      : `Your ideal size for this garment is ${sz}. `;
+  } else {
+    lead = pn
+      ? `Seu tamanho ideal para ${pn} é ${sz}. `
+      : `Seu tamanho ideal para esta peça é ${sz}. `;
+  }
+  return `${lead}${body}`.trim();
+}
+
 const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
 
@@ -4401,6 +4454,18 @@ const handleSubmit = async (
           };
           explicacao = sizeFallback[currentLanguage] || sizeFallback.en;
         }
+
+        const langForLead: 'pt' | 'es' | 'en' =
+          currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
+        if (!should_end_conversation && tamanhoFinal) {
+          explicacao = prependIdealSizeLeadIfMissing(
+            explicacao,
+            tamanhoFinal,
+            localProductName,
+            langForLead
+          );
+        }
+
         if (!explicacao) {
           console.error('❌ validate-size sem explicacao/tamanho:', result);
           throw new Error('Resposta do assistente sem texto');
@@ -4782,6 +4847,24 @@ const handleSubmit = async (
   /** Hero visual (fundo + logos + texto claro): desligado no chat/resultado para ficar como layout default. */
   const heroChromeActive = isHeroLayout && step !== 'result';
 
+  /** Imagens de try-on na etapa resultado: primário à esquerda (se ainda não está na bolha) + ordem das mensagens. */
+  const orderedTryOnImageUrls = (() => {
+    if (step !== 'result') return [] as string[];
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    const push = (u: string | undefined) => {
+      if (!u?.trim() || seen.has(u)) return;
+      seen.add(u);
+      urls.push(u);
+    };
+    const primaryInBubble = chatMessages.some((m) => m.tryOnResultVariant === 'primary');
+    if (result && !primaryInBubble) push(result);
+    for (const m of chatMessages) {
+      if (m.tryOnImageUrl) push(m.tryOnImageUrl);
+    }
+    return urls;
+  })();
+
   return (
     <motion.div
       className={`omafit-tryon-root w-full min-h-0${
@@ -4930,7 +5013,7 @@ const handleSubmit = async (
           className={
             embed
               ? `relative flex min-h-0 flex-1 flex-col overflow-hidden ${heroChromeActive ? 'bg-transparent z-10' : 'bg-white'}`
-              : 'fixed inset-0 z-50 flex flex-col bg-white'
+              : 'fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden bg-white'
           }
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -4967,34 +5050,41 @@ const handleSubmit = async (
             </div>
           )}
 
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+            {orderedTryOnImageUrls.length > 0 ? (
+              <aside
+                className={`flex shrink-0 flex-col gap-3 overflow-y-auto border-gray-100 md:w-[min(280px,40vw)] md:border-r md:px-3 md:py-4 ${
+                  embed ? 'border-b p-4 pb-3 pt-3 md:border-b-0 md:pt-14' : 'border-b p-4 md:border-b-0 md:p-4'
+                }`}
+              >
+                {orderedTryOnImageUrls.map((url, idx) => (
+                  <div
+                    key={`${url}-${idx}`}
+                    className="aspect-[3/4] w-full overflow-hidden rounded-2xl bg-gray-100 shadow-md"
+                  >
+                    <img src={url} alt="" className="h-full w-full object-cover object-center" loading="lazy" />
+                  </div>
+                ))}
+              </aside>
+            ) : null}
+
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Chat Messages */}
           <div
-            className={`flex-1 space-y-4 overflow-y-auto ${
-              embed ? 'p-4 md:px-3 md:pb-2 md:pt-12' : 'p-4'
+            className={`flex-1 space-y-4 overflow-y-auto min-h-0 ${
+              embed ? 'p-4 md:px-3 md:pb-2 md:pt-4' : 'p-4'
             }`}
           >
-            {/* Initial Try-On Result Image - Left aligned like assistant message */}
-            <motion.div
-              className="flex justify-start"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="max-w-[65%] md:max-w-[30%]">
-                {result &&
-                !chatMessages.some((m) => m.tryOnResultVariant === 'primary') ? (
-                  <img
-                    src={result}
-                    alt="Try-on result"
-                    className="w-full rounded-2xl shadow-md"
-                  />
-                ) : null}
-              </div>
-            </motion.div>
-
-            {/* Chat Messages */}
             <AnimatePresence initial={false}>
-            {chatMessages.map((message, index) => (
+            {chatMessages.map((message, index) => {
+              if (
+                message.role === 'assistant' &&
+                !message.content.trim() &&
+                !(message.suggestedProducts?.length)
+              ) {
+                return null;
+              }
+              return (
               <motion.div
                 key={`${message.timestamp}-${index}`}
                 className={`flex gap-2 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
@@ -5020,15 +5110,8 @@ const handleSubmit = async (
                   }`}
                   style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
                 >
-                  <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
-                  {message.tryOnImageUrl ? (
-                    <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
-                      <img
-                        src={message.tryOnImageUrl}
-                        alt=""
-                        className="mx-auto block max-h-[min(420px,55vh)] w-full max-w-[280px] object-contain md:max-w-[320px]"
-                      />
-                    </div>
+                  {message.content.trim() ? (
+                    <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
                   ) : null}
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
@@ -5085,7 +5168,8 @@ const handleSubmit = async (
                   ) : null}
                 </div>
               </motion.div>
-            ))}
+            );
+            })}
             </AnimatePresence>
 
             <AnimatePresence initial={false}>
@@ -5312,6 +5396,8 @@ const handleSubmit = async (
               </p>
             </motion.div>
           )}
+            </div>
+          </div>
         </motion.div>
       ) : (
         <div
