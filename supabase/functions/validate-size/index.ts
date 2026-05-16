@@ -159,7 +159,9 @@ function defaultSuggestedFromCandidates(
       : language === "en"
         ? "Pairs well with your outfit."
         : "Combina bem com o seu look atual.";
-  return candidates
+  const garments = candidates.filter((c) => !candidateLooksLikeNonGarmentProduct(c));
+  const pool = garments.length > 0 ? garments : candidates;
+  return pool
     .slice(0, 3)
     .map((c) => ({ handle: String(c.handle || "").trim(), rationale }))
     .filter((x) => x.handle);
@@ -177,7 +179,10 @@ function sanitizeSuggestedProducts(
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const h = String((item as { handle?: string }).handle || "").trim();
-    if (!h || !allowed.has(h.toLowerCase())) continue;
+    const hk = h.toLowerCase();
+    if (!h || !allowed.has(hk)) continue;
+    const row = (candidates || []).find((c) => String(c?.handle || "").trim().toLowerCase() === hk);
+    if (!row || candidateLooksLikeNonGarmentProduct(row)) continue;
     const rationale = String((item as { rationale?: string }).rationale || "").trim();
     out.push({
       handle: h,
@@ -380,23 +385,26 @@ function foldAscii(s: string): string {
 }
 
 /**
- * Calçado/acessório na frase — usa texto dobrado + \\p{L} (Unicode), não \\b antes de óculos/Óculos.
+ * Calçado/acessório na frase — texto dobrado + \\p{L} para tokens curtos (evita falsos positivos com "anel" dentro de outras palavras).
  */
 const NON_GARMENT_FOLDED_RE =
-  /(?:^|[^\p{L}])(?:sapatos?|calcados?|tenis|trainers?|sneakers?|sandalias?|chinelos?|slides?|boots?|heels?|loafers?|zapatos?|zapatillas?|botas?|chanclas?|calzado|oculos(?:\s+de\s+sol)?|sunglasses?|gafas?(?:\s+de\s+sol)?|reloj(?:es)?|relogio|smartwatch|watches?|cinto|cinturon|belts?|carteira|carteiras|bolsas?|mochila|backpack|handbag|clutch|pulseiras?|colares?|brincos?|earrings?|gorros?|bones?|chapeus?|cachecol|pa[nñ]uelo|jewelry|necklaces?|bracelets?)(?:[^\p{L}]|$)/u;
+  /(?:^|[^\p{L}])(?:sapatos?|calcados?|tenis|trainers?|sneakers?|sandalias?|chinelos?|slides?|boots?|heels?|loafers?|mocassins?|oxfords?|zapatos?|zapatillas?|botas?|botines?|chanclas?|calzado|oculos(?:\s+de\s+sol)?|sunglasses?|gafas?(?:\s+de\s+sol)?|anteojos?|reloj(?:es)?|relogio|smartwatch|watches?|cinto|cinturon|cintos?|belts?|carteira|carteiras|wallet|bolsas?|handbags?|clutch|mochila|backpack|rucksack|pulseiras?|colares?|brincos?|earrings?|necklaces?|bracelets?|rings?|joias?|bijuterias?|acessorios?|anel|aneis|argolas?|broches?|pingentes?|charms?|tiaras?|presilhas?|hair\s*clips?|headbands?|gorros?|bones?|chapeus?|sombreros?|fedoras?|gorras?|viseras?|viseiras?|toucas?|beanies?|luvas?|gloves?|cachecol|cachecois?|lenco|lencos?|echarpes?|bufandas?|scarves?|pa[nñ]uelos?|bandanas?|pochetes?|mini\s+bags?|crossbody|jewelry|accessor(?:y|ies))(?:[^\p{L}]|$)/u;
 
 function sentenceMentionsNonGarmentFolded(sentence: string): boolean {
   return NON_GARMENT_FOLDED_RE.test(foldAscii(sentence));
+}
+
+/** Título/handle de produto no catálogo (tenta excluir óculos, relógios, etc. das sugestões). */
+function candidateLooksLikeNonGarmentProduct(c: { title?: string; handle?: string }): boolean {
+  const handleSpaced = String(c.handle || '').replace(/[-_]+/g, ' ');
+  return sentenceMentionsNonGarmentFolded(`${String(c.title || '')} ${handleSpaced}`);
 }
 
 /** Remove blocos "Além disso / Además / Plus …" que mencionam acessório/calçado (mesmo com pontuação estranha). */
 function scrubAsideAccessoryBlocks(text: string, language: string): string {
   let t = String(text || '').trim();
   if (!t) return t;
-  const dropIfAccessory = (block: string) =>
-    /oculos|relogio|smartwatch|sapato|tenis|sandalia|cinto|bolsa|mochila|bone|chapeu|gafas|reloj|zapatos|bolso|cinturon|sunglasses|eyewear|watch|shoes|belt|bag|handbag|bracelet|pulseira|colar|necklace/.test(
-      foldAscii(block)
-    );
+  const dropIfAccessory = (block: string) => sentenceMentionsNonGarmentFolded(block);
 
   /** Para até pontuação fraca ou fim — cobre frases coladas sem ". " antes do aside. */
   const untilBoundary = String.raw`[\s\S]*?(?=[.!?]|\n|$)`;
@@ -445,11 +453,26 @@ function stripAccessoryInsertionsFromSentence(sentence: string): string {
     ''
   );
   s = s.replace(/\s+e\s+a\s+[^.!?]*(?:óculos|oculos)(?:\s+de\s+sol)?[^.!?]*/giu, '');
+  // PT: "um toque final com os Óculos...", "finalizar com os óculos"
+  s = s.replace(
+    /\s*,?\s*(?:um\s+)?toque\s+final\s+com\s+(?:os|as)\s+[^.!?]*(?:óculos|oculos)(?:\s+de\s+sol)?[^.!?]*/giu,
+    ''
+  );
+  s = s.replace(
+    /\s*,?\s*(?:com|por)\s+(?:os|as|um|uma)\s+[^.!?]*(?:óculos|oculos)(?:\s+de\s+sol)?[^.!?]*/giu,
+    ''
+  );
+  s = s.replace(
+    /\s*,?\s*e\s+(?:um|uma|uns|umas)\s+[^.!?]*(?:pulseira|relógio|relogio|bolsa|carteira|cinto|brinco|colar|anel|tiara|chapéu|chapeu|gorro|boné|mochila|viseira|touca)[^.!?]*/giu,
+    ''
+  );
   s = s.replace(/\s+(?:Além|Alem)\s+disso\s*,[\s\S]*$/iu, '');
-  // ES
+  // ES: gafas de sol; complementos con reloj/bolso…
   s = s.replace(/\s*y\s+(?:las\s+|los\s+|un\s+|una\s+)?[^.!?]*(?:gafas|gafa\b)[^.!?]*/giu, '');
+  s = s.replace(/\s*y\s+(?:un|una|unos|unas)\s+[^.!?]*(?:reloj|bolso|cartera|cinturon|pulsera|collar|anillo|sombrero|gorro)[^.!?]*/giu, '');
   // EN
   s = s.replace(/\s*,?\s*and\s+(?:the\s+)?[^.!?]*(?:sunglasses|eyewear)[^.!?]*/giu, '');
+  s = s.replace(/\s*,?\s*and\s+(?:a|an|the)\s+[^.!?]*(?:watch|wallet|belt|handbag|necklace|bracelet|ring|scarf|beanie|hat)\b[^.!?]*/giu, '');
   return s.replace(/\s*,\s*,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[,;\s]+|[,;\s]+$/g, '').trim();
 }
 
@@ -458,16 +481,16 @@ function scrubInvitationAccessoryTails(text: string, language: string): string {
   const endClause = '(?=[.!?]|$)';
   const runPt = (raw: string) =>
     raw.replace(new RegExp(`\\s+Não se esqueça(?: de)?[\\s\\S]*?${endClause}`, 'giu'), (block) =>
-      /oculos|relogio|cinto|bolsa|sapato|tenis|sandalia|mochila|bone|chapeu/.test(foldAscii(block)) ? '' : block
+      sentenceMentionsNonGarmentFolded(block) ? '' : block
     );
   if (language === 'es') {
     return text.replace(new RegExp(`\\s+No te olvides[\\s\\S]*?${endClause}`, 'giu'), (block) =>
-      /gafas|reloj|zapatos|bolso|cinturon|gorra/.test(foldAscii(block)) ? '' : block
+      sentenceMentionsNonGarmentFolded(block) ? '' : block
     );
   }
   if (language === 'en') {
     return text.replace(new RegExp(`\\s+Don['’]t forget[\\s\\S]*?${endClause}`, 'giu'), (block) =>
-      /sunglasses|eyewear|watch|shoes|sneakers|boots|belt|bag|handbag/.test(foldAscii(block)) ? '' : block
+      sentenceMentionsNonGarmentFolded(block) ? '' : block
     );
   }
   return runPt(text);
@@ -613,6 +636,7 @@ function explanationMentionsSize(text: string, sizeLabel: string): boolean {
   return new RegExp(`\\b${escapeRegexSegment(s)}\\b`, 'i').test(body);
 }
 
+/** @param options.stylistMode — consultor outfit: força abertura "Para o/a produto, tamanho …" e remove lead duplicado. */
 function enforceSizeFirstMessage(
   gptResponse: GPTResponse,
   data: ValidateSizeRequest,
@@ -626,7 +650,7 @@ function enforceSizeFirstMessage(
 
   let cleanedBody = withoutCatalog.trim();
 
-  // Modo estilista: primeira frase com produto + tamanho; body mesmo que venha vazio após saneamento.
+  // Modo consultor (chat outfit): primeira frase com produto + tamanho; saneamento já removeu acessórios.
   if (options?.stylistMode) {
     const lead = buildStylistSizeLead(language, size, data.product_name);
     let body = cleanedBody.trim();
@@ -1495,7 +1519,9 @@ REGRAS IMPORTANTES:
 4. Tom pessoal ("você", "no seu caso"); convite breve ao carrinho ou próximo passo no final (uma frase)
 5. Se fizer sentido, mencione a loja/marca do contexto de forma breve e positiva
 6. Respeite o CONTEXTO DE GÉNERO (perfil masculino: nunca mencione saias/vestidos na explicacao)
-7. ${catalogHardRules}
+7. Priorize o produto atual (nome no contexto): ancoral o conselho nele antes de só destacar outras peças.
+8. Só vestuário na explicacao: não sugira calçados nem acessórios (óculos, relógio, bolsa, cinto, boné, etc.).
+9. ${catalogHardRules}
 
 Retorne no formato JSON:
 {
@@ -1521,7 +1547,9 @@ REGLAS IMPORTANTES:
 3. Tono personal pero BREVE: máximo ~3–4 frases en total en explicacao
 4. Mantén el foco en ayudar al usuario a decidir
 5. Respeta el CONTEXTO DE GÉNERO en las combinaciones (perfil masculino: nunca menciones faldas/vestidos en explicacao)
-6. ${catalogHardRules}
+6. Prioriza el producto actual (nombre en contexto): ancla el consejo en él antes de destacar solo otras prendas.
+7. Solo ropa en explicacao: no sugieras calzado ni accesorios (gafas, reloj, bolso, cinturón, gorra, etc.).
+8. ${catalogHardRules}
 
 Retorna en formato JSON:
 {
@@ -1547,7 +1575,9 @@ IMPORTANT RULES:
 3. Personal tone but BRIEF: at most ~3–4 short sentences total in explicacao
 4. Keep focus on helping the user decide
 5. Follow GENDER CONTEXT for outfit pairings (male profile: never mention skirts/dresses in explicacao)
-6. ${catalogHardRules}
+6. Prioritize the current product (name in context): anchor advice on it before only highlighting other pieces.
+7. Clothing only in explicacao: do not suggest footwear or accessories (sunglasses, watch, bag, belt, hat, etc.).
+8. ${catalogHardRules}
 
 Return in JSON format:
 {
@@ -1851,6 +1881,11 @@ Deno.serve(async (req: Request) => {
       Array.isArray(data.candidate_products) &&
       data.candidate_products.length > 0;
 
+    /** Respostas de consultor de outfit no chat: vale mesmo sem lista de candidatos (ex.: catalog-search vazio). */
+    const consultantOutfitReply =
+      data.intencao_usuario === "custom_message" ||
+      data.intencao_usuario === "sugerir_combinacoes";
+
     const targetGender = resolveEffectiveTargetGender(data);
     const genderSystemExtra =
       targetGender !== "unisex" ? genderOutfitRulesAppendix(targetGender, language) : "";
@@ -1862,7 +1897,7 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: combinedSystemExtra || undefined,
-        maxTokens: hasStylistCandidates ? 850 : 600,
+        maxTokens: hasStylistCandidates || consultantOutfitReply ? 850 : 600,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
       });
     } catch (aiErr) {
@@ -1915,7 +1950,7 @@ Deno.serve(async (req: Request) => {
       };
     }
 
-    if (hasStylistCandidates) {
+    if (hasStylistCandidates || consultantOutfitReply) {
       gptResponse = {
         ...gptResponse,
         explicacao: sanitizeExplicacaoForClothingOnly(
@@ -1944,7 +1979,7 @@ Deno.serve(async (req: Request) => {
 
     const constrainedResponse = enforceAvailableSizes(gptWithForcedSize, data);
     const finalResponse = enforceSizeFirstMessage(constrainedResponse, data, {
-      stylistMode: hasStylistCandidates,
+      stylistMode: consultantOutfitReply,
     });
 
     return new Response(
@@ -1953,7 +1988,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-16-stylist-lead-para-o-produto",
+        _validate_size_rev: "2026-05-16-filter-accessories-text-and-suggestions",
       }),
       {
         headers: {
@@ -1976,7 +2011,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-16-stylist-lead-para-o-produto",
+        _validate_size_rev: "2026-05-16-filter-accessories-text-and-suggestions",
       }),
       {
         headers: {

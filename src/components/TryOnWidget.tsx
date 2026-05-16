@@ -616,6 +616,8 @@ export function TryOnWidget({
   /** Evita aplicar resposta de um fetch antigo se outro pedido ao GPT foi iniciado (remount / duplo efeito). */
   const gptAssistSeqRef = useRef(0);
   const initialGptScheduleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Pesquisa Omafit disparada em paralelo ao /tryon para o primeiro GPT após resultado não esperar tanto. */
+  const stylistCatalogPrefetchPromiseRef = useRef<Promise<OmafitCatalogCandidate[]> | null>(null);
   const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
   /** Últimas sugestões do consultor (para "quero experimentar" / try-on automático). */
   const lastStylistSuggestionsRef = useRef<
@@ -1377,19 +1379,26 @@ export function TryOnWidget({
     return () => clearTimeout(t);
   }, [step, chartGenderScope]);
 
-  // Chamar assistente GPT automaticamente quando chegar no resultado - já induzindo ao carrinho
+  // Chamar assistente GPT automaticamente quando chegar no resultado — já induzindo ao carrinho
   useEffect(() => {
     if (initialGptScheduleRef.current) {
       clearTimeout(initialGptScheduleRef.current);
       initialGptScheduleRef.current = null;
     }
     if (step !== 'result' || !sizeData) return;
-    if (chatMessages.length > 0 || gptLoading) return;
+    /** Mensagem só com imagem do try-on no chat não conta: o texto do consultor vem a seguir. */
+    const hasAssistantConsultantReply = chatMessages.some(
+      (m) =>
+        m.role === 'assistant' &&
+        !m.tryOnImageUrl &&
+        String(m.content || '').trim().length > 0
+    );
+    if (hasAssistantConsultantReply || gptLoading) return;
 
     initialGptScheduleRef.current = setTimeout(() => {
       initialGptScheduleRef.current = null;
       void callGPTAssistant('add_to_cart');
-    }, 1000);
+    }, 200);
 
     return () => {
       if (initialGptScheduleRef.current) {
@@ -1397,7 +1406,7 @@ export function TryOnWidget({
         initialGptScheduleRef.current = null;
       }
     };
-  }, [step, sizeData, chatMessages.length, gptLoading]);
+  }, [step, sizeData, chatMessages, gptLoading]);
 
   // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
@@ -2971,9 +2980,67 @@ const validatePhotoForCollection = (
     }
   };
 
+  /** Dispara catalog-search Omafit para o mesmo query do fluxo add_to_cart (em paralelo ao job de try-on). */
+  const beginStylistCatalogPrefetch = React.useCallback(() => {
+    const { baseUrl: omafitBase, secret: omafitSecret, isReady } = getOmafitCatalogRuntimeConfig();
+    const hasShopDomain = Boolean(String(effectiveShopDomain || '').trim());
+    const hasPublicId = Boolean(String(publicId || '').trim());
+    if (!isReady || !omafitBase || !omafitSecret || !hasShopDomain || !hasPublicId) return;
+
+    const shopifyCollectionHandles = [
+      ...(collectionHandles || []).map((h) => String(h || '').trim()).filter(Boolean),
+      String(collectionHandle || '').trim(),
+    ].filter((h, i, a) => h && a.indexOf(h) === i);
+
+    const collectionHandlesLine = shopifyCollectionHandles.join(', ');
+    const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
+    const autoQuery = [
+      `Combinar outfit com ${localProductName || 'esta peça'}`,
+      localProductDescription,
+      `Coleção tipo ${localCollectionType || 'upper'}`,
+      'calça jeans casaco camisa calçado acessórios cores neutras',
+    ]
+      .filter((s) => String(s || '').trim())
+      .join(' | ') + ctx;
+
+    stylistCatalogPrefetchPromiseRef.current = fetchOmafitCatalogSearch({
+      baseUrl: omafitBase,
+      secret: omafitSecret,
+      shopDomain: effectiveShopDomain,
+      publicId,
+      userMessage: autoQuery,
+      excludeHandle: (localProductHandle || productHandle || '').trim(),
+      productName: localProductName,
+      collectionType: localCollectionType || 'upper',
+      shopperGender: sizeData?.gender || 'unisex',
+      chartGenderScope,
+      collectionHandles: shopifyCollectionHandles,
+    })
+      .then((res) => res.candidates)
+      .catch(() => []);
+  }, [
+    effectiveShopDomain,
+    publicId,
+    collectionHandles,
+    collectionHandle,
+    localProductHandle,
+    productHandle,
+    localProductName,
+    localProductDescription,
+    localCollectionType,
+    sizeData?.gender,
+    chartGenderScope,
+  ]);
+
 const handleSubmit = async (
   modelFileOverride?: File | null,
-  tryOnOpts?: { embedTryOnInChat?: boolean }
+  tryOnOpts?: {
+    embedTryOnInChat?: boolean;
+    /** Evita estado React stale ao disparar try-on logo após trocar para produto sugerido (Omafit). */
+    overrideGarmentImageUrl?: string;
+    overrideProductId?: string;
+    overrideProductName?: string;
+  }
 ) => {
   const modelFile = modelFileOverride ?? modelImage;
   if (!modelFile || !product) {
@@ -2992,6 +3059,15 @@ const handleSubmit = async (
   setProcessingMessage(t('sendingImages'));
 
   try {
+    const resolvedGarmentImageUrlRaw =
+      (tryOnOpts?.overrideGarmentImageUrl && String(tryOnOpts.overrideGarmentImageUrl).trim()) ||
+      selectedProductImage ||
+      product.garment_image;
+    const resolvedProductId =
+      (tryOnOpts?.overrideProductId && String(tryOnOpts.overrideProductId).trim()) || String(product.id);
+    const resolvedProductName =
+      (tryOnOpts?.overrideProductName && String(tryOnOpts.overrideProductName).trim()) || product.name;
+
     const currentJobId = activeModelImageJobRef.current;
     const optimizedImage = preparedModelImageRef.current
       ?? await (modelImagePreparationPromiseRef.current || startModelImagePreparation(modelFile, currentJobId));
@@ -3116,8 +3192,8 @@ const handleSubmit = async (
           public_id: publicId,
           shop_domain: effectiveShopDomain || null,
           shop_name: localStoreName || null,
-          product_id: product.id,
-          product_name: product.name,
+          product_id: resolvedProductId,
+          product_name: resolvedProductName,
           collection_handle: collectionHandle || null,
           model_image: uploadedModelImageUrl || 'garment-widget-mediapipe',
           user_measurements: {
@@ -3170,7 +3246,7 @@ const handleSubmit = async (
     }
 
     setProcessingMessage(t('creatingTryOn'));
-    const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(selectedProductImage || product.garment_image);
+    const optimizedGarmentImageUrl = getOptimizedRemoteTryOnImageUrl(resolvedGarmentImageUrlRaw);
     const payload = {
       shop_domain: effectiveShopDomain,
       // Hint explícito para o backend escolher o modelo correto do try-on.
@@ -3178,8 +3254,8 @@ const handleSubmit = async (
       collection_type: localCollectionType || 'upper',
       model_image: uploadedModelImageUrl || '',
       garment_image: optimizedGarmentImageUrl,
-      product_name: product.name,
-      product_id: product.id,
+      product_name: resolvedProductName,
+      product_id: resolvedProductId,
       public_id: publicId,
       user_measurements: {
         gender: sizeData.gender || 'unisex',
@@ -3204,6 +3280,8 @@ const handleSubmit = async (
     });
     logVerboseTryOn('🔑 publicId:', publicId);
     logVerboseTryOn('👕 garment_image:', payload.garment_image);
+
+    beginStylistCatalogPrefetch();
 
     let response: Response;
     if (uploadedModelImageUrl) {
@@ -3237,6 +3315,7 @@ const handleSubmit = async (
     }
 
     if (!response.ok) {
+      stylistCatalogPrefetchPromiseRef.current = null;
       const errorData = await response.json();
       throw new Error(errorData.error || t('processingError'));
     }
@@ -3286,6 +3365,7 @@ const handleSubmit = async (
     // mantemos o fluxo funcionando sem imagem (mostra chat/cart com base no tamanho).
     if (result?.tryon_disabled === true) {
       console.log('⚠️ Try-on desativado pelo backend. Pulando polling.');
+      stylistCatalogPrefetchPromiseRef.current = null;
       await trackGarmentMediapipeSession();
       setPredictionId(null);
       setResult(null);
@@ -3349,10 +3429,12 @@ const handleSubmit = async (
 
       startPolling(result.fal_request_id);
     } else {
+      stylistCatalogPrefetchPromiseRef.current = null;
       throw new Error(result.error || t('processingError'));
     }
   } catch (error: any) {
     console.error('Erro no try-on:', error);
+    stylistCatalogPrefetchPromiseRef.current = null;
     setError(error.message || t('processingError'));
     leaveTryOnErrorStep();
     setLoading(false);
@@ -3537,6 +3619,7 @@ const handleSubmit = async (
     lastStylistSuggestionsRef.current = [];
     lastStylistImpressionMetaRef.current = null;
     suggestionAttributionRef.current = null;
+    stylistCatalogPrefetchPromiseRef.current = null;
     stylistSearchAnchorRef.current = '';
     stylistImpressionSentRef.current = new Set();
     embedTryOnInChatActiveRef.current = false;
@@ -3653,8 +3736,16 @@ const handleSubmit = async (
 
       invalidatePreparedModelAssets();
       if (options?.autoSubmitTryOn) {
+        const garmentUrl = safeDecodeUriComponent(mainImg);
+        const pid = String(product.id || '').trim();
+        const pname = String(product.title || '').trim();
         window.setTimeout(() => {
-          void handleSubmit(undefined, { embedTryOnInChat: true });
+          void handleSubmit(undefined, {
+            embedTryOnInChat: true,
+            overrideGarmentImageUrl: garmentUrl,
+            overrideProductId: pid,
+            overrideProductName: pname,
+          });
         }, 80);
       } else {
         setStep('photo');
@@ -3840,7 +3931,22 @@ const handleSubmit = async (
         ]
           .filter((s) => String(s || '').trim())
           .join(' | ') + ctx;
-        await runOmafitCatalogSearch(autoQuery);
+
+        const prefetchPromise = stylistCatalogPrefetchPromiseRef.current;
+        stylistCatalogPrefetchPromiseRef.current = null;
+        let fromPrefetch: OmafitCatalogCandidate[] | undefined;
+        if (prefetchPromise) {
+          try {
+            fromPrefetch = await prefetchPromise;
+          } catch {
+            fromPrefetch = undefined;
+          }
+        }
+        if (fromPrefetch && fromPrefetch.length > 0) {
+          candidate_products = fromPrefetch;
+        } else {
+          await runOmafitCatalogSearch(autoQuery);
+        }
         if (candidate_products?.length) {
           intencaoForPayload = 'custom_message';
           customMessageForPayload = t('stylistInitialOutfitAsk').replace(
