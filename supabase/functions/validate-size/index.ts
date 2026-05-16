@@ -368,6 +368,67 @@ function removeSizeMentions(text: string, sizeLabel: string): string {
   return out.trim();
 }
 
+/** Remove menções a tamanho da legenda pós 2.º try-on (GPT ou pós-processamento antigo). */
+function stripSizeMentionsForSecondaryCaption(
+  text: string,
+  language: string,
+  size: string
+): string {
+  let body = String(text || '').trim();
+  if (!body) return body;
+
+  const sz = escapeRegexSegment(normalizeSizeLabel(size));
+
+  body = body
+    .replace(/^\s*Seu tamanho ideal[^.!?]+[.!?]\s*/iu, '')
+    .replace(/^\s*Tu talla ideal[^.!?]+[.!?]\s*/iu, '')
+    .replace(/^\s*Your ideal size[^.!?]+[.!?]\s*/iu, '')
+    .replace(new RegExp(`^\\s*Seu tamanho ideal é\\s+${sz}[^.!?]*[.!?]\\s*`, 'iu'), '')
+    .replace(new RegExp(`^\\s*Tu talla ideal es\\s+${sz}[^.!?]*[.!?]\\s*`, 'iu'), '')
+    .replace(new RegExp(`^\\s*Your ideal size is\\s+${sz}[^.!?]*[.!?]\\s*`, 'iu'), '')
+    .trim();
+
+  body = body
+    .replace(
+      /\b(?:seu|sua|tu|tus|your)\s+(?:tamanho|talla|size)\s+ideal\s+(?:é|es|is)\s+[^.!?]+[.!?]\s*/giu,
+      ''
+    )
+    .replace(/\b(?:tamanho|talla|size)\s+(?:ideal|sugerido|recomendado)\s*[:,]?\s*[^.!?]+[.!?]\s*/giu, '')
+    .replace(/\bperfeito\s+para\s+suas?\s+propor[cç][oõ]es[^.!?]*[.!?]\s*/giu, '')
+    .trim();
+
+  if (sz.length >= 2 || /^\d{2,3}$/.test(sz)) {
+    const sizeLead = new RegExp(
+      `^\\s*(?:tamanho|talla|size)\\s*[:,\\-]?\\s*${sz}\\b[^.!?]*[.!?]\\s*`,
+      'iu'
+    );
+    body = body.replace(sizeLead, '').trim();
+  }
+
+  return body.trim();
+}
+
+function getSecondaryCaptionSystemExtra(language: string): string {
+  const blocks: Record<string, string> = {
+    pt: `MODO LEGENDA — 2.º TRY-ON EM CADEIA (prioridade máxima):
+- Na "explicacao" NÃO mencione tamanho, numeração (P/M/G/GG), "tamanho ideal", medidas corporais nem proporções ligadas a fit.
+- Foque só em como a peça experimentada combina com a peça âncora do look (silhueta, cor, ocasião).
+- Convide com naturalidade a adicionar ao carrinho se curtir o conjunto.
+- Ignore instruções gerais deste sistema que peçam para citar tamanho.`,
+    es: `MODO LEYENDA — 2.º TRY-ON EN CADENA (prioridad máxima):
+- En "explicacion" NO menciones talla, numeración, "talla ideal", medidas corporales ni proporciones de ajuste.
+- Centra solo cómo la prenda probada combina con la pieza ancla (silueta, color, ocasión).
+- Invita a añadir al carrito si le convence el conjunto.
+- Ignora instrucciones generales que pidan citar la talla.`,
+    en: `CAPTION MODE — 2nd CHAINED TRY-ON (highest priority):
+- In "explicacao" do NOT mention size, sizing letters, "ideal size", body measurements, or fit proportions.
+- Focus only on how the tried piece pairs with the anchor piece (silhouette, color, occasion).
+- Nudge add to cart if they love the combo.
+- Override general system rules that ask you to mention size.`,
+  };
+  return blocks[language] || blocks.en;
+}
+
 function buildSizeFirstSentence(language: string, size: string): string {
   if (language === 'es') return `Tu talla ideal es ${size}!`;
   if (language === 'en') return `Your ideal size is ${size}!`;
@@ -660,6 +721,15 @@ function enforceSizeFirstMessage(
 
   // Se o saneamento retirar tudo (ex.: só linhas de catálogo), recuperamos o texto cru para não perder o prefixo de tamanho.
   let cleanedBody = withoutCatalog.trim() || rawExplicacao.trim();
+
+  if (secondaryTryOnCaption) {
+    cleanedBody = stripSizeMentionsForSecondaryCaption(cleanedBody, language, size);
+    return {
+      ...gptResponse,
+      tamanho_final: size,
+      explicacao: cleanedBody || gptResponse.explicacao,
+    };
+  }
 
   // Modo consultor (chat outfit): primeira frase com produto + tamanho; saneamento já removeu acessórios.
   // Legenda do 2.º try-on nunca leva esse prefixo de tamanho/peça.
@@ -2035,7 +2105,9 @@ Deno.serve(async (req: Request) => {
     const genderSystemExtra =
       targetGender !== "unisex" ? genderOutfitRulesAppendix(targetGender, language) : "";
     const stylistSystemExtra = hasCandidateProducts ? getStylistSystemExtra(language) : "";
-    const combinedSystemExtra = [stylistSystemExtra, genderSystemExtra].filter(Boolean).join("\n\n");
+    const combinedSystemExtra = isSecondaryCaption
+      ? getSecondaryCaptionSystemExtra(language)
+      : [stylistSystemExtra, genderSystemExtra].filter(Boolean).join("\n\n");
 
     let gptResponse: GPTResponse;
     let assistantSource: "openai" | "fallback_openai" = "openai";
@@ -2124,7 +2196,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-15-secondary-caption-no-size-lead",
+        _validate_size_rev: "2026-05-16-secondary-caption-no-size-race-fix",
       }),
       {
         headers: {
@@ -2147,7 +2219,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-15-secondary-caption-no-size-lead",
+        _validate_size_rev: "2026-05-16-secondary-caption-no-size-race-fix",
       }),
       {
         headers: {

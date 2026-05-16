@@ -868,6 +868,8 @@ export function TryOnWidget({
     selectedVariantIdSnapshot: string;
     selectedProductImageSnapshot: string;
     selectedColorHexSnapshot: string;
+    /** 2.º try-on em cadeia (produto sugerido sobre resultado anterior). */
+    isChainedSuggestedTryOn?: boolean;
   } | null>(null);
   const productCatalogRef = useRef<ProductCatalog>(productCatalog);
   const selectedVariantOptionsRef = useRef<Record<string, string>>(selectedVariantOptions);
@@ -1660,7 +1662,11 @@ export function TryOnWidget({
         !m.tryOnImageUrl &&
         String(m.content || '').trim().length > 0
     );
-    if (hasAssistantConsultantReply || gptLoading) return;
+    /** Legenda pós try-on de produto sugerido (não usar prompt add_to_cart com tamanho). */
+    const hasSuggestedTryOnInChat = chatMessages.some(
+      (m) => m.role === 'assistant' && m.tryOnResultVariant === 'suggested'
+    );
+    if (hasAssistantConsultantReply || gptLoading || hasSuggestedTryOnInChat) return;
 
     initialGptScheduleRef.current = setTimeout(() => {
       initialGptScheduleRef.current = null;
@@ -3767,6 +3773,7 @@ const handleSubmit = async (
         selectedVariantIdSnapshot: selectedVariantIdRef.current,
         selectedProductImageSnapshot: selectedProductImageRef.current,
         selectedColorHexSnapshot: selectedColorHexRef.current,
+        isChainedSuggestedTryOn: usePriorTryOnOutput,
       };
 
       startPolling(result.fal_request_id);
@@ -3932,7 +3939,7 @@ const handleSubmit = async (
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
             setLoading(false);
-            if (embeddedInChat) {
+            if (embeddedInChat && jobCtx?.isChainedSuggestedTryOn) {
               const suggestedPn = String(tryOnSubmitMetaRef.current?.productName || product?.name || '').trim();
               const anchorPn = String(localProductName || '').trim();
               const fallbackSuggested =
@@ -3949,6 +3956,11 @@ const handleSubmit = async (
                     : 'a sua peça principal';
 
               const captionTs = Date.now();
+              gptAssistSeqRef.current += 1;
+              if (initialGptScheduleRef.current) {
+                clearTimeout(initialGptScheduleRef.current);
+                initialGptScheduleRef.current = null;
+              }
               setChatMessages((prev) => [
                 ...prev,
                 {
