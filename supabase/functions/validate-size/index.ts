@@ -389,6 +389,70 @@ function sentenceMentionsNonGarmentFolded(sentence: string): boolean {
   return NON_GARMENT_FOLDED_RE.test(foldAscii(sentence));
 }
 
+/** Remove blocos "Além disso / Además / Plus …" que mencionam acessório/calçado (mesmo com pontuação estranha). */
+function scrubAsideAccessoryBlocks(text: string, language: string): string {
+  let t = String(text || '').trim();
+  if (!t) return t;
+  const dropIfAccessory = (block: string) =>
+    /oculos|relogio|smartwatch|sapato|tenis|sandalia|cinto|bolsa|mochila|bone|chapeu|gafas|reloj|zapatos|bolso|cinturon|sunglasses|eyewear|watch|shoes|belt|bag|handbag|bracelet|pulseira|colar|necklace/.test(
+      foldAscii(block)
+    );
+
+  /** Para até pontuação fraca ou fim — cobre frases coladas sem ". " antes do aside. */
+  const untilBoundary = String.raw`[\s\S]*?(?=[.!?]|\n|$)`;
+
+  if (language === 'es') {
+    t = t.replace(new RegExp(`(?:^|\\s+)Además\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)Ademas\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)También\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)Tambien\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+  } else if (language === 'en') {
+    t = t.replace(new RegExp(`(?:^|\\s+)Plus\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)Additionally\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+  } else {
+    t = t.replace(new RegExp(`(?:^|\\s+)Além\\s+disso\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)Alem\\s+disso\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+    t = t.replace(new RegExp(`(?:^|\\s+)Ainda\\s*,${untilBoundary}`, 'giu'), (block) =>
+      dropIfAccessory(block) ? '' : block
+    );
+  }
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Corta menções a acessório/calçado dentro da mesma frase (ex.: "calça … e os Óculos …"). */
+function stripAccessoryInsertionsFromSentence(sentence: string): string {
+  let s = String(sentence || '').trim();
+  if (!s) return s;
+  // PT: ", e os Óculos...", "elegante e os óculos..." ou " e os óculos de sol"
+  s = s.replace(
+    /\s*,?\s*e\s+(?:os|as|um|uma)\s+[^.!?]*(?:óculos|oculos)(?:\s+de\s+sol)?[^.!?]*/giu,
+    ''
+  );
+  s = s.replace(/\s+e\s+a\s+[^.!?]*(?:óculos|oculos)(?:\s+de\s+sol)?[^.!?]*/giu, '');
+  s = s.replace(/\s+(?:Além|Alem)\s+disso\s*,[\s\S]*$/iu, '');
+  // ES
+  s = s.replace(/\s*y\s+(?:las\s+|los\s+|un\s+|una\s+)?[^.!?]*(?:gafas|gafa\b)[^.!?]*/giu, '');
+  // EN
+  s = s.replace(/\s*,?\s*and\s+(?:the\s+)?[^.!?]*(?:sunglasses|eyewear)[^.!?]*/giu, '');
+  return s.replace(/\s*,\s*,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[,;\s]+|[,;\s]+$/g, '').trim();
+}
+
 /** Remove blocos típicos do GPT ("Não se esqueça… óculos…") antes do split em frases. */
 function scrubInvitationAccessoryTails(text: string, language: string): string {
   const endClause = '(?=[.!?]|$)';
@@ -409,21 +473,126 @@ function scrubInvitationAccessoryTails(text: string, language: string): string {
   return runPt(text);
 }
 
+/** Verifica se o corpo (após o lead de tamanho) cita o produto por tokens significativos do nome. */
+function bodyAcknowledgesTryOn(body: string, productName: string): boolean {
+  const b = foldAscii(body);
+  const tokens = String(productName || '')
+    .split(/\s+/)
+    .map((w) => foldAscii(w.replace(/[^\p{L}\p{N}]/gu, '')))
+    .filter((w) => w.length >= 3)
+    .sort((a, c) => c.length - a.length);
+  if (tokens.length === 0) return false;
+  const longest = tokens[0];
+  if (longest.length >= 5 && b.includes(longest)) return true;
+  return tokens.filter((t) => t.length >= 4).every((t) => b.includes(t));
+}
+
+function tryOnAnchorPrefix(language: string, productName: string): string {
+  const pn = String(productName || '').trim();
+  if (!pn) return '';
+  if (language === 'es') return `Con ${pn} como base del look,`;
+  if (language === 'en') return `With ${pn} as your starting piece,`;
+  return `Com ${pn} como base do look,`;
+}
+
+/** Heurística por primeira palavra do título (comércio PT). */
+function portugueseDefiniteArticleForProduct(productName: string): 'o' | 'a' {
+  const head = foldAscii(String(productName || '').trim().split(/\s+/)[0] || '');
+  if (!head) return 'o';
+  const feminine = new Set([
+    'calca',
+    'saia',
+    'blusa',
+    'camisa',
+    'camiseta',
+    'regata',
+    'jaqueta',
+    'bermuda',
+    'legging',
+    'leggings',
+    'cropped',
+    'cueca',
+    'meia',
+    'meias',
+    'top',
+    'body',
+  ]);
+  const masculine = new Set([
+    'sueter',
+    'moletom',
+    'casaco',
+    'blazer',
+    'vestido',
+    'agasalho',
+    'sobretudo',
+    'pulover',
+    'polo',
+    'macacao',
+    'conjunto',
+    'shorts',
+    'chinelo',
+    'tenis',
+    'bone',
+    'gorro',
+    'terno',
+    'colete',
+  ]);
+  if (feminine.has(head)) return 'a';
+  if (masculine.has(head)) return 'o';
+  return 'o';
+}
+
+/** Heurística por primeira palavra do título (comércio ES). */
+function spanishDefiniteArticleForProduct(productName: string): 'el' | 'la' {
+  const head = foldAscii(String(productName || '').trim().split(/\s+/)[0] || '');
+  if (!head) return 'el';
+  const feminine = new Set([
+    'falda',
+    'blusa',
+    'camisa',
+    'camiseta',
+    'chaqueta',
+    'bermuda',
+    'legging',
+    'leggings',
+    'camisola',
+    'remera',
+    'musculosa',
+  ]);
+  const masculine = new Set([
+    'sueter',
+    'jersey',
+    'abrigo',
+    'blazer',
+    'vestido',
+    'pantalon',
+    'short',
+    'shorts',
+    'conjunto',
+    'polo',
+    'chaleco',
+    'terno',
+  ]);
+  if (feminine.has(head)) return 'la';
+  if (masculine.has(head)) return 'el';
+  return 'el';
+}
+
 function buildStylistSizeLead(language: string, size: string, productName?: string): string {
   const sz = normalizeSizeLabel(size);
   const pn = String(productName || '').trim();
   if (language === 'es') {
     return pn
-      ? `Para la prenda en prueba (${pn}), tu talla ideal es ${sz}.`
+      ? `Para ${spanishDefiniteArticleForProduct(pn)} ${pn}, tu talla ideal es ${sz}.`
       : `Tu talla ideal para esta prenda es ${sz}.`;
   }
   if (language === 'en') {
     return pn
-      ? `For the try-on piece (${pn}), your ideal size is ${sz}.`
+      ? `For ${pn}, your ideal size is ${sz}.`
       : `Your ideal size for this garment is ${sz}.`;
   }
   return pn
-    ? `Para a peça em try-on (${pn}), seu tamanho ideal é ${sz}.`
+    ? `Para ${portugueseDefiniteArticleForProduct(pn)} ${pn}, seu tamanho ideal é ${sz}.`
     : `Seu tamanho ideal para esta peça é ${sz}.`;
 }
 
@@ -457,21 +626,78 @@ function enforceSizeFirstMessage(
 
   let cleanedBody = withoutCatalog.trim();
 
-  // Modo estilista: primeira frase obrigatória com tamanho do sistema + peça em try-on (evita omitir).
-  if (options?.stylistMode && cleanedBody) {
+  // Modo estilista: primeira frase com produto + tamanho; body mesmo que venha vazio após saneamento.
+  if (options?.stylistMode) {
     const lead = buildStylistSizeLead(language, size, data.product_name);
-    let body = cleanedBody;
-    body = body
-      .replace(
-        /^\s*Para (?:a peça em try-on|la prenda en prueba|the try-on piece)\s*\([^)]+\)\s*,?\s*(?:seu tamanho ideal é|tu talla ideal es|your ideal size is)\s*[^.!?]+[.!?]\s*/iu,
-        ''
-      )
-      .trim();
+    let body = cleanedBody.trim();
+    const pn = String(data.product_name || '').trim();
+    if (pn) {
+      const esc = escapeRegexSegment(pn);
+      if (language === 'pt') {
+        body = body
+          .replace(
+            new RegExp(
+              `^\\s*Para\\s+(?:o|a)\\s+${esc}\\s*,\\s*seu\\s+tamanho\\s+ideal\\s+é[^.!?]*[.!?]\\s*`,
+              'iu'
+            ),
+            ''
+          )
+          .trim();
+        body = body
+          .replace(
+            new RegExp(
+              `^\\s*Para\\s+a\\s+peça\\s+em\\s+try-on\\s*\\(\\s*${esc}\\s*\\)\\s*,?\\s*seu\\s+tamanho\\s+ideal\\s+é[^.!?]*[.!?]\\s*`,
+              'iu'
+            ),
+            ''
+          )
+          .trim();
+      } else if (language === 'es') {
+        body = body
+          .replace(
+            new RegExp(`^\\s*Para\\s+(?:el|la)\\s+${esc}\\s*,\\s*tu\\s+talla\\s+ideal\\s+es[^.!?]*[.!?]\\s*`, 'iu'),
+            ''
+          )
+          .trim();
+        body = body
+          .replace(
+            new RegExp(
+              `^\\s*Para\\s+la\\s+prenda\\s+en\\s+prueba\\s*\\(\\s*${esc}\\s*\\)\\s*,?\\s*tu\\s+talla\\s+ideal\\s+es[^.!?]*[.!?]\\s*`,
+              'iu'
+            ),
+            ''
+          )
+          .trim();
+      } else {
+        body = body
+          .replace(new RegExp(`^\\s*For\\s+${esc}\\s*,\\s*your\\s+ideal\\s+size\\s+is[^.!?]*[.!?]\\s*`, 'iu'), '')
+          .trim();
+        body = body
+          .replace(
+            new RegExp(
+              `^\\s*For\\s+the\\s+try-on\\s+piece\\s*\\(\\s*${esc}\\s*\\)\\s*,?\\s*your\\s+ideal\\s+size\\s+is[^.!?]*[.!?]\\s*`,
+              'iu'
+            ),
+            ''
+          )
+          .trim();
+      }
+    } else {
+      body = body
+        .replace(
+          /^\s*Para (?:a peça em try-on|la prenda en prueba|the try-on piece)\s*\([^)]+\)\s*,?\s*(?:seu tamanho ideal é|tu talla ideal es|your ideal size is)\s*[^.!?]+[.!?]\s*/iu,
+          ''
+        )
+        .trim();
+    }
     body = body.replace(/^\s*Seu tamanho ideal (?:é|para)[^.!?]+[.!?]\s*/iu, '').trim();
     body = body.replace(/^\s*Tu talla ideal[^.!?]+[.!?]\s*/iu, '').trim();
     body = body.replace(/^\s*Your ideal size[^.!?]+[.!?]\s*/iu, '').trim();
     body = body.replace(/^\s*Seu tamanho ideal é\s+\S+[!.]?\s*/iu, '').trim();
-    cleanedBody = `${lead} ${body}`.trim();
+    if (pn && body && !bodyAcknowledgesTryOn(body, pn)) {
+      body = `${tryOnAnchorPrefix(language, pn)} ${body}`.trim();
+    }
+    cleanedBody = body ? `${lead} ${body}`.trim() : lead;
   } else if (cleanedBody && !explanationMentionsSize(cleanedBody, size)) {
     cleanedBody = `${buildSizeFirstSentence(language, size)} ${cleanedBody}`.trim();
   }
@@ -873,30 +1099,33 @@ function getStylistSystemExtra(language: string): string {
   const blocks: Record<string, string> = {
     pt: `MODO CONSULTOR DE MODA (catálogo limitado):
 - Tom caloroso e pessoal ("para você", "no seu caso"), mas SEMPRE conciso — sem "vendedor genérico".
-- TAMANHO (obrigatório): primeira frase exatamente: "Para a peça em try-on (NOME_DA_PEÇA), seu tamanho ideal é TAMANHO_FINAL." Depois, no máximo 2–3 frases curtas para combinações; não repita o tamanho.
+- TAMANHO (obrigatório): primeira frase exatamente: "Para o/a NOME_DA_PEÇA, seu tamanho ideal é TAMANHO_FINAL." (use "o" ou "a" conforme o nome — ex.: "o Suéter …", "a Calça …".) Depois, no máximo 2–3 frases curtas para combinações; não repita o tamanho.
+- PEÇA JÁ ESCOLHIDA: na 2.ª frase, diga explicitamente que o cliente já está com essa peça (nome igual ao produto em contexto) e que as sugestões são complementos de vestuário — não inverta: não comece só pela peça candidata.
 - Só mencione produtos cujo "handle" está em CANDIDATOS. Nunca invente URLs ou peças fora da lista.
 - Critérios (cite só o essencial): cor/silhueta/ocasião vs categoria upper/lower/full.
-- SÓ VESTUÁRIO: proibido calçados e acessórios na explicacao e em suggested_products.
+- SÓ VESTUÁRIO: proibido calçados e acessórios na explicacao e em suggested_products (óculos, relógio, bolsa, cinto, joias, boné, etc.). Não use "Além disso / Ainda," para acrescentar acessório ou segunda ideia fora dos candidatos de roupa.
 - GÉNERO: siga CONTEXTO DE GÉNERO e regras de combinação (perfil masculino: sem saias/vestidos).
 - Uma ideia por candidato; rationale em suggested_products: no máximo uma frase curta (~90 caracteres) por item.
 - Se o cliente mudar de ideia, escolha só entre CANDIDATOS atualizados; se não houver fit, diga em uma frase — sem inventar.
 - JSON com "suggested_products": 0–3 itens {"handle":"...","rationale":"opcional curto"} apenas da lista.`,
     es: `MODO ESTILISTA (catálogo limitado):
 - Tono cálido y personal ("para ti", "en tu caso"), pero SIEMPRE breve.
-- TALLA (obligatorio): primera frase exactamente: "Para la prenda en prueba (NOMBRE), tu talla ideal es TALLA." Luego, máximo 2–3 frases cortas para combinaciones; no repitas la talla.
+- TALLA (obligatorio): primera frase exactamente: "Para el/la NOMBRE, tu talla ideal es TALLA." (elige "el" o "la" según el nombre.) Luego, máximo 2–3 frases cortas para combinaciones; no repitas la talla.
+- PRENDA YA ELEGIDA: en la 2.ª frase, deja claro que el cliente ya lleva esa prenda (mismo nombre que el producto en contexto) y que las ideas son complementos de ropa — no empieces solo por la pieza candidata.
 - Solo handles de CANDIDATOS. Sin inventar.
 - Criterios (solo lo esencial): color/silueta/ocasión vs upper/lower/full.
-- SOLO ROPA: prohibido calzado y accesorios en explicacao y suggested_products.
+- SOLO ROPA: prohibido calzado y accesorios en explicacao y suggested_products (gafas, reloj, bolso, cinturón, bisutería, gorra, etc.). No uses "Además / También," para añadir accesorios ni una segunda idea fuera de prendas candidatas.
 - GÉNERO: respeta CONTEXTO DE GÉNERO (perfil masculino: sin faldas/vestidos).
 - rationale por ítem: una frase muy corta (~90 caracteres).
 - Si no encaja nada, dilo en una frase.
 - JSON "suggested_products": 0–3 {"handle":"...","rationale":"opcional corto"} solo de la lista.`,
     en: `STYLIST MODE (limited catalog):
 - Warm personal tone ("for you", "in your case"), but ALWAYS brief — no generic sales pitch.
-- SIZE (mandatory): first sentence exactly: "For the try-on piece (NAME), your ideal size is SIZE." Then at most 2–3 short sentences for pairings; do not repeat the size.
+- SIZE (mandatory): first sentence exactly: "For PRODUCT_NAME, your ideal size is SIZE." Then at most 2–3 short sentences for pairings; do not repeat the size.
+- ALREADY-CHOSEN GARMENT: in the 2nd sentence, state clearly the shopper is already wearing that product (same name) and suggestions are clothing complements — do not open only with the candidate item.
 - Only handles from CANDIDATES. Never invent items.
 - Criteria (state only essentials): color/silhouette/occasion vs upper/lower/full.
-- CLOTHING ONLY: no footwear or accessories in explicacao or suggested_products.
+- CLOTHING ONLY: no footwear or accessories in explicacao or suggested_products (sunglasses, watch, bag, belt, jewelry, hat, etc.). Do not use "Plus / Additionally," to add accessories or off-list styling ideas.
 - GENDER: follow GENDER CONTEXT (male profile: no skirts/dresses).
 - Per-item rationale: one very short sentence (~90 characters).
 - If nothing fits, say so in one sentence.
@@ -1003,10 +1232,13 @@ function sanitizeExplicacaoForClothingOnly(
   productName?: string
 ): string {
   let text = scrubInvitationAccessoryTails(String(explicacao || '').trim(), language);
+  text = scrubAsideAccessoryBlocks(text, language);
   if (!text) return text;
   const sentences = text.split(/(?<=[.!?…])\s+/).filter((s) => s.trim().length > 0);
-  const filtered = sentences.filter((s) => !sentenceMentionsNonGarmentFolded(s));
-  if (filtered.length > 0) return filtered.join(' ').trim();
+  const cleaned = sentences
+    .map((s) => stripAccessoryInsertionsFromSentence(s))
+    .filter((s) => s.length > 0 && !sentenceMentionsNonGarmentFolded(s));
+  if (cleaned.length > 0) return cleaned.join(' ').trim();
 
   const pn =
     productName ||
@@ -1121,12 +1353,12 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
         : "(upper = tops; think bottoms (jeans, trousers…) for silhouette and color — clothing only.)";
 
   if (language === "es") {
-    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando (try-on): ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde como estilista ("tú", "para ti", "en tu caso"); mantén explicacao breve — máximo ~4 frases cortas en total (incluida la primera obligatoria).\nOBLIGATORIO — primera frase de explicacao: debe ser exactamente del tipo: "Para la prenda en prueba (NOMBRE_EN_PRUEBA), tu talla ideal es TALLA" usando el nombre de la prenda en prueba del contexto y exactamente el valor tamanho_final (debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO en explicacao: solo prendas de vestir — prohibido calzado y accesorios. Respeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando: ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponde como estilista ("tú", "para ti", "en tu caso"); mantén explicacao breve — máximo ~4 frases cortas en total (incluida la primera obligatoria).\nOBLIGATORIO — primera frase de explicacao: debe ser exactamente del tipo: "Para el/la NOMBRE_DEL_PRODUCTO, tu talla ideal es TALLA" (elige "el" o "la" según el nombre) usando el nombre del producto del contexto y exactamente el valor tamanho_final (debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO — texto tras esa primera frase: la siguiente frase debe dejar claro que el cliente ya lleva esa prenda (nombre del producto en contexto) y solo entonces sugerir 1 complemento de ropa de los CANDIDATOS — sin gafas, reloj, bolso, cinturón ni calzado; sin "Además/También" para meter accesorios.\nOBLIGATORIO en explicacao: solo prendas de vestir — prohibido calzado y accesorios. Respeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
   }
   if (language === "en") {
-    return `The shopper wrote:\n"${msg}"\n\nGarment in try-on: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist ("you", "for you", "in your case"); keep explicacao brief — at most ~4 short sentences total (including the mandatory opening sentence).\nMANDATORY — first sentence of explicacao: must follow exactly: "For the try-on piece (TRY_ON_PRODUCT_NAME), your ideal size is SIZE" using the try-on product name from context and exactly tamanho_final (must match recommended size in context).\nMANDATORY in explicacao: clothing only — no footwear or accessories. Respect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+    return `The shopper wrote:\n"${msg}"\n\nProduct: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist ("you", "for you", "in your case"); keep explicacao brief — at most ~4 short sentences total (including the mandatory opening sentence).\nMANDATORY — first sentence of explicacao: must follow exactly: "For PRODUCT_NAME, your ideal size is SIZE" using the product name from context and exactly tamanho_final (must match recommended size in context).\nMANDATORY — text after that first sentence: the next sentence must state clearly the shopper is already wearing that product (same name), then suggest only one clothing complement from CANDIDATES — no sunglasses, watch, bag, belt, or footwear; no "Plus/Additionally" blocks to sneak accessories.\nMANDATORY in explicacao: clothing only — no footwear or accessories. Respect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
   }
-  return `O cliente escreveu:\n"${msg}"\n\nPeça em try-on: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); seja breve em explicacao — no máximo ~4 frases curtas no total (incluindo a primeira obrigatória).\nOBRIGATÓRIO — primeira frase da explicacao: deve seguir exatamente o formato: "Para a peça em try-on (NOME_DA_PEÇA_EM_TRY_ON), seu tamanho ideal é TAMANHO" usando o nome da peça em try-on do contexto e exatamente tamanho_final (deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO na explicacao: só vestuário — proibido calçados e acessórios. Respeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+  return `O cliente escreveu:\n"${msg}"\n\nProduto: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); seja breve em explicacao — no máximo ~4 frases curtas no total (incluindo a primeira obrigatória).\nOBRIGATÓRIO — primeira frase da explicacao: deve seguir exatamente o formato: "Para o/a NOME_DO_PRODUTO, seu tamanho ideal é TAMANHO" (use "o" ou "a" antes do nome, conforme for natural — ex.: "o Suéter …", "a Calça …") usando o nome do produto do contexto e exatamente tamanho_final (deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO — texto após essa primeira frase: a seguinte frase deve deixar claro que o cliente já está com essa peça (nome do produto) e só então sugerir 1 complemento de vestuário a partir dos CANDIDATOS — sem óculos, relógio, bolsa, cinto nem calçado; sem "Além disso/Ainda" para puxar acessório.\nOBRIGATÓRIO na explicacao: só vestuário — proibido calçados e acessórios. Respeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -1721,7 +1953,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-15-shorter-consultant-copy",
+        _validate_size_rev: "2026-05-16-stylist-lead-para-o-produto",
       }),
       {
         headers: {
@@ -1744,7 +1976,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-15-shorter-consultant-copy",
+        _validate_size_rev: "2026-05-16-stylist-lead-para-o-produto",
       }),
       {
         headers: {
