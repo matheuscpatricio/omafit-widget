@@ -17,12 +17,45 @@ function hasStylistConsultantPlan(plan: string | null | undefined): boolean {
   return GROWTH_PLUS_PLANS.has(String(plan || "").trim().toLowerCase());
 }
 
+/** Mensagens geradas pelo widget (não pelo cliente) — não passar por moderação de chat. */
+function isInternalStylistSystemMessage(message: string): boolean {
+  const m = String(message || "").trim();
+  if (!m) return false;
+  return (
+    /sugere até 3 handles/i.test(m) ||
+    /suggest up to 3 handles/i.test(m) ||
+    /sugiere hasta 3 handles/i.test(m) ||
+    /handles da lista de candidatos/i.test(m) ||
+    /lista de candidatos/i.test(m) ||
+    /candidatos que combinem/i.test(m) ||
+    /já vi o provador/i.test(m) ||
+    /ya vi el probador/i.test(m) ||
+    /i already saw the (?:virtual )?try-?on/i.test(m) ||
+    /~850 caracteres/i.test(m) ||
+    /tamanho sugerido e convida a experimentar/i.test(m)
+  );
+}
+
+function shouldSkipUserMessageValidation(data: ValidateSizeRequest): boolean {
+  if (data.skip_user_message_validation === true) return true;
+  const intent = String(data.intencao_usuario || "").trim();
+  if (intent === "consultor_outfit_inicial") return true;
+  const hasCandidates =
+    Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
+  const firstTurn = (data.interaction_count ?? 0) === 0;
+  if (hasCandidates && firstTurn) return true;
+  const msg = String(data.custom_message || "").trim();
+  if (msg && isInternalStylistSystemMessage(msg)) return true;
+  return false;
+}
+
 function isStylistConsultantRequest(data: ValidateSizeRequest): boolean {
   const intent = String(data.intencao_usuario || "").trim();
   if (
     intent === "legenda_tryon_secundario" ||
     intent === "sugerir_combinacoes" ||
-    intent === "induzir_adicionar_carrinho"
+    intent === "induzir_adicionar_carrinho" ||
+    intent === "consultor_outfit_inicial"
   ) {
     return true;
   }
@@ -2186,16 +2219,30 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
 
 /** Garante texto da pergunta atual e intenção coerente (evita cair no prompt de carrinho quando o cliente já perguntou algo). */
 function normalizeUserQuestion(data: ValidateSizeRequest): void {
+  const intent = String(data.intencao_usuario || "").trim();
+  if (
+    intent === "sugerir_combinacoes" ||
+    intent === "legenda_tryon_secundario" ||
+    intent === "consultor_outfit_inicial" ||
+    intent === "induzir_adicionar_carrinho"
+  ) {
+    return;
+  }
+
   let msg = String(data.custom_message ?? "").trim();
   if (!msg) {
     const hist = Array.isArray(data.chat_history) ? data.chat_history : [];
     const lastUser = [...hist].reverse().find((m) => m.role === "user");
     if (lastUser?.content) {
       msg = String(lastUser.content).trim();
-      if (msg) data.custom_message = msg;
+      if (msg && !isInternalStylistSystemMessage(msg)) {
+        data.custom_message = msg;
+      } else {
+        msg = "";
+      }
     }
   }
-  if (msg && data.intencao_usuario !== "sugerir_combinacoes" && data.intencao_usuario !== "legenda_tryon_secundario") {
+  if (msg && !isInternalStylistSystemMessage(msg)) {
     data.intencao_usuario = "custom_message";
     data.custom_message = msg;
   }
@@ -2304,8 +2351,11 @@ Deno.serve(async (req: Request) => {
 
     if (data.intencao_usuario === "legenda_tryon_secundario") {
       userPrompt = buildSecondaryTryOnCaptionPrompt(data, language);
-    } else if (data.intencao_usuario === "custom_message" && data.custom_message) {
-      if (!data.skip_user_message_validation) {
+    } else if (
+      data.intencao_usuario === "consultor_outfit_inicial" ||
+      (data.intencao_usuario === "custom_message" && data.custom_message)
+    ) {
+      if (data.intencao_usuario !== "consultor_outfit_inicial" && !shouldSkipUserMessageValidation(data)) {
         const validationResult = await validateUserMessage(data.custom_message, language);
         if (!validationResult.is_appropriate) {
           return new Response(
@@ -2331,7 +2381,9 @@ Deno.serve(async (req: Request) => {
       }
       userPrompt = hasCandidateProducts
         ? buildStylistConsultantPrompt(data, language)
-        : buildCustomMessagePrompt(data, language);
+        : data.intencao_usuario === "consultor_outfit_inicial"
+          ? buildGrowthConsultantOpeningPrompt(data, language)
+          : buildCustomMessagePrompt(data, language);
     } else if (data.intencao_usuario === "sugerir_combinacoes") {
       userPrompt = buildComplementaryPrompt(data, language);
     } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
@@ -2358,6 +2410,7 @@ Deno.serve(async (req: Request) => {
     /** Respostas de consultor de outfit no chat: vale mesmo sem lista de candidatos (ex.: catalog-search vazio). */
     const consultantOutfitReply =
       data.intencao_usuario === "custom_message" ||
+      data.intencao_usuario === "consultor_outfit_inicial" ||
       data.intencao_usuario === "sugerir_combinacoes" ||
       (growthPlusPlan &&
         data.intencao_usuario === "induzir_adicionar_carrinho" &&

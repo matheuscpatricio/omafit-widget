@@ -4769,7 +4769,11 @@ const handleSubmit = async (
       let candidate_products: OmafitCatalogCandidate[] | undefined;
       const { baseUrl: omafitBase, secret: omafitSecret } = getOmafitCatalogRuntimeConfig();
 
-      let intencaoForPayload: 'custom_message' | 'sugerir_combinacoes' | 'induzir_adicionar_carrinho' =
+      let intencaoForPayload:
+        | 'custom_message'
+        | 'consultor_outfit_inicial'
+        | 'sugerir_combinacoes'
+        | 'induzir_adicionar_carrinho' =
         intention === 'custom'
           ? 'custom_message'
           : intention === 'complementary'
@@ -4873,7 +4877,7 @@ const handleSubmit = async (
           await runOmafitCatalogSearch(autoQuery);
         }
         if (candidate_products?.length) {
-          intencaoForPayload = 'custom_message';
+          intencaoForPayload = 'consultor_outfit_inicial';
           customMessageForPayload = t('stylistInitialOutfitAsk').replace(
             /\{productName\}/g,
             localProductName || 'esta peça'
@@ -4945,7 +4949,9 @@ const handleSubmit = async (
             .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
             .map(m => ({ role: m.role, content: String(m.content || '').trim() }));
           const q =
-            intencaoForPayload === 'custom_message' && customMessageForPayload
+            (intencaoForPayload === 'custom_message' ||
+              intencaoForPayload === 'consultor_outfit_inicial') &&
+            customMessageForPayload
               ? String(customMessageForPayload).trim()
               : '';
           if (q) {
