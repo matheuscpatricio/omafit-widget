@@ -62,6 +62,10 @@ interface ValidateSizeRequest {
   chart_gender_scope?: "both" | "male" | "female" | string;
   tipo_corpo?: string;
   ajuste_preferido?: string;
+  /** Mensagem gerada só pelo widget (ex.: pedido inicial ao consultor) — não exige segunda chamada de moderação. */
+  skip_user_message_validation?: boolean;
+  /** Peça principal da PDP (nome) quando o pedido é legenda do 2.º try-on no chat. */
+  anchor_product_name?: string;
 }
 
 interface GPTResponse {
@@ -641,7 +645,7 @@ function explanationMentionsSize(text: string, sizeLabel: string): boolean {
   return false;
 }
 
-/** @param options.stylistMode — consultor outfit: força abertura "Para o/a produto, tamanho …" e remove lead duplicado. */
+/** @param options.stylistMode — consultor outfit: na 1.ª resposta (interaction_count 0), prefixo com produto + tamanho no início */
 function enforceSizeFirstMessage(
   gptResponse: GPTResponse,
   data: ValidateSizeRequest,
@@ -649,6 +653,7 @@ function enforceSizeFirstMessage(
 ): GPTResponse {
   const size = normalizeSizeLabel(gptResponse.tamanho_final || data.tamanho_calculado_algoritmo || 'M');
   const language = data.language === 'es' || data.language === 'en' ? data.language : 'pt';
+  const firstConsultantTurn = (data.interaction_count ?? 0) === 0;
 
   // 1) Limpa linhas de catálogo para evitar que "tamanhos/cores disponíveis" dominem a mensagem.
   const rawExplicacao = String(gptResponse.explicacao || '');
@@ -737,8 +742,12 @@ function enforceSizeFirstMessage(
     if (pn && body && !bodyAcknowledgesTryOn(body, pn)) {
       body = `${tryOnAnchorPrefix(language, pn)} ${body}`.trim();
     }
-    cleanedBody = body ? `${lead} ${body}`.trim() : lead;
-  } else if (!explanationMentionsSize(cleanedBody, size)) {
+    if (firstConsultantTurn) {
+      cleanedBody = body ? `${lead} ${body}`.trim() : lead;
+    } else {
+      cleanedBody = body.trim() || withoutCatalog.trim() || rawExplicacao.trim();
+    }
+  } else if (firstConsultantTurn && !explanationMentionsSize(cleanedBody, size)) {
     cleanedBody = `${buildSizeFirstSentence(language, size)} ${cleanedBody}`.trim();
   }
 
@@ -960,7 +969,7 @@ async function callOpenAISingle(
         { role: "user", content: userPrompt },
       ],
       max_tokens: opts.maxTokens,
-      temperature: 0.7,
+      temperature: 0.55,
       response_format: { type: "json_object" },
     }),
   });
@@ -1060,6 +1069,101 @@ Retorne no formato JSON:
   "coerencia": "alta",
   "confianca": 0.95
 }`;
+}
+
+/** Legenda curta pós 2.º try-on no chat (produto sugerido sobre resultado anterior). */
+function buildSecondaryTryOnCaptionPrompt(data: ValidateSizeRequest, language: string): string {
+  const anchor = String(data.anchor_product_name || '').trim();
+  const tried = String(data.product_name || '').trim();
+  const size = String(data.tamanho_calculado_algoritmo || 'M').trim();
+  const shop = data.shop_name ? String(data.shop_name).trim() : '';
+
+  const anchorLabel =
+    anchor ||
+    (language === 'es'
+      ? 'la pieza principal del look'
+      : language === 'en'
+        ? 'your main outfit piece'
+        : 'a peça principal do look');
+  const triedLabel =
+    tried ||
+    (language === 'es'
+      ? 'la segunda prenda probada'
+      : language === 'en'
+        ? 'the garment you just tried on'
+        : 'a segunda peça experimentada');
+
+  if (language === 'es') {
+    return `Segundo resultado del probador virtual (cadena): la imagen parte del look con ${anchorLabel} y muestra cómo queda ${triedLabel} en ese contexto.
+Referencia de talla del sistema (no empieces la primera frase solo con la talla): ${size}.
+${shop ? `Tienda: ${shop}.` : ''}
+
+Redacta en español para el chat del cliente:
+- 2–4 frases, tono consultor cercano y positivo.
+- Refuerza que la combinación tiene sentido en silueta/color/ocasión (solo ropa; sin empujar calzado ni accesorios).
+- Cierra invitando suavemente a añadir al carrito si le convence el resultado.
+- Sin medidas corporales en cm. Sin listar catálogo ni URLs.
+
+Devuelve JSON:
+{"tamanho_final":"${size}","explicacao":"...","coerencia":"alta","confianca":0.92}`;
+  }
+
+  if (language === 'en') {
+    return `Second virtual try-on result (chain): your mirror builds on ${anchorLabel} and now shows ${triedLabel} in that same context.
+System size hint (do not open with the size alone): ${size}.
+${shop ? `Store: ${shop}.` : ''}
+
+Write for the shopper chat:
+- 2–4 short sentences, warm stylist tone.
+- Affirm the pairing makes sense for silhouette/color/occasion (clothing focus only).
+- Close with a gentle nudge to add to cart if they like it.
+- No body measurements in cm. No catalog dumps.
+
+Return JSON:
+{"tamanho_final":"${size}","explicacao":"...","coerencia":"high","confianca":0.92}`;
+  }
+
+  return `Segundo resultado do provador virtual (em cadeia): a imagem parte do look com ${anchorLabel} e mostra como fica ${triedLabel} nesse mesmo contexto.
+Referência de tamanho do sistema (não comece a primeira frase só com o tamanho): ${size}.
+${shop ? `Loja: ${shop}.` : ''}
+
+Escreva em português para o chat do cliente:
+- 2–4 frases, tom de consultor próximo e positivo.
+- Reforce que a combinação faz sentido em silhueta/cor/ocasião (só vestuário).
+- Feche convidando a adicionar ao carrinho se curtir o resultado.
+- Sem medidas corporais em cm. Sem listar catálogo nem URLs.
+
+Devolva JSON:
+{"tamanho_final":"${size}","explicacao":"...","coerencia":"alta","confianca":0.92}`;
+}
+
+function fallbackSecondaryTryOnCaption(data: ValidateSizeRequest, language: string): GPTResponse {
+  const anchor = String(data.anchor_product_name || '').trim();
+  const tried = String(data.product_name || '').trim();
+  const size = normalizeSizeLabel(data.tamanho_calculado_algoritmo || 'M');
+  if (language === 'es') {
+    return {
+      tamanho_final: size,
+      explicacao:
+        `¡Qué bien queda ${tried || 'esta prenda'} junto a ${anchor || 'tu pieza principal'} en el probador! Si te encaja el conjunto, añádelo al carrito.`,
+      coerencia: 'alta',
+      confianca: 0.72,
+    };
+  }
+  if (language === 'en') {
+    return {
+      tamanho_final: size,
+      explicacao: `${tried || 'This piece'} pairs nicely with ${anchor || 'your main piece'} in the mirror—add to cart whenever you're ready.`,
+      coerencia: 'high',
+      confianca: 0.72,
+    };
+  }
+  return {
+    tamanho_final: size,
+    explicacao: `${tried || 'Esta peça'} combina muito bem com ${anchor || 'a sua peça principal'} no espelho. Se estiver alinhado ao seu estilo, siga para o carrinho.`,
+    coerencia: 'alta',
+    confianca: 0.72,
+  };
 }
 
 function buildProductCatalogContext(data: ValidateSizeRequest, language: string): string {
@@ -1488,7 +1592,7 @@ Return JSON:
           { role: "system", content: "You are a content moderation assistant." },
           { role: "user", content: validationPrompt[language as keyof typeof validationPrompt] || validationPrompt['en'] },
         ],
-        max_tokens: 150,
+        max_tokens: 90,
         temperature: 0.3,
         response_format: { type: "json_object" },
       }),
@@ -1809,7 +1913,7 @@ function normalizeUserQuestion(data: ValidateSizeRequest): void {
       if (msg) data.custom_message = msg;
     }
   }
-  if (msg && data.intencao_usuario !== "sugerir_combinacoes") {
+  if (msg && data.intencao_usuario !== "sugerir_combinacoes" && data.intencao_usuario !== "legenda_tryon_secundario") {
     data.intencao_usuario = "custom_message";
     data.custom_message = msg;
   }
@@ -1866,31 +1970,33 @@ Deno.serve(async (req: Request) => {
     const language = data.language || 'pt';
     console.log('🧠 Prompt language:', language);
 
-    // Se for mensagem customizada, validar conteúdo antes
-    if (data.intencao_usuario === "custom_message" && data.custom_message) {
-      const validationResult = await validateUserMessage(data.custom_message, language);
-      if (!validationResult.is_appropriate) {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            data: {
-              tamanho_final: data.tamanho_calculado_algoritmo,
-              explicacao: validationResult.response_message,
-              coerencia: "alta",
-              confianca: 1.0,
-              should_end_conversation: true
-            },
-            interaction_count: 5
-          }),
-          {
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+    if (data.intencao_usuario === "legenda_tryon_secundario") {
+      userPrompt = buildSecondaryTryOnCaptionPrompt(data, language);
+    } else if (data.intencao_usuario === "custom_message" && data.custom_message) {
+      if (!data.skip_user_message_validation) {
+        const validationResult = await validateUserMessage(data.custom_message, language);
+        if (!validationResult.is_appropriate) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                tamanho_final: data.tamanho_calculado_algoritmo,
+                explicacao: validationResult.response_message,
+                coerencia: "alta",
+                confianca: 1.0,
+                should_end_conversation: true
+              },
+              interaction_count: 5
+            }),
+            {
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        }
       }
-      // Se for apropriado, construir prompt para responder a pergunta
       userPrompt = hasCandidateProducts
         ? buildStylistConsultantPrompt(data, language)
         : buildCustomMessagePrompt(data, language);
@@ -1913,6 +2019,8 @@ Deno.serve(async (req: Request) => {
     /** Consultor outfit / combinações — candidatos no payload OU intents de conversa estilo consultor. */
     const stylistOutfitLead = consultantOutfitReply || hasCandidateProducts;
 
+    const isSecondaryCaption = data.intencao_usuario === "legenda_tryon_secundario";
+
     const targetGender = resolveEffectiveTargetGender(data);
     const genderSystemExtra =
       targetGender !== "unisex" ? genderOutfitRulesAppendix(targetGender, language) : "";
@@ -1924,7 +2032,7 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: combinedSystemExtra || undefined,
-        maxTokens: stylistOutfitLead ? 1050 : 750,
+        maxTokens: isSecondaryCaption ? 340 : stylistOutfitLead ? 680 : 480,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
       });
     } catch (aiErr) {
@@ -1945,6 +2053,8 @@ Deno.serve(async (req: Request) => {
           confianca: 0.5,
           suggested_products: [],
         };
+      } else if (data.intencao_usuario === "legenda_tryon_secundario") {
+        gptResponse = fallbackSecondaryTryOnCaption(data, language);
       } else {
         console.error("OpenAI indisponível ou resposta inválida; usando fallback por intenção:", aiErr);
         gptResponse = buildGuaranteedFallbackResponse(data, language);
@@ -2015,7 +2125,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-15-stylist-induzir-and-size-prefix-fallback",
+        _validate_size_rev: "2026-05-16-chain-tryon-caption-gpt",
       }),
       {
         headers: {
@@ -2038,7 +2148,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-15-stylist-induzir-and-size-prefix-fallback",
+        _validate_size_rev: "2026-05-16-chain-tryon-caption-gpt",
       }),
       {
         headers: {

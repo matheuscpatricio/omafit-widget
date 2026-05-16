@@ -585,6 +585,32 @@ const logProductCatalogDebug = (
   }
 };
 
+/** Medidas torácicas enviadas ao validate-size (MediaPipe ou estimativa). */
+function computeTorsoCmForValidate(
+  sizeData: { gender?: string; weight: number; bodyTypeIndex?: number },
+  finalBodyMeasurements: { chest: number; waist: number; hip: number } | null | undefined
+): { peito_cm: number; cintura_cm: number; quadril_cm: number } {
+  if (finalBodyMeasurements) {
+    return {
+      peito_cm: Math.round(finalBodyMeasurements.chest),
+      cintura_cm: Math.round(finalBodyMeasurements.waist),
+      quadril_cm: Math.round(finalBodyMeasurements.hip),
+    };
+  }
+  const female = sizeData.gender === 'female';
+  return {
+    peito_cm: female
+      ? Math.round(80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5)
+      : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6),
+    cintura_cm: female
+      ? Math.round(60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4)
+      : Math.round(75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5),
+    quadril_cm: female
+      ? Math.round(85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5)
+      : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5),
+  };
+}
+
 export function TryOnWidget({
   garmentImage,
   productId = 'unknown',
@@ -3910,19 +3936,96 @@ const handleSubmit = async (
                   : currentLanguage === 'en'
                     ? 'your main piece'
                     : 'a sua peça principal';
-              const caption = t('embeddedSuggestionTryOnCaption')
-                .replace(/\{suggestedProduct\}/g, suggestedPn || fallbackSuggested)
-                .replace(/\{anchorProduct\}/g, anchorPn || fallbackAnchor);
+
+              const captionTs = Date.now();
               setChatMessages((prev) => [
                 ...prev,
                 {
                   role: 'assistant',
-                  content: caption,
-                  timestamp: Date.now(),
+                  content: '',
+                  timestamp: captionTs,
                   tryOnImageUrl: imageUrl,
                   tryOnResultVariant: 'suggested',
                 },
               ]);
+
+              const applyCaptionFallback = () => {
+                const caption = t('embeddedSuggestionTryOnCaption')
+                  .replace(/\{suggestedProduct\}/g, suggestedPn || fallbackSuggested)
+                  .replace(/\{anchorProduct\}/g, anchorPn || fallbackAnchor);
+                setChatMessages((prev) =>
+                  prev.map((m) => (m.timestamp === captionTs ? { ...m, content: caption } : m)),
+                );
+              };
+
+              void (async () => {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                if (!supabaseUrl || !supabaseAnonKey || !sizeData) {
+                  applyCaptionFallback();
+                  return;
+                }
+                try {
+                  const torso = computeTorsoCmForValidate(sizeData, finalBodyMeasurements);
+                  const algoSz =
+                    String(
+                      tryOnAlgorithmSizeRef.current || calculatedSize || recommendedSize || 'M',
+                    ).trim() || 'M';
+
+                  const captionPayload = {
+                    altura_cm: sizeData.height,
+                    peso_kg: sizeData.weight,
+                    peito_cm: torso.peito_cm,
+                    cintura_cm: torso.cintura_cm,
+                    quadril_cm: torso.quadril_cm,
+                    tipo_corpo: sizeData.bodyType || 'regular',
+                    ajuste_preferido: sizeData.fit || 'regular',
+                    genero: sizeData.gender || 'unisex',
+                    chart_gender_scope: chartGenderScope,
+                    elasticidade: localCollectionElasticity || 'light_flex',
+                    categoria: localCollectionType || 'upper',
+                    tamanho_calculado_algoritmo: algoSz,
+                    intencao_usuario: 'legenda_tryon_secundario',
+                    skip_user_message_validation: true,
+                    session_id: analyticsSessionId || sessionId,
+                    interaction_count: interactionCount,
+                    shop_name: localStoreName,
+                    shop_domain: effectiveShopDomain,
+                    language: currentLanguage,
+                    product_name: suggestedPn || product?.name || 'Produto',
+                    anchor_product_name: anchorPn,
+                    available_sizes: productCatalog.sizes,
+                    available_colors: productCatalog.colors,
+                  };
+
+                  const res = await fetch(`${supabaseUrl}/functions/v1/validate-size`, {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${supabaseAnonKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(captionPayload),
+                  });
+                  const raw = await res.text();
+                  let parsed: { success?: boolean; data?: { explicacao?: string } };
+                  try {
+                    parsed = raw ? (JSON.parse(raw) as typeof parsed) : {};
+                  } catch {
+                    applyCaptionFallback();
+                    return;
+                  }
+                  const expl = String(parsed?.data?.explicacao || '').trim();
+                  if (!res.ok || !parsed.success || !expl) {
+                    applyCaptionFallback();
+                    return;
+                  }
+                  setChatMessages((prev) =>
+                    prev.map((m) => (m.timestamp === captionTs ? { ...m, content: expl } : m)),
+                  );
+                } catch {
+                  applyCaptionFallback();
+                }
+              })();
             }
             pendingEmbedTryOnChatCompletionRef.current = false;
             clearEmbedTryOnChatLoading();
@@ -4196,34 +4299,17 @@ const handleSubmit = async (
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      // Usar medidas do modelo corporal final (calculadas com MediaPipe ou estimadas)
-      // Se não houver, fazer fallback para estimativas básicas
-      let chestValue, waistValue, hipValue;
-
+      const torso = computeTorsoCmForValidate(sizeData, finalBodyMeasurements);
+      const chestValue = torso.peito_cm;
+      const waistValue = torso.cintura_cm;
+      const hipValue = torso.quadril_cm;
       if (finalBodyMeasurements) {
-        // Usar medidas do modelo corporal final calculado
-        chestValue = Math.round(finalBodyMeasurements.chest);
-        waistValue = Math.round(finalBodyMeasurements.waist);
-        hipValue = Math.round(finalBodyMeasurements.hip);
         console.log('✅ Usando medidas do MODELO CORPORAL FINAL para GPT:', {
           peito: chestValue,
           cintura: waistValue,
           quadril: hipValue
         });
       } else {
-        // Fallback: estimativas básicas
-        chestValue = sizeData.gender === 'female'
-          ? Math.round(80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5)
-          : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6);
-
-        waistValue = sizeData.gender === 'female'
-          ? Math.round(60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4)
-          : Math.round(75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5);
-
-        hipValue = sizeData.gender === 'female'
-          ? Math.round(85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5)
-          : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5);
-
         console.log('⚠️ Usando medidas ESTIMADAS (fallback) para GPT:', {
           peito: chestValue,
           cintura: waistValue,
@@ -4241,6 +4327,7 @@ const handleSubmit = async (
             ? 'sugerir_combinacoes'
             : 'induzir_adicionar_carrinho';
       let customMessageForPayload: string | undefined = customMessage;
+      let skipUserMessageValidation = false;
 
       const hasOmafitUrl = Boolean(String(omafitBase || '').trim());
       const hasOmafitSecret = Boolean(String(omafitSecret || '').trim());
@@ -4336,6 +4423,7 @@ const handleSubmit = async (
             /\{productName\}/g,
             localProductName || 'esta peça'
           );
+          skipUserMessageValidation = true;
         }
       }
 
@@ -4384,6 +4472,7 @@ const handleSubmit = async (
         custom_message: customMessageForPayload,
         session_id: analyticsSessionId || sessionId,
         interaction_count: interactionCount,
+        skip_user_message_validation: skipUserMessageValidation,
         shop_name: localStoreName,
         shop_domain: effectiveShopDomain,
         language: currentLanguage,
@@ -4393,7 +4482,7 @@ const handleSubmit = async (
         available_colors: productCatalog.colors,
         selected_image: selectedProductImage,
         selected_color: selectedColorHex,
-        variant_catalog: productCatalog.variants.slice(0, 100),
+        variant_catalog: productCatalog.variants.slice(0, 55),
         complementary_product: complementaryProduct,
         chat_history: (() => {
           const base = chatMessages
@@ -5114,27 +5203,56 @@ const handleSubmit = async (
                   }`}
                   style={message.role === 'user' ? { backgroundColor: localPrimaryColor } : {}}
                 >
-                  {message.content.trim() ? (
-                    <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
-                  ) : null}
-                  {message.tryOnImageUrl ? (
-                    <div
-                      className={`mx-auto w-full max-w-[min(204px,52vw)] md:max-w-[236px] ${
-                        message.content.trim() ? 'mt-3' : ''
-                      }`}
-                    >
-                      <div className="overflow-hidden rounded-xl bg-gray-100 shadow-sm ring-1 ring-black/5">
-                        <div className="aspect-[3/4] w-full">
-                          <img
-                            src={message.tryOnImageUrl}
-                            alt=""
-                            className="h-full w-full object-cover object-center"
-                            loading="lazy"
-                          />
+                  {(() => {
+                    const suggestedChainLayout =
+                      message.role === 'assistant' &&
+                      Boolean(message.tryOnImageUrl) &&
+                      message.tryOnResultVariant === 'suggested';
+
+                    const renderTryOnThumb = () =>
+                      message.tryOnImageUrl ? (
+                        <div className="overflow-hidden rounded-xl bg-gray-100 shadow-sm ring-1 ring-black/5">
+                          <div className="aspect-[3/4] w-full">
+                            <img
+                              src={message.tryOnImageUrl}
+                              alt=""
+                              className="h-full w-full object-cover object-center"
+                              loading="lazy"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : null;
+
+                    if (suggestedChainLayout && message.tryOnImageUrl) {
+                      return (
+                        <>
+                          <div className="mr-auto w-full max-w-[min(204px,52vw)] md:max-w-[236px]">
+                            {renderTryOnThumb()}
+                          </div>
+                          {message.content.trim() ? (
+                            <p className="mt-3 text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                          ) : null}
+                        </>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {message.content.trim() ? (
+                          <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                        ) : null}
+                        {message.tryOnImageUrl ? (
+                          <div
+                            className={`mr-auto w-full max-w-[min(204px,52vw)] md:max-w-[236px] ${
+                              message.content.trim() ? 'mt-3' : ''
+                            }`}
+                          >
+                            {renderTryOnThumb()}
+                          </div>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
                       {message.suggestedProducts.map((sp) => (
