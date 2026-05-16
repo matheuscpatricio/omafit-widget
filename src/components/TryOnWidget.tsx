@@ -408,6 +408,117 @@ const detectOptionKind = (name: string): 'size' | 'color' | 'other' => {
   return 'other';
 };
 
+/** Linha de carrinho derivada de um try-on concluído (variante ≈ tamanho algorítmico na altura do resultado). */
+type TryOnCartLineSnapshot = {
+  productId: string;
+  productName: string;
+  variantId: string;
+};
+
+function cloneProductCatalogSnapshot(catalog: ProductCatalog): ProductCatalog {
+  try {
+    return JSON.parse(JSON.stringify(catalog)) as ProductCatalog;
+  } catch {
+    return {
+      sizes: [...(catalog.sizes || [])],
+      colors: [...(catalog.colors || [])],
+      variants: Array.isArray(catalog.variants) ? [...catalog.variants] : [],
+    };
+  }
+}
+
+/** Resolve variant Shopify a partir do catálogo local do widget + opções + tamanho do algoritmo (espelha o raciocínio do add-to-cart no tema). */
+function resolveWidgetCartVariantId(params: {
+  catalog: ProductCatalog;
+  selectedVariantOptions: Record<string, string>;
+  selectedVariantId: string;
+  selectedProductImage: string;
+  selectedColorHex: string;
+  algorithmSize: string;
+}): string | null {
+  const variants = params.catalog?.variants || [];
+  if (!variants.length) return null;
+
+  const sizeOptionName =
+    Object.keys(params.selectedVariantOptions || {}).find((optionName) => detectOptionKind(optionName) === 'size') ||
+    'Tamanho';
+
+  const baseRecommendedSize = normalizeOptionValue(params.algorithmSize);
+  const recommendedToken = normalizeSizeToken(baseRecommendedSize);
+  const catalogSizes = params.catalog.sizes || [];
+  const matchedCatalogSize =
+    catalogSizes.find((sizeLabel) => normalizeSizeToken(sizeLabel) === recommendedToken) ||
+    catalogSizes.find(
+      (sizeLabel) =>
+        normalizeSizeToken(sizeLabel).includes(recommendedToken) ||
+        recommendedToken.includes(normalizeSizeToken(sizeLabel)),
+    ) ||
+    '';
+  const recommendedCartSize = normalizeOptionValue(matchedCatalogSize || baseRecommendedSize);
+
+  const mergedOptions: Record<string, string> = { ...params.selectedVariantOptions };
+  if (recommendedCartSize) {
+    mergedOptions[sizeOptionName] = recommendedCartSize;
+  }
+
+  const getVo = (v: any, key: string): string => {
+    const vo = (v?.selectedOptions || {}) as Record<string, unknown>;
+    const nk = normalizeOptionValue(key);
+    if (vo[key] != null) return normalizeOptionValue(vo[key]);
+    const hit = Object.keys(vo).find((k) => normalizeOptionValue(k).toLowerCase() === nk.toLowerCase());
+    return hit ? normalizeOptionValue(vo[hit]) : '';
+  };
+
+  const variantMatches = (v: any): boolean => {
+    for (const [key, wantRaw] of Object.entries(mergedOptions)) {
+      const want = normalizeOptionValue(wantRaw);
+      if (!want) continue;
+      let vk = getVo(v, key);
+      if (!vk && typeof v === 'object') {
+        for (let i = 1; i <= 3; i++) {
+          const oi = v[`option${i}`];
+          if (oi != null && normalizeOptionValue(oi)) {
+            vk = normalizeOptionValue(oi);
+            break;
+          }
+        }
+      }
+      if (!vk) return false;
+      if (detectOptionKind(key) === 'size') {
+        if (normalizeSizeToken(vk) !== normalizeSizeToken(want)) return false;
+      } else if (normalizeOptionValue(vk).toLowerCase() !== want.toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const pool = variants.filter((v: any) => v.available !== false);
+  const chosen =
+    pool.find((v: any) => variantMatches(v)) || variants.find((v: any) => variantMatches(v)) || null;
+
+  if (chosen?.id != null) {
+    return String(chosen.id);
+  }
+
+  const hintId = normalizeOptionValue(params.selectedVariantId);
+  if (hintId && variants.some((v: any) => String(v.id) === hintId)) {
+    return hintId;
+  }
+
+  return null;
+}
+
+async function fetchUrlAsTryOnModelFile(url: string): Promise<File> {
+  const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(`Falha ao obter imagem do try-on anterior (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const type = blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg';
+  return new File([blob], `tryon-chain-person.${type.includes('png') ? 'png' : 'jpg'}`, { type });
+}
+
 const logProductCatalogDebug = (
   source: string,
   catalog: { sizes: string[]; colors: string[]; variants: any[] }
@@ -597,6 +708,8 @@ export function TryOnWidget({
     timestamp: number;
     /** Imagem do provador quando o try-on veio de uma sugestão no chat (fica visível no thread). */
     tryOnImageUrl?: string;
+    /** Primeiro resultado (PDP) vs try-on após sugestão — controla duplicata com o bloco no topo. */
+    tryOnResultVariant?: 'primary' | 'suggested';
     /** Telemetria sugestões estilista (par âncora PDP → sugerido). */
     stylistImpressionId?: string;
     stylistAnchorHandle?: string;
@@ -647,12 +760,39 @@ export function TryOnWidget({
   } | null>(null);
   /** Try-on disparado a partir de sugestão no chat: UI de progresso fica no chat, sem step `processing`. */
   const embedTryOnInChatActiveRef = useRef(false);
+  /**
+   * Independente do spinner — preserva a decisão "resultado só na bolha do chat" até o polling terminar.
+   * `clearEmbedTryOnChatLoading` não pode apagar isto, senão a conclusão perde o modo embutido e não há imagem nem em `result` nem na bolha.
+   */
+  const pendingEmbedTryOnChatCompletionRef = useRef(false);
   /** Imagem/nome da peça do PDP no primeiro try-on concluído — não substituir ao experimentar produto sugerido (estado `product` muda para ATC/carteiro). */
   const anchorPdpGarmentDisplayRef = useRef<{ imageUrl: string; productName: string } | null>(null);
   /** Metadados do último `handleSubmit` (closures assíncronos / polling podem ter `product` desatualizado). */
   const tryOnSubmitMetaRef = useRef<{ productName: string } | null>(null);
   /** Tamanho algorítmico enviado ao /tryon (payload.user_measurements.recommended_size) — fonte única para o 1.º validate-size no chat. */
   const tryOnAlgorithmSizeRef = useRef<string | null>(null);
+  /** Último output do try-on — foto da «pessoa» no próximo experimento encadeado (2.º, 3.º…). */
+  const chainTryOnOutputUrlRef = useRef<string | null>(null);
+  /** Variantes por produto após cada try-on concluído (bundle no botão de carrinho). */
+  const tryOnCartLinesByProductRef = useRef<Record<string, TryOnCartLineSnapshot>>({});
+  /** Snapshot do job durante polling — evita usar variáveis só definidas dentro de handleSubmit. */
+  const pendingTryOnPollingContextRef = useRef<{
+    resolvedProductId: string;
+    resolvedProductName: string;
+    garmentDisplaySnapUrl: string;
+    catalogSnapshot: ProductCatalog;
+    selectedVariantOptionsSnapshot: Record<string, string>;
+    selectedVariantIdSnapshot: string;
+    selectedProductImageSnapshot: string;
+    selectedColorHexSnapshot: string;
+  } | null>(null);
+  const productCatalogRef = useRef<ProductCatalog>(productCatalog);
+  const selectedVariantOptionsRef = useRef<Record<string, string>>(selectedVariantOptions);
+  const selectedVariantIdRef = useRef<string>(selectedVariantId);
+  const selectedProductImageRef = useRef<string>(selectedProductImage);
+  const selectedColorHexRef = useRef<string>(selectedColorHex);
+  const calculatedSizeRef = useRef<string | null>(calculatedSize);
+  const recommendedSizeRef = useRef<string | null>(recommendedSize);
   const [tryOnLoadingInChat, setTryOnLoadingInChat] = useState(false);
   const publicIdRef = useRef<string | undefined>(publicId);
   const effectiveShopDomainRef = useRef('');
@@ -677,6 +817,24 @@ export function TryOnWidget({
     hip: number;
   } | null>(null);
   const touchEndX = useRef<number>(0);
+
+  React.useEffect(() => {
+    productCatalogRef.current = productCatalog;
+    selectedVariantOptionsRef.current = selectedVariantOptions;
+    selectedVariantIdRef.current = selectedVariantId;
+    selectedProductImageRef.current = selectedProductImage;
+    selectedColorHexRef.current = selectedColorHex;
+    calculatedSizeRef.current = calculatedSize;
+    recommendedSizeRef.current = recommendedSize;
+  }, [
+    productCatalog,
+    selectedVariantOptions,
+    selectedVariantId,
+    selectedProductImage,
+    selectedColorHex,
+    calculatedSize,
+    recommendedSize,
+  ]);
 
   // 🔹 Função auxiliar para derivar storeName do shopDomain
   const deriveStoreName = (domain: string): string => {
@@ -826,7 +984,8 @@ export function TryOnWidget({
   const startPosePreparation = (
     preparedImage: OptimizedModelImage,
     jobId: number,
-    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
+    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper',
+    relaxPoseValidation = false
   ) => {
     if (posePreparationPromiseRef.current) return posePreparationPromiseRef.current;
 
@@ -862,7 +1021,7 @@ export function TryOnWidget({
             collectionTypeForValidation
           );
 
-          if (!photoValidation.valid) {
+          if (!photoValidation.valid && !relaxPoseValidation) {
             return {
               sourceId: preparedImage.sourceId,
               detectedLandmarks: landmarks,
@@ -910,7 +1069,8 @@ export function TryOnWidget({
   const startModelImagePreparation = (
     file: File,
     jobId: number,
-    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
+    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper',
+    relaxPoseValidation = false
   ) => {
     modelImagePreparationPromiseRef.current = optimizeTryOnImage(file)
       .then((optimizedImage) => {
@@ -931,7 +1091,7 @@ export function TryOnWidget({
         preparedModelImageRef.current = preparedImage;
 
         void startModelImageUploadPreparation(preparedImage, file.name || 'tryon-model.jpg', jobId);
-        void startPosePreparation(preparedImage, jobId, collectionTypeForValidation);
+        void startPosePreparation(preparedImage, jobId, collectionTypeForValidation, relaxPoseValidation);
 
         return preparedImage;
       })
@@ -2998,6 +3158,7 @@ const validatePhotoForCollection = (
 
   /** Após erro no try-on: volta à foto ou mantém no resultado (fluxo embutido no chat). */
   const leaveTryOnErrorStep = () => {
+    pendingEmbedTryOnChatCompletionRef.current = false;
     if (embedTryOnInChatActiveRef.current) {
       embedTryOnInChatActiveRef.current = false;
       setTryOnLoadingInChat(false);
@@ -3069,9 +3230,39 @@ const handleSubmit = async (
     overrideProductName?: string;
     /** upper / lower / full alinhado ao produto sugerido (evita mesmo modelo/payload da PDP). */
     overrideCollectionType?: 'upper' | 'lower' | 'full';
+    /**
+     * Usa o último resultado do try-on como imagem da «pessoa» (cadeia 2.º/3.º experimento).
+     * MediaPipe recalcula medidas na nova imagem; validação de foto mais permissiva (render sintético).
+     */
+    priorTryOnOutputAsPerson?: boolean;
   }
 ) => {
-  const modelFile = modelFileOverride ?? modelImage;
+  let modelFile: File | null = modelFileOverride ?? modelImage ?? null;
+
+  const usePriorTryOnOutput =
+    Boolean(tryOnOpts?.priorTryOnOutputAsPerson) && Boolean(chainTryOnOutputUrlRef.current?.trim());
+
+  if (usePriorTryOnOutput && chainTryOnOutputUrlRef.current) {
+    invalidatePreparedModelAssets();
+    try {
+      modelFile = await fetchUrlAsTryOnModelFile(chainTryOnOutputUrlRef.current);
+    } catch (fetchErr) {
+      console.error('❌ Imagem encadeada do try-on:', fetchErr);
+      const chainErr =
+        currentLanguage === 'es'
+          ? 'No pudimos cargar tu último resultado de prueba. Intenta de nuevo.'
+          : currentLanguage === 'en'
+            ? 'Could not load your last try-on image. Please try again.'
+            : 'Não foi possível carregar o último resultado do try-on. Tente novamente.';
+      setError(chainErr);
+      setLoading(false);
+      leaveTryOnErrorStep();
+      return;
+    }
+  }
+
+  const relaxPoseForChain = usePriorTryOnOutput;
+
   if (!modelFile || !product) {
     setError(t('selectProductAndPhoto'));
     return;
@@ -3079,6 +3270,7 @@ const handleSubmit = async (
 
   setLoading(true);
   embedTryOnInChatActiveRef.current = Boolean(tryOnOpts?.embedTryOnInChat);
+  pendingEmbedTryOnChatCompletionRef.current = embedTryOnInChatActiveRef.current;
   if (embedTryOnInChatActiveRef.current) {
     setTryOnLoadingInChat(true);
   } else {
@@ -3105,7 +3297,7 @@ const handleSubmit = async (
     const currentJobId = activeModelImageJobRef.current;
     const optimizedImage = preparedModelImageRef.current
       ?? await (modelImagePreparationPromiseRef.current ||
-        startModelImagePreparation(modelFile, currentJobId, resolvedCollectionType));
+        startModelImagePreparation(modelFile, currentJobId, resolvedCollectionType, relaxPoseForChain));
 
     if (!optimizedImage || activeModelImageJobRef.current !== currentJobId) {
       throw new Error(t('processingError'));
@@ -3127,7 +3319,7 @@ const handleSubmit = async (
 
     const preparedPoseAnalysis = preparedPoseAnalysisRef.current
       ?? await (posePreparationPromiseRef.current ||
-        startPosePreparation(optimizedImage, currentJobId, resolvedCollectionType));
+        startPosePreparation(optimizedImage, currentJobId, resolvedCollectionType, relaxPoseForChain));
 
     if (activeModelImageJobRef.current !== currentJobId) {
       throw new Error(t('processingError'));
@@ -3274,6 +3466,7 @@ const handleSubmit = async (
     if (tryOnEnabled === false) {
       console.log('⚠️ Try-on desativado para esta loja (tryon_enabled=false). Pulando /functions/v1/tryon.');
       await trackGarmentMediapipeSession();
+      pendingEmbedTryOnChatCompletionRef.current = false;
       setPredictionId(null);
       setResult(null);
       anchorPdpGarmentDisplayRef.current = null;
@@ -3407,6 +3600,7 @@ const handleSubmit = async (
       console.log('⚠️ Try-on desativado pelo backend. Pulando polling.');
       stylistCatalogPrefetchPromiseRef.current = null;
       await trackGarmentMediapipeSession();
+      pendingEmbedTryOnChatCompletionRef.current = false;
       setPredictionId(null);
       setResult(null);
       anchorPdpGarmentDisplayRef.current = null;
@@ -3471,6 +3665,17 @@ const handleSubmit = async (
         console.log('⚠️ MEDIAPIPE: Nenhuma medida retornada');
       }
 
+      pendingTryOnPollingContextRef.current = {
+        resolvedProductId: String(resolvedProductId),
+        resolvedProductName,
+        garmentDisplaySnapUrl: String(resolvedGarmentImageUrlRaw || '').trim(),
+        catalogSnapshot: cloneProductCatalogSnapshot(productCatalogRef.current),
+        selectedVariantOptionsSnapshot: { ...selectedVariantOptionsRef.current },
+        selectedVariantIdSnapshot: selectedVariantIdRef.current,
+        selectedProductImageSnapshot: selectedProductImageRef.current,
+        selectedColorHexSnapshot: selectedColorHexRef.current,
+      };
+
       startPolling(result.fal_request_id);
     } else {
       stylistCatalogPrefetchPromiseRef.current = null;
@@ -3486,6 +3691,7 @@ const handleSubmit = async (
 };
 
   const openFinalStepWithoutImage = () => {
+    pendingEmbedTryOnChatCompletionRef.current = false;
     clearEmbedTryOnChatLoading();
     setError('');
     setResult(null);
@@ -3568,18 +3774,62 @@ const handleSubmit = async (
             console.log('✅ Setting result image:', imageUrl);
             console.log('✅ TRY-ON concluído com timings finais:');
             logTryOnTimings('Job concluído', statusData.timings || null);
-            const embeddedInChat = embedTryOnInChatActiveRef.current;
+            const embeddedInChat = pendingEmbedTryOnChatCompletionRef.current;
+            const jobCtx = pendingTryOnPollingContextRef.current;
+
+            chainTryOnOutputUrlRef.current = String(imageUrl || '').trim() || chainTryOnOutputUrlRef.current;
+
+            const algoSize =
+              String(
+                tryOnAlgorithmSizeRef.current ||
+                  calculatedSizeRef.current ||
+                  recommendedSizeRef.current ||
+                  'M',
+              ).trim() || 'M';
+
+            if (jobCtx) {
+              const vid = resolveWidgetCartVariantId({
+                catalog: jobCtx.catalogSnapshot,
+                selectedVariantOptions: jobCtx.selectedVariantOptionsSnapshot,
+                selectedVariantId: jobCtx.selectedVariantIdSnapshot,
+                selectedProductImage: jobCtx.selectedProductImageSnapshot,
+                selectedColorHex: jobCtx.selectedColorHexSnapshot,
+                algorithmSize: algoSize,
+              });
+              if (vid) {
+                tryOnCartLinesByProductRef.current[jobCtx.resolvedProductId] = {
+                  productId: jobCtx.resolvedProductId,
+                  productName: jobCtx.resolvedProductName,
+                  variantId: vid,
+                };
+              }
+            }
+
             if (!embeddedInChat) {
               setResult(imageUrl);
               const snapUrl =
-                (tryOnOpts?.overrideGarmentImageUrl && String(tryOnOpts.overrideGarmentImageUrl).trim()) ||
+                (jobCtx?.garmentDisplaySnapUrl && String(jobCtx.garmentDisplaySnapUrl).trim()) ||
                 (selectedProductImage && String(selectedProductImage).trim()) ||
                 (product?.garment_image && String(product.garment_image).trim()) ||
                 '';
               anchorPdpGarmentDisplayRef.current = {
                 imageUrl: snapUrl,
-                productName: resolvedProductName,
+                productName:
+                  jobCtx?.resolvedProductName ||
+                  tryOnSubmitMetaRef.current?.productName ||
+                  product?.name ||
+                  '',
               };
+              setChatMessages((prev) => [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: t('congratsMessage'),
+                  timestamp: Date.now(),
+                  tryOnImageUrl: imageUrl,
+                  tryOnResultVariant: 'primary',
+                },
+              ]);
             }
 
             console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
@@ -3608,9 +3858,11 @@ const handleSubmit = async (
                   content: caption,
                   timestamp: Date.now(),
                   tryOnImageUrl: imageUrl,
+                  tryOnResultVariant: 'suggested',
                 },
               ]);
             }
+            pendingEmbedTryOnChatCompletionRef.current = false;
             clearEmbedTryOnChatLoading();
             return;
           }
@@ -3664,6 +3916,9 @@ const handleSubmit = async (
     anchorPdpGarmentDisplayRef.current = null;
     tryOnSubmitMetaRef.current = null;
     tryOnAlgorithmSizeRef.current = null;
+    chainTryOnOutputUrlRef.current = null;
+    tryOnCartLinesByProductRef.current = {};
+    pendingTryOnPollingContextRef.current = null;
     setError('');
     setLoading(false);
     setGptLoading(false);
@@ -3682,6 +3937,7 @@ const handleSubmit = async (
     stylistSearchAnchorRef.current = '';
     stylistImpressionSentRef.current = new Set();
     embedTryOnInChatActiveRef.current = false;
+    pendingEmbedTryOnChatCompletionRef.current = false;
     setTryOnLoadingInChat(false);
   };
 
@@ -3808,6 +4064,7 @@ const handleSubmit = async (
             overrideProductId: pid,
             overrideProductName: pname,
             overrideCollectionType: inferredCollectionType,
+            priorTryOnOutputAsPerson: Boolean(chainTryOnOutputUrlRef.current?.trim()),
           });
         }, 80);
       } else {
@@ -4290,6 +4547,34 @@ const handleSubmit = async (
       selectedOptions[sizeOptionName] = recommendedCartSize;
     }
 
+    const algoForBundle =
+      String(
+        tryOnAlgorithmSizeRef.current || calculatedSize || recommendedSize || recommendedCartSize || 'M',
+      ).trim() || 'M';
+
+    const primaryVariantIdResolved = resolveWidgetCartVariantId({
+      catalog: productCatalog,
+      selectedVariantOptions,
+      selectedVariantId,
+      selectedProductImage,
+      selectedColorHex,
+      algorithmSize: algoForBundle,
+    });
+
+    const cartVariantBundle: Array<{ variant_id: number; quantity: number }> = [];
+    const seenVariantNums = new Set<number>();
+    const pushVariantToBundle = (raw: string | null | undefined) => {
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 1 || seenVariantNums.has(n)) return;
+      seenVariantNums.add(n);
+      cartVariantBundle.push({ variant_id: n, quantity: 1 });
+    };
+
+    pushVariantToBundle(primaryVariantIdResolved);
+    for (const row of Object.values(tryOnCartLinesByProductRef.current)) {
+      pushVariantToBundle(row.variantId);
+    }
+
     const cartPayload = {
       type: 'omafit-add-to-cart-request',
       requestId,
@@ -4310,6 +4595,8 @@ const handleSubmit = async (
       },
       quantity: 1,
       shop_domain: effectiveShopDomain,
+      /** Pacote: produto atual no provador + todos os que tiveram try-on nesta sessão (Shopify /cart/add.js items). */
+      cart_variant_bundle: cartVariantBundle.length > 0 ? cartVariantBundle.slice(0, 15) : undefined,
       metadata: {
         session_id: analyticsSessionId || sessionId,
         language: currentLanguage,
@@ -4317,6 +4604,7 @@ const handleSubmit = async (
         variant_option_name: sizeOptionName,
         selected_variant_id: hasSizeOverride ? null : (selectedVariantId || null),
         variant_catalog_count: productCatalog.variants.length,
+        try_on_bundle_count: cartVariantBundle.length,
       }
     };
 
@@ -4693,7 +4981,8 @@ const handleSubmit = async (
               transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="max-w-[65%] md:max-w-[30%]">
-                {result ? (
+                {result &&
+                !chatMessages.some((m) => m.tryOnResultVariant === 'primary') ? (
                   <img
                     src={result}
                     alt="Try-on result"

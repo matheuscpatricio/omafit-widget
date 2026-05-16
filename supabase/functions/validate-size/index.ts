@@ -633,7 +633,12 @@ function explanationMentionsSize(text: string, sizeLabel: string): boolean {
   if (new RegExp(`\\b(tamanho|talla|size)\\s*[:,\\-]?\\s*${escapeRegexSegment(s)}\\b`, 'i').test(body)) {
     return true;
   }
-  return new RegExp(`\\b${escapeRegexSegment(s)}\\b`, 'i').test(body);
+  // Evita falsos positivos com uma única letra (P/M/G/S/L) dentro de nomes ou palavras.
+  // Para rótulos com 2+ caracteres (GG, XL, PP, etc.) ou numéricos, aceitamos menção isolada com limites de palavra.
+  if (s.length >= 2 || /^\d{2,3}$/.test(s)) {
+    return new RegExp(`\\b${escapeRegexSegment(s)}\\b`, 'i').test(body);
+  }
+  return false;
 }
 
 /** @param options.stylistMode — consultor outfit: força abertura "Para o/a produto, tamanho …" e remove lead duplicado. */
@@ -646,15 +651,26 @@ function enforceSizeFirstMessage(
   const language = data.language === 'es' || data.language === 'en' ? data.language : 'pt';
 
   // 1) Limpa linhas de catálogo para evitar que "tamanhos/cores disponíveis" dominem a mensagem.
-  const withoutCatalog = stripCatalogLines(gptResponse.explicacao || '');
+  const rawExplicacao = String(gptResponse.explicacao || '');
+  const withoutCatalog = stripCatalogLines(rawExplicacao);
 
-  let cleanedBody = withoutCatalog.trim();
+  // Se o saneamento retirar tudo (ex.: só linhas de catálogo), recuperamos o texto cru para não perder o prefixo de tamanho.
+  let cleanedBody = withoutCatalog.trim() || rawExplicacao.trim();
 
   // Modo consultor (chat outfit): primeira frase com produto + tamanho; saneamento já removeu acessórios.
   if (options?.stylistMode) {
     const lead = buildStylistSizeLead(language, size, data.product_name);
     let body = cleanedBody.trim();
     const pn = String(data.product_name || '').trim();
+    if (language === 'pt') {
+      body = body.replace(/^\s*Para\s+você\s+que\s+escolheu\b[^.!?]*[.!?]\s*/iu, '').trim();
+    } else if (language === 'es') {
+      body = body
+        .replace(/^\s*Para\s+ti\s*,?\s*que\s+(?:has\s+)?elegido\b[^.!?]*[.!?]\s*/iu, '')
+        .trim();
+    } else {
+      body = body.replace(/^\s*For\s+you\s+who\s+chose\b[^.!?]*[.!?]\s*/iu, '').trim();
+    }
     if (pn) {
       const esc = escapeRegexSegment(pn);
       if (language === 'pt') {
@@ -722,7 +738,7 @@ function enforceSizeFirstMessage(
       body = `${tryOnAnchorPrefix(language, pn)} ${body}`.trim();
     }
     cleanedBody = body ? `${lead} ${body}`.trim() : lead;
-  } else if (cleanedBody && !explanationMentionsSize(cleanedBody, size)) {
+  } else if (!explanationMentionsSize(cleanedBody, size)) {
     cleanedBody = `${buildSizeFirstSentence(language, size)} ${cleanedBody}`.trim();
   }
 
@@ -1338,6 +1354,16 @@ function buildGenderContextForStylist(data: ValidateSizeRequest, language: strin
   return `CONTEXTO DE GÉNERO (obrigatório para combinar peças sugeridas):\n- Perfil que o cliente indicou no provador: ${perfil} (valor técnico: ${shopper}).\n- Âmbito da tabela de medidas configurado pelo lojista (coleção/produto): ${loja}\n- Perfil efectivo para combinar (prioridade): ${target}.\n- Regras: só recomende candidatos coerentes com este perfil; não sugira peças tipicamente femininas a perfil masculino nem o contrário de forma incoerente; com unissex prefira peças neutras/unissex salvo o título do candidato deixar claro que serve para todos.${outfitRules}`;
 }
 
+function stylistUserUtterancePlaceholder(language: string): string {
+  if (language === "es") {
+    return "(Sin mensaje de texto: el cliente acaba de ver el resultado del probador; sugiere una combinación solo de ropa entre los candidatos.)";
+  }
+  if (language === "en") {
+    return "(No text message: the shopper just saw the try-on result; suggest a clothing-only pairing from the candidates.)";
+  }
+  return "(Sem mensagem de texto: o cliente acabou de ver o resultado do provador; sugira uma combinação só de vestuário entre os candidatos.)";
+}
+
 function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: string): string {
   const candidates = Array.isArray(data.candidate_products) ? data.candidate_products : [];
   const lines = candidates
@@ -1355,7 +1381,7 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
     : "";
 
   const storeContext = data.shop_name ? ` Store: ${data.shop_name}.` : "";
-  const msg = String(data.custom_message || "").trim();
+  const msg = String(data.custom_message || "").trim() || stylistUserUtterancePlaceholder(language);
   const cat = String(data.categoria || "upper");
   const catHintPt =
     cat === "lower"
@@ -1832,6 +1858,9 @@ Deno.serve(async (req: Request) => {
 
     normalizeUserQuestion(data);
 
+    const hasCandidateProducts =
+      Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
+
     // Construir prompt baseado na intenção
     let userPrompt: string;
     const language = data.language || 'pt';
@@ -1862,34 +1891,32 @@ Deno.serve(async (req: Request) => {
         );
       }
       // Se for apropriado, construir prompt para responder a pergunta
-      const hasCandidates = Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
-      userPrompt = hasCandidates
+      userPrompt = hasCandidateProducts
         ? buildStylistConsultantPrompt(data, language)
         : buildCustomMessagePrompt(data, language);
     } else if (data.intencao_usuario === "sugerir_combinacoes") {
       userPrompt = buildComplementaryPrompt(data, language);
     } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
-      userPrompt = buildAddToCartPrompt(data, language);
+      userPrompt = hasCandidateProducts ? buildStylistConsultantPrompt(data, language) : buildAddToCartPrompt(data, language);
     } else {
-      userPrompt = buildAddToCartPrompt(data, language);
+      userPrompt = hasCandidateProducts ? buildStylistConsultantPrompt(data, language) : buildAddToCartPrompt(data, language);
     }
 
     // Chamar OpenAI
     console.log('🚀 Enviando prompt para OpenAI. Intenção:', data.intencao_usuario || 'validar_tamanho');
-    const hasStylistCandidates =
-      data.intencao_usuario === "custom_message" &&
-      Array.isArray(data.candidate_products) &&
-      data.candidate_products.length > 0;
 
     /** Respostas de consultor de outfit no chat: vale mesmo sem lista de candidatos (ex.: catalog-search vazio). */
     const consultantOutfitReply =
       data.intencao_usuario === "custom_message" ||
       data.intencao_usuario === "sugerir_combinacoes";
 
+    /** Consultor outfit / combinações — candidatos no payload OU intents de conversa estilo consultor. */
+    const stylistOutfitLead = consultantOutfitReply || hasCandidateProducts;
+
     const targetGender = resolveEffectiveTargetGender(data);
     const genderSystemExtra =
       targetGender !== "unisex" ? genderOutfitRulesAppendix(targetGender, language) : "";
-    const stylistSystemExtra = hasStylistCandidates ? getStylistSystemExtra(language) : "";
+    const stylistSystemExtra = hasCandidateProducts ? getStylistSystemExtra(language) : "";
     const combinedSystemExtra = [stylistSystemExtra, genderSystemExtra].filter(Boolean).join("\n\n");
 
     let gptResponse: GPTResponse;
@@ -1897,13 +1924,13 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: combinedSystemExtra || undefined,
-        maxTokens: hasStylistCandidates || consultantOutfitReply ? 850 : 600,
+        maxTokens: stylistOutfitLead ? 850 : 600,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
       });
     } catch (aiErr) {
       console.error("OpenAI unavailable:", aiErr);
       assistantSource = "fallback_openai";
-      if (hasStylistCandidates) {
+      if (hasCandidateProducts) {
         const lang = language;
         const emptyHint =
           lang === "es"
@@ -1924,7 +1951,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (hasStylistCandidates && data.candidate_products) {
+    if (hasCandidateProducts && data.candidate_products) {
       let suggested = sanitizeSuggestedProducts(
         gptResponse.suggested_products,
         data.candidate_products
@@ -1950,7 +1977,7 @@ Deno.serve(async (req: Request) => {
       };
     }
 
-    if (hasStylistCandidates || consultantOutfitReply) {
+    if (stylistOutfitLead) {
       gptResponse = {
         ...gptResponse,
         explicacao: sanitizeExplicacaoForClothingOnly(
@@ -1979,7 +2006,7 @@ Deno.serve(async (req: Request) => {
 
     const constrainedResponse = enforceAvailableSizes(gptWithForcedSize, data);
     const finalResponse = enforceSizeFirstMessage(constrainedResponse, data, {
-      stylistMode: consultantOutfitReply,
+      stylistMode: stylistOutfitLead,
     });
 
     return new Response(
@@ -1988,7 +2015,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-16-filter-accessories-text-and-suggestions",
+        _validate_size_rev: "2026-05-15-stylist-induzir-and-size-prefix-fallback",
       }),
       {
         headers: {
@@ -2011,7 +2038,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-16-filter-accessories-text-and-suggestions",
+        _validate_size_rev: "2026-05-15-stylist-induzir-and-size-prefix-fallback",
       }),
       {
         headers: {
