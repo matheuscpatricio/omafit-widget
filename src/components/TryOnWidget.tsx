@@ -33,6 +33,11 @@ import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../utils/chatTryOnIntent';
 import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
 import { resolvePairingCaptionForChat } from '../utils/secondaryTryOnCaption';
+import {
+  isGenericProductName,
+  resolveDisplayProductName,
+  resolveSelectedColorLabel,
+} from '../utils/productDisplayContext';
 import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
 import {
   inferProductHandleFromReferrer,
@@ -430,7 +435,7 @@ function prependIdealSizeLeadIfMissing(
   const sz = String(sizeLabel || '').trim();
   const body = String(explicacao || '').trim();
   if (!sz || !assistantReplyMissingExplicitSize(body, sz)) return body;
-  const pn = String(productName || '').trim();
+  const pn = resolveDisplayProductName(productName);
   let lead = '';
   if (lang === 'es') {
     lead = pn
@@ -1823,9 +1828,12 @@ export function TryOnWidget({
 
         // Atualizar productName e productDescription via omafit-context
         if (event.data.productName || event.data.product_name) {
-          const name = event.data.productName || event.data.product_name;
-          console.log('✅ Atualizando productName:', name);
-          setLocalProductName(name);
+          const name = String(event.data.productName || event.data.product_name || '').trim();
+          if (name && !isGenericProductName(name)) {
+            console.log('✅ Atualizando productName:', name);
+            setLocalProductName(name);
+            setProduct((prev) => (prev ? { ...prev, name } : prev));
+          }
         }
 
         if (event.data.productHandle || event.data.product_handle) {
@@ -1918,9 +1926,12 @@ export function TryOnWidget({
 
         // Atualizar productName e productDescription via omafit-config-update
         if (event.data.productName || event.data.product_name) {
-          const name = event.data.productName || event.data.product_name;
-          console.log('✅ Atualizando productName:', name);
-          setLocalProductName(name);
+          const name = String(event.data.productName || event.data.product_name || '').trim();
+          if (name && !isGenericProductName(name)) {
+            console.log('✅ Atualizando productName:', name);
+            setLocalProductName(name);
+            setProduct((prev) => (prev ? { ...prev, name } : prev));
+          }
         }
 
         if (event.data.productHandle || event.data.product_handle) {
@@ -2222,6 +2233,25 @@ export function TryOnWidget({
         setApiProductImages(imgs);
       } else {
         requestProductImagesFromParent();
+      }
+
+      const title = String(product.title || '').trim();
+      if (title) {
+        setLocalProductName((prev) => (isGenericProductName(prev) ? title : prev));
+        setProduct((prev) =>
+          prev
+            ? { ...prev, name: resolveDisplayProductName(title, prev.name) || prev.name }
+            : prev
+        );
+      }
+
+      const normalizedCatalog = normalizeProductCatalog(product.catalog);
+      if (
+        normalizedCatalog.sizes.length > 0 ||
+        normalizedCatalog.colors.length > 0 ||
+        normalizedCatalog.variants.length > 0
+      ) {
+        setProductCatalog(normalizedCatalog);
       }
     } catch (err) {
       console.warn('[Omafit] Falha ao carregar imagens do produto:', err);
@@ -4129,14 +4159,21 @@ const handleSubmit = async (
                 (selectedProductImage && String(selectedProductImage).trim()) ||
                 (product?.garment_image && String(product.garment_image).trim()) ||
                 '';
+              const anchorName = resolveDisplayProductName(
+                jobCtx?.resolvedProductName,
+                tryOnSubmitMetaRef.current?.productName,
+                product?.name,
+                localProductName,
+                productName
+              );
               anchorPdpGarmentDisplayRef.current = {
                 imageUrl: snapUrl,
-                productName:
-                  jobCtx?.resolvedProductName ||
-                  tryOnSubmitMetaRef.current?.productName ||
-                  product?.name ||
-                  '',
+                productName: anchorName,
               };
+              if (anchorName) {
+                setLocalProductName(anchorName);
+                setProduct((prev) => (prev ? { ...prev, name: anchorName } : prev));
+              }
               setChatMessages((prev) => [
                 ...prev,
                 {
@@ -4844,6 +4881,22 @@ const handleSubmit = async (
         }
       };
 
+      const effectiveProductName = resolveDisplayProductName(
+        localProductName,
+        tryOnSubmitMetaRef.current?.productName,
+        anchorPdpGarmentDisplayRef.current?.productName,
+        product?.name,
+        productName
+      );
+      const langForDisplay: 'pt' | 'es' | 'en' =
+        currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
+      const selectedColorLabel = resolveSelectedColorLabel({
+        hex: selectedColorHex,
+        catalogColors: productCatalog.colors,
+        variantOptions: selectedVariantOptions,
+        language: langForDisplay,
+      });
+
       if (stylistEnabled && intention === 'custom' && customMessage && canOmafitSearch) {
         const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const enrichedQuery = [customMessage, localProductName, localProductDescription]
@@ -4880,7 +4933,7 @@ const handleSubmit = async (
           intencaoForPayload = 'consultor_outfit_inicial';
           customMessageForPayload = t('stylistInitialOutfitAsk').replace(
             /\{productName\}/g,
-            localProductName || 'esta peça'
+            effectiveProductName || localProductName || 'esta peça'
           );
           skipUserMessageValidation = true;
         }
@@ -4935,12 +4988,13 @@ const handleSubmit = async (
         shop_name: localStoreName,
         shop_domain: effectiveShopDomain,
         language: currentLanguage,
-        product_name: localProductName,
+        product_name: effectiveProductName || undefined,
         product_description: localProductDescription,
         available_sizes: productCatalog.sizes,
         available_colors: productCatalog.colors,
         selected_image: selectedProductImage,
-        selected_color: selectedColorHex,
+        selected_color: selectedColorLabel || selectedColorHex,
+        selected_color_hex: selectedColorHex,
         variant_catalog: productCatalog.variants.slice(0, 55),
         complementary_product: complementaryProduct,
         chat_history: (() => {
@@ -5022,7 +5076,7 @@ const handleSubmit = async (
           explicacao = prependIdealSizeLeadIfMissing(
             explicacao,
             tamanhoFinal,
-            localProductName,
+            effectiveProductName || localProductName,
             langForLead
           );
         }

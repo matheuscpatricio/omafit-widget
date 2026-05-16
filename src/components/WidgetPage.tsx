@@ -1021,6 +1021,14 @@ export function WidgetPage() {
         if (imgs.length > 0) {
           setProductImages((prev) => mergeProductImageGallery(productImage, prev, imgs));
         }
+        const title = String(product.title || '').trim();
+        if (title) {
+          setProductName((prev) => {
+            const p = String(prev || '').trim();
+            if (!p || /^produto$/i.test(p)) return title;
+            return prev;
+          });
+        }
       } catch {
         /* fallback: postMessage / parent request no TryOnWidget */
       }

@@ -144,6 +144,8 @@ interface ValidateSizeRequest {
   available_colors?: string[];
   selected_image?: string;
   selected_color?: string;
+  /** Hex da cor (quando selected_color for rótulo legível). */
+  selected_color_hex?: string;
   variant_catalog?: Array<{
     id?: string | number;
     title?: string;
@@ -783,7 +785,7 @@ function spanishDefiniteArticleForProduct(productName: string): 'el' | 'la' {
 
 function buildStylistSizeLead(language: string, size: string, productName?: string): string {
   const sz = normalizeSizeLabel(size);
-  const pn = String(productName || '').trim();
+  const pn = resolveDisplayProductName(productName);
   if (language === 'es') {
     return pn
       ? `Para ${spanishDefiniteArticleForProduct(pn)} ${pn}, tu talla ideal es ${sz}.`
@@ -860,7 +862,7 @@ function enforceSizeFirstMessage(
   if (options?.stylistMode && !secondaryTryOnCaption) {
     const lead = buildStylistSizeLead(language, size, data.product_name);
     let body = cleanedBody.trim();
-    const pn = String(data.product_name || '').trim();
+    const pn = resolveDisplayProductName(data.product_name);
     if (language === 'pt') {
       body = body.replace(/^\s*Para\s+você\s+que\s+escolheu\b[^.!?]*[.!?]\s*/iu, '').trim();
     } else if (language === 'es') {
@@ -1370,10 +1372,143 @@ function fallbackSecondaryTryOnCaption(data: ValidateSizeRequest, language: stri
   };
 }
 
+const GENERIC_PRODUCT_NAMES = new Set([
+  "produto",
+  "product",
+  "producto",
+  "item",
+  "peça",
+  "peca",
+  "esta peça",
+  "esta peca",
+  "this item",
+  "esta prenda",
+  "produto da página",
+  "produto da pagina",
+]);
+
+function isGenericProductName(name: string | null | undefined): boolean {
+  const n = String(name || "").trim();
+  if (!n) return true;
+  return GENERIC_PRODUCT_NAMES.has(n.toLowerCase());
+}
+
+function resolveDisplayProductName(...candidates: Array<string | null | undefined>): string {
+  for (const c of candidates) {
+    const n = String(c || "").trim();
+    if (n && !isGenericProductName(n)) return n;
+  }
+  return "";
+}
+
+function normalizeColorHex(hex: string | null | undefined): string {
+  const raw = String(hex || "").trim().replace(/^#/, "").toLowerCase();
+  if (!raw) return "";
+  if (raw.length === 3) {
+    return `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+  }
+  if (raw.length === 6 && /^[0-9a-f]{6}$/.test(raw)) return `#${raw}`;
+  return "";
+}
+
+function isColorHexValue(value: string | null | undefined): boolean {
+  return Boolean(normalizeColorHex(value));
+}
+
+function hexToApproxColorLabel(hex: string | null | undefined, language: string): string {
+  const n = normalizeColorHex(hex);
+  if (!n) return "";
+  const h = n.slice(1);
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const palette: Array<{ hex: string; pt: string; es: string; en: string }> = [
+    { hex: "#000000", pt: "preto", es: "negro", en: "black" },
+    { hex: "#ffffff", pt: "branco", es: "blanco", en: "white" },
+    { hex: "#808080", pt: "cinza", es: "gris", en: "gray" },
+    { hex: "#800000", pt: "marrom", es: "marrón", en: "brown" },
+    { hex: "#ff0000", pt: "vermelho", es: "rojo", en: "red" },
+    { hex: "#0000ff", pt: "azul", es: "azul", en: "blue" },
+    { hex: "#008000", pt: "verde", es: "verde", en: "green" },
+    { hex: "#ffc0cb", pt: "rosa", es: "rosa", en: "pink" },
+    { hex: "#f5f5dc", pt: "bege", es: "beige", en: "beige" },
+    { hex: "#deb887", pt: "bege", es: "beige", en: "beige" },
+    { hex: "#c4bcae", pt: "bege", es: "beige", en: "beige" },
+    { hex: "#d2b48c", pt: "bege", es: "beige", en: "beige" },
+    { hex: "#000080", pt: "azul marinho", es: "azul marino", en: "navy" },
+  ];
+  let best = palette[0];
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const entry of palette) {
+    const eh = entry.hex.slice(1);
+    const er = parseInt(eh.slice(0, 2), 16);
+    const eg = parseInt(eh.slice(2, 4), 16);
+    const eb = parseInt(eh.slice(4, 6), 16);
+    const dist = Math.sqrt((r - er) ** 2 + (g - eg) ** 2 + (b - eb) ** 2);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = entry;
+    }
+  }
+  if (language === "es") return best.es;
+  if (language === "en") return best.en;
+  return best.pt;
+}
+
+function resolveSelectedColorLabel(data: ValidateSizeRequest, language: string): string {
+  const explicit = String(data.selected_color || "").trim();
+  if (explicit && !isColorHexValue(explicit)) return explicit;
+  const hex = normalizeColorHex(data.selected_color_hex || data.selected_color);
+  const catalog = (data.available_colors || []).map(String).filter(Boolean);
+  const namedCatalog = catalog.filter((c) => !isColorHexValue(c));
+  if (namedCatalog.length === 1) return namedCatalog[0];
+  const fromHex = hexToApproxColorLabel(hex, language);
+  if (fromHex) return fromHex;
+  if (namedCatalog.length > 0) return namedCatalog[0];
+  return "";
+}
+
+function normalizeRequestDisplayFields(data: ValidateSizeRequest): ValidateSizeRequest {
+  const language = data.language === "es" || data.language === "en" ? data.language : "pt";
+  const productName = resolveDisplayProductName(data.product_name);
+  const colorLabel = resolveSelectedColorLabel(data, language);
+  const hex =
+    normalizeColorHex(data.selected_color_hex) ||
+    (isColorHexValue(data.selected_color) ? normalizeColorHex(data.selected_color) : "");
+  return {
+    ...data,
+    product_name: productName || undefined,
+    selected_color: colorLabel || data.selected_color,
+    selected_color_hex: hex || data.selected_color_hex,
+  };
+}
+
+function sanitizeExplicacaoDisplayLabels(
+  text: string,
+  data: ValidateSizeRequest,
+  language: string
+): string {
+  let body = String(text || "");
+  const colorLabel = resolveSelectedColorLabel(data, language);
+  if (colorLabel) {
+    body = body.replace(/#[0-9a-f]{3,8}\b/gi, colorLabel);
+    body = body.replace(
+      new RegExp(`\\bcor\\s+${escapeRegexSegment(colorLabel)}\\s+da\\s+peça\\b`, "gi"),
+      `cor ${colorLabel}`
+    );
+  }
+  const pn = resolveDisplayProductName(data.product_name);
+  if (pn) {
+    body = body.replace(/\b(?:para|com|de)\s+Produto\b/gi, (m) => m.replace(/Produto/i, pn));
+    body = body.replace(/\bProduto\b/g, pn);
+  }
+  return body.trim();
+}
+
 function buildProductCatalogContext(data: ValidateSizeRequest, language: string): string {
   const sizes = (data.available_sizes || []).filter(Boolean);
-  const colors = (data.available_colors || []).filter(Boolean);
-  const selectedColor = data.selected_color || '';
+  const colors = (data.available_colors || []).filter(Boolean).filter((c) => !isColorHexValue(String(c)));
+  const selectedColor = resolveSelectedColorLabel(data, language);
   const variantCount = Array.isArray(data.variant_catalog) ? data.variant_catalog.length : 0;
 
   const sizeText = sizes.length > 0 ? sizes.join(', ') : (language === 'es' ? 'no informado' : language === 'en' ? 'not informed' : 'não informado');
@@ -1403,7 +1538,8 @@ IMPORTANT: base recommendation and sales message on these real sizes/colors from
 - Cores disponíveis: ${colorText}
 - Cor selecionada no try-on: ${selectedColorText}
 - Variantes recebidas: ${variantCount}
-IMPORTANTE: baseie a recomendação e a fala comercial nesses tamanhos/cores reais do produto atual.`;
+IMPORTANTE: baseie a recomendação e a fala comercial nesses tamanhos/cores reais do produto atual.
+NUNCA cite códigos hex (#RRGGBB) na explicacao — use apenas o nome da cor (ex.: bege, azul marinho).`;
 }
 
 function buildCatalogHardRules(data: ValidateSizeRequest, language: string): string {
@@ -1447,6 +1583,8 @@ function getStylistSystemExtra(language: string): string {
   const blocks: Record<string, string> = {
     pt: `MODO CONSULTOR DE MODA (catálogo limitado):
 - Tom caloroso e pessoal ("para você", "no seu caso"): claro e estruturado — nem telegráfico nem prolixo.
+- NOME DO PRODUTO: use sempre o nome real do produto no contexto — nunca escreva "Produto" genérico.
+- COR: use o nome legível da cor selecionada (ex.: bege, off-white). PROIBIDO citar códigos hex (#C4BCAE etc.).
 - TAMANHO (obrigatório): primeira frase exatamente: "Para o/a NOME_DA_PEÇA, seu tamanho ideal é TAMANHO_FINAL." (use "o" ou "a" conforme o nome — ex.: "o Suéter …", "a Calça …".) Depois, mais 3–5 frases objetivas (silhueta, proporções, cor, ocasião, por que o complemento funciona) — não repita o tamanho; limite prático ~900 caracteres no total em explicacao.
 - PEÇA JÁ ESCOLHIDA: na 2.ª frase, diga explicitamente que o cliente já está com essa peça (nome igual ao produto em contexto) e que as sugestões são complementos do look — não inverta: não comece só pela peça candidata.
 - Só mencione produtos cujo "handle" está em CANDIDATOS. Nunca invente URLs ou peças fora da lista.
@@ -2259,7 +2397,7 @@ Deno.serve(async (req: Request) => {
   let requestData: ValidateSizeRequest | null = null;
 
   try {
-    const data: ValidateSizeRequest = await req.json();
+    let data: ValidateSizeRequest = normalizeRequestDisplayFields(await req.json());
     requestData = data;
 
     console.log('📦 DADOS RECEBIDOS EM VALIDATE-SIZE:');
@@ -2506,9 +2644,18 @@ Deno.serve(async (req: Request) => {
     };
 
     const constrainedResponse = enforceAvailableSizes(gptWithForcedSize, data);
-    const finalResponse = enforceSizeFirstMessage(constrainedResponse, data, {
+    const sanitizedExplicacao = sanitizeExplicacaoDisplayLabels(
+      constrainedResponse.explicacao,
+      data,
+      language
+    );
+    const finalResponse = enforceSizeFirstMessage(
+      { ...constrainedResponse, explicacao: sanitizedExplicacao },
+      data,
+      {
       stylistMode: stylistOutfitLead && data.intencao_usuario !== 'legenda_tryon_secundario',
-    });
+      }
+    );
 
     return new Response(
       JSON.stringify({
