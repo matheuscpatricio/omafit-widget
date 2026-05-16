@@ -172,6 +172,16 @@ function inferCollectionTypeFromProductType(productType: string): 'upper' | 'low
   return 'upper';
 }
 
+/** Product type Shopify pode vir vazio/genérico — usar também título e handle (ex.: slug calça-jeans). */
+function inferCollectionTypeFromOmafitProduct(product: {
+  product_type?: string;
+  title?: string;
+  handle?: string;
+}): 'upper' | 'lower' | 'full' {
+  const blob = [product.product_type, product.title, product.handle].filter(Boolean).join(' ');
+  return inferCollectionTypeFromProductType(blob);
+}
+
 function safeDecodeUriComponent(url: string): string {
   try {
     return decodeURIComponent(url);
@@ -637,6 +647,12 @@ export function TryOnWidget({
   } | null>(null);
   /** Try-on disparado a partir de sugestão no chat: UI de progresso fica no chat, sem step `processing`. */
   const embedTryOnInChatActiveRef = useRef(false);
+  /** Imagem/nome da peça do PDP no primeiro try-on concluído — não substituir ao experimentar produto sugerido (estado `product` muda para ATC/carteiro). */
+  const anchorPdpGarmentDisplayRef = useRef<{ imageUrl: string; productName: string } | null>(null);
+  /** Metadados do último `handleSubmit` (closures assíncronos / polling podem ter `product` desatualizado). */
+  const tryOnSubmitMetaRef = useRef<{ productName: string } | null>(null);
+  /** Tamanho algorítmico enviado ao /tryon (payload.user_measurements.recommended_size) — fonte única para o 1.º validate-size no chat. */
+  const tryOnAlgorithmSizeRef = useRef<string | null>(null);
   const [tryOnLoadingInChat, setTryOnLoadingInChat] = useState(false);
   const publicIdRef = useRef<string | undefined>(publicId);
   const effectiveShopDomainRef = useRef('');
@@ -807,7 +823,11 @@ export function TryOnWidget({
     return modelImageUploadPromiseRef.current;
   };
 
-  const startPosePreparation = (preparedImage: OptimizedModelImage, jobId: number) => {
+  const startPosePreparation = (
+    preparedImage: OptimizedModelImage,
+    jobId: number,
+    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
+  ) => {
     if (posePreparationPromiseRef.current) return posePreparationPromiseRef.current;
 
     posePreparationPromiseRef.current = (async () => {
@@ -839,7 +859,7 @@ export function TryOnWidget({
 
           const photoValidation = validatePhotoForCollection(
             landmarks,
-            localCollectionType || 'upper'
+            collectionTypeForValidation
           );
 
           if (!photoValidation.valid) {
@@ -887,7 +907,11 @@ export function TryOnWidget({
     return posePreparationPromiseRef.current;
   };
 
-  const startModelImagePreparation = (file: File, jobId: number) => {
+  const startModelImagePreparation = (
+    file: File,
+    jobId: number,
+    collectionTypeForValidation: 'upper' | 'lower' | 'full' = localCollectionType || 'upper'
+  ) => {
     modelImagePreparationPromiseRef.current = optimizeTryOnImage(file)
       .then((optimizedImage) => {
         if (activeModelImageJobRef.current !== jobId) {
@@ -907,7 +931,7 @@ export function TryOnWidget({
         preparedModelImageRef.current = preparedImage;
 
         void startModelImageUploadPreparation(preparedImage, file.name || 'tryon-model.jpg', jobId);
-        void startPosePreparation(preparedImage, jobId);
+        void startPosePreparation(preparedImage, jobId, collectionTypeForValidation);
 
         return preparedImage;
       })
@@ -2436,6 +2460,8 @@ export function TryOnWidget({
     setImagePreview(null);
     setFinalBodyMeasurements(null);
     setResult(null);
+    anchorPdpGarmentDisplayRef.current = null;
+    tryOnSubmitMetaRef.current = null;
     setPredictionId(null);
     setError('');
     setLoading(false);
@@ -2454,6 +2480,7 @@ export function TryOnWidget({
         if (!payload?.gender) return;
         const sizeResult = chartRows.length > 0 ? calculateRecommendedSize(payload, chartRows) : null;
         const size = sizeResult?.size ?? 'M';
+        tryOnAlgorithmSizeRef.current = size;
         setRecommendedSize(size);
         setCalculatedSize(size);
         setStep('result');
@@ -3040,6 +3067,8 @@ const handleSubmit = async (
     overrideGarmentImageUrl?: string;
     overrideProductId?: string;
     overrideProductName?: string;
+    /** upper / lower / full alinhado ao produto sugerido (evita mesmo modelo/payload da PDP). */
+    overrideCollectionType?: 'upper' | 'lower' | 'full';
   }
 ) => {
   const modelFile = modelFileOverride ?? modelImage;
@@ -3068,9 +3097,15 @@ const handleSubmit = async (
     const resolvedProductName =
       (tryOnOpts?.overrideProductName && String(tryOnOpts.overrideProductName).trim()) || product.name;
 
+    const resolvedCollectionType: 'upper' | 'lower' | 'full' =
+      tryOnOpts?.overrideCollectionType ?? localCollectionType ?? 'upper';
+
+    tryOnSubmitMetaRef.current = { productName: resolvedProductName };
+
     const currentJobId = activeModelImageJobRef.current;
     const optimizedImage = preparedModelImageRef.current
-      ?? await (modelImagePreparationPromiseRef.current || startModelImagePreparation(modelFile, currentJobId));
+      ?? await (modelImagePreparationPromiseRef.current ||
+        startModelImagePreparation(modelFile, currentJobId, resolvedCollectionType));
 
     if (!optimizedImage || activeModelImageJobRef.current !== currentJobId) {
       throw new Error(t('processingError'));
@@ -3091,14 +3126,15 @@ const handleSubmit = async (
     let detectedMeasurements = null;
 
     const preparedPoseAnalysis = preparedPoseAnalysisRef.current
-      ?? await (posePreparationPromiseRef.current || startPosePreparation(optimizedImage, currentJobId));
+      ?? await (posePreparationPromiseRef.current ||
+        startPosePreparation(optimizedImage, currentJobId, resolvedCollectionType));
 
     if (activeModelImageJobRef.current !== currentJobId) {
       throw new Error(t('processingError'));
     }
 
     if (preparedPoseAnalysis?.validationMessage) {
-      console.warn('⚠️ Foto reprovada no validador contextual:', localCollectionType || 'upper');
+      console.warn('⚠️ Foto reprovada no validador contextual:', resolvedCollectionType);
       setError(preparedPoseAnalysis.validationMessage);
       setLoading(false);
       leaveTryOnErrorStep();
@@ -3171,6 +3207,8 @@ const handleSubmit = async (
       (sizeChart.length > 0 ? calculateRecommendedSize(measurementsForProvisionalCalc as any, sizeChart)?.size : null) ||
       'M';
 
+    tryOnAlgorithmSizeRef.current = String(provisionalSize || 'M').trim() || 'M';
+
     if (!recommendedSize && !calculatedSize && provisionalSize) {
       setRecommendedSize(provisionalSize);
       setCalculatedSize(provisionalSize);
@@ -3238,6 +3276,7 @@ const handleSubmit = async (
       await trackGarmentMediapipeSession();
       setPredictionId(null);
       setResult(null);
+      anchorPdpGarmentDisplayRef.current = null;
       setError('');
       setStep('result');
       setLoading(false);
@@ -3251,7 +3290,7 @@ const handleSubmit = async (
       shop_domain: effectiveShopDomain,
       // Hint explícito para o backend escolher o modelo correto do try-on.
       // upper/lower/full (do nosso UI) deve virar tops/bottoms/one-pieces no backend.
-      collection_type: localCollectionType || 'upper',
+      collection_type: resolvedCollectionType,
       model_image: uploadedModelImageUrl || '',
       garment_image: optimizedGarmentImageUrl,
       product_name: resolvedProductName,
@@ -3277,6 +3316,7 @@ const handleSubmit = async (
       hasPoseLandmarks: Boolean(detectedLandmarks?.length),
       hasDetectedMeasurements: Boolean(detectedMeasurements),
       recommendedSize: payload.user_measurements.recommended_size,
+      collectionType: payload.collection_type,
     });
     logVerboseTryOn('🔑 publicId:', publicId);
     logVerboseTryOn('👕 garment_image:', payload.garment_image);
@@ -3369,6 +3409,7 @@ const handleSubmit = async (
       await trackGarmentMediapipeSession();
       setPredictionId(null);
       setResult(null);
+      anchorPdpGarmentDisplayRef.current = null;
       setError('');
       setStep('result');
       setLoading(false);
@@ -3388,6 +3429,7 @@ const handleSubmit = async (
       const userRecommendedSize = bm?.userInput?.recommended_size;
 
       if (isUserInput && userRecommendedSize) {
+        tryOnAlgorithmSizeRef.current = String(userRecommendedSize).trim() || tryOnAlgorithmSizeRef.current;
         setRecommendedSize(userRecommendedSize);
         setCalculatedSize(userRecommendedSize);
         console.log('');
@@ -3412,6 +3454,8 @@ const handleSubmit = async (
         const sizeResult = calculateRecommendedSize(realMeasurements as any, sizeChart);
         console.log('');
         if (sizeResult) {
+          tryOnAlgorithmSizeRef.current =
+            String(sizeResult.size || '').trim() || tryOnAlgorithmSizeRef.current;
           setRecommendedSize(sizeResult.size);
           setCalculatedSize(sizeResult.size);
           console.log('✅ TAMANHO CALCULADO COM SUCESSO:', sizeResult.size);
@@ -3445,6 +3489,7 @@ const handleSubmit = async (
     clearEmbedTryOnChatLoading();
     setError('');
     setResult(null);
+    anchorPdpGarmentDisplayRef.current = null;
     setStep('result');
     setLoading(false);
   };
@@ -3524,7 +3569,18 @@ const handleSubmit = async (
             console.log('✅ TRY-ON concluído com timings finais:');
             logTryOnTimings('Job concluído', statusData.timings || null);
             const embeddedInChat = embedTryOnInChatActiveRef.current;
-            setResult(imageUrl);
+            if (!embeddedInChat) {
+              setResult(imageUrl);
+              const snapUrl =
+                (tryOnOpts?.overrideGarmentImageUrl && String(tryOnOpts.overrideGarmentImageUrl).trim()) ||
+                (selectedProductImage && String(selectedProductImage).trim()) ||
+                (product?.garment_image && String(product.garment_image).trim()) ||
+                '';
+              anchorPdpGarmentDisplayRef.current = {
+                imageUrl: snapUrl,
+                productName: resolvedProductName,
+              };
+            }
 
             console.log('📏 Tamanho já foi calculado com MediaPipe no handleSubmit');
             console.log('   - recommendedSize:', recommendedSize);
@@ -3534,7 +3590,7 @@ const handleSubmit = async (
             setStep('result');
             setLoading(false);
             if (embeddedInChat) {
-              const pname = String(product?.name || '').trim();
+              const pname = String(tryOnSubmitMetaRef.current?.productName || product?.name || '').trim();
               const fallbackPn =
                 currentLanguage === 'es'
                   ? 'esta prenda'
@@ -3605,6 +3661,9 @@ const handleSubmit = async (
     setRecommendedSize(null);
     setFinalBodyMeasurements(null);
     setResult(null);
+    anchorPdpGarmentDisplayRef.current = null;
+    tryOnSubmitMetaRef.current = null;
+    tryOnAlgorithmSizeRef.current = null;
     setError('');
     setLoading(false);
     setGptLoading(false);
@@ -3703,9 +3762,12 @@ const handleSubmit = async (
         suggestionAttributionRef.current = null;
       }
 
-      setLocalProductHandle(product.handle);
-      setLocalProductName(product.title);
-      setLocalCollectionType(inferCollectionTypeFromProductType(product.product_type));
+      const inferredCollectionType = inferCollectionTypeFromOmafitProduct({
+        product_type: product.product_type,
+        title: product.title,
+        handle: product.handle,
+      });
+      setLocalCollectionType(inferredCollectionType);
 
       const imgs = product.images?.length ? product.images : [product.image_url].filter(Boolean);
       const mainImg = imgs[0] || product.image_url || '';
@@ -3745,6 +3807,7 @@ const handleSubmit = async (
             overrideGarmentImageUrl: garmentUrl,
             overrideProductId: pid,
             overrideProductName: pname,
+            overrideCollectionType: inferredCollectionType,
           });
         }, 80);
       } else {
@@ -3995,7 +4058,8 @@ const handleSubmit = async (
         chart_gender_scope: chartGenderScope,
         elasticidade: localCollectionElasticity || 'light_flex',
         categoria: localCollectionType || 'upper',
-        tamanho_calculado_algoritmo: calculatedSize || recommendedSize || 'M',
+        tamanho_calculado_algoritmo:
+          String(tryOnAlgorithmSizeRef.current || calculatedSize || recommendedSize || 'M').trim() || 'M',
         intencao_usuario: intencaoForPayload,
         custom_message: customMessageForPayload,
         session_id: analyticsSessionId || sessionId,
@@ -4032,6 +4096,7 @@ const handleSubmit = async (
       };
 
       console.log('🤖 [GPT PAYLOAD] Catálogo enviado para validate-size:');
+      console.log('   • tamanho_calculado_algoritmo (payload):', tryOnAlgorithmSizeRef.current || calculatedSize || recommendedSize || '(fallback M)');
       console.log('   • available_sizes:', payload.available_sizes?.length || 0, payload.available_sizes);
       console.log('   • available_colors:', payload.available_colors?.length || 0, payload.available_colors);
       console.log('   • variant_catalog:', payload.variant_catalog?.length || 0);
@@ -4409,7 +4474,17 @@ const handleSubmit = async (
     );
   }
 
-  const displayImage = step === 'photo' ? selectedProductImage : product.garment_image;
+  const displayImage = (() => {
+    if (step === 'result' && anchorPdpGarmentDisplayRef.current?.imageUrl) {
+      return anchorPdpGarmentDisplayRef.current.imageUrl;
+    }
+    return step === 'photo' ? selectedProductImage : product.garment_image;
+  })();
+
+  const displayProductLabel =
+    step === 'result' && anchorPdpGarmentDisplayRef.current?.productName
+      ? anchorPdpGarmentDisplayRef.current.productName
+      : product.name;
 
   console.log('🎨 Estilos aplicados no widget:', { fontFamily });
 
@@ -5020,7 +5095,7 @@ const handleSubmit = async (
               <div className="w-full max-w-md rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src={displayImage}
-                alt={product.name}
+                alt={displayProductLabel}
                 className="w-full h-auto object-contain"
               />
               </div>
@@ -5076,7 +5151,7 @@ const handleSubmit = async (
             {!isHeroLayout && (
               <motion.div variants={tryonTextStaggerChild} className="rounded-xl bg-gray-50 p-3 md:hidden">
                 <div className="w-full overflow-hidden rounded-2xl bg-gray-100">
-                  <img src={displayImage} alt={product.name} className="h-auto w-full object-contain" />
+                  <img src={displayImage} alt={displayProductLabel} className="h-auto w-full object-contain" />
                 </div>
               </motion.div>
             )}
@@ -5135,7 +5210,7 @@ const handleSubmit = async (
                     <div className="max-w-[10rem] overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-gray-200/70 sm:max-w-[11.5rem]">
                       <img
                         src={displayImage}
-                        alt={product.name}
+                        alt={displayProductLabel}
                         className="block max-h-[min(20dvh,150px)] w-full rounded-2xl object-contain object-center sm:max-h-[min(22dvh,170px)]"
                       />
                     </div>
