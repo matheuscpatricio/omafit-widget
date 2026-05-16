@@ -35,6 +35,7 @@ import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
 import { resolvePairingCaptionForChat } from '../utils/secondaryTryOnCaption';
 import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
 import {
+  inferProductHandleFromReferrer,
   mergeProductImageGallery,
   parseProductImagesMessage,
   safeDecodeGarmentImage,
@@ -2176,10 +2177,28 @@ export function TryOnWidget({
     setHeroBackgroundResolved(Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''));
   }, [effectiveShopDomain, tryonLayoutBackgroundImage]);
 
+  const resolveProductHandleForGallery = React.useCallback(() => {
+    return (
+      (localProductHandle || productHandle || inferProductHandleFromReferrer() || '').trim()
+    );
+  }, [localProductHandle, productHandle]);
+
+  const requestProductImagesFromParent = React.useCallback(() => {
+    if (typeof window === 'undefined' || window.parent === window) return;
+    const handle = resolveProductHandleForGallery();
+    window.parent.postMessage(
+      { type: 'omafit-request-product-images', handle: handle || undefined },
+      '*'
+    );
+  }, [resolveProductHandleForGallery]);
+
   const hydrateProductImagesFromApi = React.useCallback(async () => {
-    const handle = (localProductHandle || productHandle || '').trim();
+    const handle = resolveProductHandleForGallery();
     const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
-    if (!handle || !isReady || !effectiveShopDomain || !publicId) return;
+    if (!handle || !isReady || !effectiveShopDomain || !publicId) {
+      requestProductImagesFromParent();
+      return;
+    }
 
     const gen = ++productImagesFetchGenRef.current;
     try {
@@ -2190,29 +2209,45 @@ export function TryOnWidget({
         publicId,
         handle,
       });
-      if (gen !== productImagesFetchGenRef.current || error || !product) return;
+      if (gen !== productImagesFetchGenRef.current) return;
+      if (error || !product) {
+        requestProductImagesFromParent();
+        return;
+      }
       const imgs = (product.images?.length ? product.images : [product.image_url])
         .map((u) => String(u || '').trim())
         .filter(Boolean);
-      if (imgs.length > 0) {
+      if (imgs.length > 1) {
         console.log('📸 Galeria via product-by-handle:', imgs.length);
         setApiProductImages(imgs);
+      } else {
+        requestProductImagesFromParent();
       }
     } catch (err) {
       console.warn('[Omafit] Falha ao carregar imagens do produto:', err);
+      requestProductImagesFromParent();
     }
-  }, [effectiveShopDomain, localProductHandle, productHandle, publicId]);
+  }, [
+    effectiveShopDomain,
+    publicId,
+    requestProductImagesFromParent,
+    resolveProductHandleForGallery,
+  ]);
 
   useEffect(() => {
-    setApiProductImages([]);
     void hydrateProductImagesFromApi();
   }, [hydrateProductImagesFromApi]);
 
   useEffect(() => {
-    if (step !== 'photo') return;
     if (availableImages.length > 1) return;
     void hydrateProductImagesFromApi();
-  }, [step, availableImages.length, hydrateProductImagesFromApi]);
+  }, [availableImages.length, hydrateProductImagesFromApi]);
+
+  useEffect(() => {
+    if (step !== 'photo' || availableImages.length > 1) return;
+    requestProductImagesFromParent();
+    void hydrateProductImagesFromApi();
+  }, [step, availableImages.length, hydrateProductImagesFromApi, requestProductImagesFromParent]);
 
   React.useEffect(() => {
     const decodedImage = safeDecodeGarmentImage(garmentImage);

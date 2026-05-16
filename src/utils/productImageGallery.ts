@@ -54,6 +54,19 @@ export function parseProductImagesMessage(payload: unknown): string[] {
     .filter(Boolean);
 }
 
+/** Handle Shopify a partir do referrer (página do produto que embute o iframe). */
+export function inferProductHandleFromReferrer(): string {
+  if (typeof document === 'undefined') return '';
+  try {
+    const ref = document.referrer || '';
+    if (!ref) return '';
+    const match = new URL(ref).pathname.match(/\/products\/([^/?#]+)/i);
+    return match?.[1] ? decodeURIComponent(match[1]).trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 export function safeDecodeGarmentImage(url: string): string {
   const trimmed = String(url || '').trim();
   if (!trimmed) return '';

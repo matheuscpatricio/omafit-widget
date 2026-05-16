@@ -2312,6 +2312,17 @@
       widgetUrl += '&tryon_layout_background_image=' + encodeURIComponent(omafitIframeTryonLayoutBackground);
       widgetUrl += '&tryonLayoutBackgroundImage=' + encodeURIComponent(omafitIframeTryonLayoutBackground);
     }
+
+    if (Array.isArray(allProductImages) && allProductImages.length > 1) {
+      try {
+        var _galleryQuery = '&productImages=' + encodeURIComponent(JSON.stringify(allProductImages));
+        if (widgetUrl.length + _galleryQuery.length < 11000) {
+          widgetUrl += _galleryQuery;
+        }
+      } catch (_galleryUrlErr) {
+        /* non-blocking */
+      }
+    }
     
     console.log('🔗 URL do widget (tamanho:', widgetUrl.length, 'chars):', widgetUrl.substring(0, 200) + '...');
     
@@ -3249,6 +3260,27 @@
   }
 
   window.addEventListener('message', async function (event) {
+    /** Widget no iframe pede galeria completa — só a página do produto (mesma origem) acede a product.js/DOM. */
+    if (event && event.data && event.data.type === 'omafit-request-product-images') {
+      if (event.origin !== OMAFIT_WIDGET_ORIGIN) return;
+      var reqHandle =
+        (event.data.handle && String(event.data.handle).trim()) ||
+        (window.location.pathname.split('/products/')[1] || '').split('/')[0];
+      try {
+        var galleryImgs = await getOnlyProductImages(reqHandle);
+        if (event.source && event.source.postMessage && Array.isArray(galleryImgs) && galleryImgs.length > 0) {
+          event.source.postMessage(
+            { type: 'omafit-product-images', images: galleryImgs },
+            event.origin
+          );
+          console.log('[Omafit] Galeria enviada ao widget (pedido do iframe):', galleryImgs.length);
+        }
+      } catch (_galleryErr) {
+        /* non-blocking */
+      }
+      return;
+    }
+
     /** Carrinho AR (variant id): iframe Netlify não pode `fetch` cross-origin a `/cart/add.js`. */
     if (event && event.data && event.data.type === 'omafit-ar-cart-add-variant') {
       if (OMAFIT_CART_ALLOWED_ORIGINS.indexOf(event.origin) === -1) {

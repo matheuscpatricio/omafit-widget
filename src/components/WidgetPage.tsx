@@ -9,7 +9,10 @@ import {
 } from '../utils/pickPreferredCollectionHandle';
 import { supabase } from '../lib/supabase';
 import { hasGrowthPlusPlan } from '../utils/shopifyPlanAccess';
+import { fetchOmafitProductByHandle } from '../utils/omafitCatalogClient';
+import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import {
+  inferProductHandleFromReferrer,
   mergeProductImageGallery,
   parseProductImagesMessage,
 } from '../utils/productImageGallery';
@@ -551,7 +554,15 @@ export function WidgetPage() {
       try {
         const images = JSON.parse(decodeURIComponent(imagesParam));
         if (Array.isArray(images)) {
-          setProductImages(images);
+          const normalized = images
+            .filter((item): item is string => typeof item === 'string')
+            .map((item) => upgradeShopifyMediaToHttps(item.trim()))
+            .filter(Boolean);
+          if (normalized.length > 0) {
+            setProductImages((prev) =>
+              mergeProductImageGallery(image || productImage, prev, normalized)
+            );
+          }
         }
       } catch (error) {
         console.error('Error parsing images:', error);
@@ -985,6 +996,39 @@ export function WidgetPage() {
       cancelled = true;
     };
   }, [shopDomain]);
+
+  useEffect(() => {
+    const handle = (productHandle || inferProductHandleFromReferrer()).trim();
+    const domain = String(shopDomain || '').trim();
+    const pub = String(publicId || '').trim();
+    const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!handle || !domain || !pub || !isReady) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { product, error } = await fetchOmafitProductByHandle({
+          baseUrl,
+          secret,
+          shopDomain: domain,
+          publicId: pub,
+          handle,
+        });
+        if (cancelled || error || !product) return;
+        const imgs = (product.images?.length ? product.images : [product.image_url])
+          .map((u) => upgradeShopifyMediaToHttps(String(u || '').trim()))
+          .filter(Boolean);
+        if (imgs.length > 0) {
+          setProductImages((prev) => mergeProductImageGallery(productImage, prev, imgs));
+        }
+      } catch {
+        /* fallback: postMessage / parent request no TryOnWidget */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productHandle, shopDomain, publicId, productImage]);
 
   const eyewearSearchSnapshot =
     typeof window !== 'undefined' ? window.location.search : '';
