@@ -643,9 +643,10 @@ export function TryOnWidget({
   // Detectar idioma
   const [currentLanguage, setCurrentLanguage] = useState<'pt' | 'es' | 'en'>(detectWidgetLanguage(language));
   const t = (key: WidgetTranslationKey): string => {
-    const translation = widgetTranslations[currentLanguage][key] || widgetTranslations['en'][key] || key;
-    // Substituir {storeName} pelo nome real da loja
-    return translation.replace('{storeName}', storeName || 'nossa loja');
+    const translation =
+      widgetTranslations[currentLanguage][key] ?? widgetTranslations['en'][key] ?? key;
+    // Substituir {storeName} pelo nome real da loja (?? preserva tradução vazia legítima)
+    return String(translation).replace('{storeName}', storeName || 'nossa loja');
   };
 
   const getOutOfStockMessage = (): string => {
@@ -792,6 +793,8 @@ export function TryOnWidget({
   /** Evita aplicar resposta de um fetch antigo se outro pedido ao GPT foi iniciado (remount / duplo efeito). */
   const gptAssistSeqRef = useRef(0);
   const initialGptScheduleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Primeira resposta do consultor no passo resultado: mostrar tamanho ideal + produtos sugeridos; nas seguintes, não repetir. */
+  const stylistOpeningExtrasConsumedRef = useRef(false);
   /** Pesquisa Omafit disparada em paralelo ao /tryon para o primeiro GPT após resultado não esperar tanto. */
   const stylistCatalogPrefetchPromiseRef = useRef<Promise<OmafitCatalogCandidate[]> | null>(null);
   const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
@@ -3989,6 +3992,7 @@ const handleSubmit = async (
     stylistCatalogPrefetchPromiseRef.current = null;
     stylistSearchAnchorRef.current = '';
     stylistImpressionSentRef.current = new Set();
+    stylistOpeningExtrasConsumedRef.current = false;
     embedTryOnInChatActiveRef.current = false;
     pendingEmbedTryOnChatCompletionRef.current = false;
     setTryOnLoadingInChat(false);
@@ -4445,8 +4449,9 @@ const handleSubmit = async (
         const should_end_conversation = Boolean(data.should_end_conversation);
         const suggested_products = data.suggested_products;
         const tamanhoFinal = String(data.tamanho_final ?? '').trim();
+        const allowOpeningExtras = !stylistOpeningExtrasConsumedRef.current;
         let explicacao = typeof data.explicacao === 'string' ? data.explicacao.trim() : '';
-        if (!explicacao && tamanhoFinal) {
+        if (!explicacao && tamanhoFinal && allowOpeningExtras) {
           const sizeFallback = {
             pt: `Tamanho sugerido: ${tamanhoFinal}. Veja o espelho virtual e adicione ao carrinho se quiser.`,
             es: `Talla sugerida: ${tamanhoFinal}. Mira el espejo virtual y añade al carrito si te encaja.`,
@@ -4457,13 +4462,22 @@ const handleSubmit = async (
 
         const langForLead: 'pt' | 'es' | 'en' =
           currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
-        if (!should_end_conversation && tamanhoFinal) {
+        if (!should_end_conversation && tamanhoFinal && allowOpeningExtras) {
           explicacao = prependIdealSizeLeadIfMissing(
             explicacao,
             tamanhoFinal,
             localProductName,
             langForLead
           );
+        }
+
+        if (!explicacao && !should_end_conversation && !allowOpeningExtras) {
+          const neutralFollowUp = {
+            pt: 'Se quiser, diga como podemos ajudar com esta peça ou use o botão para adicionar ao carrinho.',
+            es: 'Si quieres, dime cómo te ayudo con esta prenda o usa el botón para añadir al carrito.',
+            en: 'Tell me how we can help with this piece, or use the button to add it to your cart.',
+          };
+          explicacao = neutralFollowUp[currentLanguage] || neutralFollowUp.en;
         }
 
         if (!explicacao) {
@@ -4479,12 +4493,14 @@ const handleSubmit = async (
             content: explicacao,
             timestamp: Date.now()
           }]);
+          stylistOpeningExtrasConsumedRef.current = true;
           setInteractionCount(5); // Bloquear novas interações
           return;
         }
 
         let suggestedProductsBlock: ChatMessage['suggestedProducts'];
         if (
+          allowOpeningExtras &&
           Array.isArray(suggested_products) &&
           suggested_products.length > 0 &&
           candidate_products?.length
@@ -4525,14 +4541,18 @@ const handleSubmit = async (
             role: 'assistant',
             content: explicacao,
             timestamp: Date.now(),
-            ...(suggestedProductsBlock?.length ? { suggestedProducts: suggestedProductsBlock } : {}),
-            ...(stylistImpressionId && anchorForStylistMsg
+            ...(allowOpeningExtras && suggestedProductsBlock?.length
+              ? { suggestedProducts: suggestedProductsBlock }
+              : {}),
+            ...(allowOpeningExtras && stylistImpressionId && anchorForStylistMsg
               ? { stylistImpressionId, stylistAnchorHandle: anchorForStylistMsg }
               : {}),
           },
         ]);
 
-        if (suggestedProductsBlock?.length) {
+        stylistOpeningExtrasConsumedRef.current = true;
+
+        if (allowOpeningExtras && suggestedProductsBlock?.length) {
           lastStylistSuggestionsRef.current = suggestedProductsBlock;
           if (stylistImpressionId && anchorForStylistMsg) {
             lastStylistImpressionMetaRef.current = {
@@ -4540,7 +4560,7 @@ const handleSubmit = async (
               anchorHandle: anchorForStylistMsg,
             };
           }
-        } else {
+        } else if (allowOpeningExtras) {
           lastStylistImpressionMetaRef.current = null;
         }
 
@@ -4554,16 +4574,29 @@ const handleSubmit = async (
     } catch (error) {
       console.error('Erro ao chamar GPT:', error);
       const sz = String(calculatedSize || recommendedSize || '').trim();
+      const allowOpeningExtras = !stylistOpeningExtrasConsumedRef.current;
       const fallbackMessages = {
-        pt: sz
-          ? `Assistência instável. Tamanho sugerido: ${sz}. Veja o espelho e adicione ao carrinho se quiser.`
-          : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`,
-        es: sz
-          ? `Sin asistente por ahora. Talla sugerida: ${sz}. Mira el espejo y añade al carrito si te encaja.`
-          : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`,
-        en: sz
-          ? `Assistant unavailable. Suggested size: ${sz}. Check the mirror and add to cart if you like it.`
-          : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`,
+        pt: !allowOpeningExtras
+          ? sz
+            ? 'Assistência instável. Veja o espelho virtual e tente novamente em instantes.'
+            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`
+          : sz
+            ? `Assistência instável. Tamanho sugerido: ${sz}. Veja o espelho e adicione ao carrinho se quiser.`
+            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`,
+        es: !allowOpeningExtras
+          ? sz
+            ? 'Sin asistente por ahora. Mira el espejo virtual e inténtalo de nuevo en unos instantes.'
+            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`
+          : sz
+            ? `Sin asistente por ahora. Talla sugerida: ${sz}. Mira el espejo y añade al carrito si te encaja.`
+            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`,
+        en: !allowOpeningExtras
+          ? sz
+            ? 'Assistant unavailable. Check the virtual mirror and try again in a moment.'
+            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`
+          : sz
+            ? `Assistant unavailable. Suggested size: ${sz}. Check the mirror and add to cart if you like it.`
+            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`,
       };
 
       if (requestSeq !== gptAssistSeqRef.current) return;
@@ -4572,6 +4605,7 @@ const handleSubmit = async (
         content: fallbackMessages[currentLanguage],
         timestamp: Date.now()
       }]);
+      stylistOpeningExtrasConsumedRef.current = true;
     } finally {
       if (requestSeq === gptAssistSeqRef.current) {
         setGptLoading(false);
@@ -4847,24 +4881,6 @@ const handleSubmit = async (
   /** Hero visual (fundo + logos + texto claro): desligado no chat/resultado para ficar como layout default. */
   const heroChromeActive = isHeroLayout && step !== 'result';
 
-  /** Imagens de try-on na etapa resultado: primário à esquerda (se ainda não está na bolha) + ordem das mensagens. */
-  const orderedTryOnImageUrls = (() => {
-    if (step !== 'result') return [] as string[];
-    const urls: string[] = [];
-    const seen = new Set<string>();
-    const push = (u: string | undefined) => {
-      if (!u?.trim() || seen.has(u)) return;
-      seen.add(u);
-      urls.push(u);
-    };
-    const primaryInBubble = chatMessages.some((m) => m.tryOnResultVariant === 'primary');
-    if (result && !primaryInBubble) push(result);
-    for (const m of chatMessages) {
-      if (m.tryOnImageUrl) push(m.tryOnImageUrl);
-    }
-    return urls;
-  })();
-
   return (
     <motion.div
       className={`omafit-tryon-root w-full min-h-0${
@@ -5050,29 +5066,10 @@ const handleSubmit = async (
             </div>
           )}
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
-            {orderedTryOnImageUrls.length > 0 ? (
-              <aside
-                className={`flex shrink-0 flex-col gap-3 overflow-y-auto border-gray-100 md:w-[min(280px,40vw)] md:border-r md:px-3 md:py-4 ${
-                  embed ? 'border-b p-4 pb-3 pt-3 md:border-b-0 md:pt-14' : 'border-b p-4 md:border-b-0 md:p-4'
-                }`}
-              >
-                {orderedTryOnImageUrls.map((url, idx) => (
-                  <div
-                    key={`${url}-${idx}`}
-                    className="aspect-[3/4] w-full overflow-hidden rounded-2xl bg-gray-100 shadow-md"
-                  >
-                    <img src={url} alt="" className="h-full w-full object-cover object-center" loading="lazy" />
-                  </div>
-                ))}
-              </aside>
-            ) : null}
-
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Chat Messages */}
+          {/* Chat Messages — uma coluna; imagens de try-on vêm nas bolhas da loja */}
           <div
-            className={`flex-1 space-y-4 overflow-y-auto min-h-0 ${
-              embed ? 'p-4 md:px-3 md:pb-2 md:pt-4' : 'p-4'
+            className={`flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto ${
+              embed ? 'p-4 md:px-3 md:pb-2 md:pt-12' : 'p-4'
             }`}
           >
             <AnimatePresence initial={false}>
@@ -5080,7 +5077,8 @@ const handleSubmit = async (
               if (
                 message.role === 'assistant' &&
                 !message.content.trim() &&
-                !(message.suggestedProducts?.length)
+                !(message.suggestedProducts?.length) &&
+                !message.tryOnImageUrl
               ) {
                 return null;
               }
@@ -5112,6 +5110,22 @@ const handleSubmit = async (
                 >
                   {message.content.trim() ? (
                     <p className="text-sm md:text-base whitespace-pre-line">{message.content}</p>
+                  ) : null}
+                  {message.tryOnImageUrl ? (
+                    <div
+                      className={`overflow-hidden rounded-2xl bg-gray-100 shadow-sm ${
+                        message.content.trim() ? 'mt-3' : ''
+                      }`}
+                    >
+                      <div className="aspect-[3/4] w-full min-h-[140px]">
+                        <img
+                          src={message.tryOnImageUrl}
+                          alt=""
+                          className="h-full w-full object-cover object-center"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
                   ) : null}
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
@@ -5396,8 +5410,6 @@ const handleSubmit = async (
               </p>
             </motion.div>
           )}
-            </div>
-          </div>
         </motion.div>
       ) : (
         <div
