@@ -85,6 +85,8 @@ export function SizeCalculator({
   const weightInputRef = useRef<HTMLInputElement>(null);
 
   const t = (key: WidgetTranslationKey) => widgetTranslations[language][key] || widgetTranslations.en[key] || key;
+  const accentColor =
+    (primaryColor && String(primaryColor).trim()) || '#810707';
   const bodyTypes = gender === 'male' ? bodyTypesMale : bodyTypesFemale;
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export function SizeCalculator({
 
   const selectedMannequinOutline = heroFooterCTAs
     ? { borderColor: '#ffffff', boxShadow: '0 0 0 2px #ffffff' }
-    : { borderColor: primaryColor, boxShadow: `0 0 0 2px ${primaryColor}` };
+    : { borderColor: accentColor, boxShadow: `0 0 0 2px ${accentColor}` };
 
   return (
     <div className="flex flex-col h-full">
@@ -165,7 +167,7 @@ export function SizeCalculator({
                     setGender('female');
                     setBodyTypeIndex(null);
                   }}
-                  style={gender === 'female' ? { backgroundColor: primaryColor } : {}}
+                  style={gender === 'female' ? { backgroundColor: accentColor } : {}}
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     gender === 'female'
                       ? 'text-white'
@@ -179,7 +181,7 @@ export function SizeCalculator({
                     setGender('male');
                     setBodyTypeIndex(null);
                   }}
-                  style={gender === 'male' ? { backgroundColor: primaryColor } : {}}
+                  style={gender === 'male' ? { backgroundColor: accentColor } : {}}
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     gender === 'male'
                       ? 'text-white'
@@ -210,8 +212,8 @@ export function SizeCalculator({
               placeholder={t('heightPlaceholder')}
               style={{ outline: 'none' }}
               onFocus={(e) => {
-                e.target.style.borderColor = primaryColor;
-                e.target.style.boxShadow = `0 0 0 2px ${primaryColor}33`;
+                e.target.style.borderColor = accentColor;
+                e.target.style.boxShadow = `0 0 0 2px ${accentColor}33`;
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#d1d5db';
@@ -234,8 +236,8 @@ export function SizeCalculator({
               placeholder={t('weightPlaceholder')}
               style={{ outline: 'none' }}
               onFocus={(e) => {
-                e.target.style.borderColor = primaryColor;
-                e.target.style.boxShadow = `0 0 0 2px ${primaryColor}33`;
+                e.target.style.borderColor = accentColor;
+                e.target.style.boxShadow = `0 0 0 2px ${accentColor}33`;
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#d1d5db';
@@ -365,11 +367,11 @@ export function SizeCalculator({
                 <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 rounded-full -translate-y-1/2" />
 
                 {/* Barra de progresso */}
-                <div
-                  className="absolute top-1/2 left-0 h-1 rounded-full -translate-y-1/2 transition-all duration-300"
+                <motion.div
+                  className="omafit-fit-slider-fill absolute top-1/2 left-0 h-1 rounded-full -translate-y-1/2 transition-all duration-300"
                   style={{
-                    backgroundColor: primaryColor,
-                    width: `${fitIndex * 50}%`
+                    backgroundColor: accentColor,
+                    width: `${fitIndex * 50}%`,
                   }}
                 />
 
@@ -383,8 +385,11 @@ export function SizeCalculator({
                       type="button"
                     >
                       {/* Círculo do ponto */}
-                      <div
-                        className={`w-6 h-6 rounded-full transition-all duration-300 ${
+                      <motion.div
+                        layout
+                        className={`${
+                          fitIndex === index ? 'omafit-fit-slider-dot-active ' : ''
+                        }w-6 h-6 rounded-full transition-all duration-300 ${
                           heroFooterCTAs
                             ? fitIndex === index
                               ? 'border-2 border-white shadow-lg scale-110'
@@ -393,7 +398,7 @@ export function SizeCalculator({
                               ? 'border-4 border-white shadow-lg scale-110'
                               : 'border-4 border-gray-300 bg-white hover:scale-105'
                         }`}
-                        style={fitIndex === index ? { backgroundColor: primaryColor } : {}}
+                        style={fitIndex === index ? { backgroundColor: accentColor } : {}}
                       />
                       {/* Label */}
                       <span
@@ -422,7 +427,7 @@ export function SizeCalculator({
               ? undefined
               : !height || !weight || bodyTypeIndex === null
                 ? {}
-                : { backgroundColor: primaryColor }
+                : { backgroundColor: accentColor }
           }
           className={`w-full py-2 px-4 rounded-lg transition-all font-medium disabled:cursor-not-allowed ${
             heroFooterCTAs
@@ -442,7 +447,7 @@ export function SizeCalculator({
             className={`w-full text-sm font-medium underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer ${
               heroFooterCTAs ? 'omafit-hero-calculator-skip-link' : ''
             }`}
-            style={heroFooterCTAs ? undefined : { color: primaryColor }}
+            style={heroFooterCTAs ? undefined : { color: accentColor }}
           >
             {t('continueWithoutPhotoLink')}
           </button>

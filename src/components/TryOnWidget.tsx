@@ -1676,7 +1676,6 @@ export function TryOnWidget({
 
   // Chamar assistente GPT automaticamente quando chegar no resultado — já induzindo ao carrinho
   useEffect(() => {
-    if (!stylistEnabled) return;
     if (initialGptScheduleRef.current) {
       clearTimeout(initialGptScheduleRef.current);
       initialGptScheduleRef.current = null;
@@ -1728,7 +1727,7 @@ export function TryOnWidget({
         initialGptScheduleRef.current = null;
       }
     };
-  }, [step, sizeData, chatMessages, gptLoading, tryOnLoadingInChat, stylistEnabled]);
+  }, [step, sizeData, chatMessages, gptLoading, tryOnLoadingInChat]);
 
   // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
@@ -4517,7 +4516,22 @@ const handleSubmit = async (
   };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
-    if (!stylistEnabled) return;
+    if (intention === 'custom' && !stylistEnabled) {
+      const planMessages = {
+        pt: 'O consultor de estilo com sugestões de look está disponível no plano Growth ou superior.',
+        es: 'El consultor de estilo con sugerencias de look está disponible en el plan Growth o superior.',
+        en: 'The style consultant with outfit suggestions is available on the Growth plan or higher.',
+      };
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: planMessages[currentLanguage] || planMessages.en,
+          timestamp: Date.now(),
+        },
+      ]);
+      return;
+    }
     if (intention === 'add_to_cart' && suppressCartGptNudgeRef.current) {
       return;
     }
@@ -4659,13 +4673,13 @@ const handleSubmit = async (
         }
       };
 
-      if (intention === 'custom' && customMessage && canOmafitSearch) {
+      if (stylistEnabled && intention === 'custom' && customMessage && canOmafitSearch) {
         const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const enrichedQuery = [customMessage, localProductName, localProductDescription]
           .filter((s) => String(s || '').trim())
           .join(' | ') + ctx;
         await runOmafitCatalogSearch(enrichedQuery);
-      } else if (intention === 'add_to_cart' && canOmafitSearch) {
+      } else if (stylistEnabled && intention === 'add_to_cart' && canOmafitSearch) {
         const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const autoQuery = [
           `Combinar outfit com ${localProductName || 'esta peça'}`,
@@ -4869,6 +4883,7 @@ const handleSubmit = async (
 
         let suggestedProductsBlock: ChatMessage['suggestedProducts'];
         if (
+          stylistEnabled &&
           allowOpeningExtras &&
           Array.isArray(suggested_products) &&
           suggested_products.length > 0 &&
@@ -4917,10 +4932,10 @@ const handleSubmit = async (
             role: 'assistant',
             content: explicacao,
             timestamp: Date.now(),
-            ...(allowOpeningExtras && suggestedProductsBlock?.length
+            ...(stylistEnabled && allowOpeningExtras && suggestedProductsBlock?.length
               ? { suggestedProducts: suggestedProductsBlock }
               : {}),
-            ...(allowOpeningExtras && stylistImpressionId && anchorForStylistMsg
+            ...(stylistEnabled && allowOpeningExtras && stylistImpressionId && anchorForStylistMsg
               ? { stylistImpressionId, stylistAnchorHandle: anchorForStylistMsg }
               : {}),
           },
@@ -4928,7 +4943,7 @@ const handleSubmit = async (
 
         stylistOpeningExtrasConsumedRef.current = true;
 
-        if (allowOpeningExtras && suggestedProductsBlock?.length) {
+        if (stylistEnabled && allowOpeningExtras && suggestedProductsBlock?.length) {
           lastStylistSuggestionsRef.current = suggestedProductsBlock;
           if (stylistImpressionId && anchorForStylistMsg) {
             lastStylistImpressionMetaRef.current = {
@@ -5340,6 +5355,13 @@ const handleSubmit = async (
         .omafit-tryon-hero .bg-gray-100.text-gray-700,
         .omafit-tryon-hero .hover\\:bg-gray-200:hover { color: #374151 !important; }
         .omafit-tryon-hero .hover\\:bg-gray-200:hover { background-color: rgb(229 231 235) !important; }
+        .omafit-tryon-hero .omafit-fit-slider-fill {
+          background-color: ${effectivePrimaryColor} !important;
+        }
+        .omafit-tryon-hero .omafit-fit-slider-dot-active {
+          background-color: ${effectivePrimaryColor} !important;
+          border-color: #ffffff !important;
+        }
         `
             : ''
         }
@@ -6145,7 +6167,7 @@ const handleSubmit = async (
               setStep('photo');
             }}
             onContinueWithoutPhoto={handleCalculatorContinueWithoutPhoto}
-            primaryColor={primaryColor}
+            primaryColor={effectivePrimaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
             forcedGender={chartGenderScope === 'male' || chartGenderScope === 'female' ? chartGenderScope : null}
             language={currentLanguage}
