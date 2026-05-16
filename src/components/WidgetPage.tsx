@@ -805,6 +805,12 @@ export function WidgetPage() {
         } else if (typeof event.data.stylistModeEnabled === 'boolean') {
           setStylistModeEnabled(event.data.stylistModeEnabled);
         }
+        if (event.data.primaryColor) {
+          setPrimaryColor(String(event.data.primaryColor).trim());
+        }
+        if (event.data.fontFamily) {
+          setFontFamily(String(event.data.fontFamily).trim());
+        }
         if (event.data.productHandle || event.data.product_handle) {
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('📦 Product Handle do contexto:', handle);

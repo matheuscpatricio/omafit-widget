@@ -33,6 +33,7 @@ import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../utils/chatTryOnIntent';
 import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
 import { resolvePairingCaptionForChat } from '../utils/secondaryTryOnCaption';
+import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -623,7 +624,7 @@ export function TryOnWidget({
   storeName = '',
   storeLogo,
   primaryColor = '#810707',
-  fontFamily = 'Outfit',
+  fontFamily = '',
   publicId,
   productImages = [],
   shopDomain = '',
@@ -950,6 +951,7 @@ export function TryOnWidget({
   // Estados locais para configurações que podem ser atualizadas
   const [localStoreLogo, setLocalStoreLogo] = useState<string>(storeLogo || '');
   const [localPrimaryColor, setLocalPrimaryColor] = useState<string>(primaryColor);
+  const [localFontFamily, setLocalFontFamily] = useState<string>(fontFamily);
   const [localStoreName, setLocalStoreName] = useState<string>(resolveStoreName());
   const [localCollectionType, setLocalCollectionType] = useState<'upper' | 'lower' | 'full' | undefined>(collectionType);
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
@@ -1275,9 +1277,6 @@ export function TryOnWidget({
     return 1500;
   };
 
-  // Calcular cor hover baseada na cor primária local
-  const hoverColor = darkenColor(localPrimaryColor);
-
   const getContrastTextColor = (hexColor: string): string => {
     const hex = hexColor.replace('#', '');
     if (hex.length !== 6) return '#FFFFFF';
@@ -1422,6 +1421,20 @@ export function TryOnWidget({
       setLocalPrimaryColor(primaryColor);
     }
   }, [primaryColor]);
+
+  useEffect(() => {
+    if (fontFamily && String(fontFamily).trim()) {
+      setLocalFontFamily(String(fontFamily).trim());
+    }
+  }, [fontFamily]);
+
+  const effectivePrimaryColor =
+    (localPrimaryColor && localPrimaryColor.trim()) ||
+    (primaryColor && String(primaryColor).trim()) ||
+    '#810707';
+  const hoverColor = darkenColor(effectivePrimaryColor);
+  const effectiveFontFamily = (localFontFamily || fontFamily || '').trim();
+  const widgetFontCss = buildWidgetFontStyleBlock(effectiveFontFamily);
 
   useEffect(() => {
     if (tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== '') {
@@ -1760,6 +1773,13 @@ export function TryOnWidget({
           setLocalCollectionElasticity(event.data.collectionElasticity);
         }
 
+        if (event.data.primaryColor) {
+          setLocalPrimaryColor(String(event.data.primaryColor).trim());
+        }
+        if (event.data.fontFamily) {
+          setLocalFontFamily(String(event.data.fontFamily).trim());
+        }
+
         // Atualizar productName e productDescription via omafit-context
         if (event.data.productName || event.data.product_name) {
           const name = event.data.productName || event.data.product_name;
@@ -1818,12 +1838,11 @@ export function TryOnWidget({
         }
 
         if (event.data.fontFamily) {
-          console.log('✅ Atualizando fontFamily:', event.data.fontFamily);
+          setLocalFontFamily(String(event.data.fontFamily).trim());
         }
 
         if (event.data.primaryColor) {
-          console.log('✅ Atualizando primaryColor:', event.data.primaryColor);
-          setLocalPrimaryColor(event.data.primaryColor);
+          setLocalPrimaryColor(String(event.data.primaryColor).trim());
         }
 
         if (layoutFromUrl === undefined && tryonLayoutOverride === undefined) {
@@ -5179,7 +5198,7 @@ const handleSubmit = async (
             <span
               className="inline-block w-2 h-2 rounded-full animate-bounce"
               style={{
-                backgroundColor: primaryColor,
+                backgroundColor: effectivePrimaryColor,
                 animationDelay: '0ms',
                 animationDuration: '1.4s'
               }}
@@ -5187,7 +5206,7 @@ const handleSubmit = async (
             <span
               className="inline-block w-2 h-2 rounded-full animate-bounce"
               style={{
-                backgroundColor: primaryColor,
+                backgroundColor: effectivePrimaryColor,
                 animationDelay: '200ms',
                 animationDuration: '1.4s'
               }}
@@ -5195,7 +5214,7 @@ const handleSubmit = async (
             <span
               className="inline-block w-2 h-2 rounded-full animate-bounce"
               style={{
-                backgroundColor: primaryColor,
+                backgroundColor: effectivePrimaryColor,
                 animationDelay: '400ms',
                 animationDuration: '1.4s'
               }}
@@ -5230,7 +5249,7 @@ const handleSubmit = async (
       ? anchorPdpGarmentDisplayRef.current.productName
       : product.name;
 
-  console.log('🎨 Estilos aplicados no widget:', { fontFamily });
+  console.log('🎨 Estilos aplicados no widget:', { effectiveFontFamily, effectivePrimaryColor });
 
   const isSidebarLayout = tryonLayout === 'sidebar';
   const isHeroLayout = tryonLayout === 'hero';
@@ -5249,18 +5268,14 @@ const handleSubmit = async (
       transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;500;600;700&display=swap');
+        ${widgetFontCss}
 
-        * {
-          font-family: '${fontFamily}', sans-serif !important;
-        }
-
-        .bg-primary { background-color: ${localPrimaryColor} !important; }
-        .text-primary { color: ${localPrimaryColor} !important; }
-        .border-primary { border-color: ${localPrimaryColor} !important; }
+        .bg-primary { background-color: ${effectivePrimaryColor} !important; }
+        .text-primary { color: ${effectivePrimaryColor} !important; }
+        .border-primary { border-color: ${effectivePrimaryColor} !important; }
         .hover\\:bg-primary-dark:hover { background-color: ${hoverColor} !important; }
-        .hover\\:border-primary:hover { border-color: ${localPrimaryColor} !important; }
-        .focus\\:ring-primary:focus { --tw-ring-color: ${localPrimaryColor} !important; }
+        .hover\\:border-primary:hover { border-color: ${effectivePrimaryColor} !important; }
+        .focus\\:ring-primary:focus { --tw-ring-color: ${effectivePrimaryColor} !important; }
         ${
           heroChromeActive
             ? `
@@ -6547,7 +6562,7 @@ const handleSubmit = async (
               <span
                 className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
                 style={{
-                  backgroundColor: primaryColor,
+                  backgroundColor: effectivePrimaryColor,
                   animationDelay: '0ms',
                   animationDuration: '1.4s'
                 }}
@@ -6555,7 +6570,7 @@ const handleSubmit = async (
               <span
                 className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
                 style={{
-                  backgroundColor: primaryColor,
+                  backgroundColor: effectivePrimaryColor,
                   animationDelay: '200ms',
                   animationDuration: '1.4s'
                 }}
@@ -6563,7 +6578,7 @@ const handleSubmit = async (
               <span
                 className="inline-block w-3 h-3 md:w-4 md:h-4 rounded-full animate-bounce"
                 style={{
-                  backgroundColor: primaryColor,
+                  backgroundColor: effectivePrimaryColor,
                   animationDelay: '400ms',
                   animationDuration: '1.4s'
                 }}
