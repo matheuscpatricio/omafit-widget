@@ -34,6 +34,10 @@ import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../ut
 import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
 import { resolvePairingCaptionForChat } from '../utils/secondaryTryOnCaption';
 import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
+import {
+  mergeProductImageGallery,
+  parseProductImagesMessage,
+} from '../utils/productImageGallery';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -772,6 +776,7 @@ export function TryOnWidget({
 
   const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
   const [availableImages, setAvailableImages] = useState<string[]>([]);
+  const [messageProductImages, setMessageProductImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState(t('generating'));
@@ -1754,8 +1759,24 @@ export function TryOnWidget({
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Contexto da coleção (handle + gender + type + elasticity)
+      if (event.data.type === 'omafit-product-images') {
+        const next = parseProductImagesMessage(event.data.images);
+        if (next.length > 0) {
+          console.log('📸 Imagens do produto (omafit-product-images):', next.length);
+          setMessageProductImages(next);
+        }
+      }
+
       if (event.data.type === 'omafit-context') {
         console.log('📥 Recebido omafit-context:', event.data);
+
+        const ctxImages = parseProductImagesMessage(
+          event.data.productImages ?? event.data.product_images
+        );
+        if (ctxImages.length > 0) {
+          console.log('📸 Imagens do produto (omafit-context):', ctxImages.length);
+          setMessageProductImages(ctxImages);
+        }
 
         const incomingShopDomain = (event.data.shopDomain || event.data.shop_domain || '').trim();
         if (incomingShopDomain) {
@@ -2103,20 +2124,28 @@ export function TryOnWidget({
 
   React.useEffect(() => {
     const decodedImage = decodeURIComponent(garmentImage);
-    const images = productImages.length > 0 ? productImages : [decodedImage];
+    const images = mergeProductImageGallery(decodedImage, productImages, messageProductImages);
+    const gallery = images.length > 0 ? images : [decodedImage];
     const resolvedPageProductId = resolveShopifyProductIdFromPage(productId);
 
-    setAvailableImages(images);
-    setSelectedProductImage(images[0]);
-    setCurrentImageIndex(0);
+    setAvailableImages(gallery);
+    setSelectedProductImage((prev) => {
+      const prevKey = prev.trim();
+      const keepIndex = gallery.findIndex((url) => url === prevKey || decodeURIComponent(url) === prevKey);
+      return keepIndex >= 0 ? gallery[keepIndex] : gallery[0];
+    });
+    setCurrentImageIndex((prev) => {
+      if (prev < gallery.length) return prev;
+      return 0;
+    });
 
     setProduct({
       id: resolvedPageProductId,
       name: productName,
-      garment_image: decodedImage,
+      garment_image: gallery[0] || decodedImage,
       category: 'auto'
     });
-  }, [garmentImage, productId, productName, productImages]);
+  }, [garmentImage, productId, productName, productImages, messageProductImages]);
 
   React.useEffect(() => {
     if (availableImages.length > 0) {
@@ -4640,7 +4669,9 @@ const handleSubmit = async (
 
       const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
         if (!canOmafitSearch) return;
-        const searchRes = await fetchOmafitCatalogSearch({
+        let searchRes: Awaited<ReturnType<typeof fetchOmafitCatalogSearch>>;
+        try {
+          searchRes = await fetchOmafitCatalogSearch({
           baseUrl: omafitBase,
           secret: omafitSecret,
           shopDomain: effectiveShopDomain,
@@ -4653,6 +4684,10 @@ const handleSubmit = async (
           chartGenderScope,
           collectionHandles: shopifyCollectionHandles,
         });
+        } catch (catalogErr) {
+          console.warn('[Omafit catalog-search] fetch falhou (rede/CORS):', catalogErr);
+          return;
+        }
         lastCatalogSearch = {
           diagnostic: searchRes.diagnostic,
           error: searchRes.error,

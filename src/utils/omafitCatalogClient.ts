@@ -192,11 +192,22 @@ export async function fetchOmafitCatalogSearch(params: {
   });
 
   const url = `${params.baseUrl.replace(/\/$/, '')}/api/widget/catalog-search`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+  } catch (networkErr) {
+    const msg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+    return {
+      candidates: [],
+      error: 'network_error',
+      httpStatus: 0,
+      diagnostic: `fetch failed: ${msg} | dica=verifique CORS na app Omafit (Railway) e VITE_OMAFIT_APP_URL no widget`,
+    };
+  }
 
   let json: unknown = {};
   try {

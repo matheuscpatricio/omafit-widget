@@ -327,60 +327,115 @@
     return '';
   }
 
-  // Obter só imagens de produto, usando várias fontes de dados Shopify
-  async function getOnlyProductImages() {
-    // 1. window.meta.product
-    if (window.meta && window.meta.product) {
-      const p = window.meta.product;
-      const imgs = [];
+  function pushProductGalleryUrl(bucket, rawUrl) {
+    const normalized = normalizeUrl(rawUrl);
+    if (normalized) bucket.push(normalized);
+  }
 
-      if (Array.isArray(p.media)) {
-        p.media.forEach((m) => {
-          if (m.src) imgs.push(normalizeUrl(m.src));
-          else if (m.preview_image && m.preview_image.src) imgs.push(normalizeUrl(m.preview_image.src));
-        });
-      }
+  function extractImagesFromProductRecord(record) {
+    const imgs = [];
+    if (!record || typeof record !== 'object') return imgs;
 
-      if (Array.isArray(p.images)) {
-        p.images.forEach((i) => imgs.push(normalizeUrl(i)));
-      }
-
-      if (imgs.length > 0) {
-        console.log('✅ Imagens encontradas via window.meta.product:', imgs.length);
-        return [...new Set(imgs)];
-      }
+    if (Array.isArray(record.media)) {
+      record.media.forEach(function (m) {
+        if (!m) return;
+        if (m.src) pushProductGalleryUrl(imgs, m.src);
+        else if (m.preview_image && m.preview_image.src) pushProductGalleryUrl(imgs, m.preview_image.src);
+      });
     }
 
-    // 2. ShopifyAnalytics
+    if (Array.isArray(record.images)) {
+      record.images.forEach(function (i) {
+        if (typeof i === 'string') pushProductGalleryUrl(imgs, i);
+        else if (i && (i.src || i.url)) pushProductGalleryUrl(imgs, i.src || i.url);
+      });
+    }
+
+    return imgs;
+  }
+
+  function collectProductImagesFromDom() {
+    const imgs = [];
+    const selectors = [
+      '.product__media img[src*="cdn.shopify.com"]',
+      '.product__media-wrapper img[src*="cdn.shopify.com"]',
+      '.product-single__photo img[src*="cdn.shopify.com"]',
+      '[data-product-featured-media] img',
+      '.product-media img[src*="cdn.shopify.com"]',
+      'media-gallery img[src*="cdn.shopify.com"]',
+      '.product__media img',
+      '.product img[src*="cdn.shopify.com"]'
+    ];
+
+    selectors.forEach(function (selector) {
+      document.querySelectorAll(selector).forEach(function (img) {
+        if (!img) return;
+        if (img.src) pushProductGalleryUrl(imgs, img.src);
+        if (img.dataset && img.dataset.src) pushProductGalleryUrl(imgs, img.dataset.src);
+        var dataSrc = img.getAttribute('data-src');
+        if (dataSrc) pushProductGalleryUrl(imgs, dataSrc);
+      });
+    });
+
+    return imgs;
+  }
+
+  function mergeUniqueProductImages() {
+    var lists = Array.prototype.slice.call(arguments);
+    var merged = [];
+    var seen = new Set();
+    lists.forEach(function (list) {
+      if (!Array.isArray(list)) return;
+      list.forEach(function (url) {
+        var normalized = normalizeUrl(url);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        merged.push(normalized);
+      });
+    });
+    return merged;
+  }
+
+  // Obter imagens do produto fundindo meta, analytics, product.js e DOM da página
+  async function getOnlyProductImages(handleHint) {
+    const buckets = [];
+
+    if (window.meta && window.meta.product) {
+      buckets.push(extractImagesFromProductRecord(window.meta.product));
+    }
+
     if (
       window.ShopifyAnalytics &&
       window.ShopifyAnalytics.meta &&
-      window.ShopifyAnalytics.meta.product &&
-      Array.isArray(window.ShopifyAnalytics.meta.product.images)
+      window.ShopifyAnalytics.meta.product
     ) {
-      const imgs = window.ShopifyAnalytics.meta.product.images.map((i) => normalizeUrl(i));
-      console.log('✅ Imagens encontradas via ShopifyAnalytics:', imgs.length);
-      return imgs;
-    }
-
-    // 3. Fallback /products/{handle}.js
-    const handlePart = window.location.pathname.split('/products/')[1];
-    if (handlePart) {
-      const handle = handlePart.split('/')[0];
-      try {
-        const res = await fetch('/products/' + handle + '.js');
-        const product = await res.json();
-        if (Array.isArray(product.images)) {
-          const imgs = product.images.map((i) => normalizeUrl(i));
-          console.log('✅ Imagens encontradas via product.js:', imgs.length);
-          return imgs;
-        }
-      } catch (e) {
-        console.error('Erro ao buscar produto:', e);
+      const analyticsProduct = window.ShopifyAnalytics.meta.product;
+      buckets.push(extractImagesFromProductRecord(analyticsProduct));
+      if (Array.isArray(analyticsProduct.images)) {
+        buckets.push(analyticsProduct.images.map(function (i) { return normalizeUrl(i); }).filter(Boolean));
       }
     }
 
-    return [];
+    var handle =
+      (handleHint && String(handleHint).trim()) ||
+      (window.location.pathname.split('/products/')[1] || '').split('/')[0];
+    if (handle) {
+      try {
+        const res = await fetch('/products/' + encodeURIComponent(handle) + '.js');
+        if (res.ok) {
+          const product = await res.json();
+          buckets.push(extractImagesFromProductRecord(product));
+        }
+      } catch (e) {
+        console.error('Erro ao buscar imagens via product.js:', e);
+      }
+    }
+
+    buckets.push(collectProductImagesFromDom());
+
+    const merged = mergeUniqueProductImages.apply(null, buckets);
+    console.log('✅ Imagens do produto (merge):', merged.length);
+    return merged;
   }
 
   // Tentar encontrar imagem do produto na página
@@ -2057,8 +2112,12 @@
       ]);
     };
 
+    var resolvedHandleForImages =
+      (productInfo && productInfo.productHandle ? String(productInfo.productHandle).trim() : '') ||
+      (window.location.pathname.split('/products/')[1] || '').split('/')[0];
+
     var dataPack = await Promise.all([
-      getOnlyProductImages(),
+      getOnlyProductImages(resolvedHandleForImages),
       getCurrentProductData(productInfo),
       withFastTimeout(collectionTitlePromise, collectionTitle || ''),
       withFastTimeout(fetchCollectionType(shopDomain, collectionHandle), ''),
@@ -2067,6 +2126,12 @@
     ]);
     allProductImages = dataPack[0];
     currentProductData = dataPack[1];
+    if (currentProductData) {
+      allProductImages = mergeUniqueProductImages(
+        allProductImages,
+        extractImagesFromProductRecord(currentProductData)
+      );
+    }
     collectionTitle = String(dataPack[2] || collectionTitle || '').trim();
     const collectionType = dataPack[3];
     let collectionElasticity = dataPack[4];
