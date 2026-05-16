@@ -37,7 +37,9 @@ import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
 import {
   mergeProductImageGallery,
   parseProductImagesMessage,
+  safeDecodeGarmentImage,
 } from '../utils/productImageGallery';
+import { hasGrowthPlusPlan } from '../utils/shopifyPlanAccess';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -651,13 +653,19 @@ export function TryOnWidget({
   onTryonLayoutChange,
   stylistModeEnabled = false,
 }: TryOnWidgetProps) {
-  const stylistEnabled = stylistModeEnabled === true;
+  const [stylistPlanFromDb, setStylistPlanFromDb] = useState<boolean | null>(null);
+  const stylistEnabled = stylistModeEnabled === true || stylistPlanFromDb === true;
+  const stylistPlanResolved =
+    stylistModeEnabled === true ||
+    stylistPlanFromDb !== null ||
+    !String((shopDomain || '').trim());
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
   console.log('   - publicId:', publicId);
   console.log('   - shopDomain:', shopDomain);
-  console.log('   - stylistModeEnabled:', stylistEnabled);
+  console.log('   - stylistModeEnabled (prop):', stylistModeEnabled);
+  console.log('   - stylistEnabled (efetivo):', stylistEnabled);
   console.log('   - productId:', productId);
   console.log('   - productHandle:', productHandle || 'não fornecido');
   console.log('   - productName:', productName);
@@ -777,6 +785,8 @@ export function TryOnWidget({
   const [selectedProductImage, setSelectedProductImage] = useState<string>(garmentImage);
   const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [messageProductImages, setMessageProductImages] = useState<string[]>([]);
+  const [apiProductImages, setApiProductImages] = useState<string[]>([]);
+  const productImagesFetchGenRef = useRef(0);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState(t('generating'));
@@ -1710,7 +1720,8 @@ export function TryOnWidget({
       tryOnLoadingInChat ||
       suppressCartGptNudgeRef.current ||
       hasSuggestedTryOnInChat ||
-      awaitingSuggestedCaption
+      awaitingSuggestedCaption ||
+      !stylistPlanResolved
     ) {
       return;
     }
@@ -1732,7 +1743,7 @@ export function TryOnWidget({
         initialGptScheduleRef.current = null;
       }
     };
-  }, [step, sizeData, chatMessages, gptLoading, tryOnLoadingInChat]);
+  }, [step, sizeData, chatMessages, gptLoading, tryOnLoadingInChat, stylistPlanResolved]);
 
   // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
@@ -1781,6 +1792,15 @@ export function TryOnWidget({
         const incomingShopDomain = (event.data.shopDomain || event.data.shop_domain || '').trim();
         if (incomingShopDomain) {
           setLocalShopDomain(incomingShopDomain);
+        }
+
+        const billingPlanCtx = event.data.billing_plan ?? event.data.billingPlan;
+        if (billingPlanCtx != null && String(billingPlanCtx).trim() !== '') {
+          setStylistPlanFromDb(hasGrowthPlusPlan(String(billingPlanCtx)));
+        } else if (typeof event.data.stylist_mode_enabled === 'boolean') {
+          setStylistPlanFromDb(event.data.stylist_mode_enabled);
+        } else if (typeof event.data.stylistModeEnabled === 'boolean') {
+          setStylistPlanFromDb(event.data.stylistModeEnabled);
         }
 
         if (event.data.collectionType) {
@@ -2023,6 +2043,40 @@ export function TryOnWidget({
     });
   }, [selectedVariantId, selectedVariantOptions]);
 
+  useEffect(() => {
+    if (stylistModeEnabled === true) {
+      setStylistPlanFromDb(true);
+      return;
+    }
+    const domain = effectiveShopDomain;
+    if (!domain) {
+      setStylistPlanFromDb(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shopify_shops')
+          .select('plan, billing_status')
+          .eq('shop_domain', domain)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) {
+          setStylistPlanFromDb(false);
+          return;
+        }
+        const active = data?.billing_status === 'active' && data?.plan;
+        setStylistPlanFromDb(active ? hasGrowthPlusPlan(String(data.plan)) : false);
+      } catch {
+        if (!cancelled) setStylistPlanFromDb(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveShopDomain, stylistModeEnabled]);
+
   // Buscar configurações do widget ao carregar
   useEffect(() => {
     const fetchWidgetConfig = async () => {
@@ -2122,9 +2176,52 @@ export function TryOnWidget({
     setHeroBackgroundResolved(Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''));
   }, [effectiveShopDomain, tryonLayoutBackgroundImage]);
 
+  const hydrateProductImagesFromApi = React.useCallback(async () => {
+    const handle = (localProductHandle || productHandle || '').trim();
+    const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!handle || !isReady || !effectiveShopDomain || !publicId) return;
+
+    const gen = ++productImagesFetchGenRef.current;
+    try {
+      const { product, error } = await fetchOmafitProductByHandle({
+        baseUrl,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        handle,
+      });
+      if (gen !== productImagesFetchGenRef.current || error || !product) return;
+      const imgs = (product.images?.length ? product.images : [product.image_url])
+        .map((u) => String(u || '').trim())
+        .filter(Boolean);
+      if (imgs.length > 0) {
+        console.log('📸 Galeria via product-by-handle:', imgs.length);
+        setApiProductImages(imgs);
+      }
+    } catch (err) {
+      console.warn('[Omafit] Falha ao carregar imagens do produto:', err);
+    }
+  }, [effectiveShopDomain, localProductHandle, productHandle, publicId]);
+
+  useEffect(() => {
+    setApiProductImages([]);
+    void hydrateProductImagesFromApi();
+  }, [hydrateProductImagesFromApi]);
+
+  useEffect(() => {
+    if (step !== 'photo') return;
+    if (availableImages.length > 1) return;
+    void hydrateProductImagesFromApi();
+  }, [step, availableImages.length, hydrateProductImagesFromApi]);
+
   React.useEffect(() => {
-    const decodedImage = decodeURIComponent(garmentImage);
-    const images = mergeProductImageGallery(decodedImage, productImages, messageProductImages);
+    const decodedImage = safeDecodeGarmentImage(garmentImage);
+    const images = mergeProductImageGallery(
+      decodedImage,
+      productImages,
+      messageProductImages,
+      apiProductImages
+    );
     const gallery = images.length > 0 ? images : [decodedImage];
     const resolvedPageProductId = resolveShopifyProductIdFromPage(productId);
 
@@ -2145,7 +2242,7 @@ export function TryOnWidget({
       garment_image: gallery[0] || decodedImage,
       category: 'auto'
     });
-  }, [garmentImage, productId, productName, productImages, messageProductImages]);
+  }, [garmentImage, productId, productName, productImages, messageProductImages, apiProductImages]);
 
   React.useEffect(() => {
     if (availableImages.length > 0) {

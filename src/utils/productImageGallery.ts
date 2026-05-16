@@ -53,3 +53,13 @@ export function parseProductImagesMessage(payload: unknown): string[] {
     .map((item) => (typeof item === 'string' ? decodeImageUrl(item) : ''))
     .filter(Boolean);
 }
+
+export function safeDecodeGarmentImage(url: string): string {
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return '';
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}

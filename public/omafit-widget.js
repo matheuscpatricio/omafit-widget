@@ -354,6 +354,36 @@
     return imgs;
   }
 
+  function pushUrlsFromSrcset(bucket, srcsetValue) {
+    if (!srcsetValue) return;
+    String(srcsetValue)
+      .split(',')
+      .forEach(function (part) {
+        var url = part.trim().split(/\s+/)[0];
+        if (url) pushProductGalleryUrl(bucket, url);
+      });
+  }
+
+  function extractImagesFromProductJsonScripts() {
+    const imgs = [];
+    var scripts = document.querySelectorAll(
+      'script[type="application/json"][id*="Product"], script[type="application/json"][data-product-json], script[type="application/json"][data-product]'
+    );
+    scripts.forEach(function (script) {
+      try {
+        var data = JSON.parse(script.textContent || '');
+        if (!data || typeof data !== 'object') return;
+        imgs.push.apply(imgs, extractImagesFromProductRecord(data));
+        if (data.product && typeof data.product === 'object') {
+          imgs.push.apply(imgs, extractImagesFromProductRecord(data.product));
+        }
+      } catch (_err) {
+        /* ignore */
+      }
+    });
+    return imgs;
+  }
+
   function collectProductImagesFromDom() {
     const imgs = [];
     const selectors = [
@@ -363,19 +393,32 @@
       '[data-product-featured-media] img',
       '.product-media img[src*="cdn.shopify.com"]',
       'media-gallery img[src*="cdn.shopify.com"]',
+      'slideshow-component img[src*="cdn.shopify.com"]',
       '.product__media img',
-      '.product img[src*="cdn.shopify.com"]'
+      '.product img[src*="cdn.shopify.com"]',
+      'a[href*="cdn.shopify.com/s/files"]'
     ];
 
     selectors.forEach(function (selector) {
-      document.querySelectorAll(selector).forEach(function (img) {
-        if (!img) return;
+      document.querySelectorAll(selector).forEach(function (node) {
+        if (!node) return;
+        if (node.tagName === 'A' && node.href) {
+          pushProductGalleryUrl(imgs, node.href);
+          return;
+        }
+        if (node.tagName !== 'IMG') return;
+        var img = node;
         if (img.src) pushProductGalleryUrl(imgs, img.src);
+        if (img.currentSrc) pushProductGalleryUrl(imgs, img.currentSrc);
         if (img.dataset && img.dataset.src) pushProductGalleryUrl(imgs, img.dataset.src);
         var dataSrc = img.getAttribute('data-src');
         if (dataSrc) pushProductGalleryUrl(imgs, dataSrc);
+        pushUrlsFromSrcset(imgs, img.getAttribute('srcset'));
+        pushUrlsFromSrcset(imgs, img.dataset && img.dataset.srcset);
       });
     });
+
+    imgs.push.apply(imgs, extractImagesFromProductJsonScripts());
 
     return imgs;
   }
@@ -2586,11 +2629,40 @@
           }
         };
 
+        var resendProductImagesIfRicher = function () {
+          if (!iframe.contentWindow) return;
+          var handle =
+            resolvedProductHandle ||
+            (productInfo && productInfo.productHandle ? String(productInfo.productHandle).trim() : '') ||
+            (window.location.pathname.split('/products/')[1] || '').split('/')[0];
+          getOnlyProductImages(handle).then(function (fresh) {
+            if (!Array.isArray(fresh) || fresh.length <= allProductImages.length) return;
+            allProductImages = mergeUniqueProductImages(allProductImages, fresh);
+            iframe.contentWindow.postMessage(
+              { type: 'omafit-product-images', images: allProductImages },
+              OMAFIT_WIDGET_ORIGIN
+            );
+            iframe.contentWindow.postMessage(
+              {
+                type: 'omafit-context',
+                productImages: allProductImages,
+                product_images: allProductImages,
+                productImage: productImage || '',
+                product_image: productImage || '',
+              },
+              OMAFIT_WIDGET_ORIGIN
+            );
+            console.log('📸 Galeria atualizada (retry):', allProductImages.length);
+          }).catch(function () { /* non-blocking */ });
+        };
+
         // Primeira entrega + retries para cobrir timing de mount no iframe.
         sendWidgetPayloads();
         setTimeout(sendWidgetPayloads, 350);
         setTimeout(sendWidgetPayloads, 1200);
         setTimeout(sendWidgetPayloads, 2500);
+        setTimeout(resendProductImagesIfRicher, 1800);
+        setTimeout(resendProductImagesIfRicher, 4000);
 
         console.log('📤 Payload completo enviado ao widget:', {
           variant_catalog: variantCatalogList.length,

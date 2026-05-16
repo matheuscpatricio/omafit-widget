@@ -1892,6 +1892,89 @@ Return in JSON format:
   return messages[language] || messages['en'];
 }
 
+/** Abertura pós provador para lojas Growth+ sem candidatos de catálogo — tom consultor, não vendedor agressivo. */
+function buildGrowthConsultantOpeningPrompt(data: ValidateSizeRequest, language: string): string {
+  const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
+  const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
+  const productDesc = data.product_description ? `\n- Descrição: ${data.product_description}` : '';
+  const productCatalogContext = buildProductCatalogContext(data, language);
+  const genderCtx = buildGenderContextForStylist(data, language);
+  const catalogHardRules = buildCatalogHardRules(data, language);
+
+  const messages: Record<string, string> = {
+    pt: `O cliente acabou de ver o resultado do provador virtual${storeNameContext}. Você é consultor de moda (NÃO vendedor agressivo).
+
+${genderCtx}
+CONTEXTO:
+- Tamanho recomendado pelo sistema: ${data.tamanho_calculado_algoritmo}
+- Categoria: ${data.categoria}
+- Elasticidade: ${data.elasticidade}${productInfo}${productDesc}${data.shop_name ? `\n- Marca/Loja: ${data.shop_name}` : ''}
+${productCatalogContext}
+
+OBJETIVO: mensagem de boas-vindas pós provador no chat.
+ESTRUTURA (explicacao):
+1. Primeira frase: "Para o/a NOME_DO_PRODUTO, seu tamanho ideal é ${data.tamanho_calculado_algoritmo}." (ajuste o/a conforme o nome.)
+2. 2–4 frases: por que o corte/tecido valoriza a silhueta do cliente (qualitativo, sem cm); mencione o produto pelo nome.
+3. Convide a perguntar no chat por combinações de look com outras peças da loja (ex.: "me sugere uma calça", "o que combina com isso?").
+4. Pode mencionar carrinho só de forma leve e opcional (ex.: "se curtir, pode levar no carrinho") — PROIBIDO urgência ("agora", "não perca", "última chance").
+
+PROIBIDO:
+- Tom de telemarketing ou pressão forte ao carrinho
+- Repetir o tamanho após a primeira frase
+- Medidas em centímetros
+- Sugerir calçados/acessórios nesta abertura (só vestuário; combinações virão depois no chat)
+- ${catalogHardRules.replace('fala comercial', 'tom consultor')}
+
+Retorne JSON:
+{
+  "tamanho_final": "${data.tamanho_calculado_algoritmo}",
+  "explicacao": "abertura consultor",
+  "coerencia": "alta",
+  "confianca": 0.95
+}`,
+    es: `El cliente acaba de ver el probador virtual${storeNameContext}. Eres consultor de moda (NO vendedor agresivo).
+
+${genderCtx}
+CONTEXTO:
+- Talla recomendada: ${data.tamanho_calculado_algoritmo}
+- Categoría: ${data.categoria}
+- Elasticidad: ${data.elasticidade}${productInfo}${productDesc}
+${productCatalogContext}
+
+OBJETIVO: mensaje de bienvenida post probador en el chat.
+ESTRUCTURA (explicacion):
+1. Primera frase: "Para el/la NOMBRE, tu talla ideal es ${data.tamanho_calculado_algoritmo}."
+2. 2–4 frases sobre silueta/estilo del producto (sin cm).
+3. Invita a pedir combinaciones de look en el chat.
+4. Carrito solo de forma suave y opcional — sin urgencia.
+
+PROHIBIDO: televenta, repetir talla, cm, calzado/accesorios en esta apertura.
+
+Devuelve JSON con tamanho_final, explicacion, coerencia, confianca.`,
+    en: `The shopper just finished the virtual try-on${storeNameContext}. You are a fashion consultant (NOT an aggressive salesperson).
+
+${genderCtx}
+CONTEXT:
+- Recommended size: ${data.tamanho_calculado_algoritmo}
+- Category: ${data.categoria}
+- Elasticity: ${data.elasticidade}${productInfo}${productDesc}
+${productCatalogContext}
+
+GOAL: post try-on welcome message in chat.
+STRUCTURE (explicacion):
+1. First sentence: "For PRODUCT_NAME, your ideal size is ${data.tamanho_calculado_algoritmo}."
+2. 2–4 sentences on silhouette/style (qualitative, no cm).
+3. Invite them to ask in chat for outfit pairing ideas from the store.
+4. Cart mention only soft/optional — no urgency.
+
+FORBIDDEN: hard-sell, repeating size, cm, footwear/accessories in this opening.
+
+Return JSON with tamanho_final, explicacion, coerencia, confianca.`,
+  };
+
+  return messages[language] || messages.en;
+}
+
 function buildAddToCartPrompt(data: ValidateSizeRequest, language: string): string {
   const storeNameContext = data.shop_name ? ` da ${data.shop_name}` : '';
   const productInfo = data.product_name ? `\n- Produto: ${data.product_name}` : '';
@@ -2013,6 +2096,34 @@ function buildGuaranteedFallbackResponse(data: Partial<ValidateSizeRequest>, lan
   const sizeHint = data.tamanho_calculado_algoritmo || sizes[0] || 'M';
 
   // Resposta quando o assistente falhou mas o usuário perguntou algo (ex.: combinações) — evita repetir o mesmo texto de “adicione ao carrinho” + catálogo.
+  if (
+    data.intencao_usuario === "induzir_adicionar_carrinho" &&
+    (data.interaction_count ?? 0) === 0
+  ) {
+    if (language === "es") {
+      return {
+        tamanho_final: sizeHint,
+        explicacao: `Para ${productName}, tu talla ideal es ${sizeHint}. El corte te favorece en el probador — si quieres ideas de look, pregúntame en el chat.`,
+        coerencia: "alta",
+        confianca: 0.85,
+      };
+    }
+    if (language === "en") {
+      return {
+        tamanho_final: sizeHint,
+        explicacao: `For ${productName}, your ideal size is ${sizeHint}. The fit looks great in the mirror — ask me in chat for pairing ideas.`,
+        coerencia: "high",
+        confianca: 0.85,
+      };
+    }
+    return {
+      tamanho_final: sizeHint,
+      explicacao: `Para ${productName}, seu tamanho ideal é ${sizeHint}. O caimento ficou ótimo no provador — se quiser ideias de look, é só perguntar aqui no chat.`,
+      coerencia: "alta",
+      confianca: 0.85,
+    };
+  }
+
   if (data.intencao_usuario === "custom_message") {
     if (language === "es") {
       return {
@@ -2134,10 +2245,11 @@ Deno.serve(async (req: Request) => {
     normalizeUserQuestion(data);
 
     const language = data.language || "pt";
+    const shopPlan = await fetchShopBillingPlan(data.shop_domain);
+    const growthPlusPlan = hasStylistConsultantPlan(shopPlan);
 
     if (isStylistConsultantRequest(data)) {
-      const shopPlan = await fetchShopBillingPlan(data.shop_domain);
-      if (!hasStylistConsultantPlan(shopPlan)) {
+      if (!growthPlusPlan) {
         console.log(
           "[validate-size] stylist consultant blocked — plan:",
           shopPlan || "unknown",
@@ -2223,9 +2335,21 @@ Deno.serve(async (req: Request) => {
     } else if (data.intencao_usuario === "sugerir_combinacoes") {
       userPrompt = buildComplementaryPrompt(data, language);
     } else if (data.intencao_usuario === "induzir_adicionar_carrinho") {
-      userPrompt = hasCandidateProducts ? buildStylistConsultantPrompt(data, language) : buildAddToCartPrompt(data, language);
+      if (hasCandidateProducts) {
+        userPrompt = buildStylistConsultantPrompt(data, language);
+      } else if (growthPlusPlan) {
+        userPrompt = buildGrowthConsultantOpeningPrompt(data, language);
+      } else {
+        userPrompt = buildAddToCartPrompt(data, language);
+      }
     } else {
-      userPrompt = hasCandidateProducts ? buildStylistConsultantPrompt(data, language) : buildAddToCartPrompt(data, language);
+      if (hasCandidateProducts) {
+        userPrompt = buildStylistConsultantPrompt(data, language);
+      } else if (growthPlusPlan) {
+        userPrompt = buildGrowthConsultantOpeningPrompt(data, language);
+      } else {
+        userPrompt = buildAddToCartPrompt(data, language);
+      }
     }
 
     // Chamar OpenAI
@@ -2234,7 +2358,10 @@ Deno.serve(async (req: Request) => {
     /** Respostas de consultor de outfit no chat: vale mesmo sem lista de candidatos (ex.: catalog-search vazio). */
     const consultantOutfitReply =
       data.intencao_usuario === "custom_message" ||
-      data.intencao_usuario === "sugerir_combinacoes";
+      data.intencao_usuario === "sugerir_combinacoes" ||
+      (growthPlusPlan &&
+        data.intencao_usuario === "induzir_adicionar_carrinho" &&
+        (data.interaction_count ?? 0) === 0);
 
     /** Consultor outfit / combinações — candidatos no payload OU intents de conversa estilo consultor. */
     const stylistOutfitLead = consultantOutfitReply || hasCandidateProducts;
@@ -2335,8 +2462,12 @@ Deno.serve(async (req: Request) => {
         success: true,
         data: finalResponse,
         interaction_count: interactionCount + 1,
-        meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-16-secondary-caption-no-size-v2",
+        meta: {
+          assistant_source: assistantSource,
+          stylist_mode: stylistOutfitLead && data.intencao_usuario !== "legenda_tryon_secundario",
+          growth_plus_plan: growthPlusPlan,
+        },
+        _validate_size_rev: "2026-05-16-growth-consultant-opening-v1",
       }),
       {
         headers: {
