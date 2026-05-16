@@ -31,6 +31,7 @@ import {
 } from '../utils/omafitCatalogClient';
 import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../utils/chatTryOnIntent';
+import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -1881,12 +1882,22 @@ export function TryOnWidget({
         if (isSuccess) {
           const attr = suggestionAttributionRef.current;
           if (attr) {
+            const payloadProduct =
+              responsePayload?.product && typeof responsePayload.product === 'object'
+                ? (responsePayload.product as { id?: string; handle?: string })
+                : null;
+            const addedId = String(payloadProduct?.id || responsePayload?.product_id || '').trim();
+            const addedHandle = String(payloadProduct?.handle || responsePayload?.product_handle || '')
+              .trim()
+              .toLowerCase();
             const cur = cartAttributionProductRef.current;
             const ph = cur.localProductHandle.toLowerCase();
             const pid = cur.productId;
             const match =
               ph === attr.suggestedHandle.toLowerCase() ||
-              (Boolean(pid) && pid === attr.suggestedProductId);
+              (Boolean(pid) && pid === attr.suggestedProductId) ||
+              addedHandle === attr.suggestedHandle.toLowerCase() ||
+              (Boolean(addedId) && addedId === attr.suggestedProductId);
             if (match) {
               const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
               const shop = effectiveShopDomainRef.current;
@@ -4247,6 +4258,174 @@ const handleSubmit = async (
     }
   };
 
+  const handleSuggestedProductAddToCart = async (
+    handle: string,
+    options?: {
+      stylistImpressionId?: string;
+      stylistAnchorHandle?: string;
+    },
+  ) => {
+    const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!isReady || !effectiveShopDomain || !publicId) {
+      return;
+    }
+    const h = String(handle || '').trim();
+    if (!h) return;
+
+    const meta =
+      options?.stylistImpressionId &&
+      String(options.stylistImpressionId).trim() &&
+      String(options.stylistAnchorHandle || stylistSearchAnchorRef.current || '').trim()
+        ? {
+            impressionId: String(options.stylistImpressionId).trim(),
+            anchorHandle: String(
+              options.stylistAnchorHandle || stylistSearchAnchorRef.current || '',
+            ).trim(),
+          }
+        : lastStylistImpressionMetaRef.current;
+
+    if (meta?.impressionId && meta.anchorHandle) {
+      void postOmafitSuggestionEvent({
+        baseUrl: base,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        event: 'stylist_click',
+        impressionId: meta.impressionId,
+        anchorHandle: meta.anchorHandle,
+        suggestedHandle: h,
+      }).catch(() => {});
+    }
+
+    setPendingSuggestedHandle(h);
+    setIsAddingToCart(true);
+    setAddToCartFeedback('');
+
+    try {
+      const { product, error } = await fetchOmafitProductByHandle({
+        baseUrl: base,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        handle: h,
+      });
+
+      if (error || !product) {
+        setAddToCartFeedback(t('addToCartError'));
+        return;
+      }
+
+      if (meta?.impressionId && meta.anchorHandle) {
+        suggestionAttributionRef.current = {
+          impressionId: meta.impressionId,
+          anchorHandle: meta.anchorHandle,
+          suggestedHandle: String(product.handle || h).trim(),
+          suggestedProductId: String(product.id || '').trim(),
+        };
+      } else {
+        suggestionAttributionRef.current = null;
+      }
+
+      const catalog = normalizeProductCatalog(product.catalog);
+      const firstAvailable =
+        product.catalog.variants.find((v: { available?: boolean }) => v && v.available) ||
+        product.catalog.variants[0];
+      const variantOptions = firstAvailable
+        ? normalizeSelectedVariantOptions(firstAvailable.selectedOptions)
+        : {};
+      const mainImg =
+        (product.images?.length ? product.images[0] : product.image_url) || product.image_url || '';
+
+      const algoSize =
+        String(tryOnAlgorithmSizeRef.current || calculatedSize || recommendedSize || 'M').trim() ||
+        'M';
+      const variantId = resolveWidgetCartVariantId({
+        catalog,
+        selectedVariantOptions: variantOptions,
+        selectedVariantId: firstAvailable ? String(firstAvailable.id) : '',
+        selectedProductImage: safeDecodeUriComponent(mainImg),
+        selectedColorHex: selectedColorHex,
+        algorithmSize: algoSize,
+      });
+
+      const requestId = `cart_suggested_${sessionId}_${Date.now()}`;
+      const sizeOptionName =
+        Object.keys(variantOptions).find((optionName) => detectOptionKind(optionName) === 'size') ||
+        'Tamanho';
+      const selectedOptions = { ...variantOptions };
+      const baseRecommendedSize = normalizeOptionValue(algoSize);
+      const recommendedToken = normalizeSizeToken(baseRecommendedSize);
+      const catalogSizes = catalog.sizes || [];
+      const matchedCatalogSize =
+        catalogSizes.find((sizeLabel) => normalizeSizeToken(sizeLabel) === recommendedToken) ||
+        catalogSizes.find(
+          (sizeLabel) =>
+            normalizeSizeToken(sizeLabel).includes(recommendedToken) ||
+            recommendedToken.includes(normalizeSizeToken(sizeLabel)),
+        ) ||
+        '';
+      const recommendedCartSize = normalizeOptionValue(matchedCatalogSize || baseRecommendedSize);
+      if (recommendedCartSize) {
+        selectedOptions[sizeOptionName] = recommendedCartSize;
+      }
+
+      const cartPayload = {
+        type: 'omafit-add-to-cart-request',
+        requestId,
+        source: 'omafit-widget-suggested',
+        product: {
+          id: product.id,
+          name: product.title,
+          handle: product.handle || h,
+        },
+        selection: {
+          image_url: safeDecodeUriComponent(mainImg),
+          color_hex: selectedColorHex,
+          recommended_size: recommendedCartSize || null,
+          recommended_size_label: recommendedCartSize || null,
+          variant_option_name: sizeOptionName,
+          selected_options: selectedOptions,
+          selected_variant_id: variantId,
+        },
+        quantity: 1,
+        shop_domain: effectiveShopDomain,
+        cart_variant_bundle: variantId
+          ? [{ variant_id: Number(variantId), quantity: 1 }]
+          : undefined,
+        metadata: {
+          session_id: analyticsSessionId || sessionId,
+          language: currentLanguage,
+          suggested_handle: h,
+          stylist_impression_id: meta?.impressionId || null,
+          stylist_anchor_handle: meta?.anchorHandle || null,
+        },
+      };
+
+      window.parent.postMessage(cartPayload, '*');
+
+      window.setTimeout(() => {
+        setIsAddingToCart((current) => {
+          if (current) {
+            const timeoutMessages = {
+              pt: 'Ainda processando o carrinho... tente novamente em instantes.',
+              es: 'Aún procesando el carrito... inténtalo de nuevo en instantes.',
+              en: 'Still processing cart... please try again shortly.',
+            };
+            setAddToCartFeedback(timeoutMessages[currentLanguage]);
+            return false;
+          }
+          return current;
+        });
+      }, 8000);
+    } catch (e) {
+      console.error('suggested product add to cart', e);
+      setAddToCartFeedback(t('addToCartError'));
+      setIsAddingToCart(false);
+    } finally {
+      setPendingSuggestedHandle(null);
+    }
+  };
+
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
     const requestSeq = ++gptAssistSeqRef.current;
 
@@ -5255,7 +5434,12 @@ const handleSubmit = async (
                   })()}
                   {message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
-                      {message.suggestedProducts.map((sp) => (
+                      {message.suggestedProducts.map((sp) => {
+                        const useCartCta = productLooksLikeNonGarmentForTryOn({
+                          title: sp.title,
+                          handle: sp.handle,
+                        });
+                        return (
                         <div
                           key={sp.handle}
                           className="flex gap-3 rounded-xl border border-gray-200 bg-white p-2 shadow-sm"
@@ -5280,20 +5464,28 @@ const handleSubmit = async (
                               disabled={
                                 tryOnLoadingInChat ||
                                 Boolean(pendingSuggestedHandle) ||
-                                loading
+                                loading ||
+                                (useCartCta && isAddingToCart)
                               }
                               onClick={() =>
-                                void handleSuggestedProductTryOn(sp.handle, {
-                                  autoSubmitTryOn: true,
-                                  stylistImpressionId: message.stylistImpressionId,
-                                  stylistAnchorHandle: message.stylistAnchorHandle,
-                                })
+                                useCartCta
+                                  ? void handleSuggestedProductAddToCart(sp.handle, {
+                                      stylistImpressionId: message.stylistImpressionId,
+                                      stylistAnchorHandle: message.stylistAnchorHandle,
+                                    })
+                                  : void handleSuggestedProductTryOn(sp.handle, {
+                                      autoSubmitTryOn: true,
+                                      stylistImpressionId: message.stylistImpressionId,
+                                      stylistAnchorHandle: message.stylistAnchorHandle,
+                                    })
                               }
                               className="w-full rounded-md border border-gray-300 bg-white px-1 py-1.5 text-center text-[11px] font-semibold leading-tight text-gray-800 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {pendingSuggestedHandle === sp.handle
                                 ? t('loadingSuggestedProduct')
-                                : t('suggestedExperimentarCta')}
+                                : useCartCta
+                                  ? t('suggestedAddToCartCta')
+                                  : t('suggestedExperimentarCta')}
                             </button>
                           </div>
                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -5303,7 +5495,8 @@ const handleSubmit = async (
                             ) : null}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
