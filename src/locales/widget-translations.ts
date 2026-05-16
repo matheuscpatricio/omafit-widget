@@ -110,7 +110,7 @@ export const widgetTranslations = {
     chatPlaceholderStylist: 'Pergunte sobre combinações ou diga o que procura…',
     chatStylingHint: 'Quer ideias para combinar? Pergunte abaixo',
     stylistInitialOutfitAsk:
-      'Já vi o provador com {productName}. Sugere até 3 handles da lista de candidatos que combinem; texto curto (máx. ~4 frases); menciona o meu tamanho sugerido e convida a experimentar ou ao carrinho.',
+      'Já vi o provador com {productName}. Sugere até 3 handles da lista de candidatos que combinem; texto claro com ~5–7 frases curtas no máximo (~850 caracteres): explica silhueta/cor/ocasião, menciona o meu tamanho sugerido e convida a experimentar ou ao carrinho.',
     chatNewPhotoAria: 'Enviar nova foto para o provador (útil para peças de baixo se a foto atual for só de tronco)',
     catalogUnavailableShort: 'Sugestões da loja indisponíveis agora; o assistente responde sem lista de produtos.',
     suggestedTryOnCta: 'Experimentar com o provador',
@@ -119,7 +119,7 @@ export const widgetTranslations = {
     loadingSuggestedProduct: 'A carregar produto…',
     suggestedProductLoadError: 'Não foi possível carregar este produto. Tente outra sugestão.',
     embeddedSuggestionTryOnCaption:
-      'Aqui está o provador virtual com {productName}. A imagem reflete a peça sugerida na sua foto.',
+      'Adorei como {suggestedProduct} combina com {anchorProduct}: proporções harmônicas e um conjunto coeso no espelho virtual. Se faz sentido para o seu estilo, siga para adicionar ao carrinho e finalize o pedido.',
   },
   es: {
     // Loading
@@ -231,7 +231,7 @@ export const widgetTranslations = {
     chatPlaceholderStylist: 'Pregunta combinaciones o di qué buscas…',
     chatStylingHint: '¿Ideas para combinar? Pregunta abajo',
     stylistInitialOutfitAsk:
-      'Ya vi el probador con {productName}. Sugiere hasta 3 handles de la lista de candidatos que combinen; texto corto (máx. ~4 frases); menciona mi talla sugerida y invita a probar o al carrito.',
+      'Ya vi el probador con {productName}. Sugiere hasta 3 handles de la lista de candidatos que combinen; texto claro con ~5–7 frases cortas como máximo (~850 caracteres): explica silueta/color/ocasión, menciona mi talla sugerida y invita a probar o al carrito.',
     chatNewPhotoAria: 'Enviar nueva foto para el probador (útil para prendas inferiores si la foto actual es solo torso)',
     catalogUnavailableShort: 'Sugerencias de la tienda no disponibles; el asistente responde sin lista de productos.',
     suggestedTryOnCta: 'Probar con el probador',
@@ -240,7 +240,7 @@ export const widgetTranslations = {
     loadingSuggestedProduct: 'Cargando producto…',
     suggestedProductLoadError: 'No se pudo cargar este producto. Prueba otra sugerencia.',
     embeddedSuggestionTryOnCaption:
-      'Aquí tienes el probador virtual con {productName}. La imagen muestra la prenda sugerida sobre tu foto.',
+      'Me encanta cómo {suggestedProduct} funciona con {anchorProduct}: proporciones equilibradas y un conjunto muy armónico en el probador. Si te convence, añádelo al carrito y termina tu compra.',
   },
   en: {
     // Loading
@@ -352,7 +352,7 @@ export const widgetTranslations = {
     chatPlaceholderStylist: 'Ask about outfit pairings or describe what you want…',
     chatStylingHint: 'Want outfit ideas? Ask below',
     stylistInitialOutfitAsk:
-      'I saw the try-on with {productName}. Suggest up to 3 handles from the candidate list that pair well; keep copy short (~4 sentences max); mention my suggested size and invite try-on or cart.',
+      'I saw the try-on with {productName}. Suggest up to 3 handles from the candidate list that pair well; write clearly with ~5–7 short sentences max (~850 characters): explain silhouette/color/occasion, mention my suggested size, and invite try-on or cart.',
     chatNewPhotoAria: 'Upload a new photo for try-on (helpful for bottoms if your current photo is torso-only)',
     catalogUnavailableShort: 'Store suggestions unavailable; the assistant will answer without a product list.',
     suggestedTryOnCta: 'Try on with preview',
@@ -361,7 +361,7 @@ export const widgetTranslations = {
     loadingSuggestedProduct: 'Loading product…',
     suggestedProductLoadError: 'Could not load this product. Try another suggestion.',
     embeddedSuggestionTryOnCaption:
-      'Here is your virtual try-on with {productName}. The image shows the suggested garment on your photo.',
+      'I love how {suggestedProduct} pairs with {anchorProduct} — balanced proportions and a cohesive outfit in the mirror. If it feels right, add to cart and complete your order.',
   },
 };
 

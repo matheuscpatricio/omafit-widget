@@ -3896,17 +3896,23 @@ const handleSubmit = async (
             setStep('result');
             setLoading(false);
             if (embeddedInChat) {
-              const pname = String(tryOnSubmitMetaRef.current?.productName || product?.name || '').trim();
-              const fallbackPn =
+              const suggestedPn = String(tryOnSubmitMetaRef.current?.productName || product?.name || '').trim();
+              const anchorPn = String(localProductName || '').trim();
+              const fallbackSuggested =
                 currentLanguage === 'es'
-                  ? 'esta prenda'
+                  ? 'esta prenda sugerida'
                   : currentLanguage === 'en'
-                    ? 'this garment'
-                    : 'esta peça';
-              const caption = t('embeddedSuggestionTryOnCaption').replace(
-                /\{productName\}/g,
-                pname || fallbackPn
-              );
+                    ? 'this suggested piece'
+                    : 'esta peça sugerida';
+              const fallbackAnchor =
+                currentLanguage === 'es'
+                  ? 'tu pieza principal'
+                  : currentLanguage === 'en'
+                    ? 'your main piece'
+                    : 'a sua peça principal';
+              const caption = t('embeddedSuggestionTryOnCaption')
+                .replace(/\{suggestedProduct\}/g, suggestedPn || fallbackSuggested)
+                .replace(/\{anchorProduct\}/g, anchorPn || fallbackAnchor);
               setChatMessages((prev) => [
                 ...prev,
                 {
@@ -5113,17 +5119,19 @@ const handleSubmit = async (
                   ) : null}
                   {message.tryOnImageUrl ? (
                     <div
-                      className={`overflow-hidden rounded-2xl bg-gray-100 shadow-sm ${
+                      className={`mx-auto w-full max-w-[min(204px,52vw)] md:max-w-[236px] ${
                         message.content.trim() ? 'mt-3' : ''
                       }`}
                     >
-                      <div className="aspect-[3/4] w-full min-h-[140px]">
-                        <img
-                          src={message.tryOnImageUrl}
-                          alt=""
-                          className="h-full w-full object-cover object-center"
-                          loading="lazy"
-                        />
+                      <div className="overflow-hidden rounded-xl bg-gray-100 shadow-sm ring-1 ring-black/5">
+                        <div className="aspect-[3/4] w-full">
+                          <img
+                            src={message.tryOnImageUrl}
+                            alt=""
+                            className="h-full w-full object-cover object-center"
+                            loading="lazy"
+                          />
+                        </div>
                       </div>
                     </div>
                   ) : null}
