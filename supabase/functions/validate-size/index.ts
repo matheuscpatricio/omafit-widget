@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,86 @@ const corsHeaders = {
 };
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const GROWTH_PLUS_PLANS = new Set(["growth", "pro", "professional", "enterprise"]);
+
+function hasStylistConsultantPlan(plan: string | null | undefined): boolean {
+  return GROWTH_PLUS_PLANS.has(String(plan || "").trim().toLowerCase());
+}
+
+function isStylistConsultantRequest(data: ValidateSizeRequest): boolean {
+  const intent = String(data.intencao_usuario || "").trim();
+  if (
+    intent === "legenda_tryon_secundario" ||
+    intent === "sugerir_combinacoes" ||
+    intent === "induzir_adicionar_carrinho"
+  ) {
+    return true;
+  }
+  if (intent === "custom_message" && String(data.custom_message || "").trim()) {
+    return true;
+  }
+  return Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
+}
+
+async function fetchShopBillingPlan(shopDomain: string | undefined): Promise<string | null> {
+  const domain = String(shopDomain || "").trim();
+  if (!domain || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data, error } = await supabase
+      .from("shopify_shops")
+      .select("plan, billing_status")
+      .eq("shop_domain", domain)
+      .maybeSingle();
+    if (error || !data) return null;
+    if (data.billing_status !== "active" || !data.plan) return null;
+    return String(data.plan).trim().toLowerCase();
+  } catch (e) {
+    console.warn("[validate-size] fetchShopBillingPlan failed:", e);
+    return null;
+  }
+}
+
+function buildStylistPlanBlockedResponse(
+  data: ValidateSizeRequest,
+  language: string
+): GPTResponse {
+  if (data.intencao_usuario === "legenda_tryon_secundario") {
+    return fallbackSecondaryTryOnCaption(data, language);
+  }
+  const size = normalizeSizeLabel(data.tamanho_calculado_algoritmo || "M");
+  const productName =
+    data.product_name ||
+    (language === "es" ? "esta prenda" : language === "en" ? "this item" : "esta peça");
+  if (language === "es") {
+    return {
+      tamanho_final: size,
+      explicacao: `Tu talla sugerida para ${productName} es ${size}. Si te gusta el resultado del probador, añádelo al carrito.`,
+      coerencia: "alta",
+      confianca: 0.85,
+      suggested_products: [],
+    };
+  }
+  if (language === "en") {
+    return {
+      tamanho_final: size,
+      explicacao: `Your suggested size for ${productName} is ${size}. If you like what you see in the try-on, add it to cart.`,
+      coerencia: "high",
+      confianca: 0.85,
+      suggested_products: [],
+    };
+  }
+  return {
+    tamanho_final: size,
+    explicacao: `Seu tamanho sugerido para ${productName} é ${size}. Se gostou do provador, adicione ao carrinho.`,
+    coerencia: "alta",
+    confianca: 0.85,
+    suggested_products: [],
+  };
+}
 
 interface ValidateSizeRequest {
   altura_cm: number;
@@ -380,6 +461,9 @@ function stripSizeMentionsForSecondaryCaption(
   const sz = escapeRegexSegment(normalizeSizeLabel(size));
 
   body = body
+    .replace(/^\s*Seu tamanho ideal\s+(?:é|para)\s*\S+\s*,\s*/iu, '')
+    .replace(/^\s*Tu talla ideal\s+(?:es|para)\s*\S+\s*,\s*/iu, '')
+    .replace(/^\s*Your ideal size\s+(?:is|for)\s*\S+\s*,\s*/iu, '')
     .replace(/^\s*Seu tamanho ideal[^.!?]+[.!?]\s*/iu, '')
     .replace(/^\s*Tu talla ideal[^.!?]+[.!?]\s*/iu, '')
     .replace(/^\s*Your ideal size[^.!?]+[.!?]\s*/iu, '')
@@ -724,10 +808,17 @@ function enforceSizeFirstMessage(
 
   if (secondaryTryOnCaption) {
     cleanedBody = stripSizeMentionsForSecondaryCaption(cleanedBody, language, size);
+    const stillMentionsSize =
+      !cleanedBody ||
+      explanationMentionsSize(cleanedBody, size) ||
+      /\b(?:tamanho|talla|size)\s+ideal\b/i.test(cleanedBody);
+    if (stillMentionsSize) {
+      cleanedBody = fallbackSecondaryTryOnCaption(data, language).explicacao;
+    }
     return {
       ...gptResponse,
       tamanho_final: size,
-      explicacao: cleanedBody || gptResponse.explicacao,
+      explicacao: cleanedBody,
     };
   }
 
@@ -2042,12 +2133,61 @@ Deno.serve(async (req: Request) => {
 
     normalizeUserQuestion(data);
 
+    const language = data.language || "pt";
+
+    if (isStylistConsultantRequest(data)) {
+      const shopPlan = await fetchShopBillingPlan(data.shop_domain);
+      if (!hasStylistConsultantPlan(shopPlan)) {
+        console.log(
+          "[validate-size] stylist consultant blocked — plan:",
+          shopPlan || "unknown",
+          "shop:",
+          data.shop_domain || "n/a"
+        );
+        const blocked = buildStylistPlanBlockedResponse(data, language);
+        const availableSizes = (data.available_sizes || []).filter(Boolean).map(String);
+        const algorithmSizeNormalized = normalizeSizeLabel(data.tamanho_calculado_algoritmo || "M");
+        const algorithmSizeWithinCatalog =
+          availableSizes.length > 0
+            ? pickClosestAvailableSize(algorithmSizeNormalized, availableSizes)
+            : algorithmSizeNormalized;
+        const algorithmCanonical = resolveCanonicalSizeLabel(
+          algorithmSizeWithinCatalog,
+          availableSizes
+        );
+        const finalBlocked = enforceSizeFirstMessage(
+          {
+            ...enforceAvailableSizes(
+              { ...blocked, tamanho_final: algorithmCanonical },
+              data
+            ),
+          },
+          data,
+          { stylistMode: false }
+        );
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: finalBlocked,
+            interaction_count: interactionCount + 1,
+            meta: { assistant_source: "plan_gate", stylist_mode: false },
+            _validate_size_rev: "2026-05-16-stylist-growth-plan-gate-v1",
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+    }
+
     const hasCandidateProducts =
       Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
 
     // Construir prompt baseado na intenção
     let userPrompt: string;
-    const language = data.language || 'pt';
     console.log('🧠 Prompt language:', language);
 
     if (data.intencao_usuario === "legenda_tryon_secundario") {
@@ -2196,7 +2336,7 @@ Deno.serve(async (req: Request) => {
         data: finalResponse,
         interaction_count: interactionCount + 1,
         meta: { assistant_source: assistantSource },
-        _validate_size_rev: "2026-05-16-secondary-caption-no-size-race-fix",
+        _validate_size_rev: "2026-05-16-secondary-caption-no-size-v2",
       }),
       {
         headers: {
@@ -2219,7 +2359,7 @@ Deno.serve(async (req: Request) => {
         data: fallbackResponse,
         interaction_count: (requestData?.interaction_count || 0) + 1,
         meta: { assistant_source: "error_fallback" as const },
-        _validate_size_rev: "2026-05-16-secondary-caption-no-size-race-fix",
+        _validate_size_rev: "2026-05-16-secondary-caption-no-size-v2",
       }),
       {
         headers: {

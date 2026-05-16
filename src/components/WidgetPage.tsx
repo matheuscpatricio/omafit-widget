@@ -8,6 +8,7 @@ import {
   pickPreferredCollectionHandle,
 } from '../utils/pickPreferredCollectionHandle';
 import { supabase } from '../lib/supabase';
+import { hasGrowthPlusPlan } from '../utils/shopifyPlanAccess';
 
 /**
  * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
@@ -469,6 +470,7 @@ export function WidgetPage() {
     parseTryonEnabledUrlParam()
   );
   const [tryonLayoutBackgroundImage, setTryonLayoutBackgroundImage] = useState<string>('');
+  const [stylistModeEnabled, setStylistModeEnabled] = useState(false);
 
   const tryonIframeSidebar = false;
   /** Sidebar ativa (URL ou config vinda do TryOnWidget) — iframe sem margens para o layout encaixar. */
@@ -795,6 +797,14 @@ export function WidgetPage() {
           console.log('🏪 Shop Domain do contexto:', event.data.shopDomain);
           setShopDomain(event.data.shopDomain);
         }
+        const billingPlanCtx = event.data.billing_plan ?? event.data.billingPlan;
+        if (billingPlanCtx != null && String(billingPlanCtx).trim() !== '') {
+          setStylistModeEnabled(hasGrowthPlusPlan(String(billingPlanCtx)));
+        } else if (typeof event.data.stylist_mode_enabled === 'boolean') {
+          setStylistModeEnabled(event.data.stylist_mode_enabled);
+        } else if (typeof event.data.stylistModeEnabled === 'boolean') {
+          setStylistModeEnabled(event.data.stylistModeEnabled);
+        }
         if (event.data.productHandle || event.data.product_handle) {
           const handle = String(event.data.productHandle || event.data.product_handle || '').trim();
           console.log('📦 Product Handle do contexto:', handle);
@@ -937,6 +947,29 @@ export function WidgetPage() {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+
+  useEffect(() => {
+    const domain = String(shopDomain || '').trim();
+    if (!domain) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shopify_shops')
+          .select('plan, billing_status')
+          .eq('shop_domain', domain)
+          .maybeSingle();
+        if (cancelled || error) return;
+        const active = data?.billing_status === 'active' && data?.plan;
+        setStylistModeEnabled(active ? hasGrowthPlusPlan(String(data.plan)) : false);
+      } catch {
+        if (!cancelled) setStylistModeEnabled(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shopDomain]);
 
   const eyewearSearchSnapshot =
     typeof window !== 'undefined' ? window.location.search : '';
@@ -1268,6 +1301,7 @@ export function WidgetPage() {
           tryonLayoutOverride={undefined}
           tryonLayoutBackgroundImage={tryonLayoutBackgroundImage}
           onTryonLayoutChange={handleTryonLayoutChange}
+          stylistModeEnabled={stylistModeEnabled}
         />
       </div>
     </div>

@@ -32,6 +32,7 @@ import {
 import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import { pickSuggestedHandleFromUserText, userWantsTryOnGeneration } from '../utils/chatTryOnIntent';
 import { productLooksLikeNonGarmentForTryOn } from '../utils/nonGarmentProduct';
+import { resolvePairingCaptionForChat } from '../utils/secondaryTryOnCaption';
 
 /** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
 type TryonLayoutState = TryonLayoutMode | 'pending';
@@ -94,6 +95,8 @@ interface TryOnWidgetProps {
   tryonLayoutBackgroundImage?: string;
   /** Notifica a página (ex. WidgetPage) quando o layout efetivo muda — útil para full-bleed no iframe. */
   onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
+  /** Consultor stylist (chat pós provador, sugestões, catalog-search): plano Growth ou superior. */
+  stylistModeEnabled?: boolean;
 }
 
 interface ProductCatalog {
@@ -641,12 +644,15 @@ export function TryOnWidget({
   tryonLayoutOverride,
   tryonLayoutBackgroundImage,
   onTryonLayoutChange,
+  stylistModeEnabled = false,
 }: TryOnWidgetProps) {
+  const stylistEnabled = stylistModeEnabled === true;
 
   console.log('🎯 ===== TRYON WIDGET INICIALIZADO =====');
   console.log('Props recebidas:');
   console.log('   - publicId:', publicId);
   console.log('   - shopDomain:', shopDomain);
+  console.log('   - stylistModeEnabled:', stylistEnabled);
   console.log('   - productId:', productId);
   console.log('   - productHandle:', productHandle || 'não fornecido');
   console.log('   - productName:', productName);
@@ -820,6 +826,12 @@ export function TryOnWidget({
   /** Evita aplicar resposta de um fetch antigo se outro pedido ao GPT foi iniciado (remount / duplo efeito). */
   const gptAssistSeqRef = useRef(0);
   const initialGptScheduleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Bloqueia nudge automático add_to_cart enquanto corre try-on / legenda do produto sugerido. */
+  const suppressCartGptNudgeRef = useRef(false);
+  const chatMessagesRef = useRef(chatMessages);
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
   /** Primeira resposta do consultor no passo resultado: mostrar tamanho ideal + produtos sugeridos; nas seguintes, não repetir. */
   const stylistOpeningExtrasConsumedRef = useRef(false);
   /** Pesquisa Omafit disparada em paralelo ao /tryon para o primeiro GPT após resultado não esperar tanto. */
@@ -987,6 +999,7 @@ export function TryOnWidget({
 
   /** Impressões de sugestões estilista (uma vez por stylistImpressionId, após sucesso). */
   React.useEffect(() => {
+    if (!stylistEnabled) return;
     const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
     if (!isReady || !effectiveShopDomain || !publicId || !secret) return;
 
@@ -1015,7 +1028,7 @@ export function TryOnWidget({
         })
         .catch(() => {});
     }
-  }, [chatMessages, effectiveShopDomain, publicId]);
+  }, [chatMessages, effectiveShopDomain, publicId, stylistEnabled]);
 
   /** Quando `shopDomain` / `localShopDomain` fica disponível, aplicar cache e sair de `pending` sem flash. */
   React.useEffect(() => {
@@ -1650,6 +1663,7 @@ export function TryOnWidget({
 
   // Chamar assistente GPT automaticamente quando chegar no resultado — já induzindo ao carrinho
   useEffect(() => {
+    if (!stylistEnabled) return;
     if (initialGptScheduleRef.current) {
       clearTimeout(initialGptScheduleRef.current);
       initialGptScheduleRef.current = null;
@@ -1666,10 +1680,32 @@ export function TryOnWidget({
     const hasSuggestedTryOnInChat = chatMessages.some(
       (m) => m.role === 'assistant' && m.tryOnResultVariant === 'suggested'
     );
-    if (hasAssistantConsultantReply || gptLoading || hasSuggestedTryOnInChat) return;
+    const awaitingSuggestedCaption = chatMessages.some(
+      (m) =>
+        m.role === 'assistant' &&
+        m.tryOnResultVariant === 'suggested' &&
+        Boolean(m.tryOnImageUrl) &&
+        !String(m.content || '').trim()
+    );
+    if (
+      hasAssistantConsultantReply ||
+      gptLoading ||
+      tryOnLoadingInChat ||
+      suppressCartGptNudgeRef.current ||
+      hasSuggestedTryOnInChat ||
+      awaitingSuggestedCaption
+    ) {
+      return;
+    }
 
     initialGptScheduleRef.current = setTimeout(() => {
       initialGptScheduleRef.current = null;
+      if (
+        suppressCartGptNudgeRef.current ||
+        chatMessagesRef.current.some((m) => m.role === 'assistant' && m.tryOnResultVariant === 'suggested')
+      ) {
+        return;
+      }
       void callGPTAssistant('add_to_cart');
     }, 200);
 
@@ -1679,7 +1715,7 @@ export function TryOnWidget({
         initialGptScheduleRef.current = null;
       }
     };
-  }, [step, sizeData, chatMessages, gptLoading]);
+  }, [step, sizeData, chatMessages, gptLoading, tryOnLoadingInChat, stylistEnabled]);
 
   // Auto-scroll para última mensagem (um RAF por atualização — evita vários scrollIntoView no mesmo tick)
   useEffect(() => {
@@ -3269,6 +3305,7 @@ const validatePhotoForCollection = (
 
   /** Dispara catalog-search Omafit para o mesmo query do fluxo add_to_cart (em paralelo ao job de try-on). */
   const beginStylistCatalogPrefetch = React.useCallback(() => {
+    if (!stylistEnabled) return;
     const { baseUrl: omafitBase, secret: omafitSecret, isReady } = getOmafitCatalogRuntimeConfig();
     const hasShopDomain = Boolean(String(effectiveShopDomain || '').trim());
     const hasPublicId = Boolean(String(publicId || '').trim());
@@ -3317,6 +3354,7 @@ const validatePhotoForCollection = (
     localCollectionType,
     sizeData?.gender,
     chartGenderScope,
+    stylistEnabled,
   ]);
 
 const handleSubmit = async (
@@ -3939,7 +3977,7 @@ const handleSubmit = async (
             console.log('🎯 Setting step to result, loading to false');
             setStep('result');
             setLoading(false);
-            if (embeddedInChat && jobCtx?.isChainedSuggestedTryOn) {
+            if (stylistEnabled && embeddedInChat && jobCtx?.isChainedSuggestedTryOn) {
               const suggestedPn = String(tryOnSubmitMetaRef.current?.productName || product?.name || '').trim();
               const anchorPn = String(localProductName || '').trim();
               const fallbackSuggested =
@@ -3972,13 +4010,17 @@ const handleSubmit = async (
                 },
               ]);
 
-              const applyCaptionFallback = () => {
-                const caption = t('embeddedSuggestionTryOnCaption')
+              const buildPairingFallbackCaption = () =>
+                t('embeddedSuggestionTryOnCaption')
                   .replace(/\{suggestedProduct\}/g, suggestedPn || fallbackSuggested)
                   .replace(/\{anchorProduct\}/g, anchorPn || fallbackAnchor);
+
+              const applyCaptionFallback = () => {
+                const caption = buildPairingFallbackCaption();
                 setChatMessages((prev) =>
                   prev.map((m) => (m.timestamp === captionTs ? { ...m, content: caption } : m)),
                 );
+                suppressCartGptNudgeRef.current = false;
               };
 
               void (async () => {
@@ -4042,9 +4084,16 @@ const handleSubmit = async (
                     applyCaptionFallback();
                     return;
                   }
-                  setChatMessages((prev) =>
-                    prev.map((m) => (m.timestamp === captionTs ? { ...m, content: expl } : m)),
+                  const pairingCaption = resolvePairingCaptionForChat(
+                    expl,
+                    buildPairingFallbackCaption(),
                   );
+                  setChatMessages((prev) =>
+                    prev.map((m) =>
+                      m.timestamp === captionTs ? { ...m, content: pairingCaption } : m,
+                    ),
+                  );
+                  suppressCartGptNudgeRef.current = false;
                 } catch {
                   applyCaptionFallback();
                 }
@@ -4125,6 +4174,7 @@ const handleSubmit = async (
     stylistSearchAnchorRef.current = '';
     stylistImpressionSentRef.current = new Set();
     stylistOpeningExtrasConsumedRef.current = false;
+    suppressCartGptNudgeRef.current = false;
     embedTryOnInChatActiveRef.current = false;
     pendingEmbedTryOnChatCompletionRef.current = false;
     setTryOnLoadingInChat(false);
@@ -4146,12 +4196,20 @@ const handleSubmit = async (
       stylistAnchorHandle?: string;
     }
   ) => {
+    if (!stylistEnabled) return;
     const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
     if (!isReady || !effectiveShopDomain || !publicId) {
       return;
     }
     const h = String(handle || '').trim();
     if (!h) return;
+
+    suppressCartGptNudgeRef.current = true;
+    gptAssistSeqRef.current += 1;
+    if (initialGptScheduleRef.current) {
+      clearTimeout(initialGptScheduleRef.current);
+      initialGptScheduleRef.current = null;
+    }
 
     const meta =
       options?.stylistImpressionId &&
@@ -4277,6 +4335,7 @@ const handleSubmit = async (
       stylistAnchorHandle?: string;
     },
   ) => {
+    if (!stylistEnabled) return;
     const { baseUrl: base, secret, isReady } = getOmafitCatalogRuntimeConfig();
     if (!isReady || !effectiveShopDomain || !publicId) {
       return;
@@ -4439,6 +4498,11 @@ const handleSubmit = async (
   };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
+    if (!stylistEnabled) return;
+    if (intention === 'add_to_cart' && suppressCartGptNudgeRef.current) {
+      return;
+    }
+
     const requestSeq = ++gptAssistSeqRef.current;
 
     if (interactionCount >= GPT_INTERACTION_LIMIT) {
@@ -4821,6 +4885,13 @@ const handleSubmit = async (
         }
 
         if (requestSeq !== gptAssistSeqRef.current) return;
+        if (
+          chatMessagesRef.current.some(
+            (m) => m.role === 'assistant' && m.tryOnResultVariant === 'suggested'
+          )
+        ) {
+          return;
+        }
         setChatMessages((prev) => [
           ...prev,
           {
@@ -5444,7 +5515,7 @@ const handleSubmit = async (
                       </>
                     );
                   })()}
-                  {message.role === 'assistant' && message.suggestedProducts?.length ? (
+                  {stylistEnabled && message.role === 'assistant' && message.suggestedProducts?.length ? (
                     <div className="mt-3 flex flex-col gap-3 border-t border-gray-200 pt-3">
                       {message.suggestedProducts.map((sp) => {
                         const useCartCta = productLooksLikeNonGarmentForTryOn({
@@ -5634,7 +5705,7 @@ const handleSubmit = async (
           </div>
 
           {/* Input Area */}
-          {interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
+          {stylistEnabled && interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <motion.div
               className="p-4 border-t bg-gray-50"
               initial={{ opacity: 0, y: 12 }}
@@ -5726,8 +5797,43 @@ const handleSubmit = async (
             </motion.div>
           )}
 
+          {!stylistEnabled && chatMessages.length > 0 && !gptLoading && (
+            <motion.div
+              className="p-4 border-t bg-gray-50"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAddingToCart}
+                className="w-full px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: localPrimaryColor,
+                  color: getContrastTextColor(localPrimaryColor),
+                }}
+              >
+                {isAddingToCart
+                  ? currentLanguage === 'pt'
+                    ? 'Adicionando ao carrinho...'
+                    : currentLanguage === 'es'
+                      ? 'Agregando al carrito...'
+                      : 'Adding to cart...'
+                  : currentLanguage === 'pt'
+                    ? 'Adicionar ao carrinho'
+                    : currentLanguage === 'es'
+                      ? 'Agregar al carrito'
+                      : 'Add to cart'}
+              </button>
+              {addToCartFeedback ? (
+                <p className="text-xs text-center text-gray-600 mt-3">{addToCartFeedback}</p>
+              ) : null}
+            </motion.div>
+          )}
+
           {/* Mensagem de agradecimento quando limite for atingido */}
-          {interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
+          {stylistEnabled && interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <motion.div
               className="p-4 border-t bg-gray-50"
               initial={{ opacity: 0, y: 8 }}
