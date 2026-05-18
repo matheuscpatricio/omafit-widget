@@ -38,6 +38,10 @@ import {
   resolveDisplayProductName,
   resolveSelectedColorLabel,
 } from '../utils/productDisplayContext';
+import {
+  mergeShopifyCollectionHandles,
+  parseCollectionHandlesFromMessage,
+} from '../utils/mergeShopifyCollectionHandles';
 import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
 import {
   inferProductHandleFromReferrer,
@@ -978,6 +982,8 @@ export function TryOnWidget({
   const [localCollectionElasticity, setLocalCollectionElasticity] = useState<'structured' | 'light_flex' | 'flexible' | 'high_elasticity' | undefined>(collectionElasticity);
   const [localProductName, setLocalProductName] = useState<string>(productName || 'Produto');
   const [localProductHandle, setLocalProductHandle] = useState<string>(productHandle || '');
+  const [hydratedCollectionHandles, setHydratedCollectionHandles] = useState<string[]>([]);
+  const hydratedCollectionHandlesRef = useRef<string[]>([]);
   /**
    * Escopo de gênero da tabela de medidas que vai ser usada (produto > coleção > global).
    * Descoberto via Supabase no efeito abaixo; quando `male`/`female`, a etapa 2 (calculadora)
@@ -1846,6 +1852,21 @@ export function TryOnWidget({
           }
         }
 
+        if (
+          event.data.collectionHandle !== undefined ||
+          event.data.collectionHandles !== undefined
+        ) {
+          const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+          const ch =
+            event.data.collectionHandle != null ? String(event.data.collectionHandle).trim() : '';
+          const merged = mergeShopifyCollectionHandles(list, ch);
+          if (merged.length > 0) {
+            hydratedCollectionHandlesRef.current = merged;
+            setHydratedCollectionHandles(merged);
+            console.log('📦 Coleções do tema (postMessage):', merged.join(', '));
+          }
+        }
+
         if (event.data.productDescription || event.data.product_description) {
           const description = event.data.productDescription || event.data.product_description;
           console.log('✅ Atualizando productDescription:', description.substring(0, 100) + '...');
@@ -1941,6 +1962,20 @@ export function TryOnWidget({
           const attr = suggestionAttributionRef.current;
           if (attr && handle.toLowerCase() !== attr.suggestedHandle.toLowerCase()) {
             suggestionAttributionRef.current = null;
+          }
+        }
+
+        if (
+          event.data.collectionHandle !== undefined ||
+          event.data.collectionHandles !== undefined
+        ) {
+          const list = parseCollectionHandlesFromMessage(event.data.collectionHandles);
+          const ch =
+            event.data.collectionHandle != null ? String(event.data.collectionHandle).trim() : '';
+          const merged = mergeShopifyCollectionHandles(list, ch);
+          if (merged.length > 0) {
+            hydratedCollectionHandlesRef.current = merged;
+            setHydratedCollectionHandles(merged);
           }
         }
 
@@ -2194,6 +2229,53 @@ export function TryOnWidget({
     );
   }, [localProductHandle, productHandle]);
 
+  const mergeCatalogCollectionHandles = React.useCallback(
+    (extra?: string[]) =>
+      mergeShopifyCollectionHandles(
+        collectionHandles,
+        collectionHandle,
+        hydratedCollectionHandlesRef.current,
+        extra
+      ),
+    [collectionHandles, collectionHandle]
+  );
+
+  const ensureCatalogCollectionHandles = React.useCallback(async (): Promise<string[]> => {
+    const fromEmbed = mergeCatalogCollectionHandles();
+    if (fromEmbed.length > 0) return fromEmbed;
+
+    const handle = resolveProductHandleForGallery();
+    const { baseUrl, secret, isReady } = getOmafitCatalogRuntimeConfig();
+    if (!handle || !isReady || !effectiveShopDomain || !publicId) return [];
+
+    try {
+      const { product, error } = await fetchOmafitProductByHandle({
+        baseUrl,
+        secret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        handle,
+      });
+      if (error || !product) return [];
+      const fromApi = Array.isArray(product.collection_handles)
+        ? product.collection_handles.map((h) => String(h || '').trim()).filter(Boolean)
+        : [];
+      if (fromApi.length > 0) {
+        hydratedCollectionHandlesRef.current = fromApi;
+        setHydratedCollectionHandles(fromApi);
+        return mergeShopifyCollectionHandles(fromApi);
+      }
+    } catch (err) {
+      console.warn('[Omafit] Falha ao obter coleções do produto:', err);
+    }
+    return [];
+  }, [
+    mergeCatalogCollectionHandles,
+    resolveProductHandleForGallery,
+    effectiveShopDomain,
+    publicId,
+  ]);
+
   const requestProductImagesFromParent = React.useCallback(() => {
     if (typeof window === 'undefined' || window.parent === window) return;
     const handle = resolveProductHandleForGallery();
@@ -2252,6 +2334,15 @@ export function TryOnWidget({
         normalizedCatalog.variants.length > 0
       ) {
         setProductCatalog(normalizedCatalog);
+      }
+
+      const collHandles = Array.isArray(product.collection_handles)
+        ? product.collection_handles.map((h) => String(h || '').trim()).filter(Boolean)
+        : [];
+      if (collHandles.length > 0) {
+        hydratedCollectionHandlesRef.current = collHandles;
+        setHydratedCollectionHandles(collHandles);
+        console.log('📦 Coleções do produto (product-by-handle):', collHandles.join(', '));
       }
     } catch (err) {
       console.warn('[Omafit] Falha ao carregar imagens do produto:', err);
@@ -3520,12 +3611,7 @@ const validatePhotoForCollection = (
     const hasPublicId = Boolean(String(publicId || '').trim());
     if (!isReady || !omafitBase || !omafitSecret || !hasShopDomain || !hasPublicId) return;
 
-    const shopifyCollectionHandles = [
-      ...(collectionHandles || []).map((h) => String(h || '').trim()).filter(Boolean),
-      String(collectionHandle || '').trim(),
-    ].filter((h, i, a) => h && a.indexOf(h) === i);
-
-    const collectionHandlesLine = shopifyCollectionHandles.join(', ');
+    const collectionHandlesLine = mergeCatalogCollectionHandles().join(', ');
     const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
     const autoQuery = [
       `Combinar outfit com ${localProductName || 'esta peça'}`,
@@ -3536,26 +3622,28 @@ const validatePhotoForCollection = (
       .filter((s) => String(s || '').trim())
       .join(' | ') + ctx;
 
-    stylistCatalogPrefetchPromiseRef.current = fetchOmafitCatalogSearch({
-      baseUrl: omafitBase,
-      secret: omafitSecret,
-      shopDomain: effectiveShopDomain,
-      publicId,
-      userMessage: autoQuery,
-      excludeHandle: (localProductHandle || productHandle || '').trim(),
-      productName: localProductName,
-      collectionType: localCollectionType || 'upper',
-      shopperGender: sizeData?.gender || 'unisex',
-      chartGenderScope,
-      collectionHandles: shopifyCollectionHandles,
-    })
-      .then((res) => res.candidates)
-      .catch(() => []);
+    stylistCatalogPrefetchPromiseRef.current = (async () => {
+      const handles = await ensureCatalogCollectionHandles();
+      const res = await fetchOmafitCatalogSearch({
+        baseUrl: omafitBase,
+        secret: omafitSecret,
+        shopDomain: effectiveShopDomain,
+        publicId,
+        userMessage: autoQuery,
+        excludeHandle: (localProductHandle || productHandle || '').trim(),
+        productName: localProductName,
+        collectionType: localCollectionType || 'upper',
+        shopperGender: sizeData?.gender || 'unisex',
+        chartGenderScope,
+        collectionHandles: handles,
+      });
+      return res.candidates;
+    })().catch(() => []);
   }, [
     effectiveShopDomain,
     publicId,
-    collectionHandles,
-    collectionHandle,
+    ensureCatalogCollectionHandles,
+    mergeCatalogCollectionHandles,
     localProductHandle,
     productHandle,
     localProductName,
@@ -4826,12 +4914,7 @@ const handleSubmit = async (
       const canOmafitSearch =
         hasOmafitUrl && hasOmafitSecret && hasShopDomain && hasPublicId;
 
-      const shopifyCollectionHandles = [
-        ...(collectionHandles || []).map((h) => String(h || '').trim()).filter(Boolean),
-        String(collectionHandle || '').trim(),
-      ].filter((h, i, a) => h && a.indexOf(h) === i);
-
-      const collectionHandlesLine = shopifyCollectionHandles.join(', ');
+      let shopifyCollectionHandles = mergeCatalogCollectionHandles();
 
       let lastCatalogSearch: {
         diagnostic?: string;
@@ -4897,6 +4980,15 @@ const handleSubmit = async (
         language: langForDisplay,
       });
 
+      if (
+        stylistEnabled &&
+        canOmafitSearch &&
+        (intention === 'custom' || intention === 'add_to_cart')
+      ) {
+        shopifyCollectionHandles = await ensureCatalogCollectionHandles();
+      }
+      const collectionHandlesLine = shopifyCollectionHandles.join(', ');
+
       if (stylistEnabled && intention === 'custom' && customMessage && canOmafitSearch) {
         const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
         const enrichedQuery = [customMessage, localProductName, localProductDescription]
@@ -4958,9 +5050,11 @@ const handleSubmit = async (
           publicId,
           excludeHandle: (localProductHandle || productHandle || '').trim(),
           collectionHandlesEnviados: shopifyCollectionHandles,
+          colecoesInferidasApi: lastCatalogSearch?.debug?.resolved_collection_handles,
+          targetGender: lastCatalogSearch?.debug?.target_gender,
           resposta: lastCatalogSearch,
           checklist:
-            '1) Deploy da app Omafit com COLLECTION_PRODUCTS + inferência de coleções. 2) Outros produtos na coleção (só o handle atual é excluído). 3) Imagem destacada ou 1ª imagem do produto. 4) Filtro de género (ver debug.target_gender). 5) Logs Railway em /api/widget/catalog-search.',
+            '1) Produto em pelo menos uma coleção Shopify com outras peças. 2) Redeploy app Omafit (Railway). 3) Tema com data-collection-handles ou product-by-handle com coleções. 4) Imagem destacada nos candidatos. 5) target_gender no debug — tabela só masculina/feminina pode filtrar tudo.',
         });
       } else {
         console.log('🛍️ Omafit candidatos para o consultor:', nOmafitCandidates);

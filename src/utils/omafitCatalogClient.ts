@@ -403,6 +403,7 @@ export async function fetchOmafitProductByHandle(params: {
     images: string[];
     image_url: string;
     catalog: { sizes: string[]; colors: string[]; variants: any[] };
+    collection_handles?: string[];
   } | null;
   error: string | null;
 }> {
@@ -438,6 +439,7 @@ export async function fetchOmafitProductByHandle(params: {
       images: string[];
       image_url: string;
       catalog: { sizes: string[]; colors: string[]; variants: any[] };
+      collection_handles?: string[];
     } | null;
     error?: string | null;
   };
