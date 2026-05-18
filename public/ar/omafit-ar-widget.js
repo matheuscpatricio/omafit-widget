@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v4";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v5";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13374,14 +13374,22 @@ async function runHandArSession({
     /**
      * Ajuste fino de encaixe no espaço local do GLB:
      * - recentrado pelo interior já feito via `position.sub(center)`
-     * - Y proporcional à altura (encaixe no punho)
-     * - Z proporcional à profundidade (evita "flutuar na frente")
+     * - Y proporcional à altura (encaixe no punho) — apenas modo legado
+     * - Z proporcional à profundidade — apenas modo legado
+     *
+     * Rigid slot: offsets Y/Z foram calibrados para o fluxo com
+     * `quaternion.identity()` (eixos canónicos fixos). Com rotação preservada
+     * (menor-eixo bbox), os mesmos offsets vão para uma direcção arbitrária
+     * no plano do anel → um arco "sai" do pulso com diâmetro e orientação
+     * correctos. Solução: usar só `position.sub(center)` (duplo recentro).
      */
     if (accessoryType === "bracelet") {
-      glbScene.position.y -= size.y * OMAFIT_BRACELET_GLB_LOCAL_Y_SIZE_MUL;
-      glbScene.position.z -= size.z * OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL;
-      glbScene.position.y += OMAFIT_BRACELET_GLB_MICRO_POS_Y_M;
-      glbScene.position.z += OMAFIT_BRACELET_GLB_MICRO_POS_Z_M;
+      if (!braceletIsRigidSlot) {
+        glbScene.position.y -= size.y * OMAFIT_BRACELET_GLB_LOCAL_Y_SIZE_MUL;
+        glbScene.position.z -= size.z * OMAFIT_BRACELET_GLB_LOCAL_Z_SIZE_MUL;
+        glbScene.position.y += OMAFIT_BRACELET_GLB_MICRO_POS_Y_M;
+        glbScene.position.z += OMAFIT_BRACELET_GLB_MICRO_POS_Z_M;
+      }
     } else {
       glbScene.position.y += OMAFIT_HAND_GLB_LOCAL_Y_BIND_M;
     }
