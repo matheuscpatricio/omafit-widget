@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v7";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v8";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -7036,6 +7036,33 @@ async function runArSession({
   ) {
     variantSource = window.__OMAFIT_AR_VARIANTS__;
   }
+  /**
+   * Iframe Netlify: se não há variantes do Liquid (sem `__OMAFIT_AR_VARIANTS__`),
+   * tenta ler `data-ar-variants-glb` do `#omafit-ar-root` — serializado pelo
+   * `omafit-widget.js` do tema com id, glbUrl (`g`) e calibration (`c`).
+   * Formato: JSON Array<{ id, g, c }> → mapeado para o schema interno.
+   */
+  if (!variantSource.length) {
+    try {
+      const arRoot = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+      const rawGlbVars = arRoot ? (arRoot.getAttribute("data-ar-variants-glb") || "").trim() : "";
+      if (rawGlbVars) {
+        const parsed = JSON.parse(rawGlbVars);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          variantSource = parsed.map((v) => ({
+            id: v.id,
+            title: String(v.id),
+            imageUrl: "",
+            glbUrl: String(v.g || "").trim(),
+            calibration: v.c || null,
+          }));
+          console.log("[omafit-ar] arVariantsGlb (iframe):", variantSource.length, "variantes com GLB");
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   const productHandleForFetch = omafitResolveProductHandleForVariantFetch();
   if (productHandleForFetch) {
     variantSource = await omafitEnrichVariantsFromStorefrontJs(productHandleForFetch, variantSource);
@@ -7057,14 +7084,21 @@ async function runArSession({
   const resolveVariantGlb = (v) =>
     String(v?.glbUrl ?? v?.glb_url ?? "").trim() || resolveBaseGlb(variantSource);
   /**
-   * Incluir TODAS as variantes com `id` — não filtrar por GLB próprio porque
-   * várias variantes podem partilhar o `baseGlb` (GLB ao nível do produto).
-   * O único requisito é ter um `id` válido.
+   * Filtro de variantes para a barra de miniaturas:
+   * - Se alguma variante tem glbUrl próprio (fluxo Liquid ou arVariantsGlb do iframe),
+   *   mostrar APENAS as variantes com glbUrl — evita exibir variantes sem AR.
+   * - Se nenhuma variante tem glbUrl (todas partilham o baseGlb do produto),
+   *   manter todas com id válido (comportamento legado: sem filtro).
    */
+  const anyHasOwnGlb = variantSource.some((v) => v && String(v?.glbUrl ?? v?.glb_url ?? "").trim());
   let arVariants = variantSource.filter((v) => {
     if (!v) return false;
     const id = v.id != null ? String(v.id).trim() : "";
-    return Boolean(id);
+    if (!id) return false;
+    if (anyHasOwnGlb) {
+      return Boolean(String(v?.glbUrl ?? v?.glb_url ?? "").trim());
+    }
+    return true;
   });
   /**
    * Iframe Netlify: não há `window.__OMAFIT_AR_VARIANTS__` do Liquid. Com

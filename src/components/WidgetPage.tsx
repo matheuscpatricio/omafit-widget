@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-18-bracelet-rigid-slot-v7';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-18-bracelet-rigid-slot-v8';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -161,6 +161,12 @@ type EyewearArBootstrap = {
   arManifestUrl?: string;
   /** Modo radial de pulseira: auto | on | off — `data-ar-bracelet-radial`. */
   arBraceletRadial?: string;
+  /**
+   * Variantes com GLB URL serializadas pelo `omafit-widget.js` do tema.
+   * JSON string de `Array<{ id: string|number, g: string, c: unknown }>`.
+   * O iframe repassa ao `omafit-ar-widget.js` via `data-ar-variants-glb`.
+   */
+  arVariantsGlb?: string;
   /** ID da variante Shopify (numérico) — obrigatório para carrinho / miniatura no iframe Netlify. */
   variantId?: string;
   /** Domínio da loja (`loja.myshopify.com`) — `fetch` do carrinho usa `https://{domínio}/cart/add.js`. */
@@ -265,6 +271,19 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   let arManifestUrl = pickQ(['arManifestUrl', 'ar_manifest_url']);
   const arBraceletRadialRaw = pickQ(['arBraceletRadial', 'ar_bracelet_radial']).trim().toLowerCase();
   const arBraceletRadial = /^(auto|on|off)$/.test(arBraceletRadialRaw) ? arBraceletRadialRaw : undefined;
+
+  const arVariantsGlbRaw = pickQ(['arVariantsGlb', 'ar_variants_glb']).trim();
+  let arVariantsGlb: string | undefined;
+  if (arVariantsGlbRaw) {
+    try {
+      const parsed = JSON.parse(arVariantsGlbRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        arVariantsGlb = arVariantsGlbRaw;
+      }
+    } catch {
+      /* JSON inválido — ignorar */
+    }
+  }
   let legacyBraceletFit = /^1|true|on|yes$/i.test(
     pickQ(['arLegacyBraceletFit', 'ar_legacy_bracelet_fit']).trim(),
   );
@@ -420,6 +439,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     arManifestJson: arManifestJson.trim() || undefined,
     arManifestUrl: arManifestUrl.trim() || undefined,
     arBraceletRadial: arBraceletRadial || undefined,
+    arVariantsGlb: arVariantsGlb || undefined,
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
@@ -1249,6 +1269,9 @@ export function WidgetPage() {
     }
     if (eyewearBootstrap.arBraceletRadial) {
       arExtraAttrs['data-ar-bracelet-radial'] = eyewearBootstrap.arBraceletRadial;
+    }
+    if (eyewearBootstrap.arVariantsGlb) {
+      arExtraAttrs['data-ar-variants-glb'] = eyewearBootstrap.arVariantsGlb;
     }
 
     return (

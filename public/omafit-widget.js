@@ -2421,6 +2421,42 @@
       } catch (e) {
         if (OMAFIT_DEBUG) console.warn('Omafit: propagar data-ar-* para iframe falhou', e);
       }
+      /**
+       * Serializa as variantes com GLB URL para o iframe.
+       * Apenas campos essenciais (id, glbUrl, calibration) para manter a URL
+       * curta. O iframe usa /products/{handle}.js para título/imagem — não
+       * precisa vir aqui. Filtra variantes sem glbUrl (não têm AR próprio).
+       * Limite de segurança: se o JSON ultrapassar 1500 chars (muitas variantes),
+       * trunca para as 10 primeiras com GLB (o resto fica sem miniatura AR).
+       */
+      try {
+        var rawVars = window.__OMAFIT_AR_VARIANTS__;
+        if (Array.isArray(rawVars) && rawVars.length > 0) {
+          var glbVars = rawVars
+            .filter(function (v) {
+              return v && String(v.glbUrl || v.glb_url || '').trim();
+            })
+            .map(function (v) {
+              return {
+                id: v.id,
+                g: String(v.glbUrl || v.glb_url || '').trim(),
+                c: v.calibration || null,
+              };
+            });
+          if (glbVars.length > 0) {
+            var glbVarsJson = JSON.stringify(glbVars);
+            if (glbVarsJson.length > 1500) {
+              glbVarsJson = JSON.stringify(glbVars.slice(0, 10));
+            }
+            widgetUrl += '&arVariantsGlb=' + encodeURIComponent(glbVarsJson);
+            if (OMAFIT_DEBUG) {
+              console.log('[omafit] arVariantsGlb:', glbVars.length, 'variantes com GLB');
+            }
+          }
+        }
+      } catch (_eVarGlb) {
+        /* non-blocking */
+      }
     }
 
     iframe.addEventListener('load', function () {
