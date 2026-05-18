@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v6";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v7";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -14787,10 +14787,17 @@ async function runHandArSession({
         0.15,
       );
       const wristWidth = w5.distanceTo(w17);
+      /**
+       * Rigid slot: fade de material mais suave (máx 0.3) — o depth occluder
+       * cilíndrico já esconde o arco traseiro; a oclusão de material serve só
+       * para suavizar a transição lateral. Modo legado (chains): máx 0.7
+       * como antes, para compensar ausência do occluder cilíndrico.
+       */
+      const occStrMax = braceletIsRigidSlot ? 0.3 : 0.7;
       const occlusionStrength = THREE.MathUtils.clamp(
         wristWidth * 2.0,
-        0.3,
-        0.7,
+        0.15,
+        occStrMax,
       );
       const targetOpacity = 1.0 - braceletOcclusionSmooth * occlusionStrength;
       const fade = THREE.MathUtils.clamp(facing, 0.3, 1.0);
@@ -14817,9 +14824,10 @@ async function runHandArSession({
           const currentOpacity =
             typeof m.opacity === "number" ? m.opacity : opBase;
           const antiVanishOpacity = Math.max(targetOpacity, fade);
+          const opacityFloor = braceletIsRigidSlot ? 0.55 : 0.12;
           m.opacity = THREE.MathUtils.lerp(
             currentOpacity,
-            THREE.MathUtils.clamp(opBase * antiVanishOpacity, 0.12, opBase),
+            THREE.MathUtils.clamp(opBase * antiVanishOpacity, opacityFloor, opBase),
             0.15,
           );
         }
@@ -15169,6 +15177,22 @@ async function runHandArSession({
         wideWrist: isWideWrist,
       });
     }
+
+    /**
+     * Sombra de contacto pulseira: elipse proporcional à largura do punho.
+     * Aqui temos w5/w17/w0/w9 em escopo (landmarks em mundo desprojectado).
+     * X ≈ largura MCP5–MCP17 × 1.15; Z ≈ espessura punho–MCP9 × 0.85.
+     * Relógio usa escala fixa definida no init — não sobrescrever.
+     */
+    if (accessoryType === "bracelet") {
+      const csWristW = w5.distanceTo(w17);
+      const csThick = w0.distanceTo(w9);
+      contactShadow.scale.set(
+        THREE.MathUtils.clamp(csWristW * 1.15, 0.05, 0.16),
+        1,
+        THREE.MathUtils.clamp(csThick * 0.85, 0.035, 0.1),
+      );
+    }
   }
 
   function tick() {
@@ -15276,21 +15300,6 @@ async function runHandArSession({
       if (braceletAxisDebugLine) braceletAxisDebugLine.visible = accessoryType === "bracelet";
       if (braceletOccNormalDebugLine) braceletOccNormalDebugLine.visible = accessoryType === "bracelet";
       contactShadow.visible = true;
-      /**
-       * Sombra de contacto pulseira: elipse proporcional à largura do punho.
-       * Escala X ≈ largura MCP5–MCP17 em mundo × 1.15 (cobre os extremos do anel).
-       * Escala Z ≈ espessura punho×0.85 (mais curta na direção do braço).
-       * Apenas para pulseira — relógio usa escala fixa de init.
-       */
-      if (accessoryType === "bracelet") {
-        const csWristW = w5.distanceTo(w17);
-        const csThick = w0.distanceTo(w9);
-        contactShadow.scale.set(
-          THREE.MathUtils.clamp(csWristW * 1.15, 0.05, 0.16),
-          1,
-          THREE.MathUtils.clamp(csThick * 0.85, 0.035, 0.1),
-        );
-      }
     } else {
       missedFrames += 1;
       if (missedFrames > MISSED_HIDE_THRESHOLD) {
