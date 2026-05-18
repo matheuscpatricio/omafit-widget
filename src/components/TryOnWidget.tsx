@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Camera, ArrowRight, ArrowLeft, Mail, AlertCircle, Info, ShoppingCart, Plus, Loader2 } from 'lucide-react';
 import { SizeCalculator, SizeCalculatorData } from './SizeCalculator';
 import { calculateIdealSize } from '../utils/sizeCalculation';
+import { resolveBodyLengthReference } from '../utils/bodyLengthReference';
 import { supabase } from '../lib/supabase';
 import {
   resolveCollectionHandleWithSavedSizeChart,
@@ -2450,7 +2451,8 @@ export function TryOnWidget({
       waist: realWaist,
       hip: realHip,
       shoulder: realShoulder,
-      legLength: realLegLength
+      legLength: realLegLength,
+      torsoLength: realTorsoLength
     } = measurements;
 
     console.log('━━━━ 🔹 BLOCO 1: CAPTURA MEDIAPIPE (já executado) ━━━━');
@@ -2599,27 +2601,32 @@ export function TryOnWidget({
         ? realShoulder
         : (height * 0.25);
 
-      const headLength = height * 0.13;
-      const fallbackLegLength = gender === 'female' ? height * 0.49 : height * 0.47;
-      const legLength = (typeof realLegLength === 'number' && Number.isFinite(realLegLength) && realLegLength > 0)
-        ? realLegLength
-        : fallbackLegLength;
-      const trunkWithoutHead = Math.max(height - legLength - headLength, height * 0.30);
-
-      if (localCollectionType === 'lower') {
-        bodyLengthReference = legLength;
-      } else if (localCollectionType === 'upper') {
-        bodyLengthReference = trunkWithoutHead;
-      } else {
-        bodyLengthReference = height - headLength;
-      }
+      const lengthRef = resolveBodyLengthReference({
+        heightCm: height,
+        gender,
+        collectionType: localCollectionType || 'upper',
+        legLengthCm:
+          typeof realLegLength === 'number' && Number.isFinite(realLegLength) && realLegLength > 0
+            ? realLegLength
+            : undefined,
+        torsoLengthCm:
+          typeof realTorsoLength === 'number' && Number.isFinite(realTorsoLength) && realTorsoLength > 0
+            ? realTorsoLength
+            : undefined,
+      });
+      bodyLengthReference = lengthRef.valueCm;
 
       console.log('\n✅ MODELO CORPORAL FINAL (sem fit):');
       console.log('   Peito:', bodyChest.toFixed(1), 'cm');
       console.log('   Cintura:', bodyWaist.toFixed(1), 'cm');
       console.log('   Quadril:', bodyHip.toFixed(1), 'cm');
       console.log('   Ombro:', bodyShoulder.toFixed(1), 'cm');
-      console.log('   Comprimento referência:', bodyLengthReference.toFixed(1), 'cm', `(coleção: ${localCollectionType || 'upper'})`);
+      console.log(
+        '   Comprimento referência:',
+        bodyLengthReference.toFixed(1),
+        'cm',
+        `(coleção: ${localCollectionType || 'upper'}, fonte: ${lengthRef.source})`
+      );
     } else {
       console.log('\n📏 MODO: Estimativa por altura');
 
@@ -2628,24 +2635,24 @@ export function TryOnWidget({
       bodyWaist = height * baseWaistRatio * selectedBodyType.waistFactor * bmiAdjustment;
       bodyHip = height * baseHipRatio * selectedBodyType.hipFactor * bmiAdjustment;
       bodyShoulder = height * 0.25 * selectedBodyType.shoulderFactor;
-      const estimatedLegLength = gender === 'female' ? height * 0.49 : height * 0.47;
-      const estimatedHeadLength = height * 0.13;
-      const estimatedTrunkWithoutHead = Math.max(height - estimatedLegLength - estimatedHeadLength, height * 0.30);
-
-      if (localCollectionType === 'lower') {
-        bodyLengthReference = estimatedLegLength;
-      } else if (localCollectionType === 'upper') {
-        bodyLengthReference = estimatedTrunkWithoutHead;
-      } else {
-        bodyLengthReference = height - estimatedHeadLength;
-      }
+      const lengthRef = resolveBodyLengthReference({
+        heightCm: height,
+        gender,
+        collectionType: localCollectionType || 'upper',
+      });
+      bodyLengthReference = lengthRef.valueCm;
 
       console.log('✅ MODELO CORPORAL FINAL (sem fit):');
       console.log('   Peito:', bodyChest.toFixed(1), 'cm');
       console.log('   Cintura:', bodyWaist.toFixed(1), 'cm');
       console.log('   Quadril:', bodyHip.toFixed(1), 'cm');
       console.log('   Ombro:', bodyShoulder.toFixed(1), 'cm');
-      console.log('   Comprimento referência:', bodyLengthReference.toFixed(1), 'cm', `(coleção: ${localCollectionType || 'upper'})`);
+      console.log(
+        '   Comprimento referência:',
+        bodyLengthReference.toFixed(1),
+        'cm',
+        `(coleção: ${localCollectionType || 'upper'}, fonte: ${lengthRef.source})`
+      );
     }
 
     // Armazenar medidas do modelo corporal final para GPT
@@ -3821,6 +3828,7 @@ const handleSubmit = async (
             0
           ) || undefined,
           legLength: Number(detectedMeasurements.legLength ?? 0) || undefined,
+          torsoLength: Number(detectedMeasurements.torsoLength ?? 0) || undefined,
           measurement_method: detectedMeasurements.measurement_method,
         }
       : ((sizeData as any) || {});

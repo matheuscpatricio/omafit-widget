@@ -16,6 +16,8 @@ export interface BodyMeasurements {
   height: number;
   armLength: number;
   legLength: number;
+  /** Ombro → quadril (vertical), em cm — base para comprimento em peças upper. */
+  torsoLength: number;
   /** Como as circunferências foram obtidas (para debug e logs no widget). */
   measurement_method?:
     | 'landmark_ellipse'
@@ -813,10 +815,28 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
         ? armLengthFromPhoto * 0.6 + referenceHeightCm * armRatio * 0.4
         : referenceHeightCm * armRatio
     );
-    const legLength = Math.round(
+    const expectedLegCm = referenceHeightCm * legRatio;
+    let legLength = Math.round(
       silhouetteUsable && poseOk
-        ? legLengthFromPhoto * 0.65 + referenceHeightCm * legRatio * 0.35
-        : referenceHeightCm * legRatio
+        ? legLengthFromPhoto * 0.65 + expectedLegCm * 0.35
+        : expectedLegCm
+    );
+    if (legLength < expectedLegCm * 0.75 || legLength > expectedLegCm * 1.2) {
+      legLength = Math.round(expectedLegCm);
+    }
+
+    const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
+    const hipMidY = (leftHip.y + rightHip.y) / 2;
+    const torsoNorm = Math.abs(hipMidY - shoulderMidY);
+    const expectedTorsoProp = gender === 'female' ? 0.3 : 0.32;
+    const measuredTorsoProp =
+      bodyHeightNorm > 0.2 ? torsoNorm / bodyHeightNorm : expectedTorsoProp;
+    const torsoProp =
+      fullBodyInFrame && measuredTorsoProp >= 0.22 && measuredTorsoProp <= 0.4
+        ? measuredTorsoProp
+        : expectedTorsoProp;
+    const torsoLength = Math.round(
+      clamp(referenceHeightCm * torsoProp, referenceHeightCm * 0.2, referenceHeightCm * 0.42)
     );
 
     // 🔹 11. CONFIANÇA GLOBAL
@@ -840,17 +860,19 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
       height: Math.round(referenceHeightCm),
       armLength,
       legLength,
+      torsoLength,
       measurement_method: measurementMethod,
     };
 
     console.log(`✅ Medidas calculadas (método: ${measurementMethod}):`);
     console.log('   • Largura ombros:', measurements.shoulder_width, 'cm');
-    console.log('   • Circunf. peito:', measurements.chest, 'cm (elíptica)');
-    console.log('   • Circunf. cintura:', measurements.waist, 'cm (elíptica)');
-    console.log('   • Circunf. quadril:', measurements.hip, 'cm (elíptica)');
+    console.log('   • Circunf. peito:', measurements.chest, 'cm');
+    console.log('   • Circunf. cintura:', measurements.waist, 'cm');
+    console.log('   • Circunf. quadril:', measurements.hip, 'cm');
     console.log('   • Altura:', measurements.height, 'cm');
     console.log('   • Comprimento braço:', measurements.armLength, 'cm');
     console.log('   • Comprimento perna:', measurements.legLength, 'cm');
+    console.log('   • Comprimento tronco (ombro→quadril):', measurements.torsoLength, 'cm');
     console.log('   • Confiança global:', (globalConfidence * 100).toFixed(0), '%');
     console.log('   • Fatores aplicados:');
     console.log('     - Inclinação:', (tiltPenalty * 100).toFixed(0), '%');
