@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v8";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v9";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -7051,8 +7051,8 @@ async function runArSession({
         if (Array.isArray(parsed) && parsed.length > 0) {
           variantSource = parsed.map((v) => ({
             id: v.id,
-            title: String(v.id),
-            imageUrl: "",
+            title: String(v.t || v.id || "").trim() || String(v.id),
+            imageUrl: String(v.i || "").trim(),
             glbUrl: String(v.g || "").trim(),
             calibration: v.c || null,
           }));
