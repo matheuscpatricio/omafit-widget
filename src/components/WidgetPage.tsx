@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-14-ar-bracelet-radial-default-auto-v1';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-18-bracelet-rigid-slot-v1';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -159,6 +159,8 @@ type EyewearArBootstrap = {
   arManifestJson?: string;
   /** URL do manifest AR (CORS) — `data-ar-manifest-url`. */
   arManifestUrl?: string;
+  /** Modo radial de pulseira: auto | on | off — `data-ar-bracelet-radial`. */
+  arBraceletRadial?: string;
   /** ID da variante Shopify (numérico) — obrigatório para carrinho / miniatura no iframe Netlify. */
   variantId?: string;
   /** Domínio da loja (`loja.myshopify.com`) — `fetch` do carrinho usa `https://{domínio}/cart/add.js`. */
@@ -261,6 +263,8 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
 
   let arManifestJson = pickQ(['arManifestJson', 'ar_manifest_json']);
   let arManifestUrl = pickQ(['arManifestUrl', 'ar_manifest_url']);
+  const arBraceletRadialRaw = pickQ(['arBraceletRadial', 'ar_bracelet_radial']).trim().toLowerCase();
+  const arBraceletRadial = /^(auto|on|off)$/.test(arBraceletRadialRaw) ? arBraceletRadialRaw : undefined;
   let legacyBraceletFit = /^1|true|on|yes$/i.test(
     pickQ(['arLegacyBraceletFit', 'ar_legacy_bracelet_fit']).trim(),
   );
@@ -415,6 +419,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
     calibration: (calibration && calibration.trim()) || undefined,
     arManifestJson: arManifestJson.trim() || undefined,
     arManifestUrl: arManifestUrl.trim() || undefined,
+    arBraceletRadial: arBraceletRadial || undefined,
     variantId: variantId || undefined,
     shopDomain: shopDomain || undefined,
     productId: productIdBootstrap || undefined,
@@ -1241,6 +1246,9 @@ export function WidgetPage() {
     }
     if (eyewearBootstrap.arManifestUrl) {
       arExtraAttrs['data-ar-manifest-url'] = eyewearBootstrap.arManifestUrl;
+    }
+    if (eyewearBootstrap.arBraceletRadial) {
+      arExtraAttrs['data-ar-bracelet-radial'] = eyewearBootstrap.arBraceletRadial;
     }
 
     return (

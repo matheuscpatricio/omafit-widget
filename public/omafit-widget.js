@@ -2416,6 +2416,7 @@
           passAttr('arOmafitCalibration', 'data-ar-omafit-calibration');
           passAttr('arManifestJson', 'data-ar-manifest-json');
           passAttr('arManifestUrl', 'data-ar-manifest-url');
+          passAttr('arBraceletRadial', 'data-ar-bracelet-radial');
         }
       } catch (e) {
         if (OMAFIT_DEBUG) console.warn('Omafit: propagar data-ar-* para iframe falhou', e);
@@ -2493,7 +2494,9 @@
           billing_plan: shopBillingPlan,
           billingPlan: shopBillingPlan,
           stylist_mode_enabled: stylistModeEnabled,
-          stylistModeEnabled: stylistModeEnabled
+          stylistModeEnabled: stylistModeEnabled,
+          primaryColor: config.primaryColor || '#810707',
+          fontFamily: config.fontFamily || detectedFontFamily || ''
           }, OMAFIT_WIDGET_ORIGIN);
 
           // Enviar produto complementar em mensagem dedicada (com nomes que o app Netlify usa)
