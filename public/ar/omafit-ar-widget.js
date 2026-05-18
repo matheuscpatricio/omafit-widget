@@ -396,8 +396,12 @@ const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = true;
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
 const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
-/** Pulseira: evitar sumiço no dorso desativando depth-occluder dedicado. */
-const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
+/**
+ * Depth occluder cilíndrico para pulseira.
+ * Ativo para rigid slot (bangle sólido): escreve depth no cilindro do braço
+ * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
+ */
+const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -490,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v5";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v6";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -14687,13 +14691,24 @@ async function runHandArSession({
     }
     armOccluder.visible =
       accessoryType === "bracelet"
-        ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && !braceletDorsumFacingCamera
+        /**
+         * Rigid slot: occluder sempre ativo — o cilindro está centrado no braço
+         * e usa BackSide, portanto oclui o lado posterior do anel em qualquer
+         * orientação da mão. O guarda `!braceletDorsumFacingCamera` era para
+         * o modo legado (corrente) onde o occluder causava artefactos ao virar.
+         */
+        ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && (braceletIsRigidSlot || !braceletDorsumFacingCamera)
         : true;
     /** Z offset: centrar o cilindro atrás do pulso (−L/2). */
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
-    occPlane.visible = accessoryType === "bracelet" && !braceletIsRigidSlot;
+    /**
+     * occPlane: reativado para rigid slot após orientação estabilizada (v6).
+     * O plano depth-only entre pele e parte posterior do anel faz a pulseira
+     * parecer envolver o punho — sem ele a metade traseira aparece à frente da pele.
+     */
+    occPlane.visible = accessoryType === "bracelet";
     if (occPlane.visible) {
       // T/B/N: normal do plano deve apontar para DENTRO do braço.
       braceletOccWidth.copy(smX).normalize();   // T
@@ -14748,7 +14763,6 @@ async function runHandArSession({
      */
     if (
       OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
-      !braceletIsRigidSlot &&
       accessoryType === "bracelet" &&
       braceletOcclusionMaterials.length > 0
     ) {
@@ -15262,6 +15276,21 @@ async function runHandArSession({
       if (braceletAxisDebugLine) braceletAxisDebugLine.visible = accessoryType === "bracelet";
       if (braceletOccNormalDebugLine) braceletOccNormalDebugLine.visible = accessoryType === "bracelet";
       contactShadow.visible = true;
+      /**
+       * Sombra de contacto pulseira: elipse proporcional à largura do punho.
+       * Escala X ≈ largura MCP5–MCP17 em mundo × 1.15 (cobre os extremos do anel).
+       * Escala Z ≈ espessura punho×0.85 (mais curta na direção do braço).
+       * Apenas para pulseira — relógio usa escala fixa de init.
+       */
+      if (accessoryType === "bracelet") {
+        const csWristW = w5.distanceTo(w17);
+        const csThick = w0.distanceTo(w9);
+        contactShadow.scale.set(
+          THREE.MathUtils.clamp(csWristW * 1.15, 0.05, 0.16),
+          1,
+          THREE.MathUtils.clamp(csThick * 0.85, 0.035, 0.1),
+        );
+      }
     } else {
       missedFrames += 1;
       if (missedFrames > MISSED_HIDE_THRESHOLD) {
