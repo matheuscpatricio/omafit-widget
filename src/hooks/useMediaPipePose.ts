@@ -16,6 +16,172 @@ export interface BodyMeasurements {
   height: number;
   armLength: number;
   legLength: number;
+  /** Como as circunferências foram obtidas (para debug e logs no widget). */
+  measurement_method?:
+    | 'landmark_ellipse'
+    | 'silhouette_adjusted'
+    | 'anthropometric'
+    | 'anthropometric_body_type';
+}
+
+/** Inclinação da linha entre dois pontos em graus (0° = horizontal), ignorando espelhamento esquerda/direita. */
+function lineTiltDegrees(p1: PoseLandmark, p2: PoseLandmark): number {
+  const dx = Math.abs(p2.x - p1.x);
+  const dy = Math.abs(p2.y - p1.y);
+  if (dx < 1e-6 && dy < 1e-6) return 0;
+  return (Math.atan2(dy, dx) * 180) / Math.PI;
+}
+
+function normDistance(p1: PoseLandmark, p2: PoseLandmark): number {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const dz = (p2.z ?? 0) - (p1.z ?? 0);
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function ellipseCircumference(widthCm: number, depthCm: number): number {
+  const a = widthCm / 2;
+  const b = depthCm / 2;
+  return Math.PI * Math.sqrt(2 * (a * a + b * b));
+}
+
+/** Mesmos fatores do manequim em TryOnWidget (índice 0–4). */
+const BODY_TYPE_PROFILES = [
+  { chest: 1.0, waist: 1.0, hip: 1.0, shoulder: 1.0 },
+  { chest: 1.04, waist: 1.0, hip: 1.0, shoulder: 1.03 },
+  { chest: 1.05, waist: 1.04, hip: 1.02, shoulder: 1.04 },
+  { chest: 1.06, waist: 1.02, hip: 1.01, shoulder: 1.05 },
+  { chest: 1.03, waist: 1.07, hip: 1.06, shoulder: 1.02 },
+] as const;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function referenceWidthsForHeight(heightCm: number, gender: string): { shoulder: number; hip: number } {
+  if (gender === 'female') {
+    return { shoulder: heightCm * 0.24, hip: heightCm * 0.2 };
+  }
+  return { shoulder: heightCm * 0.25, hip: heightCm * 0.19 };
+}
+
+function applyBodyTypeProfile(
+  base: { chest: number; waist: number; hip: number },
+  bodyTypeIndex: number | undefined,
+  gender: string
+): { chest: number; waist: number; hip: number } {
+  const idx = clamp(Math.round(bodyTypeIndex ?? 0), 0, BODY_TYPE_PROFILES.length - 1);
+  const profile = BODY_TYPE_PROFILES[idx];
+  return {
+    chest: base.chest * profile.chest,
+    waist: base.waist * profile.waist,
+    hip: base.hip * profile.hip,
+  };
+}
+
+/** Limites amplos em torno da referência estatística — não força o valor “ideal” central. */
+function softBoundAroundReference(value: number, reference: number, spread = 0.22): number {
+  const min = reference * (1 - spread);
+  const max = reference * (1 + spread);
+  return clamp(value, min, max);
+}
+
+function estimateEllipseFromPhoto(
+  shoulderWidthCm: number,
+  hipWidthCm: number,
+  bmi: number,
+  gender: string
+): { chest: number; waist: number; hip: number } {
+  let chestDepthFactor = gender === 'female' ? 0.52 : 0.55;
+  let waistDepthFactor = gender === 'female' ? 0.42 : 0.45;
+  let hipDepthFactor = gender === 'female' ? 0.62 : 0.58;
+  if (bmi > 27) {
+    chestDepthFactor += 0.08;
+    waistDepthFactor += 0.1;
+    hipDepthFactor += 0.08;
+  } else if (bmi < 20) {
+    chestDepthFactor -= 0.05;
+    waistDepthFactor -= 0.05;
+    hipDepthFactor -= 0.05;
+  }
+
+  const chestWidth = shoulderWidthCm * 0.95;
+  const waistWidth = shoulderWidthCm * 0.78;
+  return {
+    chest: ellipseCircumference(chestWidth, chestWidth * chestDepthFactor),
+    waist: ellipseCircumference(waistWidth, waistWidth * waistDepthFactor),
+    hip: ellipseCircumference(hipWidthCm, hipWidthCm * hipDepthFactor),
+  };
+}
+
+/** Ajusta a referência altura/peso pelas proporções largura ombro/quadril vistas na foto. */
+function adjustBySilhouetteRatios(
+  base: { chest: number; waist: number; hip: number },
+  shoulderWidthCm: number,
+  hipWidthCm: number,
+  heightCm: number,
+  gender: string
+): { chest: number; waist: number; hip: number } {
+  const ref = referenceWidthsForHeight(heightCm, gender);
+  const shoulderRatio = clamp(shoulderWidthCm / ref.shoulder, 0.82, 1.22);
+  const hipRatio = clamp(hipWidthCm / ref.hip, 0.82, 1.22);
+  const torsoRatio = shoulderRatio * 0.55 + hipRatio * 0.45;
+
+  return {
+    chest: base.chest * shoulderRatio,
+    waist: base.waist * torsoRatio,
+    hip: base.hip * hipRatio,
+  };
+}
+
+function enforceAnatomy(
+  chest: number,
+  waist: number,
+  hip: number,
+  gender: string,
+  bmi: number
+): { chest: number; waist: number; hip: number } {
+  let c = chest;
+  let w = waist;
+  let h = hip;
+  if (h < w) {
+    h = w + 5;
+  }
+  if (gender === 'female' && h < w * 1.08) {
+    h = w * 1.08;
+  }
+  if (c / h > 1.25 && bmi < 30) {
+    c = h * 1.1;
+  }
+  if (w > c && bmi < 32) {
+    w = c * 0.88;
+  }
+  return { chest: c, waist: w, hip: h };
+}
+
+function estimateAnthropometricCircumferences(
+  referenceHeightCm: number,
+  weightKg: number,
+  gender: string
+): { chest: number; waist: number; hip: number; bmi: number } {
+  const heightM = referenceHeightCm / 100;
+  const bmi = weightKg / (heightM * heightM);
+  const bmiAdjustmentFactor = bmi - (gender === 'male' ? 22 : 21);
+
+  if (gender === 'male') {
+    return {
+      bmi,
+      chest: referenceHeightCm * 0.53 + bmiAdjustmentFactor * 2.0,
+      waist: referenceHeightCm * 0.46 + bmiAdjustmentFactor * 2.2,
+      hip: referenceHeightCm * 0.54 + bmiAdjustmentFactor * 1.8,
+    };
+  }
+  return {
+    bmi,
+    chest: referenceHeightCm * 0.52 + bmiAdjustmentFactor * 1.8,
+    waist: referenceHeightCm * 0.42 + bmiAdjustmentFactor * 1.5,
+    hip: referenceHeightCm * 0.56 + bmiAdjustmentFactor * 2.0,
+  };
 }
 
 export interface UseMediaPipePoseOptions {
@@ -357,7 +523,8 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
     imageHeight: number,
     userHeight?: number,
     userWeight?: number,
-    userGender?: string
+    userGender?: string,
+    bodyTypeIndex?: number
   ): BodyMeasurements => {
     const startTime = performance.now();
     console.log('📏 Calculando medidas corporais a partir dos landmarks...');
@@ -380,30 +547,29 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
     const rightKnee = landmarks[26];
     const leftAnkle = landmarks[27];
     const rightAnkle = landmarks[28];
+    const leftFoot = landmarks[31];
+    const rightFoot = landmarks[32];
 
     // 🔹 1. TOPO REAL DA CABEÇA (não apenas nariz)
     const headLandmarks = [nose, leftEye, rightEye, leftEar, rightEar];
-    const headY = Math.min(...headLandmarks.map(l => l.y));
-    const footY = Math.max(leftAnkle.y, rightAnkle.y);
+    const headY = Math.min(...headLandmarks.map((l) => l.y));
+    const footY = Math.max(
+      leftAnkle?.y ?? 0,
+      rightAnkle?.y ?? 0,
+      leftFoot?.y ?? 0,
+      rightFoot?.y ?? 0
+    );
 
     console.log('   • Topo cabeça Y:', headY.toFixed(3));
     console.log('   • Base pés Y:', footY.toFixed(3));
 
-    // 🔹 2. DETECTAR INCLINAÇÃO CORPORAL
-    const shoulderAngle = Math.atan2(
-      rightShoulder.y - leftShoulder.y,
-      rightShoulder.x - leftShoulder.x
-    ) * (180 / Math.PI);
+    // 🔹 2. DETECTAR INCLINAÇÃO CORPORAL (ângulo agudo vs horizontal — evita falso 180° em foto frontal)
+    const shoulderTilt = lineTiltDegrees(leftShoulder, rightShoulder);
+    const hipTilt = lineTiltDegrees(leftHip, rightHip);
+    const avgTilt = (shoulderTilt + hipTilt) / 2;
 
-    const hipAngle = Math.atan2(
-      rightHip.y - leftHip.y,
-      rightHip.x - leftHip.x
-    ) * (180 / Math.PI);
-
-    const avgTilt = (Math.abs(shoulderAngle) + Math.abs(hipAngle)) / 2;
-
-    console.log('   • Inclinação ombros:', shoulderAngle.toFixed(1), '°');
-    console.log('   • Inclinação quadril:', hipAngle.toFixed(1), '°');
+    console.log('   • Inclinação ombros:', shoulderTilt.toFixed(1), '°');
+    console.log('   • Inclinação quadril:', hipTilt.toFixed(1), '°');
     console.log('   • Inclinação média:', avgTilt.toFixed(1), '°');
 
     // Penalizar confiança se inclinação > 10°
@@ -447,27 +613,26 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
       posturePenalty = 0.85;
     }
 
-    const distance = (p1: PoseLandmark, p2: PoseLandmark): number => {
+    const referenceHeightCm = userHeight || 170;
+    const weightKg = userWeight || 70;
+    const gender = userGender || 'male';
+
+    // Calibração em espaço normalizado (0–1), como no backend try-on — mais estável que só eixo Y
+    const bodyHeightNorm = Math.max(Math.abs(footY - headY), 0.12);
+    const cmPerNormUnit = referenceHeightCm / bodyHeightNorm;
+
+    const normToCm = (normSpan: number): number => normSpan * cmPerNormUnit;
+
+    const shoulderWidthNorm = normDistance(leftShoulder, rightShoulder);
+    const hipWidthNorm = normDistance(leftHip, rightHip);
+    const shoulderWidthCm = normToCm(shoulderWidthNorm);
+    const hipWidthCm = normToCm(hipWidthNorm);
+
+    const distancePx = (p1: PoseLandmark, p2: PoseLandmark): number => {
       const dx = (p2.x - p1.x) * imageWidth;
       const dy = (p2.y - p1.y) * imageHeight;
       return Math.sqrt(dx * dx + dy * dy);
     };
-
-    // Calcular altura corporal corrigida
-    const bodyHeightPx = Math.abs(footY - headY) * imageHeight;
-    const referenceHeightCm = userHeight || 170;
-    const pixelToCmRatio = referenceHeightCm / bodyHeightPx;
-
-    const pixelToCm = (pixels: number): number => {
-      return pixels * pixelToCmRatio;
-    };
-
-    // Calcular larguras
-    const shoulderWidthPx = distance(leftShoulder, rightShoulder);
-    const hipWidthPx = distance(leftHip, rightHip);
-
-    const shoulderWidthCm = pixelToCm(shoulderWidthPx);
-    const hipWidthCm = pixelToCm(hipWidthPx);
 
     // 🔹 5. VALIDAR DISTORÇÃO DE PERSPECTIVA
     const shoulderToHeightRatio = shoulderWidthCm / referenceHeightCm;
@@ -481,234 +646,121 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
     }
 
     // 🔹 6. VALIDAÇÃO ANTROPOMÉTRICA
-    const isPlausible =
-      shoulderWidthCm >= 30 && shoulderWidthCm <= 70 &&
-      hipWidthCm >= 25 && hipWidthCm <= 60;
+    const shoulderPlausible = shoulderWidthCm >= 30 && shoulderWidthCm <= 70;
+    const hipPlausible = hipWidthCm >= 25 && hipWidthCm <= 60;
+    const widthsPlausible = shoulderPlausible && hipPlausible;
 
-    if (!isPlausible) {
-      console.error('   ❌ MEDIDAS FORA DA FAIXA HUMANA PLAUSÍVEL');
-      console.error('   • Ombros:', shoulderWidthCm, 'cm (esperado: 30-70cm)');
-      console.error('   • Quadril:', hipWidthCm, 'cm (esperado: 25-60cm)');
+    if (!widthsPlausible) {
+      console.warn('   ⚠️ Larguras 2D fora da faixa típica (foto parcial ou perspectiva)');
+      console.warn('   • Ombros:', shoulderWidthCm.toFixed(1), 'cm (típico: 30–70)');
+      console.warn('   • Quadril:', hipWidthCm.toFixed(1), 'cm (típico: 25–60)');
     }
 
-    // 🔹 7. CALCULAR IMC E PERFIL
-    const heightM = referenceHeightCm / 100;
-    const weightKg = userWeight || 70;
-    const bmi = weightKg / (heightM * heightM);
-    const gender = userGender || 'male';
+    const anthropometricRaw = estimateAnthropometricCircumferences(
+      referenceHeightCm,
+      weightKg,
+      gender
+    );
+    const bmi = anthropometricRaw.bmi;
+    const statisticalRef = applyBodyTypeProfile(anthropometricRaw, bodyTypeIndex, gender);
 
     console.log('   • IMC calculado:', bmi.toFixed(1));
     console.log('   • Gênero:', gender);
+    console.log('   • Largura ombros (2D na foto):', shoulderWidthCm.toFixed(1), 'cm');
+    console.log('   • Largura quadril (2D na foto):', hipWidthCm.toFixed(1), 'cm');
+    console.log(
+      '   • Referência estatística (altura/peso + perfil corporal):',
+      `peito ${statisticalRef.chest.toFixed(1)} · cintura ${statisticalRef.waist.toFixed(1)} · quadril ${statisticalRef.hip.toFixed(1)} cm`
+    );
 
-    // 🔹 8. IMC calculado (usado nas fórmulas antropométricas)
+    const poseOk =
+      avgTilt <= 15 && perspectivePenalty >= 0.8 && symmetryPenalty >= 0.85;
 
-    // 🔹 9. USAR DADOS ANTROPOMÉTRICOS DIRETAMENTE
-    // IMPORTANTE: Não tentar derivar circunferências da largura 2D detectada
-    // Isso causa erros enormes. Usar altura/peso/gênero diretamente é mais confiável.
-
-    console.log('\n━━━━ 🔹 ESTIMATIVA INICIAL (ANTROPOMÉTRICA) ━━━━');
-    console.log('   • Largura ombros detectada (2D):', shoulderWidthCm.toFixed(1), 'cm');
-    console.log('   • Largura quadril detectada (2D):', hipWidthCm.toFixed(1), 'cm');
-    console.log('   ⚠️ Estas medidas 2D NÃO serão usadas para calcular circunferências');
-    console.log('   ✓ Usando fórmulas antropométricas baseadas em altura/peso/gênero');
-
-    // Estimar circunferências usando fórmulas antropométricas baseadas em IMC
-    // Método científico que gera medidas realistas para diferentes tipos corporais
     let chestCircumference: number;
     let waistCircumference: number;
     let hipCircumference: number;
+    let measurementMethod: BodyMeasurements['measurement_method'] = 'anthropometric_body_type';
 
-    // Fórmulas baseadas em proporções corporais validadas cientificamente
-    // Usam altura como base e IMC para ajuste de volume corporal
-    const bmiAdjustmentFactor = bmi - (gender === 'male' ? 22 : 21);
+    if (widthsPlausible && poseOk) {
+      const fromPhoto = estimateEllipseFromPhoto(shoulderWidthCm, hipWidthCm, bmi, gender);
+      chestCircumference = fromPhoto.chest;
+      waistCircumference = fromPhoto.waist;
+      hipCircumference = fromPhoto.hip;
+      measurementMethod = 'landmark_ellipse';
 
-    if (gender === 'male') {
-      // 🚹 FÓRMULAS PARA HOMENS (validadas com dados reais)
-      // Peito: 53% da altura + ajuste por IMC
-      // Validação: 170cm/70kg≈95cm | 177cm/78kg≈100cm | 183cm/85kg≈104cm ✅
-      chestCircumference = (referenceHeightCm * 0.53) + (bmiAdjustmentFactor * 2.0);
+      console.log('\n━━━━ 🔹 MEDIDAS DA SILHUETA NA FOTO (elipse 2D) ━━━━');
+      console.log('   • Peito:', chestCircumference.toFixed(1), 'cm');
+      console.log('   • Cintura:', waistCircumference.toFixed(1), 'cm');
+      console.log('   • Quadril:', hipCircumference.toFixed(1), 'cm');
+      const ref = referenceWidthsForHeight(referenceHeightCm, gender);
+      console.log(
+        '   • vs referência estatística:',
+        `Δ peito ${(chestCircumference - statisticalRef.chest).toFixed(1)} cm ·`,
+        `Δ cintura ${(waistCircumference - statisticalRef.waist).toFixed(1)} cm ·`,
+        `Δ quadril ${(hipCircumference - statisticalRef.hip).toFixed(1)} cm`
+      );
+      console.log(
+        '   • Proporção ombro/ref:',
+        (shoulderWidthCm / ref.shoulder).toFixed(2),
+        '· quadril/ref:',
+        (hipWidthCm / ref.hip).toFixed(2)
+      );
+    } else if (shoulderPlausible || hipPlausible) {
+      const adjusted = adjustBySilhouetteRatios(
+        statisticalRef,
+        shoulderPlausible ? shoulderWidthCm : referenceWidthsForHeight(referenceHeightCm, gender).shoulder,
+        hipPlausible ? hipWidthCm : referenceWidthsForHeight(referenceHeightCm, gender).hip,
+        referenceHeightCm,
+        gender
+      );
+      chestCircumference = adjusted.chest;
+      waistCircumference = adjusted.waist;
+      hipCircumference = adjusted.hip;
+      measurementMethod = 'silhouette_adjusted';
 
-      // Cintura: 46% da altura + ajuste por IMC (maior sensibilidade ao peso)
-      // Validação: 170cm/70kg≈83cm | 177cm/78kg≈88cm | 183cm/85kg≈92cm ✅
-      waistCircumference = (referenceHeightCm * 0.46) + (bmiAdjustmentFactor * 2.2);
-
-      // Quadril: 54% da altura + ajuste por IMC
-      // Validação: 170cm/70kg≈96cm | 177cm/78kg≈101cm | 183cm/85kg≈105cm ✅
-      hipCircumference = (referenceHeightCm * 0.54) + (bmiAdjustmentFactor * 1.8);
+      console.log('\n━━━━ 🔹 AJUSTE PELA SILHUETA (proporções da foto) ━━━━');
+      console.log('   • Peito:', chestCircumference.toFixed(1), 'cm');
+      console.log('   • Cintura:', waistCircumference.toFixed(1), 'cm');
+      console.log('   • Quadril:', hipCircumference.toFixed(1), 'cm');
     } else {
-      // 🚺 FÓRMULAS PARA MULHERES (proporções femininas validadas)
-      // Peito: 52% da altura + ajuste por IMC (menor que homens)
-      // Validação: 160cm/60kg≈88cm | 165cm/65kg≈91cm | 170cm/70kg≈95cm ✅
-      chestCircumference = (referenceHeightCm * 0.52) + (bmiAdjustmentFactor * 1.8);
+      chestCircumference = statisticalRef.chest;
+      waistCircumference = statisticalRef.waist;
+      hipCircumference = statisticalRef.hip;
+      measurementMethod =
+        bodyTypeIndex != null && bodyTypeIndex > 0 ? 'anthropometric_body_type' : 'anthropometric';
 
-      // Cintura: 42% da altura + ajuste por IMC (cintura mais marcada)
-      // Validação: 160cm/60kg≈71cm | 165cm/65kg≈74cm | 170cm/70kg≈77cm ✅
-      waistCircumference = (referenceHeightCm * 0.42) + (bmiAdjustmentFactor * 1.5);
-
-      // Quadril: 56% da altura + ajuste por IMC (quadril acentuado)
-      // Validação: 160cm/60kg≈94cm | 165cm/65kg≈98cm | 170cm/70kg≈102cm ✅
-      hipCircumference = (referenceHeightCm * 0.56) + (bmiAdjustmentFactor * 2.0);
+      console.log('\n━━━━ 🔹 SÓ REFERÊNCIA ALTURA/PESO (sem silhueta confiável na foto) ━━━━');
+      console.log('   • Peito:', chestCircumference.toFixed(1), 'cm');
+      console.log('   • Cintura:', waistCircumference.toFixed(1), 'cm');
+      console.log('   • Quadril:', hipCircumference.toFixed(1), 'cm');
     }
 
-    console.log('   • Circunferência peito (antropométrica):', chestCircumference.toFixed(1), 'cm');
-    console.log('   • Circunferência cintura (antropométrica):', waistCircumference.toFixed(1), 'cm');
-    console.log('   • Circunferência quadril (antropométrica):', hipCircumference.toFixed(1), 'cm');
+    chestCircumference = softBoundAroundReference(chestCircumference, statisticalRef.chest, 0.24);
+    waistCircumference = softBoundAroundReference(waistCircumference, statisticalRef.waist, 0.26);
+    hipCircumference = softBoundAroundReference(hipCircumference, statisticalRef.hip, 0.24);
 
-    // 🔹 9.5. VALIDAÇÃO ANTROPOMÉTRICA BASEADA EM ALTURA E PESO
-    console.log('\n━━━━ 🔹 VALIDAÇÃO ANTROPOMÉTRICA ━━━━');
+    const anatomical = enforceAnatomy(
+      chestCircumference,
+      waistCircumference,
+      hipCircumference,
+      gender,
+      bmi
+    );
+    chestCircumference = anatomical.chest;
+    waistCircumference = anatomical.waist;
+    hipCircumference = anatomical.hip;
 
-    // Faixas realistas baseadas em altura e peso
-    // Usando dados antropométricos reais da população
-    interface MeasurementRange {
-      expected: number;
-      min: number;
-      max: number;
-    }
-
-    let chestRange: MeasurementRange;
-    let waistRange: MeasurementRange;
-    let hipRange: MeasurementRange;
-
-    const bmiAdjustmentFactorValidation = bmi - (gender === 'male' ? 22 : 21);
-
-    if (gender === 'male') {
-      // 🚹 HOMENS - Baseado em fórmulas validadas com IMC
-      // Faixas validadas com dados de 155cm-200cm e 50kg-120kg
-
-      // PEITO: 53% da altura + ajuste por IMC
-      // Validação: 170cm/70kg≈95cm | 177cm/78kg≈100cm | 183cm/85kg≈104cm
-      const baseChest = (referenceHeightCm * 0.53) + (bmiAdjustmentFactorValidation * 2.0);
-      chestRange = {
-        expected: baseChest,
-        min: baseChest - 10,  // tolerância: -10cm
-        max: baseChest + 10   // tolerância: +10cm
-      };
-
-      // CINTURA: 46% da altura + ajuste por IMC
-      // Validação: 170cm/70kg≈83cm | 177cm/78kg≈88cm | 183cm/85kg≈92cm
-      const baseWaist = (referenceHeightCm * 0.46) + (bmiAdjustmentFactorValidation * 2.2);
-      waistRange = {
-        expected: baseWaist,
-        min: baseWaist - 8,   // tolerância: -8cm
-        max: baseWaist + 12   // tolerância: +12cm (barriga pode variar mais)
-      };
-
-      // QUADRIL: 54% da altura + ajuste por IMC
-      // Validação: 170cm/70kg≈96cm | 177cm/78kg≈101cm | 183cm/85kg≈105cm
-      const baseHip = (referenceHeightCm * 0.54) + (bmiAdjustmentFactorValidation * 1.8);
-      hipRange = {
-        expected: baseHip,
-        min: baseHip - 10,    // tolerância: -10cm
-        max: baseHip + 10     // tolerância: +10cm
-      };
-
-    } else {
-      // 🚺 MULHERES - Proporções femininas validadas
-      // Faixas validadas com dados de 145cm-185cm e 45kg-100kg
-
-      // PEITO: 52% da altura + ajuste por IMC
-      // Validação: 160cm/60kg≈88cm | 165cm/65kg≈91cm | 170cm/70kg≈95cm
-      const baseChest = (referenceHeightCm * 0.52) + (bmiAdjustmentFactorValidation * 1.8);
-      chestRange = {
-        expected: baseChest,
-        min: baseChest - 10,
-        max: baseChest + 10
-      };
-
-      // CINTURA: 42% da altura + ajuste por IMC
-      // Validação: 160cm/60kg≈71cm | 165cm/65kg≈74cm | 170cm/70kg≈77cm
-      const baseWaist = (referenceHeightCm * 0.42) + (bmiAdjustmentFactorValidation * 1.5);
-      waistRange = {
-        expected: baseWaist,
-        min: baseWaist - 8,
-        max: baseWaist + 12
-      };
-
-      // QUADRIL: 56% da altura + ajuste por IMC
-      // Validação: 160cm/60kg≈94cm | 165cm/65kg≈98cm | 170cm/70kg≈102cm
-      const baseHip = (referenceHeightCm * 0.56) + (bmiAdjustmentFactorValidation * 2.0);
-      hipRange = {
-        expected: baseHip,
-        min: baseHip - 10,
-        max: baseHip + 10
-      };
-    }
-
-    console.log('   • Faixas realistas para', gender === 'male' ? 'HOMEM' : 'MULHER', '-', referenceHeightCm, 'cm /', weightKg, 'kg:');
-    console.log(`     - Peito: ${chestRange.min.toFixed(0)}-${chestRange.max.toFixed(0)}cm (ideal: ${chestRange.expected.toFixed(0)}cm)`);
-    console.log(`     - Cintura: ${waistRange.min.toFixed(0)}-${waistRange.max.toFixed(0)}cm (ideal: ${waistRange.expected.toFixed(0)}cm)`);
-    console.log(`     - Quadril: ${hipRange.min.toFixed(0)}-${hipRange.max.toFixed(0)}cm (ideal: ${hipRange.expected.toFixed(0)}cm)`);
-
-    console.log('   • Medidas detectadas pelo MediaPipe:');
-    console.log('     - Peito detectado:', chestCircumference.toFixed(1), 'cm');
-    console.log('     - Cintura detectada:', waistCircumference.toFixed(1), 'cm');
-    console.log('     - Quadril detectado:', hipCircumference.toFixed(1), 'cm');
-
-    // Função para ajustar medidas fora da faixa - SEMPRE traz de volta para dentro da faixa
-    const clampToRange = (measured: number, range: MeasurementRange, label: string): number => {
-      // Se está fora da faixa, força para o valor esperado
-      if (measured < range.min) {
-        console.warn(`   ⚠️ ${label} ABAIXO do mínimo:`, measured.toFixed(1), 'cm');
-        console.warn(`      Faixa permitida: ${range.min.toFixed(1)} - ${range.max.toFixed(1)} cm`);
-        console.warn(`      ✅ Ajustando para o valor esperado: ${range.expected.toFixed(1)} cm`);
-        return range.expected;
-      }
-
-      if (measured > range.max) {
-        console.warn(`   ⚠️ ${label} ACIMA do máximo:`, measured.toFixed(1), 'cm');
-        console.warn(`      Faixa permitida: ${range.min.toFixed(1)} - ${range.max.toFixed(1)} cm`);
-        console.warn(`      ✅ Ajustando para o valor esperado: ${range.expected.toFixed(1)} cm`);
-        return range.expected;
-      }
-
-      console.log(`   ✓ ${label} dentro da faixa normal (${measured.toFixed(1)} cm)`);
-      return measured;
-    };
-
-    chestCircumference = clampToRange(chestCircumference, chestRange, 'Peito');
-    waistCircumference = clampToRange(waistCircumference, waistRange, 'Cintura');
-    hipCircumference = clampToRange(hipCircumference, hipRange, 'Quadril');
-
-    // 🔹 9.6. GARANTIR RELAÇÕES ANATÔMICAS CORRETAS
-    console.log('\n━━━━ 🔹 VALIDAÇÃO DE PROPORÇÕES ANATÔMICAS ━━━━');
-
-    // Regra 1: Quadril nunca pode ser menor que cintura
-    if (hipCircumference < waistCircumference) {
-      console.warn('   ⚠️ ERRO: Quadril menor que cintura detectado!');
-      console.warn(`      Cintura: ${waistCircumference.toFixed(1)} cm, Quadril: ${hipCircumference.toFixed(1)} cm`);
-
-      // Corrigir: quadril deve ser no mínimo 5cm maior que cintura
-      hipCircumference = waistCircumference + 5;
-      console.warn(`      Quadril ajustado para: ${hipCircumference.toFixed(1)} cm`);
-    }
-
-    // Regra 2: Para mulheres, quadril deve ser significativamente maior que cintura
-    if (gender === 'female' && hipCircumference < waistCircumference * 1.08) {
-      const minHip = waistCircumference * 1.08;
-      console.warn('   ⚠️ Quadril feminino proporcionalmente pequeno');
-      console.warn(`      Ajustando de ${hipCircumference.toFixed(1)} para ${minHip.toFixed(1)} cm`);
-      hipCircumference = minHip;
-    }
-
-    // Regra 3: Peito não pode ser excessivamente maior que quadril (exceto obesidade)
-    const chestHipRatio = chestCircumference / hipCircumference;
-    if (chestHipRatio > 1.25 && bmi < 30) {
-      console.warn('   ⚠️ Proporção peito/quadril anormal:', chestHipRatio.toFixed(2));
-      chestCircumference = hipCircumference * 1.10;
-      console.warn(`      Peito ajustado para: ${chestCircumference.toFixed(1)} cm`);
-    }
-
-    // Regra 4: Cintura não pode ser maior que peito (exceto obesidade abdominal extrema)
-    if (waistCircumference > chestCircumference && bmi < 32) {
-      console.warn('   ⚠️ Cintura maior que peito detectada');
-      waistCircumference = chestCircumference * 0.88;
-      console.warn(`      Cintura ajustada para: ${waistCircumference.toFixed(1)} cm`);
-    }
-
-    console.log('   ✅ Medidas finais após validação:');
-    console.log('     - Peito:', chestCircumference.toFixed(1), 'cm');
-    console.log('     - Cintura:', waistCircumference.toFixed(1), 'cm');
-    console.log('     - Quadril:', hipCircumference.toFixed(1), 'cm');
+    console.log('\n━━━━ 🔹 RESULTADO FINAL (vai para o provador) ━━━━');
+    console.log(`   • Método: ${measurementMethod}`);
+    console.log('   • Peito:', chestCircumference.toFixed(1), 'cm');
+    console.log('   • Cintura:', waistCircumference.toFixed(1), 'cm');
+    console.log('   • Quadril:', hipCircumference.toFixed(1), 'cm');
+    console.log(
+      '   • Diferença vs “ideal” 182cm/81kg:',
+      `peito ${(chestCircumference - statisticalRef.chest).toFixed(1)} ·`,
+      `cintura ${(waistCircumference - statisticalRef.waist).toFixed(1)} ·`,
+      `quadril ${(hipCircumference - statisticalRef.hip).toFixed(1)} cm`
+    );
 
     // 🔹 10. PROPORÇÕES BRAÇO/PERNA POR GÊNERO E IMC
     let armRatio = 0.38;
@@ -728,39 +780,61 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
       legRatio *= 1.02;
     }
 
-    const armLengthPx = (distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist) +
-                         distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)) / 2;
-    const legLengthPx = (distance(leftHip, leftKnee) + distance(leftKnee, leftAnkle) +
-                         distance(rightHip, rightKnee) + distance(rightKnee, rightAnkle)) / 2;
+    const armLengthFromPhoto = normToCm(
+      (normDistance(leftShoulder, leftElbow) +
+        normDistance(leftElbow, leftWrist) +
+        normDistance(rightShoulder, rightElbow) +
+        normDistance(rightElbow, rightWrist)) /
+        2
+    );
+    const legLengthFromPhoto = normToCm(
+      (normDistance(leftHip, leftKnee) +
+        normDistance(leftKnee, leftAnkle) +
+        normDistance(rightHip, rightKnee) +
+        normDistance(rightKnee, rightAnkle)) /
+        2
+    );
 
-    const armLength = Math.round(referenceHeightCm * armRatio);
-    const legLength = Math.round(referenceHeightCm * legRatio);
+    const armLength = Math.round(
+      widthsPlausible && poseOk
+        ? armLengthFromPhoto * 0.6 + referenceHeightCm * armRatio * 0.4
+        : referenceHeightCm * armRatio
+    );
+    const legLength = Math.round(
+      widthsPlausible && poseOk
+        ? legLengthFromPhoto * 0.65 + referenceHeightCm * legRatio * 0.35
+        : referenceHeightCm * legRatio
+    );
 
     // 🔹 11. CONFIANÇA GLOBAL
-    // Como estamos usando estimativas antropométricas (não derivando de pixels),
-    // a confiança é moderada mas consistente
-    const anthropometricMethodConfidence = 0.65; // Método indireto, mas confiável
+    const methodConfidence =
+      measurementMethod === 'landmark_ellipse'
+        ? 0.82
+        : measurementMethod === 'silhouette_adjusted'
+          ? 0.74
+          : 0.62;
 
     const globalConfidence = Math.min(
       tiltPenalty,
       symmetryPenalty,
       posturePenalty,
       perspectivePenalty,
-      isPlausible ? 1.0 : 0.3,
-      anthropometricMethodConfidence
+      widthsPlausible ? 1.0 : 0.4,
+      methodConfidence
     );
 
-    const measurements = {
+    const measurements: BodyMeasurements = {
       shoulder_width: Math.round(shoulderWidthCm),
       chest: Math.round(chestCircumference),
       waist: Math.round(waistCircumference),
       hip: Math.round(hipCircumference),
       height: Math.round(referenceHeightCm),
       armLength,
-      legLength
+      legLength,
+      measurement_method: measurementMethod,
     };
 
-    console.log('✅ Medidas calculadas (PREMIUM):');
+    console.log(`✅ Medidas calculadas (método: ${measurementMethod}):`);
     console.log('   • Largura ombros:', measurements.shoulder_width, 'cm');
     console.log('   • Circunf. peito:', measurements.chest, 'cm (elíptica)');
     console.log('   • Circunf. cintura:', measurements.waist, 'cm (elíptica)');
@@ -774,7 +848,7 @@ export function useMediaPipePose(options?: UseMediaPipePoseOptions) {
     console.log('     - Simetria:', (symmetryPenalty * 100).toFixed(0), '%');
     console.log('     - Postura:', (posturePenalty * 100).toFixed(0), '%');
     console.log('     - Perspectiva:', (perspectivePenalty * 100).toFixed(0), '%');
-    console.log('     - Plausibilidade:', isPlausible ? '100%' : '30%');
+    console.log('     - Plausibilidade larguras 2D:', widthsPlausible ? '100%' : '40%');
 
     const endTime = performance.now();
     console.log(`⏱️ Tempo de cálculo: ${(endTime - startTime).toFixed(2)}ms`);

@@ -1163,7 +1163,8 @@ export function TryOnWidget({
             imgElement.height,
             sizeData?.height,
             sizeData?.weight,
-            sizeData?.gender
+            sizeData?.gender,
+            sizeData?.bodyTypeIndex
           );
 
           return {
@@ -2578,8 +2579,12 @@ export function TryOnWidget({
     let bodyChest, bodyWaist, bodyHip, bodyShoulder, bodyLengthReference;
 
     if (hasRealMeasurements) {
-      console.log('\n✅ MODO: Medidas reais do MediaPipe');
-      console.log('📸 Medidas brutas (MediaPipe):');
+      const mpMethod = (measurements as { measurement_method?: string })?.measurement_method;
+      console.log('\n✅ MODO: Medidas do MediaPipe (pré-processamento)');
+      if (mpMethod) {
+        console.log('   • Método de circunferências:', mpMethod);
+      }
+      console.log('📸 Circunferências usadas no modelo corporal:');
       console.log('   Peito:', realChest.toFixed(1), 'cm');
       console.log('   Cintura:', realWaist.toFixed(1), 'cm');
       console.log('   Quadril:', realHip.toFixed(1), 'cm');
@@ -3816,6 +3821,7 @@ const handleSubmit = async (
             0
           ) || undefined,
           legLength: Number(detectedMeasurements.legLength ?? 0) || undefined,
+          measurement_method: detectedMeasurements.measurement_method,
         }
       : ((sizeData as any) || {});
 
@@ -3824,6 +3830,7 @@ const handleSubmit = async (
         chest: measurementsForProvisionalCalc.chest,
         waist: measurementsForProvisionalCalc.waist,
         hip: measurementsForProvisionalCalc.hip,
+        method: detectedMeasurements.measurement_method || 'desconhecido',
       });
     }
 
