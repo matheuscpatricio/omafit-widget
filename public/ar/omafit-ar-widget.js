@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v9";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v10";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12706,6 +12706,14 @@ async function runHandArSession({
    */
   function omafitNormalizeBraceletTripoGlbScale(THREE, glbScene, glbRoot) {
     if (!glbScene || !THREE) return;
+    /**
+     * Sempre resetar a escala antes de medir — ignora escala baked no ficheiro
+     * e escala residual de uma variante anterior. Depois normalizar SEMPRE para
+     * OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M (~65 mm), seja o GLB grande ou
+     * pequeno. Garante que todas as variantes partem da mesma base de referência
+     * antes do fitWristGlb, tornando o comportamento idêntico à primeira carga.
+     */
+    glbScene.scale.set(1, 1, 1);
     glbScene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(glbScene);
     const size = new THREE.Vector3();
@@ -12715,15 +12723,10 @@ async function runHandArSession({
     const normalizationScale = THREE.MathUtils.clamp(
       OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M / maxDim,
       0.01,
-      1,
+      10,
     );
-    const isGiant = maxDim > 0.25 || estimatedRadius > 0.12;
-    const needsNormalize =
-      isGiant || maxDim > OMAFIT_BRACELET_TRIPO_TARGET_DIAMETER_M;
-    if (needsNormalize && normalizationScale < 1 - 1e-9) {
-      glbScene.scale.multiplyScalar(normalizationScale);
-      glbScene.updateMatrixWorld(true);
-    }
+    glbScene.scale.setScalar(normalizationScale);
+    glbScene.updateMatrixWorld(true);
     try {
       const gr = glbRoot && glbRoot.scale ? glbRoot.scale.x : 1;
       console.log("[bracelet-normalization]", {
@@ -12732,8 +12735,6 @@ async function runHandArSession({
         finalScale: glbScene.scale.x,
         glbRootScale: gr,
         estimatedRadius,
-        isGiant,
-        needsNormalize,
       });
     } catch {
       /* ignore */
@@ -15480,26 +15481,29 @@ async function runHandArSession({
   const prevSwitch = window.__omafitArSwitchGlb || null;
   window.__omafitArSwitchGlb = async (nextUrl, cal) => {
     try {
+      /**
+       * Repor sempre a posição base antes de aplicar cal — evita herdar
+       * wearPosition da variante anterior quando a nova não tem calibração.
+       * O bloco cal.scale × baseScale_antigo foi removido: a escala correcta
+       * é calculada pelo fitWristGlb depois de carregar o novo GLB (idêntico
+       * à primeira carga).
+       */
+      applyCalibRot();
+      wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
       if (cal && typeof cal === "object") {
-        applyCalibRot();
         if (Number.isFinite(Number(cal.wearX))) wearPosition.position.x = Number(cal.wearX);
         if (Number.isFinite(Number(cal.wearY))) wearPosition.position.y = Number(cal.wearY);
         if (Number.isFinite(Number(cal.wearZ))) wearPosition.position.z = Number(cal.wearZ);
-        if (Number.isFinite(Number(cal.scale)) && Number(cal.scale) > 0) {
-          const cu = baseScale * Number(cal.scale);
-          const Wcal =
-            (OMAFIT_BRACELET_EXPAND_THIN + OMAFIT_BRACELET_EXPAND_WIDE) / 2;
-          if (accessoryType === "bracelet") {
-            glbRoot.scale.set(
-              cu * Wcal * OMAFIT_BRACELET_ELLIPSE_X,
-              cu * Wcal * OMAFIT_BRACELET_ELLIPSE_DEPTH,
-              cu,
-            );
-          } else {
-            glbRoot.scale.setScalar(cu * Wcal);
-          }
-        }
       }
+      /**
+       * Reset do estado de suavização: evita que a nova variante comece com
+       * deslocamento de slide/wear acumulado da variante anterior.
+       */
+      if (accessoryType === "bracelet" && braceletPlaceState) {
+        resetOmafitBraceletWristPlacementState(braceletPlaceState);
+      }
+      braceletSlideFast = 0;
+      braceletSlideLag = 0;
       if (nextUrl && typeof nextUrl === "string") {
         await new Promise((resolve) => {
           glbLoader.load(
@@ -15552,7 +15556,7 @@ async function runHandArSession({
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
               upgradeHandArGlassMaterials(THREE, next);
-              const fitRes = fitWristGlb(next, glbRoot, accessoryType, cal?.scale);
+              const fitRes = fitWristGlb(next, glbRoot, accessoryType, userScale);
               baseScale = fitRes.baseScale;
               localRingR = fitRes.localRingR;
               localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
@@ -15590,6 +15594,14 @@ async function runHandArSession({
                   braceletRingHoleTmpMat,
                   braceletProceduralRadial ? braceletRadialHoleAxisScene : null,
                 );
+                braceletOcclusionMaterials = omafitCollectUniqueMaterials(next);
+                for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
+                  const bm = braceletOcclusionMaterials[mi];
+                  if (!bm || typeof bm !== "object") continue;
+                  bm.depthWrite = true;
+                  bm.depthTest = true;
+                  bm.side = THREE.DoubleSide;
+                }
               } else if (accessoryType === "watch") {
                 if (countHandArSolidMeshes(next) === 1) {
                   watchVertexDeform = initWatchSingleMeshStrapVertexDeformation(
