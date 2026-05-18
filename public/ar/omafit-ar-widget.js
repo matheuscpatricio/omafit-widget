@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v1";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v2";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13588,7 +13588,13 @@ async function runHandArSession({
     forceHoleAxisSceneUnit,
   ) {
     glbScene.matrixAutoUpdate = true;
-    glbScene.scale.set(1, 1, 1);
+    /**
+     * NÃO resetar glbScene.scale — a escala de normalização (~0.065) deve ser
+     * mantida. `transformDirection` ignora a escala da matriz (apenas aplica
+     * rotação), portanto o resultado da detecção do eixo é idêntico com ou
+     * sem escala. Resetar para (1,1,1) e não restaurar destruía a normalização
+     * no modo rigid-slot (o GLB aparecia à escala nativa ~1 m).
+     */
     glbScene.updateMatrixWorld(true);
     calibRot.updateMatrixWorld(true);
     if (
