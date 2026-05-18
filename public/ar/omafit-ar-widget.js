@@ -490,7 +490,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v3";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v4";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13350,8 +13350,17 @@ async function runHandArSession({
      * médio do anel no plano XY (eixo Z = braço após `fit`).
      */
     if (accessoryType === "bracelet") {
-      glbScene.rotation.set(0, 0, 0);
-      glbScene.quaternion.identity();
+      /**
+       * Rigid slot: preservar a rotação aplicada pelo menor-eixo bbox
+       * (alinha o furo ao Z do espaço local → `wristAlignStep` alinha Z ao braço).
+       * Resetar quaternion aqui (comportamento legado) apagava esse alinhamento.
+       *
+       * Modo legado (chains sem rigid slot): mantém reset para compatibilidade.
+       */
+      if (!braceletIsRigidSlot) {
+        glbScene.rotation.set(0, 0, 0);
+        glbScene.quaternion.identity();
+      }
       glbScene.updateMatrixWorld(true);
       bbox.setFromObject(glbScene);
       bbox.getCenter(center);
@@ -13571,14 +13580,22 @@ async function runHandArSession({
     const thick = tmp3;
     omafitPowerMaxUnitEigen3(C, e2, ringOut);
     omafitPowerSecondUnitEigen3(C, e2, e1, ringOut);
+    /**
+     * `thick` = autovetor de MENOR variância = direção de menor extensão
+     * geométrica = eixo **normal ao plano do anel** = eixo do FURO.
+     *
+     * Anteriormente calculávamos `ringOut = cross(thick, X/Y)`, que devolvia
+     * um vetor tangente ao plano — ao tentar alinhar essa tangente com a
+     * direção do braço, o plano do anel ficava perpendicular ao pulso.
+     *
+     * Correção: retornar `thick` diretamente como eixo do furo.
+     * `wristAlignStep` vai alinhar thick com wristDir → anel envolve o pulso.
+     */
     thick.crossVectors(e2, e1);
     if (thick.lengthSq() < 1e-16) thick.set(0, 0, 1);
     else thick.normalize();
 
-    ringOut.crossVectors(thick, new THREE.Vector3(1, 0, 0));
-    if (ringOut.lengthSq() < 0.25) ringOut.crossVectors(thick, new THREE.Vector3(0, 1, 0));
-    if (ringOut.lengthSq() < 1e-16) ringOut.set(0, 0, 1);
-    else ringOut.normalize();
+    ringOut.copy(thick);
 
     return ringOut;
   }
@@ -13791,7 +13808,12 @@ async function runHandArSession({
         if (accessoryType === "bracelet") {
           upgradeHandArLuxuryJewelryMaterials(THREE, glbScene);
           braceletIsBangle = detectBraceletBangle(THREE, glbScene);
-          if (!braceletIsBangle && !braceletProceduralRadial) {
+          /**
+           * Rigid slot: sem deformações de elo — a malha é usada como objeto
+           * rígido, sem reparent de meshes nem vertex deform que alteram a
+           * geometria e quebram a orientação no slot do pulso.
+           */
+          if (!braceletIsRigidSlot && !braceletIsBangle && !braceletProceduralRadial) {
             if (countHandArSolidMeshes(glbScene) === 1) {
               braceletVertexDeform = initBraceletLinkVertexDeformation(
                 THREE,
@@ -13811,6 +13833,7 @@ async function runHandArSession({
           if (debug) {
             console.log("[omafit-ar] bracelet", {
               bangle: braceletIsBangle,
+              rigidSlot: braceletIsRigidSlot,
               linkVertex: Boolean(braceletVertexDeform),
               linkGroup: Boolean(braceletLinkRadial),
             });
@@ -14662,7 +14685,7 @@ async function runHandArSession({
     armOccluder.position.z = -smoothForearmLength / 2;
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
-    occPlane.visible = accessoryType === "bracelet";
+    occPlane.visible = accessoryType === "bracelet" && !braceletIsRigidSlot;
     if (occPlane.visible) {
       // T/B/N: normal do plano deve apontar para DENTRO do braço.
       braceletOccWidth.copy(smX).normalize();   // T
@@ -14717,6 +14740,7 @@ async function runHandArSession({
      */
     if (
       OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
+      !braceletIsRigidSlot &&
       accessoryType === "bracelet" &&
       braceletOcclusionMaterials.length > 0
     ) {
@@ -15461,7 +15485,7 @@ async function runHandArSession({
               if (accessoryType === "bracelet") {
                 upgradeHandArLuxuryJewelryMaterials(THREE, next);
                 braceletIsBangle = detectBraceletBangle(THREE, next);
-                if (!braceletIsBangle && !braceletProceduralRadial) {
+                if (!braceletIsRigidSlot && !braceletIsBangle && !braceletProceduralRadial) {
                   if (countHandArSolidMeshes(next) === 1) {
                     braceletVertexDeform = initBraceletLinkVertexDeformation(
                       THREE,
