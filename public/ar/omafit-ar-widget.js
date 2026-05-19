@@ -397,23 +397,9 @@ const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
 const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 /**
- * === DEPTH OCCLUDER CILÍNDRICO PARA PULSEIRAS ===
- *
- * Cria efeito de profundidade realista fazendo a pulseira "envolver" o pulso.
- * O occluder é um cilindro invisível (BackSide) que escreve no depth buffer
- * e esconde a parte posterior da pulseira que deveria estar "atrás" do braço.
- *
- * COMPORTAMENTO:
- *   - RIGID SLOT (modo padrão): Sempre ativo, cria ilusão perfeita de volume
- *   - Modo legado: Só ativo quando pulso não está de frente para câmera
- *
- * OTIMIZAÇÃO:
- *   - Escala elíptica adapta-se à anatomia (largura × espessura do pulso)
- *   - Raio base alinha-se ao raio interno do GLB para precisão máxima
- *   - BackSide evita artefactos de z-fighting na frente do braço
- *
- * Com `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true`, o occluder está
- * sempre ativo e otimizado para máxima previsibilidade.
+ * Depth occluder cilíndrico para pulseira.
+ * Ativo para rigid slot (bangle sólido): escreve depth no cilindro do braço
+ * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
  */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 /**
@@ -519,9 +505,9 @@ try {
 /**
  * Quando `true`, **não** cria malha facial 468 só-depth nem extensões temporais (óculos).
  * Serve para isolar problemas: óculos **dentro da cara** → provável Z; **invisível** → escala/rotação.
- * Temporariamente `true` para diagnosticar escala/posição antes de reativar.
+ * Manter `false` em produção.
  */
-const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = true;
+const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = false;
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -869,8 +855,8 @@ const OMAFIT_GLASSES_SCALE_IPD_MUL = 1.5;
 /** IPD em **espaço mundo da face**: `distanceTo` após `applyMatrix4(face.matrixWorld)` × este factor no mesh. */
 const OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL = 2;
 /** Clamp absoluto na escala uniforme do mesh (óculos após IPD×factor). */
-const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.04;
-const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 2.5;
+const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.03;
+const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 22;
 /**
  * Avanço +Z local (m) no espaço do rosto: `Vector3(0,0,m).applyQuaternion(model.quaternion)` + `position.add`.
  * Aplicado após `glasses.position` / `glasses.quaternion` vindos da faceMatrix.
@@ -8743,14 +8729,6 @@ async function runArSession({
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
-    /**
-     * Largura intrínseca do frame dos óculos (eixo X após bake/bind).
-     * Usada para normalizar a escala IPD-based, prevenindo óculos gigantes.
-     */
-    let glassesFrameWidthLocal = 1.0;
-    if (accessoryType === "glasses") {
-      glassesFrameWidthLocal = Math.max(sz.x, 0.001);
-    }
     if (!glassesCanonicalBlenderExport) {
       const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
       if (frontCenter) glasses.position.sub(frontCenter);
@@ -8965,10 +8943,10 @@ async function runArSession({
      * somado a `wearPosition` cada frame (translação; não usar só quaternion para lateral).
      * Opt-out: `data-ar-glasses-eye-midpoint-align="0"`. Inactivo: manual MindAR, estrutural,
      * geometria, `data-ar-glasses-cheek-orthogonal-basis="1"`.
-     * ALTERADO: removido `!glassesSimpleFaceOnly` para habilitar alinhamento preciso ao ponto médio dos olhos.
      */
     const glassesEyeMidpointAlign =
       accessoryType === "glasses" &&
+      !glassesSimpleFaceOnly &&
       !glassesManualMindarRig &&
       !glassesStructuralMindarRig &&
       !glassesGeometryAnchor &&
@@ -9374,9 +9352,8 @@ async function runArSession({
      *     se reduz a wearX/Y/Z em unidades de âncora (previsíveis).
      */
     /**
-     * `calibRot`: grupo para rotação de calibração do lojista (rx/ry/rz).
-     * Para face path (óculos), aplica a calibração quando disponível.
-     * Para hand path (pulseiras/relógios), aplicado em `_initialHandCal` e `__omafitArSwitchGlb`.
+     * `calibRot`: sempre identidade — rotação mundo (rx/ry/rz do metafield / canonical-fix)
+     * foi removida para não acumular com pose MindAR ou malha facial.
      *
      * `wearPosM`: `wearPosition.position.set`; óculos manual MindAR forçado a wear 0 nos attrs.
      * Óculos automáticos: escala interpupilar no mesh por frame.
@@ -9389,13 +9366,6 @@ async function runArSession({
     calibRot.quaternion.identity();
     calibRot.updateMatrix();
     calibRot.updateMatrixWorld(true);
-    
-    /** Aplicar calibração do lojista para face path (óculos) se disponível */
-    if (accessoryType === "glasses" && _initialHandCal) {
-      _applyThreeGroupCalibRot(calibRot, _initialHandCal);
-      calibRot.updateMatrix();
-      calibRot.updateMatrixWorld(true);
-    }
     const glassesAnatomy =
       accessoryType === "necklace" ? new GroupCtor() : null;
     if (glassesAnatomy) {
@@ -9926,7 +9896,6 @@ async function runArSession({
       glassesNegateWearOffsetX,
       glassesEyeMidpointAlign,
       glassesSimpleFaceOnly,
-      glassesFrameWidthLocal,
       eyeMidWearSmoothed: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
       eyeMidWearTarget: glassesEyeMidpointAlign ? new THREE.Vector3() : null,
       eyeMidWearZero: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
@@ -10684,11 +10653,7 @@ async function runArSession({
                         glassesTrackingWrap && st.glassesSimpleFaceOnly
                           ? OMAFIT_GLASSES_SCALE_IPD_MUL
                           : OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL;
-                      /**
-                       * Normalização pela largura do frame: evita óculos gigantes
-                       * quando o GLB tem bbox grande. Divide pelo `glassesFrameWidthLocal`.
-                       */
-                      let scale = (ipdMetric * ipdMul) / st.glassesFrameWidthLocal;
+                      let scale = ipdMetric * ipdMul;
                       scale = THREE.MathUtils.clamp(
                         scale,
                         OMAFIT_GLASSES_MESH_SCALE_ABS_MIN,
@@ -11341,20 +11306,17 @@ async function runArSession({
       }
     }
 
-    /** 4.2) Diagnóstico: `calibRot` agora aplicado para óculos (rx/ry/rz do metafield). */
+    /** 4.2) Diagnóstico: `calibRot` mantém-se identidade (sem rx/ry/rz de metafield). */
     try {
       const dbgAxX = new THREE.Vector3(1, 0, 0).applyQuaternion(calibRot.quaternion);
       const dbgAxY = new THREE.Vector3(0, 1, 0).applyQuaternion(calibRot.quaternion);
       const dbgAxZ = new THREE.Vector3(0, 0, 1).applyQuaternion(calibRot.quaternion);
-      const calApplied = accessoryType === "glasses" && _initialHandCal ? _initialHandCal : null;
-      console.log("[omafit-ar] calibRot para óculos (calibração de loja aplicada)", {
+      console.log("[omafit-ar] calibRot (identidade; sem rotação de calibração loja)", {
         glassesSimpleFaceOnly,
         wearPosM: wearPosMEffective,
         accessoryMeshNormalizeScale,
-        glassesFrameWidthLocal,
         glassesScaleIpdMul: OMAFIT_GLASSES_SCALE_IPD_MUL,
         glassesScaleIpdMetricMul: OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL,
-        calibrationApplied: calApplied ? { rx: calApplied.rx, ry: calApplied.ry, rz: calApplied.rz } : "none",
         calibRotXinWorld: [
           dbgAxX.x.toFixed(3), dbgAxX.y.toFixed(3), dbgAxX.z.toFixed(3),
         ],
@@ -11502,15 +11464,7 @@ async function runArSession({
      */
     window.__omafitArSwitchGlb = async (nextUrl, cal) => {
       try {
-        if (cal && typeof cal === "object") {
-          applyOmafitCalibration(cal, arCfg);
-          /** Aplicar calibração ao calibRot para óculos (face path) */
-          if (accessoryType === "glasses") {
-            _applyThreeGroupCalibRot(calibRot, cal);
-            calibRot.updateMatrix();
-            calibRot.updateMatrixWorld(true);
-          }
-        }
+        if (cal && typeof cal === "object") applyOmafitCalibration(cal, arCfg);
         try {
           const stSw = faceArEnhancementState;
           if (stSw?.microUx && !stSw.microUxDisabled) {
@@ -12633,23 +12587,15 @@ async function runHandArSession({
     Y: new THREE.Vector3(0, 1, 0),
     Z: new THREE.Vector3(0, 0, 1),
   };
-  /**
-   * Aplica rotação de calibração (rx, ry, rz) a um grupo Three.js usando `rotateOnWorldAxis`.
-   * Ordem: Y → X → Z (igual ao preview admin).
-   * @param {THREE.Group} group - Grupo Three.js para aplicar a rotação
-   * @param {object} cal - Objeto de calibração com rx, ry, rz em graus
-   */
-  const _applyThreeGroupCalibRot = (group, cal) => {
-    if (!group) return;
-    group.quaternion.identity();
+  const applyCalibRot = (cal) => {
+    calibRot.quaternion.identity();
     const rxDeg = Number((cal && cal.rx) ?? 0) || 0;
     const ryDeg = Number((cal && cal.ry) ?? 0) || 0;
     const rzDeg = Number((cal && cal.rz) ?? 0) || 0;
-    if (ryDeg) group.rotateOnWorldAxis(_calWorldAxes.Y, ryDeg * Math.PI / 180);
-    if (rxDeg) group.rotateOnWorldAxis(_calWorldAxes.X, rxDeg * Math.PI / 180);
-    if (rzDeg) group.rotateOnWorldAxis(_calWorldAxes.Z, rzDeg * Math.PI / 180);
+    if (ryDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Y, ryDeg * Math.PI / 180);
+    if (rxDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.X, rxDeg * Math.PI / 180);
+    if (rzDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Z, rzDeg * Math.PI / 180);
   };
-  const applyCalibRot = (cal) => _applyThreeGroupCalibRot(calibRot, cal);
 
   /** Lê calibração inicial do produto a partir de `data-ar-omafit-calibration`. */
   const _initialHandCal = (() => {
@@ -12783,24 +12729,6 @@ async function runHandArSession({
    * Valor 3.0: bangle típico tem elong ~1.0–1.8; corrente simples tem elong > 4.
    */
   const OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD = 3.0;
-
-  /**
-   * === MODO RIGID SLOT FORÇADO ===
-   *
-   * Quando `true`, TODAS as pulseiras usam o modo "rigid slot" (geometria
-   * preservada, sem deformações, depth occluder sempre ativo) independente
-   * da elongação ou detecção automática. Este é o modo mais previsível.
-   *
-   * Pode ser sobrescrito por metafield `omafit.ar_bracelet_mode`:
-   *   - "rigid" → força rigid slot
-   *   - "legacy" → permite wrap cilíndrico (menos previsível)
-   *   - "auto" → usa detecção automática (padrão quando não forçado)
-   *
-   * NOTA: Modo radial procedural (instâncias) continua disponível via
-   * metafield `omafit.ar_bracelet_radial` para correntes/chains quando
-   * necessário, mas por padrão todas as pulseiras usam rigid slot.
-   */
-  const OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true;
 
   /**
    * Normaliza escala da cena da pulseira quando o bbox é desproporcional.
@@ -13406,67 +13334,6 @@ async function runHandArSession({
           wrapFraction,
           postBbox: { x: size.x, y: size.y, z: size.z },
         });
-      } else {
-        /**
-         * === CANONIZAÇÃO DE ORIENTAÇÃO PARA RELÓGIOS JÁ ENROLADOS ===
-         *
-         * Relógios que já vêm enrolados (flatRatio < 2.0) não passam pelo
-         * bend cilíndrico, mas ainda precisam de orientação previsível para
-         * evitar aparecerem de cabeça para baixo no AR.
-         *
-         * Objetivo: alinhar o relógio ao frame da âncora de forma consistente:
-         *   - Eixo dorsal (MIN) → +Y local (para cima, face visível)
-         *   - Eixo arm (MED) → +Z local (direção do braço)
-         *   - Eixo lateral (MAX) → +X local (ao redor do pulso)
-         *
-         * Lógica similar ao bend, mas sem deformação geométrica:
-         *   1. Detectar sentido correto do eixo dorsal (usando centro do bbox)
-         *   2. Construir base ortonormal right-handed
-         *   3. Aplicar rotação para alinhar ao frame da âncora
-         */
-        const bboxCenter = new THREE.Vector3();
-        bbox.getCenter(bboxCenter);
-
-        // Detectar sentido dorsal (face do relógio deve apontar "para fora")
-        const dorsalN = dorsal.vec.clone();
-        if (bboxCenter.dot(dorsalN) < 0) dorsalN.negate();
-
-        // Para relógios enrolados, o eixo MAX é tipicamente lateral (X)
-        const lateralN = bend.vec.clone();
-        const armN = arm.vec.clone();
-
-        // Garantir base right-handed: lateral × dorsal = arm
-        const expectedArm = new THREE.Vector3().crossVectors(lateralN, dorsalN);
-        if (expectedArm.dot(armN) < 0) armN.negate();
-
-        /**
-         * Construir matriz de mudança de base:
-         * Queremos mapear (lateral, dorsal, arm) do GLB → (X, Y, Z) da âncora
-         *
-         * M = [lateral | dorsal | arm]  (colunas)
-         * Rotação necessária: M^T (transposta = inversa para matriz ortonormal)
-         */
-        const M = new THREE.Matrix4().makeBasis(lateralN, dorsalN, armN);
-        const invM = new THREE.Matrix4().copy(M).transpose();
-        const q = new THREE.Quaternion().setFromRotationMatrix(invM);
-
-        // Aplicar rotação apenas se não for identidade
-        if (Math.abs(q.x) + Math.abs(q.y) + Math.abs(q.z) > 1e-6) {
-          glbScene.quaternion.premultiply(q);
-          glbScene.updateMatrixWorld(true);
-          bbox = new THREE.Box3().setFromObject(glbScene);
-          bbox.getSize(size);
-        }
-
-        console.log("[omafit-ar] watch orientation canonicalized (already wrapped)", {
-          lateralAxis: bend.name,
-          dorsalAxis: dorsal.name,
-          armAxis: arm.name,
-          armFlipped: armN.dot(arm.vec) < 0,
-          flatRatio: Number(flatRatio.toFixed(3)),
-          preBbox: { max: bend.size, mid: arm.size, min: dorsal.size },
-          postBbox: { x: size.x, y: size.y, z: size.z },
-        });
       }
     }
 
@@ -13623,46 +13490,15 @@ async function runHandArSession({
 
   /**
    * Determina se o GLB da pulseira deve usar o modo "rigid slot" (objeto rígido).
+   * Calcula elong = maxDim / medianDim do bbox normalizado. Se ≤ threshold, é
+   * bangle/sólido → rigid slot. Se > threshold, é corrente/chain (mas nesse
+   * caso o radial procedural já estaria ativo, então esta função raramente
+   * retorna false em prática).
    *
-   * MODO RIGID SLOT:
-   *   - Geometria preservada (sem wrap cilíndrico destrutivo)
-   *   - Escala uniforme (sem deformação elíptica)
-   *   - Depth occluder sempre ativo
-   *   - Resultado mais previsível e fiel ao design original
-   *
-   * LÓGICA DE DECISÃO:
-   *   1. Se `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true` → força rigid slot
-   *   2. Metafield `omafit.ar_bracelet_mode` pode sobrescrever:
-   *      - "rigid" → força rigid slot
-   *      - "legacy" → permite modo legado (wrap cilíndrico)
-   *      - "auto" → usa detecção automática por elongação
-   *   3. Detecção automática: elong ≤ threshold → rigid slot
-   *
-   * @param {Object3D} scene - Cena do GLB normalizado
-   * @param {Function} cfgAttrFn - Função para ler atributos/metafields
-   * @returns {boolean} true para usar rigid slot, false para modo legado
+   * Precisa ser chamada APÓS omafitNormalizeBraceletTripoGlbScale (escala ~65mm).
    */
-  function computeBraceletRigidSlotFromScene(scene, cfgAttrFn) {
+  function computeBraceletRigidSlotFromScene(scene) {
     if (braceletProceduralRadial) return false;
-
-    // Verificar override via metafield
-    const modeOverride = String(cfgAttrFn("arBraceletMode", "")).trim().toLowerCase();
-    if (modeOverride === "rigid") {
-      console.log("[omafit-ar] bracelet rigid-slot: forced by metafield", { mode: modeOverride });
-      return true;
-    }
-    if (modeOverride === "legacy") {
-      console.log("[omafit-ar] bracelet rigid-slot: disabled by metafield", { mode: modeOverride });
-      return false;
-    }
-
-    // Se modo forçado globalmente, aplicar (exceto se override = "legacy")
-    if (OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE && modeOverride !== "auto") {
-      console.log("[omafit-ar] bracelet rigid-slot: forced globally (FORCE_RIGID_SLOT_MODE=true)");
-      return true;
-    }
-
-    // Detecção automática por elongação
     scene.updateMatrixWorld(true);
     const _rsBox = new THREE.Box3().setFromObject(scene);
     const _rsSize = new THREE.Vector3();
@@ -13670,11 +13506,7 @@ async function runHandArSession({
     const _rsDims = [_rsSize.x, _rsSize.y, _rsSize.z].sort((a, b) => a - b);
     const _rsElong = _rsDims[2] / Math.max(1e-6, _rsDims[1]);
     const _rsResult = _rsElong <= OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD;
-    console.log("[omafit-ar] bracelet rigid-slot: auto-detect", {
-      rigidSlot: _rsResult,
-      elong: Number(_rsElong.toFixed(3)),
-      threshold: OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD,
-    });
+    console.log("[omafit-ar] bracelet rigid-slot", { rigidSlot: _rsResult, elong: Number(_rsElong.toFixed(3)) });
     return _rsResult;
   }
 
@@ -13959,22 +13791,10 @@ async function runHandArSession({
   const braceletRadScaleOne = new THREE.Vector3(1, 1, 1);
   let braceletIsBangle = false;
   /**
-   * === MODO RIGID SLOT (PADRÃO) ===
-   *
-   * Quando `true`, o GLB é tratado como objeto rígido num slot fixo no pulso:
-   *   - ✓ Geometria preservada (SEM wrap cilíndrico destrutivo)
-   *   - ✓ Escala uniforme (SEM deformação elíptica por frame)
-   *   - ✓ Depth occluder sempre ativo (volume realista)
-   *   - ✓ Rotação de calibração respeitada (alinhamento preciso)
-   *   - ✓ Resultado mais previsível e fiel ao design original
-   *
-   * PADRÃO: `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true`
-   *   → TODAS as pulseiras usam rigid slot (máxima previsibilidade)
-   *
-   * Override via metafield `omafit.ar_bracelet_mode`:
-   *   - "rigid" → força rigid slot (padrão)
-   *   - "legacy" → permite modo legado com wrap cilíndrico
-   *   - "auto" → detecção por elongação (elong ≤ 3.0 → rigid)
+   * Modo "rigid slot": quando verdadeiro, o GLB é tratado como objeto rígido
+   * num slot fixo no pulso — sem rotação pelo menor eixo bbox, sem wrap
+   * cilíndrico, sem escala elíptica por frame. Ativo para bangles e pulseiras
+   * sólidas (elong ≤ OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD).
    */
   let braceletIsRigidSlot = false;
   let braceletLinkRadial = null;
@@ -14051,7 +13871,7 @@ async function runHandArSession({
             segments: braceletRadialSegCount,
             sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
           });
-          braceletIsRigidSlot = computeBraceletRigidSlotFromScene(glbScene, cfgAttr);
+          braceletIsRigidSlot = computeBraceletRigidSlotFromScene(glbScene);
         }
         try {
           const triH = omafitCountGltfTriangles(glbScene);
@@ -15007,19 +14827,10 @@ async function runHandArSession({
     armOccluder.visible =
       accessoryType === "bracelet"
         /**
-         * === DEPTH OCCLUDER VISIBILITY ===
-         *
-         * RIGID SLOT (modo padrão com FORCE_RIGID_SLOT_MODE=true):
-         *   - Occluder SEMPRE ativo em qualquer orientação da mão
-         *   - Cilindro BackSide centrado no braço oclui metade posterior
-         *   - Resultado: pulseira parece "envolver" o pulso com volume realista
-         *
-         * Modo legado (só se override = "legacy"):
-         *   - Só ativo quando `!braceletDorsumFacingCamera`
-         *   - Evita artefactos de z-fighting em correntes flat
-         *
-         * Com todas as pulseiras em rigid slot, o occluder está otimizado
-         * para máxima previsibilidade e qualidade visual consistente.
+         * Rigid slot: occluder sempre ativo — o cilindro está centrado no braço
+         * e usa BackSide, portanto oclui o lado posterior do anel em qualquer
+         * orientação da mão. O guarda `!braceletDorsumFacingCamera` era para
+         * o modo legado (corrente) onde o occluder causava artefactos ao virar.
          */
         ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && (braceletIsRigidSlot || !braceletDorsumFacingCamera)
         : true;
@@ -15848,7 +15659,7 @@ async function runHandArSession({
                   segments: braceletRadialSegCount,
                   sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
                 });
-                braceletIsRigidSlot = computeBraceletRigidSlotFromScene(next, cfgAttr);
+                braceletIsRigidSlot = computeBraceletRigidSlotFromScene(next);
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
