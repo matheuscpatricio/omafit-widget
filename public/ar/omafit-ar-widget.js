@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v10";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v11";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -15501,6 +15501,14 @@ async function runHandArSession({
        */
       if (accessoryType === "bracelet" && braceletPlaceState) {
         resetOmafitBraceletWristPlacementState(braceletPlaceState);
+        /**
+         * Após reset, `smoothPosLerp` fica em (0,0,0). Isso faz a pulseira
+         * animar de (0,0,0) até o alvo real (wearXYZ) — visualmente "desce"
+         * ou "sobe" durante o lerp. Prime diretamente para wearXYZ para que a
+         * troca seja instantânea na posição correcta.
+         */
+        braceletPlaceState.smoothPosLerp.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
+        braceletPlaceState.wearLerpPrimed = true;
       }
       braceletSlideFast = 0;
       braceletSlideLag = 0;
@@ -15555,6 +15563,12 @@ async function runHandArSession({
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
+              /**
+               * Resetar escala do glbRoot antes do fit — evita herdar escala
+               * de variante anterior caso fitWristGlb tenha algum path que não
+               * sobreponha a escala (salvaguarda explícita).
+               */
+              glbRoot.scale.set(1, 1, 1);
               upgradeHandArGlassMaterials(THREE, next);
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, userScale);
               baseScale = fitRes.baseScale;
@@ -15628,15 +15642,32 @@ async function runHandArSession({
               if (!handMicroUxDisabled) {
                 try {
                   omafitStoreMaterialOpacityBaseline(next);
-                  omafitApplyModelOpacityFactor(next, 0);
+                  /**
+                   * Troca de variante: NÃO aplicar opacidade 0.
+                   * Na 1ª carga a opacidade 0 faz sentido (modelo ainda não
+                   * trackava). Na troca o modelo anterior já estava visível —
+                   * começar em 0 torna o novo invisível por ~480 ms.
+                   * Usa apenas a animação de escala (0.9→1.0) como indicador
+                   * visual da troca. `preparedOpacity = false` desativa o
+                   * interpolador de opacidade em `omafitStepMicroUxIntro`.
+                   */
                   handMicroUx.introStartMs = performance.now();
                   handMicroUx.introComplete = false;
-                  handMicroUx.preparedOpacity = true;
+                  handMicroUx.preparedOpacity = false;
                   handMicroUxWrap.scale.setScalar(0.9);
                 } catch {
                   /* ignore */
                 }
               }
+              console.log("[omafit-ar] hand GLB fit (switch)", {
+                accessoryType,
+                baseScale: fitRes.baseScale,
+                localInnerR_mm: ((fitRes.localInnerR || 0) * 1000).toFixed(1),
+                localRingR_mm: (fitRes.localRingR * 1000).toFixed(1),
+                bbox: { x: fitRes.size.x.toFixed(4), y: fitRes.size.y.toFixed(4), z: fitRes.size.z.toFixed(4) },
+                braceletIsRigidSlot,
+                userScale,
+              });
               resolve();
             },
             undefined,
