@@ -12576,12 +12576,42 @@ async function runHandArSession({
   const wearXYZ = parseXyzMeters(cfgAttr("arMindarWearPosition", "0 0 0"), 0, 0, 0);
   const userScale = Number(cfgAttr("arMindarModelScale", "1")) || 1;
 
-  /** Mantém `calibRot` identidade — sem rx/ry/rz de metafield / canonical-fix. */
-  const applyCalibRot = () => {
-    calibRot.rotation.set(0, 0, 0);
-    calibRot.quaternion.identity();
+  /**
+   * Aplica apenas a rotação de calibração do lojista ao `calibRot` (rx/ry/rz
+   * em graus, eixos **mundo**, composição Y→X→Z — mesma ordem que o preview do
+   * admin em `applyCalibrationToState`). Posição e escala ficam intactos.
+   * Sem cal (ou todos zero) repõe identidade.
+   */
+  const _calWorldAxes = {
+    X: new THREE.Vector3(1, 0, 0),
+    Y: new THREE.Vector3(0, 1, 0),
+    Z: new THREE.Vector3(0, 0, 1),
   };
-  applyCalibRot();
+  const applyCalibRot = (cal) => {
+    calibRot.quaternion.identity();
+    const rxDeg = Number((cal && cal.rx) ?? 0) || 0;
+    const ryDeg = Number((cal && cal.ry) ?? 0) || 0;
+    const rzDeg = Number((cal && cal.rz) ?? 0) || 0;
+    if (ryDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Y, ryDeg * Math.PI / 180);
+    if (rxDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.X, rxDeg * Math.PI / 180);
+    if (rzDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Z, rzDeg * Math.PI / 180);
+  };
+
+  /** Lê calibração inicial do produto a partir de `data-ar-omafit-calibration`. */
+  const _initialHandCal = (() => {
+    try {
+      const raw = arCfg?.dataset?.arOmafitCalibration || embedCfg?.dataset?.arOmafitCalibration || "";
+      if (!raw) return null;
+      let v = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (v && typeof v === "object" && v.value !== undefined) {
+        try { v = typeof v.value === "string" ? JSON.parse(v.value) : v.value; } catch { /* noop */ }
+      }
+      if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+      if (typeof v.error === "string" && Object.keys(v).length <= 2) return null;
+      return v;
+    } catch { return null; }
+  })();
+  applyCalibRot(_initialHandCal);
 
   wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
 
@@ -15558,7 +15588,7 @@ async function runHandArSession({
        * é calculada pelo fitWristGlb depois de carregar o novo GLB (idêntico
        * à primeira carga).
        */
-      applyCalibRot();
+      applyCalibRot(cal && typeof cal === "object" ? cal : null);
       wearPosition.position.set(wearXYZ.x, wearXYZ.y, wearXYZ.z);
       if (cal && typeof cal === "object") {
         if (Number.isFinite(Number(cal.wearX))) wearPosition.position.x = Number(cal.wearX);
