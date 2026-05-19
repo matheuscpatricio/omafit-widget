@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v11";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-18-bracelet-rigid-slot-v12";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13710,6 +13710,15 @@ async function runHandArSession({
    *  Usado no ajuste adaptativo por frame: targetInnerR_mundo / localInnerR
    *  dá o scale exacto para a face interna encostar à pele. */
   let localInnerR = 0.022;
+  /**
+   * Referência do localInnerR da PRIMEIRA variante carregada (pulseira).
+   * Usada nas trocas: se o GLB seguinte tiver localInnerR muito diferente
+   * (export com unidades distintas ou geometria de anel com outra espessura
+   * medida pelo computeLocalInnerRadius), normalizar para este valor de âncora
+   * garante que o baseScale — e portanto a escala final no pulso — fique igual.
+   * Null = ainda não inicializado (primeira carga vai setar).
+   */
+  let anchorLocalInnerR = null;
   /** Sinaliza se o relógio foi geometricamente dobrado à volta dum cilindro
    *  (GLB plano detectado). Usado só para logging. */
   let didBendWatch = false;
@@ -13846,6 +13855,14 @@ async function runHandArSession({
         localRingR = fitRes.localRingR;
         localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
         didBendWatch = Boolean(fitRes.didBend);
+        /**
+         * Guardar raio interno da PRIMEIRA carga como âncora para trocas futuras.
+         * Só para pulseira: relógio/óculos não têm o problema de divergência
+         * de localInnerR entre variantes (geometrias mais padronizadas).
+         */
+        if (accessoryType === "bracelet" && anchorLocalInnerR === null && localInnerR > 1e-6) {
+          anchorLocalInnerR = localInnerR;
+        }
 
         watchVertexDeform = null;
         watchStrapRadial = null;
@@ -14010,6 +14027,31 @@ async function runHandArSession({
         });
 
         glbRoot.visible = true;
+        /**
+         * Pré-carga em background dos GLBs das outras variantes.
+         * Dispara `fetch()` com `cache: "force-cache"` imediatamente após o
+         * primeiro GLB estar pronto — quando o utilizador clicar na miniatura,
+         * o browser já terá o ficheiro em disco/memória (sem bloquear o render).
+         * Apenas GLBs com URL diferente do actual são pré-carregados.
+         * Erros de rede são silenciosos (non-blocking).
+         */
+        try {
+          const rootArEl = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+          const rawVarsPreload = rootArEl ? (rootArEl.getAttribute("data-ar-variants-glb") || "").trim() : "";
+          if (rawVarsPreload) {
+            const parsedPreload = JSON.parse(rawVarsPreload);
+            if (Array.isArray(parsedPreload)) {
+              const currentUrl = String(finalGlbUrl || "");
+              parsedPreload.forEach((vp) => {
+                const vpUrl = buildGlbLoaderUrl(String(vp?.g || "").trim(), versionHint);
+                if (!vpUrl || vpUrl === currentUrl) return;
+                fetch(vpUrl, { cache: "force-cache", mode: "cors" }).catch(() => {});
+              });
+            }
+          }
+        } catch {
+          /* pré-carga não-bloqueante: ignora qualquer erro */
+        }
         dbgBraceletAr("H3", "glb:before_resolve", "fit_complete", {
           baseScale: fitRes.baseScale,
           glbRootVisible: glbRoot.visible,
@@ -15573,7 +15615,33 @@ async function runHandArSession({
               const fitRes = fitWristGlb(next, glbRoot, accessoryType, userScale);
               baseScale = fitRes.baseScale;
               localRingR = fitRes.localRingR;
-              localInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
+              const rawInnerR = fitRes.localInnerR || fitRes.localRingR * 0.9;
+              /**
+               * Normalização de escala por âncora (pulseira):
+               * Se o localInnerR da nova variante divergir mais de ±25% da 1ª
+               * carga, ajusta baseScale para que o tamanho no pulso seja igual.
+               * Fórmula: baseScale_corrigido = fitRes.baseScale × (rawInnerR / anchorLocalInnerR)
+               * → resulta em targetInnerR / anchorLocalInnerR (raio âncora, não o bruto).
+               * O runtime usa baseScale × adaptMul para escalar por frame;
+               * anchorLocalInnerR é usado como localInnerR para que o adaptMul
+               * frame-a-frame também fique consistente entre variantes.
+               */
+              if (accessoryType === "bracelet" && anchorLocalInnerR !== null && anchorLocalInnerR > 1e-6 && rawInnerR > 1e-6) {
+                const drift = rawInnerR / anchorLocalInnerR;
+                if (drift < 0.75 || drift > 1.33) {
+                  baseScale = fitRes.baseScale * drift;
+                  console.log("[omafit-ar] bracelet innerR drift corrected", {
+                    rawInnerR_mm: (rawInnerR * 1000).toFixed(1),
+                    anchorLocalInnerR_mm: (anchorLocalInnerR * 1000).toFixed(1),
+                    drift: drift.toFixed(3),
+                    baseScaleOrig: fitRes.baseScale.toFixed(4),
+                    baseScaleCorrected: baseScale.toFixed(4),
+                  });
+                }
+                localInnerR = anchorLocalInnerR;
+              } else {
+                localInnerR = rawInnerR;
+              }
               didBendWatch = Boolean(fitRes.didBend);
               watchVertexDeform = null;
               watchStrapRadial = null;
