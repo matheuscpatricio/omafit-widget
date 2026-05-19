@@ -397,9 +397,23 @@ const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
 const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 /**
- * Depth occluder cilíndrico para pulseira.
- * Ativo para rigid slot (bangle sólido): escreve depth no cilindro do braço
- * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
+ * === DEPTH OCCLUDER CILÍNDRICO PARA PULSEIRAS ===
+ *
+ * Cria efeito de profundidade realista fazendo a pulseira "envolver" o pulso.
+ * O occluder é um cilindro invisível (BackSide) que escreve no depth buffer
+ * e esconde a parte posterior da pulseira que deveria estar "atrás" do braço.
+ *
+ * COMPORTAMENTO:
+ *   - RIGID SLOT (modo padrão): Sempre ativo, cria ilusão perfeita de volume
+ *   - Modo legado: Só ativo quando pulso não está de frente para câmera
+ *
+ * OTIMIZAÇÃO:
+ *   - Escala elíptica adapta-se à anatomia (largura × espessura do pulso)
+ *   - Raio base alinha-se ao raio interno do GLB para precisão máxima
+ *   - BackSide evita artefactos de z-fighting na frente do braço
+ *
+ * Com `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true`, o occluder está
+ * sempre ativo e otimizado para máxima previsibilidade.
  */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 /**
@@ -12731,6 +12745,24 @@ async function runHandArSession({
   const OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD = 3.0;
 
   /**
+   * === MODO RIGID SLOT FORÇADO ===
+   *
+   * Quando `true`, TODAS as pulseiras usam o modo "rigid slot" (geometria
+   * preservada, sem deformações, depth occluder sempre ativo) independente
+   * da elongação ou detecção automática. Este é o modo mais previsível.
+   *
+   * Pode ser sobrescrito por metafield `omafit.ar_bracelet_mode`:
+   *   - "rigid" → força rigid slot
+   *   - "legacy" → permite wrap cilíndrico (menos previsível)
+   *   - "auto" → usa detecção automática (padrão quando não forçado)
+   *
+   * NOTA: Modo radial procedural (instâncias) continua disponível via
+   * metafield `omafit.ar_bracelet_radial` para correntes/chains quando
+   * necessário, mas por padrão todas as pulseiras usam rigid slot.
+   */
+  const OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true;
+
+  /**
    * Normaliza escala da cena da pulseira quando o bbox é desproporcional.
    * Não altera landmarks nem tracking — só `glbScene.scale`.
    */
@@ -13490,15 +13522,46 @@ async function runHandArSession({
 
   /**
    * Determina se o GLB da pulseira deve usar o modo "rigid slot" (objeto rígido).
-   * Calcula elong = maxDim / medianDim do bbox normalizado. Se ≤ threshold, é
-   * bangle/sólido → rigid slot. Se > threshold, é corrente/chain (mas nesse
-   * caso o radial procedural já estaria ativo, então esta função raramente
-   * retorna false em prática).
    *
-   * Precisa ser chamada APÓS omafitNormalizeBraceletTripoGlbScale (escala ~65mm).
+   * MODO RIGID SLOT:
+   *   - Geometria preservada (sem wrap cilíndrico destrutivo)
+   *   - Escala uniforme (sem deformação elíptica)
+   *   - Depth occluder sempre ativo
+   *   - Resultado mais previsível e fiel ao design original
+   *
+   * LÓGICA DE DECISÃO:
+   *   1. Se `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true` → força rigid slot
+   *   2. Metafield `omafit.ar_bracelet_mode` pode sobrescrever:
+   *      - "rigid" → força rigid slot
+   *      - "legacy" → permite modo legado (wrap cilíndrico)
+   *      - "auto" → usa detecção automática por elongação
+   *   3. Detecção automática: elong ≤ threshold → rigid slot
+   *
+   * @param {Object3D} scene - Cena do GLB normalizado
+   * @param {Function} cfgAttrFn - Função para ler atributos/metafields
+   * @returns {boolean} true para usar rigid slot, false para modo legado
    */
-  function computeBraceletRigidSlotFromScene(scene) {
+  function computeBraceletRigidSlotFromScene(scene, cfgAttrFn) {
     if (braceletProceduralRadial) return false;
+
+    // Verificar override via metafield
+    const modeOverride = String(cfgAttrFn("arBraceletMode", "")).trim().toLowerCase();
+    if (modeOverride === "rigid") {
+      console.log("[omafit-ar] bracelet rigid-slot: forced by metafield", { mode: modeOverride });
+      return true;
+    }
+    if (modeOverride === "legacy") {
+      console.log("[omafit-ar] bracelet rigid-slot: disabled by metafield", { mode: modeOverride });
+      return false;
+    }
+
+    // Se modo forçado globalmente, aplicar (exceto se override = "legacy")
+    if (OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE && modeOverride !== "auto") {
+      console.log("[omafit-ar] bracelet rigid-slot: forced globally (FORCE_RIGID_SLOT_MODE=true)");
+      return true;
+    }
+
+    // Detecção automática por elongação
     scene.updateMatrixWorld(true);
     const _rsBox = new THREE.Box3().setFromObject(scene);
     const _rsSize = new THREE.Vector3();
@@ -13506,7 +13569,11 @@ async function runHandArSession({
     const _rsDims = [_rsSize.x, _rsSize.y, _rsSize.z].sort((a, b) => a - b);
     const _rsElong = _rsDims[2] / Math.max(1e-6, _rsDims[1]);
     const _rsResult = _rsElong <= OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD;
-    console.log("[omafit-ar] bracelet rigid-slot", { rigidSlot: _rsResult, elong: Number(_rsElong.toFixed(3)) });
+    console.log("[omafit-ar] bracelet rigid-slot: auto-detect", {
+      rigidSlot: _rsResult,
+      elong: Number(_rsElong.toFixed(3)),
+      threshold: OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD,
+    });
     return _rsResult;
   }
 
@@ -13791,10 +13858,22 @@ async function runHandArSession({
   const braceletRadScaleOne = new THREE.Vector3(1, 1, 1);
   let braceletIsBangle = false;
   /**
-   * Modo "rigid slot": quando verdadeiro, o GLB é tratado como objeto rígido
-   * num slot fixo no pulso — sem rotação pelo menor eixo bbox, sem wrap
-   * cilíndrico, sem escala elíptica por frame. Ativo para bangles e pulseiras
-   * sólidas (elong ≤ OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD).
+   * === MODO RIGID SLOT (PADRÃO) ===
+   *
+   * Quando `true`, o GLB é tratado como objeto rígido num slot fixo no pulso:
+   *   - ✓ Geometria preservada (SEM wrap cilíndrico destrutivo)
+   *   - ✓ Escala uniforme (SEM deformação elíptica por frame)
+   *   - ✓ Depth occluder sempre ativo (volume realista)
+   *   - ✓ Rotação de calibração respeitada (alinhamento preciso)
+   *   - ✓ Resultado mais previsível e fiel ao design original
+   *
+   * PADRÃO: `OMAFIT_BRACELET_FORCE_RIGID_SLOT_MODE = true`
+   *   → TODAS as pulseiras usam rigid slot (máxima previsibilidade)
+   *
+   * Override via metafield `omafit.ar_bracelet_mode`:
+   *   - "rigid" → força rigid slot (padrão)
+   *   - "legacy" → permite modo legado com wrap cilíndrico
+   *   - "auto" → detecção por elongação (elong ≤ 3.0 → rigid)
    */
   let braceletIsRigidSlot = false;
   let braceletLinkRadial = null;
@@ -13871,7 +13950,7 @@ async function runHandArSession({
             segments: braceletRadialSegCount,
             sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
           });
-          braceletIsRigidSlot = computeBraceletRigidSlotFromScene(glbScene);
+          braceletIsRigidSlot = computeBraceletRigidSlotFromScene(glbScene, cfgAttr);
         }
         try {
           const triH = omafitCountGltfTriangles(glbScene);
@@ -14827,10 +14906,19 @@ async function runHandArSession({
     armOccluder.visible =
       accessoryType === "bracelet"
         /**
-         * Rigid slot: occluder sempre ativo — o cilindro está centrado no braço
-         * e usa BackSide, portanto oclui o lado posterior do anel em qualquer
-         * orientação da mão. O guarda `!braceletDorsumFacingCamera` era para
-         * o modo legado (corrente) onde o occluder causava artefactos ao virar.
+         * === DEPTH OCCLUDER VISIBILITY ===
+         *
+         * RIGID SLOT (modo padrão com FORCE_RIGID_SLOT_MODE=true):
+         *   - Occluder SEMPRE ativo em qualquer orientação da mão
+         *   - Cilindro BackSide centrado no braço oclui metade posterior
+         *   - Resultado: pulseira parece "envolver" o pulso com volume realista
+         *
+         * Modo legado (só se override = "legacy"):
+         *   - Só ativo quando `!braceletDorsumFacingCamera`
+         *   - Evita artefactos de z-fighting em correntes flat
+         *
+         * Com todas as pulseiras em rigid slot, o occluder está otimizado
+         * para máxima previsibilidade e qualidade visual consistente.
          */
         ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && (braceletIsRigidSlot || !braceletDorsumFacingCamera)
         : true;
@@ -15659,7 +15747,7 @@ async function runHandArSession({
                   segments: braceletRadialSegCount,
                   sizing: braceletProceduralRadial ? "procedural-wrist-only" : "glb-derived",
                 });
-                braceletIsRigidSlot = computeBraceletRigidSlotFromScene(next);
+                braceletIsRigidSlot = computeBraceletRigidSlotFromScene(next, cfgAttr);
               }
               while (glbRoot.children.length) glbRoot.remove(glbRoot.children[0]);
               glbRoot.add(next);
