@@ -13366,6 +13366,67 @@ async function runHandArSession({
           wrapFraction,
           postBbox: { x: size.x, y: size.y, z: size.z },
         });
+      } else {
+        /**
+         * === CANONIZAÇÃO DE ORIENTAÇÃO PARA RELÓGIOS JÁ ENROLADOS ===
+         *
+         * Relógios que já vêm enrolados (flatRatio < 2.0) não passam pelo
+         * bend cilíndrico, mas ainda precisam de orientação previsível para
+         * evitar aparecerem de cabeça para baixo no AR.
+         *
+         * Objetivo: alinhar o relógio ao frame da âncora de forma consistente:
+         *   - Eixo dorsal (MIN) → +Y local (para cima, face visível)
+         *   - Eixo arm (MED) → +Z local (direção do braço)
+         *   - Eixo lateral (MAX) → +X local (ao redor do pulso)
+         *
+         * Lógica similar ao bend, mas sem deformação geométrica:
+         *   1. Detectar sentido correto do eixo dorsal (usando centro do bbox)
+         *   2. Construir base ortonormal right-handed
+         *   3. Aplicar rotação para alinhar ao frame da âncora
+         */
+        const bboxCenter = new THREE.Vector3();
+        bbox.getCenter(bboxCenter);
+
+        // Detectar sentido dorsal (face do relógio deve apontar "para fora")
+        const dorsalN = dorsal.vec.clone();
+        if (bboxCenter.dot(dorsalN) < 0) dorsalN.negate();
+
+        // Para relógios enrolados, o eixo MAX é tipicamente lateral (X)
+        const lateralN = bend.vec.clone();
+        const armN = arm.vec.clone();
+
+        // Garantir base right-handed: lateral × dorsal = arm
+        const expectedArm = new THREE.Vector3().crossVectors(lateralN, dorsalN);
+        if (expectedArm.dot(armN) < 0) armN.negate();
+
+        /**
+         * Construir matriz de mudança de base:
+         * Queremos mapear (lateral, dorsal, arm) do GLB → (X, Y, Z) da âncora
+         *
+         * M = [lateral | dorsal | arm]  (colunas)
+         * Rotação necessária: M^T (transposta = inversa para matriz ortonormal)
+         */
+        const M = new THREE.Matrix4().makeBasis(lateralN, dorsalN, armN);
+        const invM = new THREE.Matrix4().copy(M).transpose();
+        const q = new THREE.Quaternion().setFromRotationMatrix(invM);
+
+        // Aplicar rotação apenas se não for identidade
+        if (Math.abs(q.x) + Math.abs(q.y) + Math.abs(q.z) > 1e-6) {
+          glbScene.quaternion.premultiply(q);
+          glbScene.updateMatrixWorld(true);
+          bbox = new THREE.Box3().setFromObject(glbScene);
+          bbox.getSize(size);
+        }
+
+        console.log("[omafit-ar] watch orientation canonicalized (already wrapped)", {
+          lateralAxis: bend.name,
+          dorsalAxis: dorsal.name,
+          armAxis: arm.name,
+          armFlipped: armN.dot(arm.vec) < 0,
+          flatRatio: Number(flatRatio.toFixed(3)),
+          preBbox: { max: bend.size, mid: arm.size, min: dorsal.size },
+          postBbox: { x: size.x, y: size.y, z: size.z },
+        });
       }
     }
 
