@@ -519,9 +519,9 @@ try {
 /**
  * Quando `true`, **não** cria malha facial 468 só-depth nem extensões temporais (óculos).
  * Serve para isolar problemas: óculos **dentro da cara** → provável Z; **invisível** → escala/rotação.
- * Manter `false` em produção.
+ * Temporariamente `true` para diagnosticar escala/posição antes de reativar.
  */
-const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = false;
+const OMAFIT_GLASSES_FACE_OCCLUSION_DEBUG_OFF = true;
 
 /**
  * Quando `true`, ignora offsets/rotação/escala vindos dos data-attrs para o
@@ -869,8 +869,8 @@ const OMAFIT_GLASSES_SCALE_IPD_MUL = 1.5;
 /** IPD em **espaço mundo da face**: `distanceTo` após `applyMatrix4(face.matrixWorld)` × este factor no mesh. */
 const OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL = 2;
 /** Clamp absoluto na escala uniforme do mesh (óculos após IPD×factor). */
-const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.03;
-const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 22;
+const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.04;
+const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 2.5;
 /**
  * Avanço +Z local (m) no espaço do rosto: `Vector3(0,0,m).applyQuaternion(model.quaternion)` + `position.add`.
  * Aplicado após `glasses.position` / `glasses.quaternion` vindos da faceMatrix.
@@ -8743,6 +8743,14 @@ async function runArSession({
     if (!Number.isFinite(maxDim) || maxDim < 1e-9) {
       throw new Error("omafit-ar: dimensões do GLB inválidas (NaN ou zero).");
     }
+    /**
+     * Largura intrínseca do frame dos óculos (eixo X após bake/bind).
+     * Usada para normalizar a escala IPD-based, prevenindo óculos gigantes.
+     */
+    let glassesFrameWidthLocal = 1.0;
+    if (accessoryType === "glasses") {
+      glassesFrameWidthLocal = Math.max(sz.x, 0.001);
+    }
     if (!glassesCanonicalBlenderExport) {
       const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
       if (frontCenter) glasses.position.sub(frontCenter);
@@ -8957,10 +8965,10 @@ async function runArSession({
      * somado a `wearPosition` cada frame (translação; não usar só quaternion para lateral).
      * Opt-out: `data-ar-glasses-eye-midpoint-align="0"`. Inactivo: manual MindAR, estrutural,
      * geometria, `data-ar-glasses-cheek-orthogonal-basis="1"`.
+     * ALTERADO: removido `!glassesSimpleFaceOnly` para habilitar alinhamento preciso ao ponto médio dos olhos.
      */
     const glassesEyeMidpointAlign =
       accessoryType === "glasses" &&
-      !glassesSimpleFaceOnly &&
       !glassesManualMindarRig &&
       !glassesStructuralMindarRig &&
       !glassesGeometryAnchor &&
@@ -9366,8 +9374,9 @@ async function runArSession({
      *     se reduz a wearX/Y/Z em unidades de âncora (previsíveis).
      */
     /**
-     * `calibRot`: sempre identidade — rotação mundo (rx/ry/rz do metafield / canonical-fix)
-     * foi removida para não acumular com pose MindAR ou malha facial.
+     * `calibRot`: grupo para rotação de calibração do lojista (rx/ry/rz).
+     * Para face path (óculos), aplica a calibração quando disponível.
+     * Para hand path (pulseiras/relógios), aplicado em `_initialHandCal` e `__omafitArSwitchGlb`.
      *
      * `wearPosM`: `wearPosition.position.set`; óculos manual MindAR forçado a wear 0 nos attrs.
      * Óculos automáticos: escala interpupilar no mesh por frame.
@@ -9380,6 +9389,13 @@ async function runArSession({
     calibRot.quaternion.identity();
     calibRot.updateMatrix();
     calibRot.updateMatrixWorld(true);
+    
+    /** Aplicar calibração do lojista para face path (óculos) se disponível */
+    if (accessoryType === "glasses" && _initialHandCal) {
+      _applyThreeGroupCalibRot(calibRot, _initialHandCal);
+      calibRot.updateMatrix();
+      calibRot.updateMatrixWorld(true);
+    }
     const glassesAnatomy =
       accessoryType === "necklace" ? new GroupCtor() : null;
     if (glassesAnatomy) {
@@ -9910,6 +9926,7 @@ async function runArSession({
       glassesNegateWearOffsetX,
       glassesEyeMidpointAlign,
       glassesSimpleFaceOnly,
+      glassesFrameWidthLocal,
       eyeMidWearSmoothed: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
       eyeMidWearTarget: glassesEyeMidpointAlign ? new THREE.Vector3() : null,
       eyeMidWearZero: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
@@ -10667,7 +10684,11 @@ async function runArSession({
                         glassesTrackingWrap && st.glassesSimpleFaceOnly
                           ? OMAFIT_GLASSES_SCALE_IPD_MUL
                           : OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL;
-                      let scale = ipdMetric * ipdMul;
+                      /**
+                       * Normalização pela largura do frame: evita óculos gigantes
+                       * quando o GLB tem bbox grande. Divide pelo `glassesFrameWidthLocal`.
+                       */
+                      let scale = (ipdMetric * ipdMul) / st.glassesFrameWidthLocal;
                       scale = THREE.MathUtils.clamp(
                         scale,
                         OMAFIT_GLASSES_MESH_SCALE_ABS_MIN,
@@ -11320,17 +11341,20 @@ async function runArSession({
       }
     }
 
-    /** 4.2) Diagnóstico: `calibRot` mantém-se identidade (sem rx/ry/rz de metafield). */
+    /** 4.2) Diagnóstico: `calibRot` agora aplicado para óculos (rx/ry/rz do metafield). */
     try {
       const dbgAxX = new THREE.Vector3(1, 0, 0).applyQuaternion(calibRot.quaternion);
       const dbgAxY = new THREE.Vector3(0, 1, 0).applyQuaternion(calibRot.quaternion);
       const dbgAxZ = new THREE.Vector3(0, 0, 1).applyQuaternion(calibRot.quaternion);
-      console.log("[omafit-ar] calibRot (identidade; sem rotação de calibração loja)", {
+      const calApplied = accessoryType === "glasses" && _initialHandCal ? _initialHandCal : null;
+      console.log("[omafit-ar] calibRot para óculos (calibração de loja aplicada)", {
         glassesSimpleFaceOnly,
         wearPosM: wearPosMEffective,
         accessoryMeshNormalizeScale,
+        glassesFrameWidthLocal,
         glassesScaleIpdMul: OMAFIT_GLASSES_SCALE_IPD_MUL,
         glassesScaleIpdMetricMul: OMAFIT_GLASSES_SCALE_IPD_METRIC_MUL,
+        calibrationApplied: calApplied ? { rx: calApplied.rx, ry: calApplied.ry, rz: calApplied.rz } : "none",
         calibRotXinWorld: [
           dbgAxX.x.toFixed(3), dbgAxX.y.toFixed(3), dbgAxX.z.toFixed(3),
         ],
@@ -11478,7 +11502,15 @@ async function runArSession({
      */
     window.__omafitArSwitchGlb = async (nextUrl, cal) => {
       try {
-        if (cal && typeof cal === "object") applyOmafitCalibration(cal, arCfg);
+        if (cal && typeof cal === "object") {
+          applyOmafitCalibration(cal, arCfg);
+          /** Aplicar calibração ao calibRot para óculos (face path) */
+          if (accessoryType === "glasses") {
+            _applyThreeGroupCalibRot(calibRot, cal);
+            calibRot.updateMatrix();
+            calibRot.updateMatrixWorld(true);
+          }
+        }
         try {
           const stSw = faceArEnhancementState;
           if (stSw?.microUx && !stSw.microUxDisabled) {
@@ -12601,15 +12633,23 @@ async function runHandArSession({
     Y: new THREE.Vector3(0, 1, 0),
     Z: new THREE.Vector3(0, 0, 1),
   };
-  const applyCalibRot = (cal) => {
-    calibRot.quaternion.identity();
+  /**
+   * Aplica rotação de calibração (rx, ry, rz) a um grupo Three.js usando `rotateOnWorldAxis`.
+   * Ordem: Y → X → Z (igual ao preview admin).
+   * @param {THREE.Group} group - Grupo Three.js para aplicar a rotação
+   * @param {object} cal - Objeto de calibração com rx, ry, rz em graus
+   */
+  const _applyThreeGroupCalibRot = (group, cal) => {
+    if (!group) return;
+    group.quaternion.identity();
     const rxDeg = Number((cal && cal.rx) ?? 0) || 0;
     const ryDeg = Number((cal && cal.ry) ?? 0) || 0;
     const rzDeg = Number((cal && cal.rz) ?? 0) || 0;
-    if (ryDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Y, ryDeg * Math.PI / 180);
-    if (rxDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.X, rxDeg * Math.PI / 180);
-    if (rzDeg) calibRot.rotateOnWorldAxis(_calWorldAxes.Z, rzDeg * Math.PI / 180);
+    if (ryDeg) group.rotateOnWorldAxis(_calWorldAxes.Y, ryDeg * Math.PI / 180);
+    if (rxDeg) group.rotateOnWorldAxis(_calWorldAxes.X, rxDeg * Math.PI / 180);
+    if (rzDeg) group.rotateOnWorldAxis(_calWorldAxes.Z, rzDeg * Math.PI / 180);
   };
+  const applyCalibRot = (cal) => _applyThreeGroupCalibRot(calibRot, cal);
 
   /** Lê calibração inicial do produto a partir de `data-ar-omafit-calibration`. */
   const _initialHandCal = (() => {
