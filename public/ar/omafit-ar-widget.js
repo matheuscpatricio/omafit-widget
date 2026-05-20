@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-eye-center-v23";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-eye-center-v24";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8239,8 +8239,9 @@ async function runArSession({
       (glassesEyeMidDebugQuery ||
         /^(1|true|on|yes)$/i.test(String(cfgAttr("arGlassesEyeMidDebugVisual", "")).trim()));
     
-    /** v22: Debug simples via query (?omafit_ar_glasses_eye_debug=1) para confirmar alinhamento. */
+    /** Debug simples via query (?omafit_ar_glasses_eye_debug=1) — declarar cedo para evitar ReferenceError no state. */
     let glassesEyeDebugSimple = false;
+    let glassesEyeDebugSpheres = null;
     try {
       glassesEyeDebugSimple =
         accessoryType === "glasses" &&
@@ -9899,8 +9900,6 @@ async function runArSession({
 
     let eyeMidDebugMesh = null;
     let glassesBboxCenterDebugMesh = null;
-    /** v23: esferas debug olhos/centro (?omafit_ar_glasses_eye_debug=1). */
-    let glassesEyeDebugSpheres = null;
     if (glassesEyeDebugSimple) {
       const geomEye = new THREE.SphereGeometry(0.006, 12, 12);
       const matEye = new THREE.MeshBasicMaterial({
@@ -9943,7 +9942,7 @@ async function runArSession({
       anchor.group.add(glassesEyeDebugSpheres.center);
       try {
         console.log(
-          "[omafit-ar] glasses eye debug v23 — vermelho: olhos; verde: centro (?omafit_ar_glasses_eye_debug=1)",
+          "[omafit-ar] glasses eye debug v24 — vermelho: olhos; verde: centro (?omafit_ar_glasses_eye_debug=1)",
         );
       } catch {
         /* ignore */
