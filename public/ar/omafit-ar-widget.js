@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-video-cover-v18";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-mindar-resize-v19";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5348,23 +5348,6 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
       background: transparent !important;
       background-color: transparent !important;
     }
-    /* Paridade com pulseiras/relógios: vídeo preenche o host (cover), sem barras pretas. */
-    .omafit-ar-mindar-host video {
-      position: absolute !important;
-      inset: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      margin: 0 !important;
-      object-fit: cover !important;
-      object-position: center center !important;
-    }
-    .omafit-ar-mindar-host canvas {
-      position: absolute !important;
-      inset: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      margin: 0 !important;
-    }
     @keyframes omafit-ar-ring-pulse {
       0% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.12), 0 0 0 0 rgba(120,220,160,0.35); }
       55% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.22), 0 0 22px 3px rgba(120,220,160,0.28); }
@@ -6742,51 +6725,6 @@ async function startMindARFaceWithReliableCamera(mindarThree, videoIdealBlock) {
 }
 
 /**
- * Mesmo CSS que `runHandArSession`: o vídeo preenche o contentor com cover.
- * O MindAR dimensiona por pixel; sem isto aparecem barras pretas (fundo #000).
- * @param {HTMLElement | null} mindarHost
- * @param {{ mirrorSelfie?: boolean }} [opts]
- */
-function omafitApplyFaceVideoCoverFill(mindarHost, opts) {
-  if (!mindarHost) return;
-  const mirrorSelfie = opts?.mirrorSelfie !== false;
-  const video = mindarHost.querySelector?.("video");
-  if (video) {
-    Object.assign(video.style, {
-      position: "absolute",
-      inset: "0",
-      top: "0",
-      left: "0",
-      right: "0",
-      bottom: "0",
-      width: "100%",
-      height: "100%",
-      maxWidth: "none",
-      maxHeight: "none",
-      margin: "0",
-      objectFit: "cover",
-      objectPosition: "center center",
-      transform: mirrorSelfie ? "scaleX(-1)" : "none",
-      zIndex: "1",
-    });
-  }
-  const canvases = mindarHost.querySelectorAll?.("canvas") || [];
-  for (let i = 0; i < canvases.length; i++) {
-    const c = canvases[i];
-    Object.assign(c.style, {
-      position: "absolute",
-      inset: "0",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      margin: "0",
-      pointerEvents: "none",
-    });
-  }
-}
-
-/**
  * MindAR coloca o `<video>` da câmara atrás do canvas (z-index -2). O fundo só
  * se vê se o WebGL limpar com **alpha 0**; caso contrário o canvas tapa o vídeo
  * com preto opaco — o GLB continua visível, mas o feed da câmara desaparece.
@@ -6822,14 +6760,9 @@ function fixMindARFaceVideoBehindCanvas(THREE, mindarThree, mindarHost, projecti
       video.style.pointerEvents = "none";
       void video.play?.().catch?.(() => {});
     }
-    try {
-      omafitApplyFaceVideoCoverFill(mindarHost, {
-        mirrorSelfie: projectionOpts?.mirrorSelfie !== false,
-      });
-    } catch {
-      /* ignore */
-    }
     /**
+     * NÃO forçar width/height:100% nem object-fit no vídeo/canvas — o MindAR
+     * posiciona em pixels (_resize) e o canvas esticado por CSS desalinha o GLB.
      * Canvas + vídeo com as mesmas dimensões intrínsecas, `camera.aspect` e
      * FOV alinhado à webcam — ver `omafitSyncMindARFaceProjection`.
      */
