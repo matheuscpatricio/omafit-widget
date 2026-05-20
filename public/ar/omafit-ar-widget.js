@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-face-cover-v20";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-position-fix-v21";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8028,9 +8028,9 @@ async function runArSession({
     const glassesDepthForwardM =
       accessoryType === "glasses"
         ? (() => {
-            const v = Number(String(cfgAttr("arGlassesDepthForwardM", "0.025")).trim());
-            if (!Number.isFinite(v)) return 0.025;
-            return THREE.MathUtils.clamp(v, 0.015, 0.04);
+            const v = Number(String(cfgAttr("arGlassesDepthForwardM", "0.015")).trim());
+            if (!Number.isFinite(v)) return 0.015;
+            return THREE.MathUtils.clamp(v, 0, 0.08);
           })()
         : 0;
     /**
@@ -8041,8 +8041,8 @@ async function runArSession({
     const glassesNoseAlignOffsetXM =
       accessoryType === "glasses"
         ? (() => {
-            const v = Number(String(cfgAttr("arGlassesNoseAlignOffsetXM", "-0.03")).trim());
-            if (!Number.isFinite(v)) return -0.03;
+            const v = Number(String(cfgAttr("arGlassesNoseAlignOffsetXM", "0")).trim());
+            if (!Number.isFinite(v)) return 0;
             return THREE.MathUtils.clamp(v, -0.08, 0.04);
           })()
         : 0;
@@ -8054,14 +8054,15 @@ async function runArSession({
     /**
      * Offset estrutural empírico do mesh `glasses` após pose + bump Z frontal (faceMatrix); metros locais XYZ.
      * Defaults afinados ao GLB actual (centro / nariz / frente). Attr: `data-ar-glasses-empirical-align-m`.
+     * v21: reduzidos para posicionamento mais próximo do rosto (antes: -0.035 -0.04 0.02).
      */
     const glassesEmpiricalAlignM =
       accessoryType === "glasses"
         ? parseXyzMeters(
-            cfgAttr("arGlassesEmpiricalAlignM", "-0.035 -0.04 0.02"),
-            -0.035,
-            -0.04,
-            0.02,
+            cfgAttr("arGlassesEmpiricalAlignM", "0 -0.01 -0.005"),
+            0,
+            -0.01,
+            -0.005,
           )
         : { x: 0, y: 0, z: 0 };
     /** Multiplicador de estilo na largura anatómica (automático: IPD×equiv×factor/faceScale; antes era bochechas). */
@@ -10005,6 +10006,7 @@ async function runArSession({
       },
       faceProjectionOpts,
       projectionSyncLogged: false,
+      positionLogged: false,
       glassesNdcScreenLock,
       glassesNdcBlendFromMp,
       glassesLensDistortK,
@@ -10689,6 +10691,21 @@ async function runArSession({
                       glassesModelCenterOffsetM.y + glassesEmpiricalAlignM.y,
                       glassesModelCenterOffsetM.z + glassesEmpiricalAlignM.z,
                     );
+                    if (!st.positionLogged) {
+                      st.positionLogged = true;
+                      console.log("[omafit-ar] glasses position offsets v21", {
+                        glassesModelCenterOffsetM,
+                        glassesNoseAlignOffsetXM: nx0,
+                        glassesEmpiricalAlignM,
+                        glassesDepthForwardM: st.glassesDepthForwardM,
+                        finalPosition: {
+                          x: glasses.position.x.toFixed(4),
+                          y: glasses.position.y.toFixed(4),
+                          z: glasses.position.z.toFixed(4),
+                        },
+                        hint: "Ajustar via data-ar-glasses-empirical-align-m='x y z' (metros)",
+                      });
+                    }
                   }
                 } else {
                   /** Ramo legado (ex.: sem tracking wrap — GLB standardize): pose composta no alvo único. */
