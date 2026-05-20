@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-glasses-bind0-v27';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-glasses-canonical-bind-v28';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -1273,10 +1273,10 @@ export function WidgetPage() {
     if (eyewearBootstrap.arVariantsGlb) {
       arExtraAttrs['data-ar-variants-glb'] = eyewearBootstrap.arVariantsGlb;
     }
-    /** Óculos: bind Ry 0° — GLB com frente das lentes já em +Z (sem flip 180°). */
+    /** Óculos: bind Ry 180° — paridade com export Blender (−Z → MindAR +Z). */
     const arAccessory = String(eyewearBootstrap.accessoryType || 'glasses').trim().toLowerCase();
     if (arAccessory === 'glasses' || arAccessory === 'eyewear') {
-      arExtraAttrs['data-ar-glasses-bind-rotation-y-deg'] = '0';
+      arExtraAttrs['data-ar-glasses-bind-rotation-y-deg'] = '180';
     }
 
     return (

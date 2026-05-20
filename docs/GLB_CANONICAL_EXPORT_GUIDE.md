@@ -107,22 +107,14 @@ Vista Frontal (Front View):
 ## Troubleshooting
 
 ### Problema: Óculos aparece com hastes viradas para frente (lado errado)
-**Causa:** GLB foi exportado com frente = +Z ao invés de −Z, ou vice-versa  
-**Solução Rápida:** Adicione `data-ar-glasses-bind-rotation-y-deg="0"` no HTML para desabilitar o bind de 180°  
-**Solução Permanente:** Rotacione o objeto no Blender para que a frente das lentes seja −Z, depois Apply All Transforms
-
-**Exemplo de configuração:**
-```html
-<div 
-  data-omafit-ar="..."
-  data-ar-glasses-bind-rotation-y-deg="0"
->
-```
+**Causa:** Orientação do GLB vs bind MindAR (Ry 180° no load).  
+**Solução no widget (v28+):** O bind é aplicado automaticamente no modo canónico (`bindRotationYDeg: 180` no console).  
+**Solução na calibração admin:** Use o slider **Rodar esquerda/direita (ry)** — **180°** inverte o modelo; valores pequenos afinam.  
+**Alternativa HTML:** `data-ar-glasses-bind-rotation-y-deg="0"` se o GLB já estiver com frente = +Z.
 
 **Valores comuns:**
 - `180` (padrão): GLB com frente = −Z (convenção Blender)
 - `0`: GLB já orientado com frente = +Z (MindAR)
-- Outros valores: Para correções específicas
 
 ### Problema: Óculos muito grande ou muito pequeno
 **Causa:** Dimensões não estão em metros reais  
