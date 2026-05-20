@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-canonical-v25";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-bind0-v27";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1165,9 +1165,10 @@ function omafitAutoAlignGlassesModel(glasses, THREE) {
  */
 function normalizeGlassesModel(THREE, model, opts = {}) {
   if (!THREE || !model) return model;
+  const rotationYRad = Number.isFinite(opts.rotationYRad) ? opts.rotationYRad : Math.PI;
   model.scale.set(1, 1, 1);
   model.rotation.order = "XYZ";
-  model.rotation.set(0, Math.PI, 0);
+  model.rotation.set(0, rotationYRad, 0);
   model.position.set(0, 0, 0);
   if (typeof model.updateMatrix === "function") model.updateMatrix();
   model.updateMatrixWorld(true);
@@ -7980,7 +7981,7 @@ async function runArSession({
      * 
      * Quando habilitado (padrão "1"), o widget:
      * - Não recentra o GLB automaticamente (usa origin do Blender)
-     * - Aplica apenas bind Ry 180° para compatibilidade com MindAR
+     * - Bind Ry configurável (`data-ar-glasses-bind-rotation-y-deg`, default **0°**)
      * - Calcula largura do frame diretamente da bbox canônica
      * - Alinha matematicamente ao ponto médio dos olhos (landmarks 33/263)
      * - Respeita calibração rx/ry/rz do merchant sem offsets empíricos
@@ -7990,6 +7991,28 @@ async function runArSession({
       /^(1|true|yes|on)$/.test(
         String(cfgAttr("arGlassesCanonicalBlenderExport", "1")).trim().toLowerCase(),
       );
+    /**
+     * Rotação de bind (eixo Y) aplicada ao GLB durante normalização.
+     * Attr: `data-ar-glasses-bind-rotation-y-deg` (graus, default 0).
+     * 
+     * **Uso comum:**
+     * - **0°** (padrão): GLB já orientado com frente = +Z (MindAR / export atual)
+     * - **180°**: GLB exportado com frente = −Z (convenção Blender clássica)
+     * - **Outros valores**: Para correções específicas de orientação
+     * 
+     * Se o óculos aparece com hastes viradas para frente (lado errado),
+     * mude de 180° para 0° ou vice-versa.
+     */
+    const glassesBindRotationYDeg =
+      accessoryType === "glasses"
+        ? (() => {
+            const raw = String(cfgAttr("arGlassesBindRotationYDeg", "0")).trim();
+            const v = Number(raw);
+            if (!Number.isFinite(v)) return 0;
+            return v;
+          })()
+        : 0;
+    const glassesBindRotationYRad = (glassesBindRotationYDeg * Math.PI) / 180;
     /**
      * Rig estrutural MindAR (`data-ar-glasses-structural-mindar-rig="1"`) — definido cedo
      * para o pipeline de standardização GLB e outros flags o poderem referenciar.
@@ -9272,6 +9295,8 @@ async function runArSession({
         try {
           console.log("[omafit-ar] glasses canonical Blender export — sem bind automático / Tripo.", {
             bbox: { x: szCan.x, y: szCan.y, z: szCan.z },
+            bindRotationYDeg: glassesBindRotationYDeg,
+            bindRotationYRad: glassesBindRotationYRad.toFixed(4),
           });
         } catch {
           /* ignore */
@@ -9388,11 +9413,12 @@ async function runArSession({
       }
     } else if (accessoryType === "glasses" && glassesStructuralMindarRig) {
       /**
-       * Pipeline estrutural: `normalizeGlassesModel` (sem bind/Tripo) — só **`Ry(π)`** fixo.
+       * Pipeline estrutural: `normalizeGlassesModel` (sem bind/Tripo) — bind Ry configurável.
        */
       normalizeGlassesModel(THREE, glasses, {
         skipBboxCenter: glassesCanonicalBlenderExport,
         recenterAfterRotation: !glassesCanonicalBlenderExport,
+        rotationYRad: glassesBindRotationYRad,
       });
       glasses.updateMatrixWorld(true);
       const bStr = new THREE.Box3().setFromObject(glasses);
