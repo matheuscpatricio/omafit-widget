@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-eye-center-v24";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-canonical-v25";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -7970,11 +7970,25 @@ async function runArSession({
      * rotação aplicada no mesh (Apply Rotation), **frente das lentes = −Z** no espaço do root,
      * **+Y** para cima. Desliga heurísticas Tripo / bind base Ry / centro por bbox no root.
      * Attr: `data-ar-glasses-canonical-blender-export="1"`.
+     * 
+     * **CONTRATO DE EXPORT CANÔNICO (padrão desde v25):**
+     * 1. **Origin:** Posicionado na ponte do nariz (bridge), entre as lentes
+     * 2. **Orientação:** Frente das lentes olhando para −Z (eixo Z negativo)
+     * 3. **Eixos:** +X = largura do frame (esquerda→direita), +Y = altura (para cima)
+     * 4. **Rotação:** Apply All Transforms no Blender antes de exportar
+     * 5. **Escala:** Unidades em metros reais (ex: frame de 14cm = 0.14 unidades)
+     * 
+     * Quando habilitado (padrão "1"), o widget:
+     * - Não recentra o GLB automaticamente (usa origin do Blender)
+     * - Aplica apenas bind Ry 180° para compatibilidade com MindAR
+     * - Calcula largura do frame diretamente da bbox canônica
+     * - Alinha matematicamente ao ponto médio dos olhos (landmarks 33/263)
+     * - Respeita calibração rx/ry/rz do merchant sem offsets empíricos
      */
     const glassesCanonicalBlenderExport =
       accessoryType === "glasses" &&
       /^(1|true|yes|on)$/.test(
-        String(cfgAttr("arGlassesCanonicalBlenderExport", "0")).trim().toLowerCase(),
+        String(cfgAttr("arGlassesCanonicalBlenderExport", "1")).trim().toLowerCase(),
       );
     /**
      * Rig estrutural MindAR (`data-ar-glasses-structural-mindar-rig="1"`) — definido cedo
@@ -10761,11 +10775,12 @@ async function runArSession({
                     /* noop */
                   }
                   {
-                    // v22: ZERO offsets — posição pura do glassesTrackingWrap (ponto médio dos olhos)
+                    // v25: ZERO offsets + canonical export — posição pura do glassesTrackingWrap (ponto médio dos olhos)
                     glasses.position.set(0, 0, 0);
                     if (!st.positionLogged) {
                       st.positionLogged = true;
-                      console.log("[omafit-ar] glasses position v22 (ZERO offsets, eye-center aligned)", {
+                      console.log("[omafit-ar] glasses position v25 (canonical export, ZERO offsets, eye-center aligned)", {
+                        canonicalMode: glassesCanonicalBlenderExport,
                         glassesTrackingWrapPosition: {
                           x: glassesTrackingWrap.position.x.toFixed(4),
                           y: glassesTrackingWrap.position.y.toFixed(4),
