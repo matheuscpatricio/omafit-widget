@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-mindar-resize-v19";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-face-cover-v20";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -6725,6 +6725,51 @@ async function startMindARFaceWithReliableCamera(mindarThree, videoIdealBlock) {
 }
 
 /**
+ * Depois do `_resize()` do MindAR, garante object-fit **cover** em pixels no
+ * `<video>` e no canvas WebGL com o **mesmo** rect (paridade hand path).
+ * Não usar `width/height:100%` no canvas — estica ao aspecto do contentor e
+ * o GLB sai do frustum; aqui escala pelo aspecto do stream e centra com overflow
+ * cortado pelo `overflow:hidden` do host.
+ * @returns {boolean}
+ */
+function omafitMindARFaceCoverLayout(mindarHost, mindarThree) {
+  if (!mindarHost) return false;
+  const rect = mindarHost.getBoundingClientRect();
+  const cw = Math.max(1, Math.round(rect.width));
+  const ch = Math.max(1, Math.round(rect.height));
+  const video = mindarHost.querySelector?.("video");
+  if (!video) return false;
+  const vw = Math.max(0, Number(video.videoWidth) || 0);
+  const vh = Math.max(0, Number(video.videoHeight) || 0);
+  if (vw < 2 || vh < 2) return false;
+  const scale = Math.max(cw / vw, ch / vh);
+  const dw = Math.ceil(vw * scale);
+  const dh = Math.ceil(vh * scale);
+  const left = Math.round((cw - dw) / 2);
+  const top = Math.round((ch - dh) / 2);
+  const patchEl = (el, zIndex) => {
+    if (!el) return;
+    Object.assign(el.style, {
+      position: "absolute",
+      width: `${dw}px`,
+      height: `${dh}px`,
+      left: `${left}px`,
+      top: `${top}px`,
+      right: "auto",
+      bottom: "auto",
+      margin: "0",
+      maxWidth: "none",
+      maxHeight: "none",
+    });
+    if (zIndex != null) el.style.zIndex = String(zIndex);
+  };
+  patchEl(video, 1);
+  patchEl(mindarThree?.renderer?.domElement, 2);
+  patchEl(mindarThree?.cssRenderer?.domElement, 3);
+  return true;
+}
+
+/**
  * MindAR coloca o `<video>` da câmara atrás do canvas (z-index -2). O fundo só
  * se vê se o WebGL limpar com **alpha 0**; caso contrário o canvas tapa o vídeo
  * com preto opaco — o GLB continua visível, mas o feed da câmara desaparece.
@@ -6760,11 +6805,14 @@ function fixMindARFaceVideoBehindCanvas(THREE, mindarThree, mindarHost, projecti
       video.style.pointerEvents = "none";
       void video.play?.().catch?.(() => {});
     }
+    try {
+      omafitMindARFaceCoverLayout(mindarHost, mindarThree);
+    } catch {
+      /* ignore */
+    }
     /**
-     * NÃO forçar width/height:100% nem object-fit no vídeo/canvas — o MindAR
-     * posiciona em pixels (_resize) e o canvas esticado por CSS desalinha o GLB.
-     * Canvas + vídeo com as mesmas dimensões intrínsecas, `camera.aspect` e
-     * FOV alinhado à webcam — ver `omafitSyncMindARFaceProjection`.
+     * Projeção: buffer WebGL = stream; CSS cover em pixels (acima) — ver
+     * `omafitSyncMindARFaceProjection` (não usar aspect do contentor no frustum).
      */
     try {
       if (THREE) {
