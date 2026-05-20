@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-desktop-camera-v15";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-19-glasses-camera-fill-v16";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5427,17 +5427,6 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
     }`
         : ""
     }
-    /* Desktop: contentor da câmara com aspecto ~3:4 centrado — evita faixa larga/baixa que corta o feed. */
-    .omafit-ar-fit-desktop-camera {
-      flex: 1 1 0 !important;
-      min-height: 0 !important;
-      width: 100% !important;
-      max-width: min(100%, calc((100dvh - 7rem) * 3 / 4)) !important;
-      max-height: 100% !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-      aspect-ratio: 3 / 4 !important;
-    }
     .omafit-ar-shell-hero-layout { position: fixed; }
     .omafit-ar-shell-hero-layout .omafit-ar-hero-bg-root {
       position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
@@ -6977,20 +6966,27 @@ async function runArSession({
 
   mainRow.style.flexDirection = "column";
   mainRow.style.padding = "0";
-  if (arSessionIsDesktop) {
-    mainRow.style.flex = "1 1 0";
-    mainRow.style.minHeight = "0";
-    try {
-      const contentOuter = mainRow.parentElement;
-      if (contentOuter && contentOuter !== shell) {
-        contentOuter.style.flex = "1 1 0";
-        contentOuter.style.minHeight = "0";
-        contentOuter.style.display = "flex";
-        contentOuter.style.flexDirection = "column";
-      }
-    } catch {
-      /* ignore */
+  /** Mesmo layout que pulseiras/relógios: área da câmara ocupa o popup acima da barra inferior. */
+  try {
+    shell.style.display = "flex";
+    shell.style.flexDirection = "column";
+    shell.style.minHeight = "0";
+    shell.style.height = "100%";
+  } catch {
+    /* ignore */
+  }
+  mainRow.style.flex = "1 1 0";
+  mainRow.style.minHeight = "0";
+  try {
+    const contentOuter = mainRow.parentElement;
+    if (contentOuter && contentOuter !== shell) {
+      contentOuter.style.flex = "1 1 0";
+      contentOuter.style.minHeight = "0";
+      contentOuter.style.display = "flex";
+      contentOuter.style.flexDirection = "column";
     }
+  } catch {
+    /* ignore */
   }
 
   const arWrap = el("div", {
@@ -7020,14 +7016,12 @@ async function runArSession({
    * depois do modal estabilizar (ver `lateMindarResizeTimerIds`).
    */
   const arFit = el("div", {
-    className: arSessionIsDesktop
-      ? "omafit-ar-fit omafit-ar-fit-desktop-camera"
-      : "omafit-ar-fit",
+    className: "omafit-ar-fit",
     style: {
       position: "relative",
       flex: "1 1 0",
       width: "100%",
-      minHeight: arSessionIsDesktop ? "0" : "min(520px, 62dvh)",
+      minHeight: "0",
       overflow: "hidden",
       background: "#000",
       boxSizing: "border-box",
@@ -7345,13 +7339,10 @@ async function runArSession({
    */
   colContent.style.overflow = "hidden";
   colContent.style.overflowX = "hidden";
-  colContent.style.flex = "1";
+  colContent.style.flex = "1 1 0";
   colContent.style.display = "flex";
   colContent.style.flexDirection = "column";
-  if (arSessionIsDesktop) {
-    colContent.style.minHeight = "0";
-    colContent.style.height = "100%";
-  }
+  colContent.style.minHeight = "0";
   colContent.appendChild(arWrap);
   /**
    * Miniaturas + carrinho: irmãos de `arWrap` dentro de `colContent` (coluna
