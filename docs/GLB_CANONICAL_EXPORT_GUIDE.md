@@ -18,9 +18,19 @@ Isso funcionava na maioria dos casos, mas gerava comportamento imprevisível qua
 - A origem não estava onde o widget esperava
 - Havia artefatos de exportação (rotações aplicadas mas não "bakadas")
 
-### Solução: Contrato de Export
-O export canônico define **regras claras** que o artista 3D segue no Blender (ou outro DCC), e o widget **confia** que essas regras foram seguidas. Resultado:
+### Solução: Contrato de Export + Base Geométrica
+O export canônico define **regras claras** que o artista 3D segue no Blender (ou outro DCC), e o widget **confia** que essas regras foram seguidas. 
+
+**v29+** adiciona **Base Geométrica** (padrão "on"):
+- Rotação calculada diretamente dos landmarks dos **olhos** (33/263), **testa** (10) e **queixo** (152)
+- Eixo X alinha com a linha dos olhos → largura do frame naturalmente paralela
+- Eixo Y segue testa→queixo → altura da face
+- Eixo Z ortogonal → hastes seguem direção das orelhas de forma previsível
+
+**Resultado:**
 - ✅ Posicionamento previsível em 100% dos casos
+- ✅ **Hastes alinhadas às orelhas** (direção geométrica, não cópia da malha 468)
+- ✅ **Lentes paralelas ao plano dos olhos**
 - ✅ Sem "magia" ou heurísticas que podem falhar
 - ✅ Comportamento idêntico entre diferentes GLBs que seguem o contrato
 - ✅ Similar ao sistema de pulseiras "rigid slot" (posição fixa e previsível)
@@ -140,11 +150,17 @@ Isso reativa as heurísticas de auto-detecção, mas o comportamento pode ser im
 
 ## Referências Técnicas
 
-- **Widget Build:** v25+ (2026-05-20-glasses-canonical-v25)
-- **Atributo de Configuração:** `data-ar-glasses-canonical-blender-export="1"` (padrão)
-- **Landmarks MindAR:** 33 (olho direito), 263 (olho esquerdo), 168 (ponte nasal)
+- **Widget Build:** v29+ (2026-05-20-glasses-geometric-basis-v29)
+- **Atributos de Configuração:** 
+  - `data-ar-glasses-canonical-blender-export="1"` (padrão)
+  - `data-ar-glasses-geometric-basis="1"` (padrão v29+, rotação geométrica)
+- **Landmarks MindAR:**
+  - 33 (olho direito externo), 263 (olho esquerdo externo)
+  - 168 (ponte nasal)
+  - 10 (testa), 152 (queixo) — para base geométrica
 - **Coordenadas MindAR:** +X (direita), +Y (cima), +Z (para câmera)
 - **Bind Aplicado:** Ry 180° (converte −Z Blender → +Z MindAR)
+- **Base Geométrica (v29):** `buildGlassesFaceBasisMatrix` — X=olhos, Y=testa→queixo, Z=ortogonal
 
 ## Suporte
 

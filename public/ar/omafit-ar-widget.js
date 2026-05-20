@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-canonical-bind-v28";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-geometric-basis-v29";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8033,6 +8033,23 @@ async function runArSession({
         : 180;
     const glassesBindRotationYRad = (glassesBindRotationYDeg * Math.PI) / 180;
     /**
+     * Base geométrica (olhos + testa + queixo) para rotação mais previsível.
+     * Attr: `data-ar-glasses-geometric-basis` (default "1" desde v29).
+     * 
+     * Quando habilitado no modo canónico + simple:
+     * - X = linha dos olhos (33→263, largura do frame alinha naturalmente)
+     * - Y = testa(10)→queixo(152), altura facial
+     * - Z = ortogonal (forward), calculado via cross product
+     * 
+     * Resultado: hastes seguem direção das orelhas de forma mais previsível,
+     * lentes ficam no plano dos olhos. Mais estável que copiar faceMatrix (468 vértices).
+     */
+    const glassesGeometricBasis =
+      accessoryType === "glasses" &&
+      /^(1|true|yes|on)$/.test(
+        String(cfgAttr("arGlassesGeometricBasis", "1")).trim().toLowerCase(),
+      );
+    /**
      * Rig estrutural MindAR (`data-ar-glasses-structural-mindar-rig="1"`) — definido cedo
      * para o pipeline de standardização GLB e outros flags o poderem referenciar.
      */
@@ -9195,6 +9212,7 @@ async function runArSession({
       console.log("[omafit-ar] pipeline óculos (verificar build + modo)", {
         build: OMAFIT_AR_WIDGET_BUILD,
         glassesSimpleFaceOnly,
+        glassesGeometricBasis,
         glassesManualMindarRig,
         glassesCanonicalBlenderExport,
         glassesGlbStandardize,
@@ -9317,6 +9335,10 @@ async function runArSession({
             bbox: { x: szCan.x, y: szCan.y, z: szCan.z },
             bindRotationYDeg: glassesBindRotationYDeg,
             bindRotationYRad: glassesBindRotationYRad.toFixed(4),
+            geometricBasis: glassesGeometricBasis,
+            geometricBasisHint: glassesGeometricBasis
+              ? "Rotação: base olhos(33/263) + testa(10) + queixo(152) — hastes alinham às orelhas"
+              : "Rotação: faceMatrix (468 landmarks)",
           });
         } catch {
           /* ignore */
@@ -10133,6 +10155,7 @@ async function runArSession({
       glassesNegateWearOffsetX,
       glassesEyeMidpointAlign,
       glassesSimpleFaceOnly,
+      glassesGeometricBasis,
       glassesFrameWidthLocal,
       eyeMidWearSmoothed: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
       eyeMidWearTarget: glassesEyeMidpointAlign ? new THREE.Vector3() : null,
@@ -10725,14 +10748,50 @@ async function runArSession({
 
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
-                   * Rotação: 3×3 de `parentInv*faceWorld` (mesma pose que a malha 468 suavizada).
-                   * (Evitar `faceWorld×lmBasis` no wrap: a composição alterava o eixo e a percepção
-                   * de escala/virado.) Translação: ponto interpupilar em mundo → local do wrap;
-                   * +Z de profundidade: coluna 2 de `fa.basis` no referencial do pai.
+                   * Rotação: escolha entre faceMatrix (468 landmarks) ou base geométrica (olhos + testa + queixo).
+                   * 
+                   * v29: `glassesGeometricBasis` (default "1") usa `buildGlassesFaceBasisMatrix` —
+                   * eixo X alinha com linha dos olhos, Y com testa→queixo, Z ortogonal.
+                   * Resultado: hastes seguem direção natural das orelhas, lentes paralelas aos olhos.
+                   * 
+                   * Legado: `faceMatrix` completa (malha 468) — mais sensível a roll/assimetrias.
                    * O bind glTF→MindAR fica no `glassesStaticBindWrap`.
                    */
-                  fa.q.setFromRotationMatrix(fa.basis);
-                  glassesTrackingWrap.quaternion.copy(fa.q);
+                  if (st.glassesGeometricBasis) {
+                    if (!fa.geomBasis) fa.geomBasis = new THREE.Matrix4();
+                    if (!fa.geomReuse) {
+                      fa.geomReuse = {
+                        x: new THREE.Vector3(),
+                        yRaw: new THREE.Vector3(),
+                        y: new THREE.Vector3(),
+                        z: new THREE.Vector3(),
+                        p: new THREE.Vector3(),
+                        tmp: new THREE.Vector3(),
+                        O: new THREE.Vector3(),
+                        eR: new THREE.Vector3(),
+                        eL: new THREE.Vector3(),
+                        fh: new THREE.Vector3(),
+                        ch: new THREE.Vector3(),
+                      };
+                    }
+                    const geomOk = buildGlassesFaceBasisMatrix(
+                      THREE,
+                      lmLoc,
+                      st.lmSmoother,
+                      fa.geomBasis,
+                      fa.geomReuse,
+                    );
+                    if (geomOk) {
+                      fa.q.setFromRotationMatrix(fa.geomBasis);
+                      glassesTrackingWrap.quaternion.copy(fa.q);
+                    } else {
+                      fa.q.setFromRotationMatrix(fa.basis);
+                      glassesTrackingWrap.quaternion.copy(fa.q);
+                    }
+                  } else {
+                    fa.q.setFromRotationMatrix(fa.basis);
+                    glassesTrackingWrap.quaternion.copy(fa.q);
+                  }
                   const okMid = (() => {
                     if (!lmLoc) return false;
                     const smR0 = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
@@ -10776,7 +10835,8 @@ async function runArSession({
                   if (okMid && st.glassesEyeMidpointAlign && faceAlignParent) {
                     glassesTrackingWrap.position.copy(fa.midW);
                     faceAlignParent.worldToLocal(glassesTrackingWrap.position);
-                    const ce = fa.basis.elements;
+                    const basisForDepth = st.glassesGeometricBasis && fa.geomBasis ? fa.geomBasis : fa.basis;
+                    const ce = basisForDepth.elements;
                     fa.zFaceLocal.set(ce[8], ce[9], ce[10]);
                     if (fa.zFaceLocal.lengthSq() > 1e-12) fa.zFaceLocal.normalize();
                     fa.zFaceLocal.transformDirection(fa.parentInv);
@@ -10825,8 +10885,9 @@ async function runArSession({
                     glasses.position.set(0, 0, 0);
                     if (!st.positionLogged) {
                       st.positionLogged = true;
-                      console.log("[omafit-ar] glasses position v25 (canonical export, ZERO offsets, eye-center aligned)", {
+                      console.log("[omafit-ar] glasses position v29 (geometric basis, canonical export, ZERO offsets)", {
                         canonicalMode: glassesCanonicalBlenderExport,
+                        geometricBasis: st.glassesGeometricBasis,
                         glassesTrackingWrapPosition: {
                           x: glassesTrackingWrap.position.x.toFixed(4),
                           y: glassesTrackingWrap.position.y.toFixed(4),
