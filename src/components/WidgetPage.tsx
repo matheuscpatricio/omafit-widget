@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-glasses-scale-slider-v31';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-glasses-nose-bridge-v32';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -1277,6 +1277,7 @@ export function WidgetPage() {
     const arAccessory = String(eyewearBootstrap.accessoryType || 'glasses').trim().toLowerCase();
     if (arAccessory === 'glasses' || arAccessory === 'eyewear') {
       arExtraAttrs['data-ar-glasses-bind-rotation-y-deg'] = '180';
+      arExtraAttrs['data-ar-glasses-canonical-blender-export'] = '1';
     }
 
     return (
