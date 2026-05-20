@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-eye-center-v22";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-eye-center-v23";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9899,6 +9899,56 @@ async function runArSession({
 
     let eyeMidDebugMesh = null;
     let glassesBboxCenterDebugMesh = null;
+    /** v23: esferas debug olhos/centro (?omafit_ar_glasses_eye_debug=1). */
+    let glassesEyeDebugSpheres = null;
+    if (glassesEyeDebugSimple) {
+      const geomEye = new THREE.SphereGeometry(0.006, 12, 12);
+      const matEye = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.85,
+        depthTest: false,
+        depthWrite: false,
+      });
+      glassesEyeDebugSpheres = {
+        right: new THREE.Mesh(geomEye, matEye),
+        left: new THREE.Mesh(geomEye.clone(), matEye.clone()),
+        center: new THREE.Mesh(
+          new THREE.SphereGeometry(0.008, 16, 16),
+          new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.9,
+            depthTest: false,
+            depthWrite: false,
+          }),
+        ),
+        scratchR: new THREE.Vector3(),
+        scratchL: new THREE.Vector3(),
+        scratchMid: new THREE.Vector3(),
+      };
+      for (const m of [
+        glassesEyeDebugSpheres.right,
+        glassesEyeDebugSpheres.left,
+        glassesEyeDebugSpheres.center,
+      ]) {
+        m.frustumCulled = false;
+        m.renderOrder = 1000;
+      }
+      glassesEyeDebugSpheres.right.name = "omafit-eye-debug-right";
+      glassesEyeDebugSpheres.left.name = "omafit-eye-debug-left";
+      glassesEyeDebugSpheres.center.name = "omafit-eye-debug-center";
+      anchor.group.add(glassesEyeDebugSpheres.right);
+      anchor.group.add(glassesEyeDebugSpheres.left);
+      anchor.group.add(glassesEyeDebugSpheres.center);
+      try {
+        console.log(
+          "[omafit-ar] glasses eye debug v23 — vermelho: olhos; verde: centro (?omafit_ar_glasses_eye_debug=1)",
+        );
+      } catch {
+        /* ignore */
+      }
+    }
     if (glassesEyeMidDebugVisualEnabled) {
       const rDbg = 0.009;
       const mkSphere = (color) => {
@@ -10679,21 +10729,19 @@ async function runArSession({
                       glassesTrackingWrap.position.addScaledVector(fa.zFaceLocal, df);
                     }
                     
-                    /** v22: Debug visual — esferas nos olhos e centro. */
-                    if (st.glassesEyeDebugSpheres) {
+                    /** v23: Debug visual — esferas no espaço da âncora MindAR. */
+                    if (st.glassesEyeDebugSpheres && anchor?.group) {
                       const d = st.glassesEyeDebugSpheres;
+                      const ag = anchor.group;
                       d.scratchR.copy(fa.eyeR).applyMatrix4(fa.faceWorld);
                       d.scratchL.copy(fa.eyeL).applyMatrix4(fa.faceWorld);
                       d.scratchMid.copy(fa.midW);
-                      faceAlignParent.worldToLocal(d.scratchR);
-                      faceAlignParent.worldToLocal(d.scratchL);
-                      faceAlignParent.worldToLocal(d.scratchMid);
+                      ag.worldToLocal(d.scratchR);
+                      ag.worldToLocal(d.scratchL);
+                      ag.worldToLocal(d.scratchMid);
                       d.right.position.copy(d.scratchR);
                       d.left.position.copy(d.scratchL);
                       d.center.position.copy(d.scratchMid);
-                      if (df > 0) {
-                        d.center.position.addScaledVector(fa.zFaceLocal, df);
-                      }
                     }
                   } else {
                     glassesTrackingWrap.position.setFromMatrixPosition(fa.basis);
