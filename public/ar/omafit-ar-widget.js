@@ -494,7 +494,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-geometric-basis-v29";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-depth-slider-v30";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10840,10 +10840,9 @@ async function runArSession({
                     fa.zFaceLocal.set(ce[8], ce[9], ce[10]);
                     if (fa.zFaceLocal.lengthSq() > 1e-12) fa.zFaceLocal.normalize();
                     fa.zFaceLocal.transformDirection(fa.parentInv);
-                    const df = Math.max(
-                      0,
-                      Number.isFinite(st.glassesDepthForwardM) ? st.glassesDepthForwardM : 0,
-                    );
+                    const baseDepth = Number.isFinite(st.glassesDepthForwardM) ? st.glassesDepthForwardM : 0;
+                    const calWearZ = Number.isFinite(initialFaceCal.wearZ) ? initialFaceCal.wearZ : 0;
+                    const df = Math.max(0, baseDepth + calWearZ);
                     if (df > 0) {
                       glassesTrackingWrap.position.addScaledVector(fa.zFaceLocal, df);
                     }
