@@ -5,8 +5,8 @@
  *   - `app/ar-calibration.shared.js` (sanitização / defaults)
  *
  * Semântica (previsível para o lojista):
- *   - `scale` = 1 → armação com largura ≈ IPD de referência (63 mm) numa largura de
- *     frame de referência (~145 mm), antes do multiplicador do slider.
+ *   - `scale` = 1 → largura da armação ≈ referência física (~145 mm) no preview e no AR.
+ *     O slider multiplica só essa base (`fitW / bboxX`), não o IPD (63 mm).
  *   - `wearZ` = 0 → sem deslocamento extra em profundidade (metros).
  *     Negativo aproxima, positivo afasta (mesmo eixo que o preview estático).
  *   - `wearX` / `wearY` = metros (direita / cima no preview; convertidos para a âncora no AR).
@@ -83,13 +83,27 @@ export function computeGlassesAutoFitMeshScale(p) {
 }
 
 /**
- * `baseScale` do preview admin (= escala automática a 100% antes de `cal.scale`).
+ * `baseScale` do preview admin e do AR a 100% (= `fitW / bboxX`).
+ * Alinha a largura do mesh à referência da armação (~145 mm), não ao IPD.
  *
  * @param {number} bboxWidthLocal Largura X da bbox do GLB.
+ * @returns {number}
+ */
+export function computeGlassesPreviewBaseScale(bboxWidthLocal) {
+  const fitW = resolveGlassesFrameWidthForFit(bboxWidthLocal);
+  const rawW = Math.max(Number(bboxWidthLocal) || 0, 1e-4);
+  return fitW / rawW;
+}
+
+/**
+ * Escala com fit IPD (legado / ramos não-simples). Modo simples usa
+ * `computeGlassesPreviewBaseScale` × `merchantScale`.
+ *
+ * @param {number} bboxWidthLocal
  * @param {number} [ipdMul]
  * @returns {number}
  */
-export function computeGlassesPreviewBaseScale(
+export function computeGlassesPreviewBaseScaleIpdFit(
   bboxWidthLocal,
   ipdMul = OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
 ) {
@@ -137,13 +151,7 @@ export function computeGlassesEffectiveDisplayScale(p) {
   const base = Math.max(Number(p.autoFitBase) || 0, 1e-6);
   const cal =
     Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
-  if (p.matchPreviewOnly) {
-    /** Paridade com o preview admin: `baseScale × scale` sem IPD ao vivo. */
-    return base * cal;
-  }
-  const ipd = Math.max(Number(p.ipdMetricM) || 0, 1e-6);
-  const ref = Math.max(Number(p.referenceIpdM) || OMAFIT_GLASSES_REFERENCE_IPD_M, 1e-6);
-  return base * cal * (ipd / ref);
+  return base * cal;
 }
 
 /**
