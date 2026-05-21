@@ -410,7 +410,10 @@ const OMAFIT_BRACELET_OCCLUSION_TOP_MIN_OPACITY = 0.72;
 const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = true;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
-/** Relógio: evitar depender da label Left/Right (pode oscilar por mirror). */
+/**
+ * Relógio: não espelhar só com `Left` (regra da pulseira). Pulso direito precisa
+ * de flip 180° no plano do mostrador (tmpX+tmpY); ver bloco em `updateAnchorFromHand`.
+ */
 const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 /**
  * Depth occluder cilíndrico para pulseira.
@@ -510,7 +513,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v51";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v52";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
