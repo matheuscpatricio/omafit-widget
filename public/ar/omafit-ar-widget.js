@@ -513,7 +513,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v52";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v53";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1900,9 +1900,8 @@ function buildGlbLoaderUrl(baseUrl, version) {
 }
 
 /**
- * Iframe Netlify: `omafit-widget.js` envia `omafit_mode=eyewear_ar` ao abrir o provador com GLB
- * **só** para acessórios de rosto (não watch/bracelet / hand). Isto força `glasses` no query
- * e evita classificação errada de óptica como `watch` em algumas lojas.
+ * Iframe Netlify: `omafit_mode=eyewear_ar` — provador face (óculos **ou** colar), não mão.
+ * Bloqueia TryOn de roupa no Netlify; **não** implica `accessoryType=glasses`.
  */
 function isOmafitEyewearArForcedFromQuery() {
   try {
@@ -1914,6 +1913,27 @@ function isOmafitEyewearArForcedFromQuery() {
   } catch {
     return false;
   }
+}
+
+/**
+ * Só força `glasses` no modo eyewear_ar quando o produto não é colar (face stack partilhada).
+ *
+ * @param {string} accessoryType tipo já resolvido
+ * @param {string} liquidType `data-ar-accessory-type` do Liquid
+ * @param {string} clientDetected deteção cliente
+ * @param {boolean} clientHasStrongSignal
+ */
+function omafitShouldForceGlassesFromEyewearArQuery(
+  accessoryType,
+  liquidType,
+  clientDetected,
+  clientHasStrongSignal,
+) {
+  if (!isOmafitEyewearArForcedFromQuery()) return false;
+  if (accessoryType === "necklace") return false;
+  if (liquidType === "necklace") return false;
+  if (clientHasStrongSignal && clientDetected === "necklace") return false;
+  return true;
 }
 
 /**
@@ -7703,9 +7723,18 @@ async function runArSession({
     }
 
     if (isOmafitEyewearArForcedFromQuery()) {
-      accessoryType = "glasses";
-      accessoryTypeSource = "query-eyewear_ar-forced";
       trackingStack = "face";
+      if (
+        omafitShouldForceGlassesFromEyewearArQuery(
+          accessoryType,
+          liquidAccessoryType,
+          clientDetected,
+          clientHasStrongSignal,
+        )
+      ) {
+        accessoryType = "glasses";
+        accessoryTypeSource = "query-eyewear_ar-forced";
+      }
     }
 
     const arPerfModeEarly = String(cfgAttrDispatch("arPerformanceProfile", "auto")).trim().toLowerCase();
@@ -14947,6 +14976,19 @@ async function runHandArSession({
       if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
     }
 
+    /**
+     * Pulso direito: sem este flip o mostrador fica invertido (hastes/topo trocados)
+     * enquanto o esquerdo já está correcto. Equivalente a π rad em torno do antebraço.
+     */
+    if (
+      accessoryType === "watch" &&
+      !OMAFIT_WATCH_USE_HANDEDNESS_LABEL &&
+      handLabel === "Right"
+    ) {
+      tmpX.negate();
+      tmpY.negate();
+    }
+
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
@@ -16590,7 +16632,14 @@ async function main() {
     accessoryTypeSource = "default";
   }
 
-  if (isOmafitEyewearArForcedFromQuery()) {
+  if (
+    omafitShouldForceGlassesFromEyewearArQuery(
+      accessoryType,
+      liquidArType,
+      clientArType,
+      clientHasStrongSignal,
+    )
+  ) {
     accessoryType = "glasses";
     accessoryTypeSource = "query-eyewear_ar-forced";
   }

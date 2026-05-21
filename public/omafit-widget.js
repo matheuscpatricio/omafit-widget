@@ -2335,9 +2335,8 @@
     if (glbPass) {
       widgetUrl += '&arGlbUrl=' + encodeURIComponent(glbPass);
       /**
-       * `omafit_mode=eyewear_ar` força face/óculos no iframe (corrige produtos óptica
-       * mal classificados como relógio). Para **watch/bracelet** ou stack **hand**, não
-       * enviar — senão sobrepõe `data-ar-accessory-type` e o provador mostra cópia/UI de óculos.
+       * `omafit_mode=eyewear_ar` = provador face (óculos **ou** colar); bloqueia TryOn roupa.
+       * Não enviar para **watch/bracelet** (stack mão). Colar mantém `necklace` no widget.
        */
       try {
         var arRootMode = document.getElementById('omafit-ar-root');
