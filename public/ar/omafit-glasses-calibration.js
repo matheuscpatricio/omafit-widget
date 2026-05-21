@@ -5,8 +5,9 @@
  *   - `app/ar-calibration.shared.js` (sanitização / defaults)
  *
  * Semântica (previsível para o lojista):
- *   - `scale` = 1 → largura da armação ≈ referência física (~145 mm) no preview e no AR.
- *     O slider multiplica só essa base (`fitW / bboxX`), não o IPD (63 mm).
+ *   - Export canónico Blender + AR simples: `scale` = 1 → GLB como exportado (origem na ponte);
+ *     2 = o dobro. Sem factor `fitW/bbox` (isso encolhia ~4× no AR).
+ *   - GLB não canónico / bbox gigante: `scale` × (`fitW` / largura bbox).
  *   - `wearZ` = 0 → sem deslocamento extra em profundidade (metros).
  *     Negativo aproxima, positivo afasta (mesmo eixo que o preview estático).
  *   - `wearX` / `wearY` = metros (direita / cima no preview; convertidos para a âncora no AR).
@@ -152,6 +153,47 @@ export function computeGlassesEffectiveDisplayScale(p) {
   const cal =
     Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
   return base * cal;
+}
+
+/**
+ * Escala uniforme do mesh `glasses` — única função para admin + AR.
+ *
+ * @param {{
+ *   bboxWidthLocal: number,
+ *   merchantScaleMul?: number,
+ *   canonicalBlenderExport?: boolean,
+ *   simpleFaceOnly?: boolean,
+ * }} p
+ * @returns {number}
+ */
+export function resolveGlassesMerchantMeshScale(p) {
+  const mul =
+    Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
+  if (p.canonicalBlenderExport && p.simpleFaceOnly) {
+    return mul;
+  }
+  const base = computeGlassesPreviewBaseScale(p.bboxWidthLocal);
+  return computeGlassesEffectiveDisplayScale({
+    autoFitBase: base,
+    merchantScaleMul: mul,
+  });
+}
+
+/**
+ * Valor de referência a 100% do slider (só telemetria / logs).
+ *
+ * @param {{
+ *   bboxWidthLocal: number,
+ *   canonicalBlenderExport?: boolean,
+ *   simpleFaceOnly?: boolean,
+ * }} p
+ * @returns {number}
+ */
+export function resolveGlassesCalibScaleBase(p) {
+  if (p.canonicalBlenderExport && p.simpleFaceOnly) {
+    return 1;
+  }
+  return computeGlassesPreviewBaseScale(p.bboxWidthLocal);
 }
 
 /**
