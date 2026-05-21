@@ -506,7 +506,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v42";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v43";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9500,7 +9500,26 @@ async function runArSession({
     const accessoryMeshNormalizeScale = accessoryType === "glasses" ? 1 : 1 / maxDim;
     if (accessoryType === "glasses") {
       if (!glassesManualMindarRig) {
-        glasses.scale.set(1, 1, 1);
+        if (glassesSimpleFaceOnly) {
+          const mc = readGlassesMerchantCal();
+          const autoBase = computeGlassesPreviewBaseScale(
+            glassesFrameWidthRawLocal,
+            OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
+          );
+          const mul = mc && Number(mc.scale) > 0 ? mc.scale : 1;
+          const bootScale = THREE.MathUtils.clamp(
+            computeGlassesEffectiveDisplayScale({
+              autoFitBase: autoBase,
+              merchantScaleMul: mul,
+              matchPreviewOnly: true,
+            }),
+            OMAFIT_GLASSES_MESH_SCALE_ABS_MIN,
+            OMAFIT_GLASSES_MESH_SCALE_ABS_MAX,
+          );
+          glasses.scale.set(bootScale, bootScale, bootScale);
+        } else {
+          glasses.scale.set(1, 1, 1);
+        }
       }
     } else {
       glasses.scale.setScalar(accessoryMeshNormalizeScale);
@@ -10705,7 +10724,10 @@ async function runArSession({
               /** Pai do alinhamento facial: sempre `glassesModelWrap` (tracking wrap é filho). */
               const faceAlignParent =
                 st.glassesModelWrap || glassesModelWrap || glasses?.parent || null;
-              if (faceSrc && faceAlignParent) {
+              /** MindAR: `metricLandmarks` chegam antes de `faceMeshes` estar populado no 1.º `onUpdate`. */
+              const facePoseFromAnchor =
+                !faceSrc && anchor?.group && st.glassesSimpleFaceOnly;
+              if (faceAlignParent && (faceSrc || facePoseFromAnchor)) {
                 if (!_omafitSimpleGlassesFaceAlignScratch) {
                   _omafitSimpleGlassesFaceAlignScratch = {
                     faceWorld: new THREE.Matrix4(),
@@ -10728,10 +10750,16 @@ async function runArSession({
                 const fa = _omafitSimpleGlassesFaceAlignScratch;
                 const lmLoc = lm;
                 if (!fa.faceForwardOff) fa.faceForwardOff = new THREE.Vector3();
-                faceSrc.updateMatrixWorld(true);
+                if (faceSrc) {
+                  faceSrc.updateMatrixWorld(true);
+                } else {
+                  anchor.group.updateMatrixWorld(true);
+                }
                 faceAlignParent.updateMatrixWorld(true);
-                /** `faceMatrix` MindAR: mesma matriz 4×4 suavizada que a malha (`m[12]..[14]` = translação). */
-                fa.faceWorld.copy(faceSrc.matrixWorld);
+                /** Pose facial: malha 468 suavizada, ou âncora 168 (ponte) quando a malha ainda não existe. */
+                fa.faceWorld.copy(
+                  faceSrc ? faceSrc.matrixWorld : anchor.group.matrixWorld,
+                );
                 fa.parentInv.copy(faceAlignParent.matrixWorld).invert();
                 fa.localMat.multiplyMatrices(fa.parentInv, fa.faceWorld);
                 if (st.glassesSimpleFaceOnly) {
@@ -10856,9 +10884,10 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v42 (preview 1:1)", {
+                      console.log("[omafit-ar] glasses calibration v43 (preview 1:1)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
+                        facePoseFromAnchor: !!facePoseFromAnchor,
                         glassesCalibAutoScaleBase: autoBase,
                         meshScale: displayScale,
                         expectedAtScale1: autoBase,
@@ -10959,7 +10988,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v42 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v43 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,
