@@ -509,7 +509,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v48";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v49";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9572,9 +9572,7 @@ async function runArSession({
     calibRot.rotation.order = "XYZ";
     calibRot.rotation.set(0, 0, 0);
     calibRot.quaternion.identity();
-    if (accessoryType === "glasses" && initialFaceCal) {
-      applyThreeGroupCalibRot(calibRot, initialFaceCal);
-    }
+    /** rx/ry/rz aplicados após bind Ry 180° (paridade preview admin). */
     calibRot.updateMatrix();
     calibRot.updateMatrixWorld(true);
     const glassesAnatomy =
@@ -9761,8 +9759,12 @@ async function runArSession({
         glassesStaticBindWrap.position.set(0, 0, 0);
         glassesStaticBindWrap.scale.set(1, 1, 1);
         if (glassesCanonicalBlenderExport && glassesSimpleFaceOnly) {
-          /** Paridade preview admin: Ry 180° no GLB antes de `calibRot` (rx/ry/rz). */
-          glassesStaticBindWrap.quaternion.setFromAxisAngle(
+          /**
+           * Paridade preview admin: Ry 180° no root do GLB com `calibRot` ainda
+           * identidade, depois rx/ry/rz em `calibRot` (ver abaixo).
+           */
+          glassesStaticBindWrap.quaternion.identity();
+          glassesStaticBindWrap.rotateOnWorldAxis(
             new THREE.Vector3(0, 1, 0),
             OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
           );
@@ -9773,6 +9775,11 @@ async function runArSession({
         }
         glasses.quaternion.identity();
         glasses.rotation.set(0, 0, 0);
+      }
+      if (accessoryType === "glasses" && initialFaceCal) {
+        applyThreeGroupCalibRot(calibRot, initialFaceCal);
+        calibRot.updateMatrix();
+        calibRot.updateMatrixWorld(true);
       }
       /** Centro lógico no wrap: translação só no mesh `glasses` (GLB inalterado). Com **tracking wrap**, soma também offset empírico estático. */
       if (accessoryType === "glasses") {
@@ -10900,15 +10907,24 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v48 (merchant × canonical)", {
+                      console.log("[omafit-ar] glasses calibration v49 (merchant × canonical)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
+                        calibrationRotation: {
+                          rx: merchantCal?.rx,
+                          ry: merchantCal?.ry,
+                          rz: merchantCal?.rz,
+                        },
                         facePoseFromAnchor: !!facePoseFromAnchor,
                         glassesCanonicalBlenderExport: st.glassesCanonicalBlenderExport,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,
                         meshScale: displayScale,
+                        trackingWrapRotationMode:
+                          st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
+                            ? "identity (paridade preview)"
+                            : "faceBasis",
                         formula: st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
-                          ? "meshScale = merchantScale (canónico)"
+                          ? "meshScale = merchantScale; rot = anchor×calibRot(rx/ry/rz)×Ry180"
                           : "meshScale = (fitW/bboxX) × merchantScale",
                         faceUnitsPerMeter: faceU,
                         glassesTrackingWrapPosition: {
@@ -11007,7 +11023,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v47 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v49 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,

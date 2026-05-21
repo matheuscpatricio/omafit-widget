@@ -65,9 +65,20 @@ export function resolveGlassesFrameWidthForFit(bboxWidthLocal) {
   return w;
 }
 
+/** Arredonda graus de rotação (óculos) — paridade `snapArRotationFineDeg` no admin. */
+function snapGlassesMerchantRotationDeg(deg) {
+  const n = Number(deg);
+  if (!Number.isFinite(n)) return 0;
+  const clamped = Math.min(180, Math.max(-180, n));
+  const snapped = Math.round(clamped / 5) * 5;
+  if (snapped > 180) return 180;
+  if (snapped < -180) return -180;
+  return snapped;
+}
+
 /**
  * @param {unknown} cal
- * @returns {{ scale: number, wearX: number, wearY: number, wearZ: number }}
+ * @returns {{ scale: number, wearX: number, wearY: number, wearZ: number, rx: number, ry: number, rz: number }}
  */
 export function normalizeGlassesMerchantCalibration(cal) {
   const src = cal && typeof cal === "object" ? cal : {};
@@ -81,6 +92,9 @@ export function normalizeGlassesMerchantCalibration(cal) {
     wearX: num("wearX", 0),
     wearY: num("wearY", 0),
     wearZ: num("wearZ", 0),
+    rx: snapGlassesMerchantRotationDeg(src.rx),
+    ry: snapGlassesMerchantRotationDeg(src.ry),
+    rz: snapGlassesMerchantRotationDeg(src.rz),
   };
 }
 
