@@ -122,17 +122,53 @@ export function omafitAnchorUnitsPerMeter(matrixWorld) {
 }
 
 /**
- * Posição de `wearPosition` (modo simples): mesmos metros que o preview admin.
+ * Escala efectiva do GLB no widget (= `glassesModelWrap.scale × glasses.scale` no modo simples).
+ * `merchantScale` multiplica só o auto-fit de referência (100% do admin).
  *
- * @param {import("three").Vector3} out
- * @param {import("three").Matrix4} anchorMatrixWorld
- * @param {{ wearX?: number, wearY?: number, wearZ?: number }} cal
+ * @param {{
+ *   autoFitBase: number,
+ *   merchantScaleMul?: number,
+ *   ipdMetricM?: number,
+ *   referenceIpdM?: number,
+ * }} p
+ * @returns {number}
  */
-export function applyGlassesWearPositionMeters(out, anchorMatrixWorld, cal) {
-  const uPerM = omafitAnchorUnitsPerMeter(anchorMatrixWorld);
-  const wx = Number(cal.wearX) || 0;
-  const wy = Number(cal.wearY) || 0;
-  const wz = Number(cal.wearZ) || 0;
-  out.set(wx * uPerM, wy * uPerM, wz * uPerM);
-  return out;
+export function computeGlassesEffectiveDisplayScale(p) {
+  const base = Math.max(Number(p.autoFitBase) || 0, 1e-6);
+  const cal =
+    Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
+  const ipd = Math.max(Number(p.ipdMetricM) || 0, 1e-6);
+  const ref = Math.max(Number(p.referenceIpdM) || OMAFIT_GLASSES_REFERENCE_IPD_M, 1e-6);
+  return base * cal * (ipd / ref);
+}
+
+/**
+ * Soma wearX/Y/Z (metros) ao `position` usando as colunas 3×3 de `localFaceMatrix`
+ * (face → espaço do pai do tracking wrap, ex. `glassesModelWrap`).
+ *
+ * @param {import("three").Vector3} position
+ * @param {import("three").Matrix4} localFaceMatrix parentInv × faceWorld
+ * @param {{ wearX?: number, wearY?: number, wearZ?: number, depthForwardM?: number }} cal
+ * @param {number} metersPerLocalUnit fator face (‖col‖ média da rotação)
+ */
+export function addGlassesMerchantWearToPositionM(
+  position,
+  localFaceMatrix,
+  cal,
+  metersPerLocalUnit,
+) {
+  const m = localFaceMatrix.elements;
+  const sx = Math.hypot(m[0], m[1], m[2]);
+  const sy = Math.hypot(m[4], m[5], m[6]);
+  const sz = Math.hypot(m[8], m[9], m[10]);
+  const u = Math.max(Number(metersPerLocalUnit) || 0, (sx + sy + sz) / 3, 1e-6);
+  const ax = sx > 1e-9 ? sx : 1;
+  const ay = sy > 1e-9 ? sy : 1;
+  const az = sz > 1e-9 ? sz : 1;
+  const wx = (Number(cal.wearX) || 0) * u;
+  const wy = (Number(cal.wearY) || 0) * u;
+  const wz = ((Number(cal.wearZ) || 0) + (Number(cal.depthForwardM) || 0)) * u;
+  position.x += (m[0] / ax) * wx + (m[4] / ay) * wy + (m[8] / az) * wz;
+  position.y += (m[1] / ax) * wx + (m[5] / ay) * wy + (m[9] / az) * wz;
+  position.z += (m[2] / ax) * wx + (m[6] / ay) * wy + (m[10] / az) * wz;
 }
