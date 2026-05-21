@@ -11,9 +11,32 @@
  *   - `wearZ` = 0 → sem deslocamento extra em profundidade (metros).
  *     Negativo aproxima, positivo afasta (mesmo eixo que o preview estático).
  *   - `wearX` / `wearY` = metros (direita / cima no preview; convertidos para a âncora no AR).
+ *   - `rx` / `ry` / `rz` (graus): eixos de mundo fixos, ordem Y → X → Z (igual preview admin).
  */
 
-/** IPD médio adulto (m) — referência do preview admin (= 100% escala automática). */
+/** Bind estático óculos canónicos: Ry 180° no mesh (paridade preview `calibrate.$assetId`). */
+export const OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD = Math.PI;
+
+/**
+ * Rotação de calibração do lojista (rx/ry/rz) — mesma semântica que o preview admin.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} group ex. `calibRot`
+ * @param {{ rx?: number, ry?: number, rz?: number }} cal
+ */
+export function applyGlassesMerchantCalibRotation(THREE, group, cal) {
+  if (!THREE || !group?.quaternion || typeof group.rotateOnWorldAxis !== "function") {
+    return;
+  }
+  const toRad = (d) => ((Number(d) || 0) * Math.PI) / 180;
+  const rx = toRad(cal?.rx);
+  const ry = toRad(cal?.ry);
+  const rz = toRad(cal?.rz);
+  group.quaternion.identity();
+  if (ry) group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), ry);
+  if (rx) group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rx);
+  if (rz) group.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz);
+}
 export const OMAFIT_GLASSES_REFERENCE_IPD_M = 0.063;
 
 /** Largura física típica da armação (m) — bbox do GLB costuma vir inflada (~1,2 m). */

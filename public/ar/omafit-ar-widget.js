@@ -24,9 +24,11 @@ import {
   OMAFIT_GLASSES_REFERENCE_IPD_M,
   OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
   addGlassesMerchantWearToPositionM,
+  applyGlassesMerchantCalibRotation,
   computeGlassesAutoFitMeshScale,
   computeGlassesPreviewBaseScale,
   normalizeGlassesMerchantCalibration,
+  OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
@@ -507,7 +509,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v46";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v47";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -7887,21 +7889,9 @@ async function runArSession({
       if (typeof v.error === "string" && Object.keys(v).length <= 2) return null;
       return v;
     }
-    const _faceCalWorldAxes = {
-      X: new THREE.Vector3(1, 0, 0),
-      Y: new THREE.Vector3(0, 1, 0),
-      Z: new THREE.Vector3(0, 0, 1),
-    };
-    /** Rotação de calibração loja (Y→X→Z) num grupo Three.js — face path (óculos). */
+    /** Rotação de calibração loja (Y→X→Z) — `omafit-glasses-calibration.js`. */
     function applyThreeGroupCalibRot(group, cal) {
-      if (!group) return;
-      group.quaternion.identity();
-      const rxDeg = Number((cal && cal.rx) ?? 0) || 0;
-      const ryDeg = Number((cal && cal.ry) ?? 0) || 0;
-      const rzDeg = Number((cal && cal.rz) ?? 0) || 0;
-      if (ryDeg) group.rotateOnWorldAxis(_faceCalWorldAxes.Y, (ryDeg * Math.PI) / 180);
-      if (rxDeg) group.rotateOnWorldAxis(_faceCalWorldAxes.X, (rxDeg * Math.PI) / 180);
-      if (rzDeg) group.rotateOnWorldAxis(_faceCalWorldAxes.Z, (rzDeg * Math.PI) / 180);
+      applyGlassesMerchantCalibRotation(THREE, group, cal);
     }
     const initialFaceCal = parseOmafitCalibrationRaw(
       arCfg?.dataset?.arOmafitCalibration || "",
@@ -9770,7 +9760,13 @@ async function runArSession({
         glasses.updateMatrix();
         glassesStaticBindWrap.position.set(0, 0, 0);
         glassesStaticBindWrap.scale.set(1, 1, 1);
-        if (glassesStaticBindQuatPostBind) {
+        if (glassesCanonicalBlenderExport && glassesSimpleFaceOnly) {
+          /** Paridade preview admin: Ry 180° no GLB antes de `calibRot` (rx/ry/rz). */
+          glassesStaticBindWrap.quaternion.setFromAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
+          );
+        } else if (glassesStaticBindQuatPostBind) {
           glassesStaticBindWrap.quaternion.copy(glassesStaticBindQuatPostBind);
         } else {
           glassesStaticBindWrap.quaternion.copy(glasses.quaternion);
@@ -10182,6 +10178,7 @@ async function runArSession({
       glassesSimpleFaceOnly,
       anchorFaceLm: anchorIndex,
       readGlassesMerchantCal,
+      calibRotGroup: calibRot,
       glassesFrameWidthRawLocal,
       glassesMeshWidthNormMul,
       glassesCanonicalBlenderExport: !!glassesCanonicalBlenderExport,
@@ -10884,6 +10881,13 @@ async function runArSession({
                     st.glassesLastMeshScale = displayScale;
                     if (st.glassesModelWrap) st.glassesModelWrap.scale.set(1, 1, 1);
                     glasses.scale.set(displayScale, displayScale, displayScale);
+                    if (st.calibRotGroup) {
+                      applyGlassesMerchantCalibRotation(
+                        THREE,
+                        st.calibRotGroup,
+                        merchantCal,
+                      );
+                    }
                     if (!st.glassesCalibRuntimeLogged) {
                       st.glassesCalibRuntimeLogged = true;
                       const lmE = fa.localMat.elements;
@@ -10892,7 +10896,7 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v46 (merchant × canonical)", {
+                      console.log("[omafit-ar] glasses calibration v47 (merchant × canonical)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
                         facePoseFromAnchor: !!facePoseFromAnchor,
@@ -10999,7 +11003,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v46 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v47 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,
