@@ -506,7 +506,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v44";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v45";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9746,7 +9746,10 @@ async function runArSession({
         glasses.rotation.set(0, Math.PI, 0);
         glasses.updateMatrix();
       } else {
-        glasses.scale.set(1, 1, 1);
+        /** Não repor scale=1 no modo simples: `bootScale` (frame-width × merchant) já foi aplicado. */
+        if (!glassesSimpleFaceOnly) {
+          glasses.scale.set(1, 1, 1);
+        }
         glasses.rotation.order = "XYZ";
         glasses.rotation.set(0, 0, 0);
       }
@@ -10886,7 +10889,7 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v44 (frame-width 1:1)", {
+                      console.log("[omafit-ar] glasses calibration v45 (frame-width 1:1)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
                         facePoseFromAnchor: !!facePoseFromAnchor,
@@ -10991,7 +10994,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v44 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v45 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,
@@ -11039,7 +11042,10 @@ async function runArSession({
                   }
                 }
 
-                if (lmLoc) {
+                if (
+                  lmLoc &&
+                  !(glassesTrackingWrap && st.glassesSimpleFaceOnly)
+                ) {
                   const okR = (() => {
                     const sm = st.lmSmoother?.get(OMAFIT_FACE_LM_EYE_R_OUT);
                     if (sm && Number.isFinite(sm.x) && Number.isFinite(sm.y) && Number.isFinite(sm.z)) {
@@ -11076,11 +11082,7 @@ async function runArSession({
                     }
                     return false;
                   })();
-                  if (
-                    okR &&
-                    okL &&
-                    !(glassesTrackingWrap && st.glassesSimpleFaceOnly)
-                  ) {
+                  if (okR && okL) {
                     /**
                      * IPD **só** no espaço `metricLandmarks` (antes de `faceWorld`). A
                      * `face.matrixWorld` inclui escala do modelo 468 / fitting — usar a
@@ -11123,11 +11125,7 @@ async function runArSession({
                         OMAFIT_GLASSES_MESH_SCALE_ABS_MIN,
                         OMAFIT_GLASSES_MESH_SCALE_ABS_MAX,
                       );
-                      if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
-                        glasses.scale.set(scale, scale, scale);
-                      } else {
-                        glasses.scale.setScalar(scale);
-                      }
+                      glasses.scale.setScalar(scale);
                     }
                   }
                 }
