@@ -9059,8 +9059,8 @@ async function runArSession({
     /**
      * Óculos automáticos **sem** Tripo/geometria/bochechas/standardize: `faceMatrix` →
      * `glassesTrackingWrap` (interpupilar + profundidade base), bind no `glassesStaticBindWrap`.
-     * Calibração loja (`scale`, `wearX/Y/Z`) aplica-se em `wearPosition` + escala do mesh
-     * (igual à pré-visualização na página de calibração).
+     * Calibração loja: `scale` no mesh (IPD×`omafit-glasses-calibration.js`); `wearX/Y/Z` em
+     * metros no grupo `glassesMerchantWear` (paridade com o preview admin).
      */
     const glassesSimpleFaceOnly =
       accessoryType === "glasses" &&
