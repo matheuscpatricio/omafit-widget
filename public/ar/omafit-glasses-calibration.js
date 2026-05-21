@@ -10,7 +10,8 @@
  *   - GLB não canónico / bbox gigante: `scale` × (`fitW` / largura bbox).
  *   - `wearZ` = 0 → sem deslocamento extra em profundidade (metros).
  *     Negativo aproxima, positivo afasta (mesmo eixo que o preview estático).
- *   - `wearX` / `wearY` = metros (direita / cima no preview; convertidos para a âncora no AR).
+ *   - `wearX` / `wearY` / `wearZ` = metros. Preview: `wearPosition.position` directo.
+ *     AR simples: o mesmo em `wearPosition` (filho da âncora 168), × unidades MindAR/m.
  *   - `rx` / `ry` / `rz` (graus): eixos de mundo fixos, ordem Y → X → Z (igual preview admin).
  */
 
@@ -175,6 +176,23 @@ export function omafitAnchorUnitsPerMeter(matrixWorld) {
   const sz = Math.hypot(e[8], e[9], e[10]);
   const avg = (sx + sy + sz) / 3;
   return Math.max(1e-6, avg);
+}
+
+/**
+ * Paridade preview admin: wearX/Y/Z (m) → `wearPosition` da âncora MindAR.
+ *
+ * @param {import("three").Vector3} position
+ * @param {import("three").Matrix4} anchorMatrixWorld
+ * @param {{ wearX?: number, wearY?: number, wearZ?: number }} cal
+ */
+export function applyGlassesMerchantWearToAnchorPosition(position, anchorMatrixWorld, cal) {
+  if (!position) return;
+  const u = omafitAnchorUnitsPerMeter(anchorMatrixWorld);
+  position.set(
+    (Number(cal?.wearX) || 0) * u,
+    (Number(cal?.wearY) || 0) * u,
+    (Number(cal?.wearZ) || 0) * u,
+  );
 }
 
 /**
