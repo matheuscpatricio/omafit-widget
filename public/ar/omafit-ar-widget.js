@@ -506,7 +506,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v41";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v42";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10141,6 +10141,7 @@ async function runArSession({
       faceProjectionOpts,
       projectionSyncLogged: false,
       positionLogged: false,
+      glassesCalibRuntimeLogged: false,
       glassesNdcScreenLock,
       glassesNdcBlendFromMp,
       glassesLensDistortK,
@@ -10826,44 +10827,6 @@ async function runArSession({
                     const merchantCal = st.readGlassesMerchantCal
                       ? st.readGlassesMerchantCal()
                       : { scale: 1, wearX: 0, wearY: 0, wearZ: 0 };
-                    let ipdMetric = OMAFIT_GLASSES_REFERENCE_IPD_M;
-                    if (lmLoc) {
-                      const pickEye = (idx, out) => {
-                        const p = st.lmSmoother?.get(idx);
-                        if (
-                          p &&
-                          Number.isFinite(p.x) &&
-                          Number.isFinite(p.y) &&
-                          Number.isFinite(p.z)
-                        ) {
-                          out.set(p.x, p.y, p.z);
-                          return true;
-                        }
-                        const raw = lmLoc[idx];
-                        if (!raw) return false;
-                        if (typeof raw.length === "number" && raw.length >= 3) {
-                          out.set(raw[0], raw[1], raw[2]);
-                          return true;
-                        }
-                        if (typeof raw.x === "number") {
-                          out.set(raw.x, raw.y, Number.isFinite(raw.z) ? raw.z : 0);
-                          return true;
-                        }
-                        return false;
-                      };
-                      if (pickEye(OMAFIT_FACE_LM_EYE_R_OUT, fa.eyeR) && pickEye(OMAFIT_FACE_LM_EYE_L_OUT, fa.eyeL)) {
-                        const ipdLandmark = fa.eyeR.distanceTo(fa.eyeL);
-                        const fe = fa.faceWorld.elements;
-                        const sx = Math.hypot(fe[0], fe[1], fe[2]);
-                        const sy = Math.hypot(fe[4], fe[5], fe[6]);
-                        const szFace = Math.hypot(fe[8], fe[9], fe[10]);
-                        const faceScale =
-                          Number.isFinite(sx) && Number.isFinite(sy) && Number.isFinite(szFace)
-                            ? Math.max(1e-6, (sx + sy + szFace) / 3)
-                            : 1;
-                        ipdMetric = ipdLandmark / faceScale;
-                      }
-                    }
                     const autoBase = Number(st.glassesCalibAutoScaleBase) > 0
                       ? st.glassesCalibAutoScaleBase
                       : Number(st.glassesAutoFitScaleRef) > 0
@@ -10877,16 +10840,38 @@ async function runArSession({
                       computeGlassesEffectiveDisplayScale({
                         autoFitBase: autoBase,
                         merchantScaleMul: merchantMul,
-                        ipdMetricM: ipdMetric,
-                        referenceIpdM: OMAFIT_GLASSES_REFERENCE_IPD_M,
+                        matchPreviewOnly: true,
                       }),
                       OMAFIT_GLASSES_MESH_SCALE_ABS_MIN,
                       OMAFIT_GLASSES_MESH_SCALE_ABS_MAX,
                     );
                     st.glassesLastMeshScale = displayScale;
-                    /** Escala no mesh (não no modelWrap): wear em trackingWrap fica em unidades face ~1 m. */
                     if (st.glassesModelWrap) st.glassesModelWrap.scale.set(1, 1, 1);
                     glasses.scale.set(displayScale, displayScale, displayScale);
+                    if (!st.glassesCalibRuntimeLogged) {
+                      st.glassesCalibRuntimeLogged = true;
+                      const lmE = fa.localMat.elements;
+                      const faceU =
+                        (Math.hypot(lmE[0], lmE[1], lmE[2]) +
+                          Math.hypot(lmE[4], lmE[5], lmE[6]) +
+                          Math.hypot(lmE[8], lmE[9], lmE[10])) /
+                        3;
+                      console.log("[omafit-ar] glasses calibration v42 (preview 1:1)", {
+                        build: OMAFIT_AR_WIDGET_BUILD,
+                        merchantCal,
+                        glassesCalibAutoScaleBase: autoBase,
+                        meshScale: displayScale,
+                        expectedAtScale1: autoBase,
+                        faceUnitsPerMeter: faceU,
+                        glassesTrackingWrapPosition: {
+                          x: glassesTrackingWrap.position.x.toFixed(4),
+                          y: glassesTrackingWrap.position.y.toFixed(4),
+                          z: glassesTrackingWrap.position.z.toFixed(4),
+                        },
+                        hint:
+                          "meshScale ≈ autoFitBase × slider scale (como admin). wearZ em m × faceUnitsPerMeter no wrap.",
+                      });
+                    }
                   };
                   if (okBridge && st.glassesEyeMidpointAlign && faceAlignParent) {
                     if (skipBridgeTranslate) {
@@ -10974,7 +10959,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v41 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v42 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,

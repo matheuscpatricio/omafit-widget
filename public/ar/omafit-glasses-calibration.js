@@ -137,6 +137,10 @@ export function computeGlassesEffectiveDisplayScale(p) {
   const base = Math.max(Number(p.autoFitBase) || 0, 1e-6);
   const cal =
     Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
+  if (p.matchPreviewOnly) {
+    /** Paridade com o preview admin: `baseScale × scale` sem IPD ao vivo. */
+    return base * cal;
+  }
   const ipd = Math.max(Number(p.ipdMetricM) || 0, 1e-6);
   const ref = Math.max(Number(p.referenceIpdM) || OMAFIT_GLASSES_REFERENCE_IPD_M, 1e-6);
   return base * cal * (ipd / ref);
