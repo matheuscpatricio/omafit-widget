@@ -28,7 +28,6 @@ import {
   computeGlassesAutoFitMeshScale,
   computeGlassesPreviewBaseScale,
   normalizeGlassesMerchantCalibration,
-  OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
@@ -509,7 +508,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v49";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v50";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9572,7 +9571,7 @@ async function runArSession({
     calibRot.rotation.order = "XYZ";
     calibRot.rotation.set(0, 0, 0);
     calibRot.quaternion.identity();
-    /** rx/ry/rz aplicados após bind Ry 180° (paridade preview admin). */
+    /** rx/ry/rz em `calibRot` após montar o GLB (AR canónico: sem bind Ry 180°). */
     calibRot.updateMatrix();
     calibRot.updateMatrixWorld(true);
     const glassesAnatomy =
@@ -9760,14 +9759,10 @@ async function runArSession({
         glassesStaticBindWrap.scale.set(1, 1, 1);
         if (glassesCanonicalBlenderExport && glassesSimpleFaceOnly) {
           /**
-           * Paridade preview admin: Ry 180° no root do GLB com `calibRot` ainda
-           * identidade, depois rx/ry/rz em `calibRot` (ver abaixo).
+           * AR canónico: sem Ry 180° (preview admin mantém-o na cena estática).
+           * A âncora MindAR já alinha o export Blender; o bind extra inverte hastes.
            */
           glassesStaticBindWrap.quaternion.identity();
-          glassesStaticBindWrap.rotateOnWorldAxis(
-            new THREE.Vector3(0, 1, 0),
-            OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
-          );
         } else if (glassesStaticBindQuatPostBind) {
           glassesStaticBindWrap.quaternion.copy(glassesStaticBindQuatPostBind);
         } else {
@@ -10817,7 +10812,7 @@ async function runArSession({
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
                    * Canónico + calibração loja: paridade com o preview admin (modelo estático).
-                   *   - Orientação = âncora MindAR (168) + `calibRot` (rx/ry/rz) + bind Ry 180° no GLB.
+                   *   - Orientação = âncora MindAR (168) + `calibRot` (rx/ry/rz); sem bind Ry 180°.
                    *   - Não copiar a rotação da malha 468 no wrap (duplicava yaw e desviava o ry do lojista).
                    * Outros GLBs simples (não canónicos): mantém rotação da face no wrap.
                    * Translação: ponte 168 / wear em metros nos eixos de `fa.localMat`.
@@ -10907,7 +10902,7 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v49 (merchant × canonical)", {
+                      console.log("[omafit-ar] glasses calibration v50 (merchant × canonical)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
                         calibrationRotation: {
@@ -10923,8 +10918,11 @@ async function runArSession({
                           st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
                             ? "identity (paridade preview)"
                             : "faceBasis",
+                        canonicalBindRy: st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
+                          ? "none (MindAR anchor)"
+                          : "legacy",
                         formula: st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
-                          ? "meshScale = merchantScale; rot = anchor×calibRot(rx/ry/rz)×Ry180"
+                          ? "meshScale = merchantScale; rot = anchor×calibRot(rx/ry/rz)"
                           : "meshScale = (fitW/bboxX) × merchantScale",
                         faceUnitsPerMeter: faceU,
                         glassesTrackingWrapPosition: {
@@ -11023,7 +11021,7 @@ async function runArSession({
                       const merchantCalLog = st.readGlassesMerchantCal
                         ? st.readGlassesMerchantCal()
                         : null;
-                      console.log("[omafit-ar] glasses calibration v49 (mesh×merchant + wear face-axes m)", {
+                      console.log("[omafit-ar] glasses calibration v50 (mesh×merchant + wear face-axes m)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal: merchantCalLog,
                         glassesCalibAutoScaleBase: st.glassesCalibAutoScaleBase,

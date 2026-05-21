@@ -14,7 +14,11 @@
  *   - `rx` / `ry` / `rz` (graus): eixos de mundo fixos, ordem Y → X → Z (igual preview admin).
  */
 
-/** Bind estático óculos canónicos: Ry 180° no mesh (paridade preview `calibrate.$assetId`). */
+/**
+ * Bind Ry 180° no preview admin (cena estática). No AR canónico + face simples
+ * a âncora MindAR (168) já orienta o GLB — aplicar o mesmo bind no widget inverte
+ * as hastes (180°). Só o preview usa este valor.
+ */
 export const OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD = Math.PI;
 
 /**
