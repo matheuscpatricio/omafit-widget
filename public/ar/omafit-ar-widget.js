@@ -509,7 +509,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v47";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-glasses-calibration-v48";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10809,14 +10809,18 @@ async function runArSession({
 
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
-                   * Rotação: 3×3 de `parentInv*faceWorld` (mesma pose que a malha 468 suavizada).
-                   * (Evitar `faceWorld×lmBasis` no wrap: a composição alterava o eixo e a percepção
-                   * de escala/virado.) Translação: ponte nasal (LM 168) em mundo → local do wrap;
-                   * +Z de profundidade: coluna 2 de `fa.basis` no referencial do pai.
-                   * O bind glTF→MindAR fica no `glassesStaticBindWrap`.
+                   * Canónico + calibração loja: paridade com o preview admin (modelo estático).
+                   *   - Orientação = âncora MindAR (168) + `calibRot` (rx/ry/rz) + bind Ry 180° no GLB.
+                   *   - Não copiar a rotação da malha 468 no wrap (duplicava yaw e desviava o ry do lojista).
+                   * Outros GLBs simples (não canónicos): mantém rotação da face no wrap.
+                   * Translação: ponte 168 / wear em metros nos eixos de `fa.localMat`.
                    */
-                  fa.q.setFromRotationMatrix(fa.basis);
-                  glassesTrackingWrap.quaternion.copy(fa.q);
+                  if (st.glassesCanonicalBlenderExport) {
+                    glassesTrackingWrap.quaternion.identity();
+                  } else {
+                    fa.q.setFromRotationMatrix(fa.basis);
+                    glassesTrackingWrap.quaternion.copy(fa.q);
+                  }
                   const okBridge = (() => {
                     if (!lmLoc) return false;
                     const pickLm = (idx, out) => {
@@ -10896,7 +10900,7 @@ async function runArSession({
                           Math.hypot(lmE[4], lmE[5], lmE[6]) +
                           Math.hypot(lmE[8], lmE[9], lmE[10])) /
                         3;
-                      console.log("[omafit-ar] glasses calibration v47 (merchant × canonical)", {
+                      console.log("[omafit-ar] glasses calibration v48 (merchant × canonical)", {
                         build: OMAFIT_AR_WIDGET_BUILD,
                         merchantCal,
                         facePoseFromAnchor: !!facePoseFromAnchor,
