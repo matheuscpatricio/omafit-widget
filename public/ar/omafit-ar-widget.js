@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v55";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v56";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -927,6 +927,9 @@ const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
 const OMAFIT_NECKLACE_CHIN_TO_THROAT = 0.42;
 /** Largura alvo do arco do colar no pescoço (metros) — normalização previsível (não usar maxDim/Y). */
 const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
+/** Deslocamento wear (metros, `metricLandmarks`) — pescoço → peito, ligeiramente à frente da face. */
+const OMAFIT_NECKLACE_WEAR_DOWN_M = -0.028;
+const OMAFIT_NECKLACE_WEAR_FORWARD_M = 0.042;
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -8609,8 +8612,19 @@ async function runArSession({
     /** Cilindro só depth: base ~ombros / topo ~mandíbula (métrico face). */
     let neckOccluderMesh = null;
     let neckOccGeomState = null;
+    /**
+     * Colar no peito fica **atrás** da malha 468 / cilindro do pescoço (só depth) →
+     * invisível com depthTest. Oclusão facial só para óculos (opt-in no colar).
+     */
+    const necklaceFaceOccAttr = String(cfgAttr("arNecklaceFaceDepthOccluder", "0"))
+      .trim()
+      .toLowerCase();
+    const necklaceFaceDepthOccluder =
+      accessoryType === "necklace" &&
+      /^(1|true|yes|on)$/.test(necklaceFaceOccAttr);
     const useFace468DepthOccluder =
-      accessoryType === "necklace" || glassesFaceDepthOccluderEnabled;
+      (accessoryType === "glasses" && glassesFaceDepthOccluderEnabled) ||
+      necklaceFaceDepthOccluder;
     if (useFace468DepthOccluder) {
       if (typeof mindarThree.addFaceMesh === "function") {
         try {
@@ -8657,7 +8671,14 @@ async function runArSession({
           console.warn("[omafit-ar] temple depth extenders:", e?.message || e);
         }
       }
-      if (accessoryType === "necklace" && anchor.group) {
+      const necklaceNeckOccAttr = String(cfgAttr("arNecklaceNeckDepthOccluder", "0"))
+        .trim()
+        .toLowerCase();
+      if (
+        accessoryType === "necklace" &&
+        anchor.group &&
+        /^(1|true|yes|on)$/.test(necklaceNeckOccAttr)
+      ) {
         try {
           neckOccGeomState = {};
           const ng = new THREE.CylinderGeometry(0.068, 0.084, 0.22, 22, 1, true);
@@ -8767,7 +8788,7 @@ async function runArSession({
     glasses.traverse((child) => {
       if (!child.isMesh) return;
       child.frustumCulled = false;
-      child.renderOrder = 2;
+      child.renderOrder = accessoryType === "necklace" ? 8 : 2;
       const colorAttr =
         child.geometry && child.geometry.getAttribute ? child.geometry.getAttribute("color") : null;
       if (!child.material && colorAttr) {
@@ -8812,10 +8833,16 @@ async function runArSession({
          */
         if ("polygonOffset" in mat) {
           mat.polygonOffset = true;
-          mat.polygonOffsetFactor = -2;
-          mat.polygonOffsetUnits = -2;
+          mat.polygonOffsetFactor = accessoryType === "necklace" ? -4 : -2;
+          mat.polygonOffsetUnits = accessoryType === "necklace" ? -4 : -2;
         }
-        mat.toneMapped = false;
+        if (accessoryType === "necklace") {
+          mat.depthTest = true;
+          mat.depthWrite = true;
+          mat.toneMapped = true;
+        } else {
+          mat.toneMapped = false;
+        }
         mat.needsUpdate = true;
       }
     });
@@ -9643,11 +9670,21 @@ async function runArSession({
     } else {
       glasses.scale.setScalar(accessoryMeshNormalizeScale);
     }
+    if (accessoryType === "necklace") {
+      glasses.visible = true;
+      glasses.traverse((o) => {
+        if (o) o.visible = true;
+      });
+    }
     console.log("[omafit-ar] face scale resolved", {
       glbMaxDim: maxDim,
       necklaceNeckSpanM: accessoryType === "necklace" ? necklaceNeckSpanM : null,
       necklaceReferenceWidthM:
         accessoryType === "necklace" ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M : null,
+      necklaceOccluders:
+        accessoryType === "necklace"
+          ? { face468: necklaceFaceDepthOccluder, neckCylinder: Boolean(neckOccluderMesh) }
+          : null,
       accessoryMeshNormalizeScale,
       glassesSimpleFaceOnly,
       merchantCalibration: readGlassesMerchantCal(),
@@ -10528,6 +10565,7 @@ async function runArSession({
       necklaceAnchorScratch:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       glassesAnatomy: accessoryType === "necklace" ? glassesAnatomy : null,
+      necklaceDiagLogged: false,
       necklaceSwing:
         accessoryType === "necklace" && necklaceSwingGroup
           ? {
@@ -11387,8 +11425,12 @@ async function runArSession({
           if (anchorOk) {
             wearPosition.position.set(
               wearPosM.x + (throat.x - anchorVec.x),
-              wearPosM.y + (throat.y - anchorVec.y),
-              wearPosM.z + (throat.z - anchorVec.z),
+              wearPosM.y +
+                (throat.y - anchorVec.y) +
+                OMAFIT_NECKLACE_WEAR_DOWN_M,
+              wearPosM.z +
+                (throat.z - anchorVec.z) +
+                OMAFIT_NECKLACE_WEAR_FORWARD_M,
             );
           }
           const cw =
@@ -11468,6 +11510,36 @@ async function runArSession({
           st.lastNecklaceFrameMs = nowMs;
           const tgtPos = new THREE.Vector3(0, 0, 0);
           omafitNecklaceSpringStep(THREE, st, dtSec, tgtPos, targetRx, targetRy);
+          if (
+            anchorOk &&
+            !st.necklaceDiagLogged &&
+            glasses
+          ) {
+            st.necklaceDiagLogged = true;
+            try {
+              glasses.updateMatrixWorld(true);
+              const wp = new THREE.Vector3();
+              wp.setFromMatrixPosition(glasses.matrixWorld);
+              console.log("[omafit-ar] necklace tracking diag (1x)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                wearPosition: {
+                  x: wearPosition.position.x,
+                  y: wearPosition.position.y,
+                  z: wearPosition.position.z,
+                },
+                meshScale: {
+                  x: glasses.scale.x,
+                  y: glasses.scale.y,
+                  z: glasses.scale.z,
+                },
+                worldPos: { x: wp.x, y: wp.y, z: wp.z },
+                cheekW: cw,
+                anchorIndex,
+              });
+            } catch {
+              /* ignore */
+            }
+          }
           if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cw)) {
             const jawW = cw;
             const bot = new THREE.Vector3(
