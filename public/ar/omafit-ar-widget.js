@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v59";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v61";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2516,16 +2516,35 @@ function omafitApplyNecklaceTripoBind(THREE, root) {
 }
 
 /**
- * Desloca o GLB para que o ponto de wear (garganta / topo do arco) fique na origem local.
+ * Alinha o topo do arco (garganta) perto da origem local.
+ * Não usar o maior eixo da bbox (pós-Tripo costuma ser profundidade Z ~1 m) — escolher o eixo
+ * cuja extensão ≈ largura de referência do colar (~36 cm).
  */
 function omafitApplyNecklaceWearPivotOffset(THREE, root) {
-  if (!THREE || !root) return;
+  if (!THREE || !root) return null;
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(root);
-  if (typeof box.isEmpty === "function" && box.isEmpty()) return;
-  const wearY = THREE.MathUtils.lerp(box.min.y, box.max.y, 0.82);
-  root.position.y -= wearY;
+  if (typeof box.isEmpty === "function" && box.isEmpty()) return null;
+  const sz = new THREE.Vector3();
+  box.getSize(sz);
+  const spans = [sz.x, sz.y, sz.z];
+  let axis = 1;
+  let best = Infinity;
+  for (let a = 0; a < 3; a += 1) {
+    if (spans[a] < 0.02) continue;
+    const d = Math.abs(spans[a] - OMAFIT_NECKLACE_REFERENCE_WIDTH_M);
+    if (d < best) {
+      best = d;
+      axis = a;
+    }
+  }
+  const maxC = [box.max.x, box.max.y, box.max.z];
+  const wearCoord = maxC[axis];
+  if (axis === 0) root.position.x -= wearCoord;
+  else if (axis === 1) root.position.y -= wearCoord;
+  else root.position.z -= wearCoord;
   root.updateMatrix();
+  return axis === 0 ? "x" : axis === 1 ? "y" : "z";
 }
 
 /**
@@ -9140,7 +9159,7 @@ async function runArSession({
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
         const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
-        omafitApplyNecklaceWearPivotOffset(THREE, glasses);
+        const wearPivotAxis = omafitApplyNecklaceWearPivotOffset(THREE, glasses);
         glasses.updateMatrixWorld(true);
         const szNeck = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szNeck);
@@ -9149,9 +9168,10 @@ async function runArSession({
             build: OMAFIT_AR_WIDGET_BUILD,
             ok: neckCenter?.ok,
             tripBind: tripBind?.bind,
+            wearPivotAxis,
             sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
             sizeBboxPost: { x: szNeck.x, y: szNeck.y, z: szNeck.z },
-            neckSpanM: Math.max(szNeck.x, szNeck.z, 1e-6),
+            neckSpanM: Math.max(szNeck.x, szNeck.y, 1e-6),
             targetWidthM: OMAFIT_NECKLACE_REFERENCE_WIDTH_M,
           });
         } catch {
@@ -9766,7 +9786,8 @@ async function runArSession({
     if (accessoryType === "necklace") {
       const szNeckFit = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szNeckFit);
-      necklaceNeckSpanM = Math.max(szNeckFit.x, szNeckFit.z, 1e-6);
+      /** Largura do arco (plano do pescoço): não usar profundidade Z pós-Tripo (~1 m). */
+      necklaceNeckSpanM = Math.max(szNeckFit.x, szNeckFit.y, 1e-6);
       accessoryMeshNormalizeScale =
         OMAFIT_NECKLACE_REFERENCE_WIDTH_M / necklaceNeckSpanM;
     }
@@ -11545,17 +11566,35 @@ async function runArSession({
             clavScratch &&
             clavicle &&
             omafitComputeNecklaceClaviclePoint(lm, st.lmSmoother, clavicle, clavScratch);
-          if (anchorOk && clavOk) {
+          if (anchorOk) {
             const fineRaw = String(cfgAttr("arNecklaceWearFine", "0 0 0")).trim();
             const fine = parseXyzMeters(fineRaw, 0, 0, 0);
             const fineX = nativeSpace ? fine.x * 100 : fine.x;
             const fineY = nativeSpace ? fine.y * 100 : fine.y;
             const fineZ = nativeSpace ? fine.z * 100 : fine.z;
-            wearPosition.position.set(
-              wearPosM.x + (clavicle.x - anchorVec.x) + fineX,
-              wearPosM.y + (clavicle.y - anchorVec.y) + fineY,
-              wearPosM.z + (clavicle.z - anchorVec.z) + fineZ,
-            );
+            if (clavOk && clavicle) {
+              wearPosition.position.set(
+                wearPosM.x + (clavicle.x - anchorVec.x) + fineX,
+                wearPosM.y + (clavicle.y - anchorVec.y) + fineY,
+                wearPosM.z + (clavicle.z - anchorVec.z) + fineZ,
+              );
+            } else if (clavScratch?.chin && clavScratch?.nose && clavScratch?.down) {
+              if (
+                omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, clavScratch.chin) &&
+                omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_NOSE_BRIDGE, st.lmSmoother, clavScratch.nose)
+              ) {
+                const downFb = clavScratch.down.subVectors(clavScratch.chin, clavScratch.nose);
+                const lenFb = downFb.length();
+                if (lenFb > 1e-5) {
+                  downFb.multiplyScalar(OMAFIT_NECKLACE_CLAVICLE_BELOW_CHIN_MUL);
+                  wearPosition.position.set(
+                    wearPosM.x + downFb.x + fineX,
+                    wearPosM.y + downFb.y + fineY,
+                    wearPosM.z + downFb.z + fineZ,
+                  );
+                }
+              }
+            }
           }
           const cheekNative = omafitFaceLandmarkDist3(
             lm,
