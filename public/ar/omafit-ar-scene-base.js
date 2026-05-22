@@ -500,8 +500,15 @@ export class OmafitArSceneBase {
   }
 
   initRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const ua = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
+    const isQuestBrowser = /OculusBrowser/i.test(ua) || /\bQuest\s*\d/i.test(ua);
+    const maxDpr = isQuestBrowser ? 1.25 : 2;
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !isQuestBrowser,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.autoClear = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

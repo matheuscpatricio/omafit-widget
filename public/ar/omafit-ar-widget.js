@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v58";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v59";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -548,6 +548,17 @@ const OMAFIT_GLASSES_PIVOT_TEST_OVERRIDES = {
 
 /** FOV vertical da `PerspectiveCamera` alinhado à webcam típica (laptop / telemóvel). */
 const OMAFIT_FACE_CAMERA_FOV_DEFAULT = 63;
+
+/**
+ * Meta Quest Browser (UA documentado: `OculusBrowser`, token `Quest N`).
+ * Só para perfil WebGL/câmara — não substitui feature detection (Meta browser-specs).
+ * @returns {boolean}
+ */
+function omafitDetectMetaQuestBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = String(navigator.userAgent || "");
+  return /OculusBrowser/i.test(ua) || /\bQuest\s*\d/i.test(ua);
+}
 
 /**
  * Form factor do browser (mobile / tablet / desktop) — heurística UA + touch + viewport.
@@ -628,6 +639,7 @@ function omafitDetectArPerfTier(formFactor) {
  *   maxTextureAnisotropy: number,
  *   webglAntialias: boolean,
  *   faceVideoIdealMax: { w: number, h: number },
+ *   questBrowser: boolean,
  * }}
  */
 function omafitResolveArDeviceRuntimeProfile(opts) {
@@ -695,6 +707,15 @@ function omafitResolveArDeviceRuntimeProfile(opts) {
     }
   }
 
+  const questBrowser = omafitDetectMetaQuestBrowser();
+  if (questBrowser) {
+    // Orçamento GPU Quest Browser (~72 Hz ≈ 13,7 ms/frame; WebAR partilha GPU com compositor).
+    maxDprCap = Math.min(maxDprCap, perfTier === "high" ? 1.25 : 1);
+    maxAniso = Math.min(maxAniso, perfTier === "high" ? 4 : 2);
+    if (perfTier !== "high") webglAntialias = false;
+    faceVideoIdealMax = { w: 960, h: 540 };
+  }
+
   return {
     formFactor,
     perfTier,
@@ -702,6 +723,7 @@ function omafitResolveArDeviceRuntimeProfile(opts) {
     maxTextureAnisotropy: maxAniso,
     webglAntialias,
     faceVideoIdealMax,
+    questBrowser,
   };
 }
 
@@ -923,18 +945,20 @@ const OMAFIT_NECKLACE_ROT_K = 28;
 const OMAFIT_NECKLACE_ROT_DAMP = 6.5;
 /** Mistura rotação cabeça vs inclinação ombros (0 = só face). */
 const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
-/** Lerp posição queixo → base pescoço (espaço métrico face). */
-const OMAFIT_NECKLACE_CHIN_TO_THROAT = 0.42;
+/**
+ * Extensão abaixo do queixo ao longo do eixo nariz→queixo (|nariz−queixo| × mul).
+ * ~0,55–0,72 situa o colar na base do pescoço / clavícula (não na mandíbula).
+ */
+const OMAFIT_NECKLACE_CLAVICLE_BELOW_CHIN_MUL = 0.68;
+/** Pequeno avanço para o peito (perpendicular ao eixo queixo, no plano do pescoço). */
+const OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL = 0.14;
 /** Largura alvo do arco do colar no pescoço (metros) — normalização previsível (não usar maxDim/Y). */
 const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
 /** Multiplicador visual (Tripo + fit bochecha) — colar costuma ficar pequeno sem isto. */
 const OMAFIT_NECKLACE_DISPLAY_SCALE_MUL = 2.75;
-/** Wear em espaço nativo MindAR (cm quando landmarks ~15 entre bochechas). */
-const OMAFIT_NECKLACE_WEAR_DOWN_CM = -3.2;
-const OMAFIT_NECKLACE_WEAR_FORWARD_CM = 5.5;
-/** Wear quando landmarks já vêm em metros (cheek dist < 1,2). */
-const OMAFIT_NECKLACE_WEAR_DOWN_M = -0.032;
-const OMAFIT_NECKLACE_WEAR_FORWARD_M = 0.048;
+/** Ajuste fino opcional (cm / m) após o ponto clavícula — attrs `data-ar-necklace-wear-fine`. */
+const OMAFIT_NECKLACE_WEAR_FINE_CM = { x: 0, y: 0, z: 0 };
+const OMAFIT_NECKLACE_WEAR_FINE_M = { x: 0, y: 0, z: 0 };
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -2489,6 +2513,63 @@ function omafitApplyNecklaceTripoBind(THREE, root) {
     box2.getSize(sz);
   }
   return { bind, size: { x: sz.x, y: sz.y, z: sz.z } };
+}
+
+/**
+ * Desloca o GLB para que o ponto de wear (garganta / topo do arco) fique na origem local.
+ */
+function omafitApplyNecklaceWearPivotOffset(THREE, root) {
+  if (!THREE || !root) return;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  if (typeof box.isEmpty === "function" && box.isEmpty()) return;
+  const wearY = THREE.MathUtils.lerp(box.min.y, box.max.y, 0.82);
+  root.position.y -= wearY;
+  root.updateMatrix();
+}
+
+/**
+ * Base pescoço / clavícula no espaço nativo dos `metricLandmarks` (cm ou m).
+ * @param {any} lm
+ * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
+ * @param {import("three").Vector3} out
+ * @param {{ chin: import("three").Vector3, nose: import("three").Vector3, fh: import("three").Vector3, L: import("three").Vector3, R: import("three").Vector3, down: import("three").Vector3, cheekX: import("three").Vector3, fwd: import("three").Vector3 }} scratch
+ * @returns {boolean}
+ */
+function omafitComputeNecklaceClaviclePoint(lm, smoother, out, scratch) {
+  if (!lm || !out || !scratch) return false;
+  const ch = scratch.chin;
+  const nb = scratch.nose;
+  if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, smoother, ch)) return false;
+  if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_NOSE_BRIDGE, smoother, nb)) return false;
+  const down = scratch.down.subVectors(ch, nb);
+  let segLen = down.length();
+  if (segLen < 1e-5) {
+    if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_FOREHEAD_TOP, smoother, scratch.fh)) {
+      out.copy(ch);
+      return true;
+    }
+    down.subVectors(ch, scratch.fh);
+    segLen = down.length();
+  }
+  if (segLen < 1e-5) {
+    out.copy(ch);
+    return true;
+  }
+  down.multiplyScalar(1 / segLen);
+  out.copy(ch).addScaledVector(down, segLen * OMAFIT_NECKLACE_CLAVICLE_BELOW_CHIN_MUL);
+  if (
+    omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_LEFT_CHEEK, smoother, scratch.L) &&
+    omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, smoother, scratch.R)
+  ) {
+    const cheekX = scratch.cheekX.subVectors(scratch.L, scratch.R);
+    if (cheekX.lengthSq() > 1e-10) {
+      cheekX.normalize();
+      const fwd = scratch.fwd.crossVectors(down, cheekX).normalize();
+      out.addScaledVector(fwd, segLen * OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL);
+    }
+  }
+  return true;
 }
 
 /**
@@ -9059,6 +9140,7 @@ async function runArSession({
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
         const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
+        omafitApplyNecklaceWearPivotOffset(THREE, glasses);
         glasses.updateMatrixWorld(true);
         const szNeck = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szNeck);
@@ -10335,6 +10417,7 @@ async function runArSession({
                 OMAFIT_FACE_LM_RIGHT_CHEEK,
                 OMAFIT_FACE_LM_LEFT_CHEEK,
                 OMAFIT_FACE_LM_NOSE_BRIDGE,
+                OMAFIT_FACE_LM_FOREHEAD_TOP,
               ],
               OMAFIT_FACE_ONE_EURO_MIN_CUTOFF,
               OMAFIT_FACE_ONE_EURO_BETA,
@@ -10606,6 +10689,20 @@ async function runArSession({
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       glassesAnatomy: accessoryType === "necklace" ? glassesAnatomy : null,
       necklaceDiagLogged: false,
+      necklaceClavicleScratch:
+        accessoryType === "necklace"
+          ? {
+              chin: new THREE.Vector3(),
+              nose: new THREE.Vector3(),
+              fh: new THREE.Vector3(),
+              L: new THREE.Vector3(),
+              R: new THREE.Vector3(),
+              down: new THREE.Vector3(),
+              cheekX: new THREE.Vector3(),
+              fwd: new THREE.Vector3(),
+              clavicle: new THREE.Vector3(),
+            }
+          : null,
       necklaceSwing:
         accessoryType === "necklace" && necklaceSwingGroup
           ? {
@@ -11442,43 +11539,22 @@ async function runArSession({
           const anchorVec = st.necklaceAnchorScratch;
           const anchorOk =
             anchorVec && omafitMetricLandmarkToVec3(lm, anchorIndex, st.lmSmoother, anchorVec);
-          const ch = new THREE.Vector3();
-          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, ch)) {
-            ch.set(
-              lm[OMAFIT_FACE_LM_CHIN][0] ?? 0,
-              lm[OMAFIT_FACE_LM_CHIN][1] ?? 0,
-              lm[OMAFIT_FACE_LM_CHIN][2] ?? 0,
-            );
-          }
-          const R = new THREE.Vector3();
-          const L = new THREE.Vector3();
-          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, st.lmSmoother, R)) {
-            R.set(lm[234][0], lm[234][1], lm[234][2]);
-          }
-          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_LEFT_CHEEK, st.lmSmoother, L)) {
-            L.set(lm[454][0], lm[454][1], lm[454][2]);
-          }
-          const midJ = new THREE.Vector3(
-            (L.x + R.x) * 0.5,
-            (L.y + R.y) * 0.5,
-            (L.z + R.z) * 0.5,
-          );
-          const throat = {
-            x: THREE.MathUtils.lerp(ch.x, midJ.x, OMAFIT_NECKLACE_CHIN_TO_THROAT),
-            y: THREE.MathUtils.lerp(ch.y, midJ.y, OMAFIT_NECKLACE_CHIN_TO_THROAT),
-            z: THREE.MathUtils.lerp(ch.z, midJ.z, OMAFIT_NECKLACE_CHIN_TO_THROAT),
-          };
-          if (anchorOk) {
-            const wearDown = nativeSpace
-              ? OMAFIT_NECKLACE_WEAR_DOWN_CM
-              : OMAFIT_NECKLACE_WEAR_DOWN_M;
-            const wearFwd = nativeSpace
-              ? OMAFIT_NECKLACE_WEAR_FORWARD_CM
-              : OMAFIT_NECKLACE_WEAR_FORWARD_M;
+          const clavScratch = st.necklaceClavicleScratch;
+          const clavicle = clavScratch?.clavicle;
+          const clavOk =
+            clavScratch &&
+            clavicle &&
+            omafitComputeNecklaceClaviclePoint(lm, st.lmSmoother, clavicle, clavScratch);
+          if (anchorOk && clavOk) {
+            const fineRaw = String(cfgAttr("arNecklaceWearFine", "0 0 0")).trim();
+            const fine = parseXyzMeters(fineRaw, 0, 0, 0);
+            const fineX = nativeSpace ? fine.x * 100 : fine.x;
+            const fineY = nativeSpace ? fine.y * 100 : fine.y;
+            const fineZ = nativeSpace ? fine.z * 100 : fine.z;
             wearPosition.position.set(
-              wearPosM.x + (throat.x - anchorVec.x),
-              wearPosM.y + (throat.y - anchorVec.y) + wearDown,
-              wearPosM.z + (throat.z - anchorVec.z) + wearFwd,
+              wearPosM.x + (clavicle.x - anchorVec.x) + fineX,
+              wearPosM.y + (clavicle.y - anchorVec.y) + fineY,
+              wearPosM.z + (clavicle.z - anchorVec.z) + fineZ,
             );
           }
           const cheekNative = omafitFaceLandmarkDist3(
@@ -11593,6 +11669,13 @@ async function runArSession({
                   z: glasses.scale.z,
                 },
                 worldPos: { x: wp.x, y: wp.y, z: wp.z },
+                clavicle: clavOk
+                  ? {
+                      x: clavicle.x,
+                      y: clavicle.y,
+                      z: clavicle.z,
+                    }
+                  : null,
                 cheekNative,
                 cheekWM,
                 refWidthNative,
@@ -11602,14 +11685,21 @@ async function runArSession({
               /* ignore */
             }
           }
-          if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cheekNative)) {
+          if (
+            anchorOk &&
+            clavOk &&
+            clavicle &&
+            neckOccluderMesh &&
+            neckOccGeomState &&
+            Number.isFinite(cheekNative)
+          ) {
             const jawW = cheekNative * (nativeSpace ? 1 : metersMul);
             const bot = new THREE.Vector3(
-              throat.x,
-              throat.y - jawW * 0.42,
-              throat.z + jawW * 0.1,
+              clavicle.x,
+              clavicle.y - jawW * 0.42,
+              clavicle.z + jawW * 0.1,
             );
-            const top = new THREE.Vector3(throat.x, throat.y + jawW * 0.06, throat.z);
+            const top = new THREE.Vector3(clavicle.x, clavicle.y + jawW * 0.06, clavicle.z);
             const va = new THREE.Vector3(
               top.x - anchorVec.x,
               top.y - anchorVec.y,
