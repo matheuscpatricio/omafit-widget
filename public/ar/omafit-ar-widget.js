@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v64";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v65";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -952,12 +952,17 @@ const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
 const OMAFIT_NECKLACE_CLAVICLE_BELOW_CHIN_MUL = 0.68;
 /** Avanço para o peito (0 por defeito — `fwd` em cm deslocava o colar para fora do ecrã). */
 const OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL = 0;
-/** Largura alvo do arco do colar no pescoço (metros) — normalização previsível (não usar maxDim/Y). */
+/** Largura alvo do arco do colar no pescoço (metros físicos ≈ 36 cm). */
 const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
-/** Multiplicador visual (Tripo + fit bochecha) — colar costuma ficar pequeno sem isto. */
-const OMAFIT_NECKLACE_DISPLAY_SCALE_MUL = 2.75;
-/** Piso de escala no ecrã em unidades **nativas** MindAR (cm quando `metersMul=0.01`). */
-const OMAFIT_NECKLACE_MIN_DISPLAY_SCALE_NATIVE = 28;
+/**
+ * Ajuste fino do lojista (`data-ar-necklace-scale-mul`, default 1).
+ * Escala base = (0,36 m / largura bbox) × (cm por m) × este mul × k(bochecha).
+ */
+const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
+/** Piso em unidades nativas MindAR (cm): ~24 cm de arco visível. */
+const OMAFIT_NECKLACE_MIN_DISPLAY_SCALE_NATIVE = 24;
+/** Teto em unidades nativas (cm): evita colar > ~52 cm no ecrã. */
+const OMAFIT_NECKLACE_MAX_DISPLAY_SCALE_NATIVE = 52;
 /** Spans acima disto são profundidade Tripo (1 m), não largura do arco. */
 const OMAFIT_NECKLACE_MAX_ARC_SPAN_M = 0.72;
 /** Ajuste fino opcional (cm / m) após o ponto clavícula — attrs `data-ar-necklace-wear-fine`. */
@@ -2565,41 +2570,65 @@ function omafitNecklaceMeterToNativeMul(metersMul) {
 }
 
 /**
- * Escala de exibição do colar (sempre aplicada com face detectada).
- * GLB em **metros**; landmarks MindAR Tripo em **cm** (~15 bochecha) — converter com `meterToNative`.
+ * Escala previsível do colar no espaço nativo MindAR (cm com Tripo).
+ *
+ * Contrato:
+ *   - GLB em metros; landmarks em cm (`metersMul` 0,01).
+ *   - `accessoryMeshNormalizeScale` = 0,36 m / largura do arco (m).
+ *   - `fitScale` = normalize × (100 cm/m) × mul loja × k(estabilidade bochecha).
+ *   - Largura visível do arco ≈ `OMAFIT_NECKLACE_REFERENCE_WIDTH_M` × mul × k (em cm).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {{ accessoryMeshNormalizeScale: number, necklaceNeckSpanM?: number, necklacePartition?: { chain?: import("three").Object3D, pendant?: import("three").Object3D } | null, necklaceSwing?: { refNeckW: number | null } | null, necklaceScaleMul?: number }} st
+ * @param {number} cheekNative distância bochechas (unidades nativas)
+ * @param {number} metersMul
+ * @returns {{ fitScale: number, meterToNative: number, targetArcWidthNative: number, cheekTrackK: number }}
  */
-function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, lm, cheekNative, metersMul) {
-  if (!THREE || !st || !glbRoot) return 0;
-  const nativeSpace = metersMul < 1;
+function omafitComputeNecklacePredictableScale(THREE, st, cheekNative, metersMul) {
   const meterToNative = omafitNecklaceMeterToNativeMul(metersMul);
-  const refWidthNative = nativeSpace
-    ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M / metersMul
+  const nativeSpace = meterToNative > 1.01;
+  const targetArcWidthNative = nativeSpace
+    ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M / (metersMul > 0 ? metersMul : 0.01)
     : OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
   let cheek = cheekNative;
-  if (!Number.isFinite(cheek) || cheek <= 1e-5) {
-    cheek = omafitFaceLandmarkDist3(
-      lm,
-      OMAFIT_FACE_LM_RIGHT_CHEEK,
-      OMAFIT_FACE_LM_LEFT_CHEEK,
-    );
-  }
   if (!Number.isFinite(cheek) || cheek <= 1e-5) {
     cheek = nativeSpace ? 14 : 0.14;
   }
   if (st.necklaceSwing && st.necklaceSwing.refNeckW === null) {
     st.necklaceSwing.refNeckW = cheek;
   }
-  const k =
+  const cheekTrackK =
     st.necklaceSwing && Number.isFinite(st.necklaceSwing.refNeckW) && st.necklaceSwing.refNeckW > 1e-5
-      ? THREE.MathUtils.clamp(cheek / st.necklaceSwing.refNeckW, 0.86, 1.18)
+      ? THREE.MathUtils.clamp(cheek / st.necklaceSwing.refNeckW, 0.9, 1.1)
       : 1;
-  let fitScale =
-    (cheek / Math.max(refWidthNative, 1e-5)) *
-    st.accessoryMeshNormalizeScale *
-    k *
-    OMAFIT_NECKLACE_DISPLAY_SCALE_MUL *
-    meterToNative;
-  fitScale = Math.max(fitScale, OMAFIT_NECKLACE_MIN_DISPLAY_SCALE_NATIVE);
+  const merchantMul =
+    Number.isFinite(st.necklaceScaleMul) && st.necklaceScaleMul > 0
+      ? st.necklaceScaleMul
+      : OMAFIT_NECKLACE_DEFAULT_SCALE_MUL;
+  const norm = Number.isFinite(st.accessoryMeshNormalizeScale) && st.accessoryMeshNormalizeScale > 0
+    ? st.accessoryMeshNormalizeScale
+    : 1;
+  let fitScale = norm * meterToNative * merchantMul * cheekTrackK;
+  fitScale = THREE.MathUtils.clamp(
+    fitScale,
+    OMAFIT_NECKLACE_MIN_DISPLAY_SCALE_NATIVE,
+    OMAFIT_NECKLACE_MAX_DISPLAY_SCALE_NATIVE,
+  );
+  return { fitScale, meterToNative, targetArcWidthNative, cheekTrackK, merchantMul };
+}
+
+function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, lm, cheekNative, metersMul) {
+  if (!THREE || !st || !glbRoot) return 0;
+  let cheek = cheekNative;
+  if ((!Number.isFinite(cheek) || cheek <= 1e-5) && lm) {
+    cheek = omafitFaceLandmarkDist3(
+      lm,
+      OMAFIT_FACE_LM_RIGHT_CHEEK,
+      OMAFIT_FACE_LM_LEFT_CHEEK,
+    );
+  }
+  const { fitScale, meterToNative, targetArcWidthNative, cheekTrackK, merchantMul } =
+    omafitComputeNecklacePredictableScale(THREE, st, cheek, metersMul);
   const part = st.necklacePartition;
   if (part?.chain?.children?.length) {
     glbRoot.scale.set(1, 1, 1);
@@ -2614,6 +2643,9 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, lm, cheekNative, me
   });
   st.necklaceMeterToNative = meterToNative;
   st.necklaceLastFitScale = fitScale;
+  st.necklaceTargetArcWidthNative = targetArcWidthNative;
+  st.necklaceCheekTrackK = cheekTrackK;
+  st.necklaceScaleMul = merchantMul;
   return fitScale;
 }
 
@@ -9867,6 +9899,13 @@ async function runArSession({
      */
     let accessoryMeshNormalizeScale = accessoryType === "glasses" ? 1 : 1 / maxDim;
     let necklaceNeckSpanM = maxDim;
+    let necklaceScaleMulCfg = OMAFIT_NECKLACE_DEFAULT_SCALE_MUL;
+    if (accessoryType === "necklace") {
+      const scaleMulRaw = Number(String(cfgAttr("arNecklaceScaleMul", "1")).trim());
+      if (Number.isFinite(scaleMulRaw) && scaleMulRaw > 0) {
+        necklaceScaleMulCfg = THREE.MathUtils.clamp(scaleMulRaw, 0.55, 1.85);
+      }
+    }
     if (accessoryType === "necklace") {
       const szNeckFit = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szNeckFit);
@@ -9894,15 +9933,16 @@ async function runArSession({
         }
       }
     } else if (accessoryType === "necklace") {
-      /** Tripo/MindAR: landmarks em cm → converter mesh (m) para unidades da âncora. */
-      const meterToNativeBoot = omafitNecklaceMeterToNativeMul(0.01);
-      const bootNeckScale = Math.max(
-        accessoryMeshNormalizeScale *
-          OMAFIT_NECKLACE_DISPLAY_SCALE_MUL *
-          0.5 *
-          meterToNativeBoot,
-        OMAFIT_NECKLACE_MIN_DISPLAY_SCALE_NATIVE,
-      );
+      const bootNeckScale = omafitComputeNecklacePredictableScale(
+        THREE,
+        {
+          accessoryMeshNormalizeScale,
+          necklaceScaleMul: necklaceScaleMulCfg,
+          necklaceSwing: null,
+        },
+        14,
+        0.01,
+      ).fitScale;
       if (necklacePartition?.chain?.children?.length) {
         glasses.scale.set(1, 1, 1);
         necklacePartition.chain.scale.setScalar(bootNeckScale);
@@ -10646,6 +10686,7 @@ async function runArSession({
       /** Joias: `1/maxDim` no load; óculos: 1 — a escala anatómica vem só do IPD×factor em `onUpdate`. */
       accessoryMeshNormalizeScale,
       necklaceNeckSpanM: accessoryType === "necklace" ? necklaceNeckSpanM : null,
+      necklaceScaleMul: accessoryType === "necklace" ? necklaceScaleMulCfg : null,
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -11824,6 +11865,13 @@ async function runArSession({
                 effectiveScale: effSc,
                 fitScale,
                 meterToNative: st.necklaceMeterToNative,
+                necklaceScaleMul: st.necklaceScaleMul,
+                targetArcWidthCm: st.necklaceTargetArcWidthNative,
+                cheekTrackK: st.necklaceCheekTrackK,
+                predictedArcWidthCm:
+                  Number.isFinite(st.necklaceNeckSpanM) && Number.isFinite(fitScale)
+                    ? st.necklaceNeckSpanM * (st.necklaceMeterToNative || 1) * fitScale
+                    : null,
                 anchorUnitsPerMeter: anchor?.group
                   ? omafitAnchorUnitsPerMeter(anchor.group.matrixWorld)
                   : null,
