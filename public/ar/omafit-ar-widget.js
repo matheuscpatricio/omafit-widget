@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v61";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v62";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2516,35 +2516,16 @@ function omafitApplyNecklaceTripoBind(THREE, root) {
 }
 
 /**
- * Alinha o topo do arco (garganta) perto da origem local.
- * Não usar o maior eixo da bbox (pós-Tripo costuma ser profundidade Z ~1 m) — escolher o eixo
- * cuja extensão ≈ largura de referência do colar (~36 cm).
+ * Largura do arco do colar a partir da bbox pós-bind: mediana das 3 dimensões
+ * (evita usar profundidade Z ~1 m ou max(x,y) quando Y≈1 após partition).
  */
-function omafitApplyNecklaceWearPivotOffset(THREE, root) {
-  if (!THREE || !root) return null;
-  root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
-  if (typeof box.isEmpty === "function" && box.isEmpty()) return null;
-  const sz = new THREE.Vector3();
-  box.getSize(sz);
-  const spans = [sz.x, sz.y, sz.z];
-  let axis = 1;
-  let best = Infinity;
-  for (let a = 0; a < 3; a += 1) {
-    if (spans[a] < 0.02) continue;
-    const d = Math.abs(spans[a] - OMAFIT_NECKLACE_REFERENCE_WIDTH_M);
-    if (d < best) {
-      best = d;
-      axis = a;
-    }
-  }
-  const maxC = [box.max.x, box.max.y, box.max.z];
-  const wearCoord = maxC[axis];
-  if (axis === 0) root.position.x -= wearCoord;
-  else if (axis === 1) root.position.y -= wearCoord;
-  else root.position.z -= wearCoord;
-  root.updateMatrix();
-  return axis === 0 ? "x" : axis === 1 ? "y" : "z";
+function omafitNecklaceArcSpanFromSize(sz) {
+  if (!sz) return OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
+  const dims = [sz.x, sz.y, sz.z].filter((v) => Number.isFinite(v) && v > 1e-5);
+  dims.sort((a, b) => a - b);
+  if (dims.length === 0) return OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
+  if (dims.length === 1) return dims[0];
+  return dims[1];
 }
 
 /**
@@ -8986,7 +8967,7 @@ async function runArSession({
         mat.needsUpdate = true;
       }
     });
-    if (accessoryType === "glasses") {
+    if (accessoryType === "glasses" || accessoryType === "necklace") {
       try {
         omafitEnsureGlassesMeshesRenderable(THREE, glasses);
       } catch (e) {
@@ -9155,23 +9136,24 @@ async function runArSession({
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
       glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesFrameWidthRawLocal;
     }
+    /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
+    let necklaceArcSpanPrepM = null;
     if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
         const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
-        const wearPivotAxis = omafitApplyNecklaceWearPivotOffset(THREE, glasses);
         glasses.updateMatrixWorld(true);
         const szNeck = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szNeck);
+        necklaceArcSpanPrepM = omafitNecklaceArcSpanFromSize(szNeck);
         try {
           console.log("[omafit-ar] necklace GLB prep (bbox center + Tripo bind)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             ok: neckCenter?.ok,
             tripBind: tripBind?.bind,
-            wearPivotAxis,
             sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
             sizeBboxPost: { x: szNeck.x, y: szNeck.y, z: szNeck.z },
-            neckSpanM: Math.max(szNeck.x, szNeck.y, 1e-6),
+            neckArcSpanM: necklaceArcSpanPrepM,
             targetWidthM: OMAFIT_NECKLACE_REFERENCE_WIDTH_M,
           });
         } catch {
@@ -9786,8 +9768,10 @@ async function runArSession({
     if (accessoryType === "necklace") {
       const szNeckFit = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szNeckFit);
-      /** Largura do arco (plano do pescoço): não usar profundidade Z pós-Tripo (~1 m). */
-      necklaceNeckSpanM = Math.max(szNeckFit.x, szNeckFit.y, 1e-6);
+      necklaceNeckSpanM =
+        Number.isFinite(necklaceArcSpanPrepM) && necklaceArcSpanPrepM > 1e-5
+          ? necklaceArcSpanPrepM
+          : omafitNecklaceArcSpanFromSize(szNeckFit);
       accessoryMeshNormalizeScale =
         OMAFIT_NECKLACE_REFERENCE_WIDTH_M / necklaceNeckSpanM;
     }
@@ -9809,6 +9793,12 @@ async function runArSession({
         } else {
           glasses.scale.set(1, 1, 1);
         }
+      }
+    } else if (accessoryType === "necklace" && necklacePartition?.chain) {
+      glasses.scale.set(1, 1, 1);
+      necklacePartition.chain.scale.setScalar(accessoryMeshNormalizeScale);
+      if (necklacePartition.pendant) {
+        necklacePartition.pendant.scale.setScalar(accessoryMeshNormalizeScale);
       }
     } else {
       glasses.scale.setScalar(accessoryMeshNormalizeScale);
@@ -10540,6 +10530,7 @@ async function runArSession({
       glassesOffsetFinalVec: new THREE.Vector3(),
       /** Joias: `1/maxDim` no load; óculos: 1 — a escala anatómica vem só do IPD×factor em `onUpdate`. */
       accessoryMeshNormalizeScale,
+      necklaceNeckSpanM: accessoryType === "necklace" ? necklaceNeckSpanM : null,
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -11615,6 +11606,7 @@ async function runArSession({
               OMAFIT_NECKLACE_DISPLAY_SCALE_MUL;
             const part = st.necklacePartition;
             if (part?.chain) {
+              glasses.scale.set(1, 1, 1);
               part.chain.scale.setScalar(fitScale);
               if (part.pendant) part.pendant.scale.setScalar(fitScale);
             } else {
@@ -11693,10 +11685,18 @@ async function runArSession({
               glasses.updateMatrixWorld(true);
               const wp = new THREE.Vector3();
               wp.setFromMatrixPosition(glasses.matrixWorld);
+              const partDiag = st.necklacePartition;
+              const chainSc = partDiag?.chain?.scale?.x;
+              const effSc =
+                Number.isFinite(chainSc) && chainSc > 0
+                  ? glasses.scale.x * chainSc
+                  : glasses.scale.x;
               console.log("[omafit-ar] necklace tracking diag (1x)", {
                 build: OMAFIT_AR_WIDGET_BUILD,
                 metersMul,
                 nativeSpace,
+                necklaceNeckSpanM: st.necklaceNeckSpanM,
+                accessoryMeshNormalizeScale: st.accessoryMeshNormalizeScale,
                 wearPosition: {
                   x: wearPosition.position.x,
                   y: wearPosition.position.y,
@@ -11707,6 +11707,8 @@ async function runArSession({
                   y: glasses.scale.y,
                   z: glasses.scale.z,
                 },
+                chainScale: Number.isFinite(chainSc) ? chainSc : null,
+                effectiveScale: effSc,
                 worldPos: { x: wp.x, y: wp.y, z: wp.z },
                 clavicle: clavOk
                   ? {
