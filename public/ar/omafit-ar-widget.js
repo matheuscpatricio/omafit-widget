@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v54";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v55";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -925,6 +925,8 @@ const OMAFIT_NECKLACE_ROT_DAMP = 6.5;
 const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
 /** Lerp posição queixo → base pescoço (espaço métrico face). */
 const OMAFIT_NECKLACE_CHIN_TO_THROAT = 0.42;
+/** Largura alvo do arco do colar no pescoço (metros) — normalização previsível (não usar maxDim/Y). */
+const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -2431,10 +2433,46 @@ function upgradeFaceArNecklaceJewelryMaterials(THREE, root, envTexture) {
         o.needsUpdate = true;
         return o;
       }
+      if (
+        (m.isMeshStandardMaterial === true || m.isMeshPhysicalMaterial === true) &&
+        !gemRe.test(name) &&
+        !pendantRe.test(name) &&
+        !metalRe.test(name)
+      ) {
+        const o = m.isMeshPhysicalMaterial === true ? m.clone() : new THREE.MeshPhysicalMaterial().copy(m);
+        o.envMap = envTexture;
+        o.envMapIntensity = Math.max(1.1, Number(o.envMapIntensity) || 1.35);
+        o.metalness = Math.min(1, Math.max(0.78, Number(o.metalness) || 0.9));
+        o.roughness = Math.min(0.38, Math.max(0.08, Number(o.roughness) || 0.16));
+        o.toneMapped = true;
+        o.needsUpdate = true;
+        return o;
+      }
       return m;
     });
     obj.material = Array.isArray(obj.material) ? next : next[0];
   });
+}
+
+/**
+ * Tripo/colares verticais (Y >> X,Z): deita o arco no plano horizontal do pescoço.
+ * @returns {{ bind: string, size: { x: number, y: number, z: number } } | null}
+ */
+function omafitApplyNecklaceTripoBind(THREE, root) {
+  if (!THREE || !root) return null;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const sz = new THREE.Vector3();
+  box.getSize(sz);
+  let bind = "identity";
+  if (sz.y >= sz.x * 1.15 && sz.y >= sz.z * 1.15) {
+    root.rotateX(-Math.PI / 2);
+    bind = "rx-minus-90";
+    root.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(root);
+    box2.getSize(sz);
+  }
+  return { bind, size: { x: sz.x, y: sz.y, z: sz.z } };
 }
 
 /**
@@ -8750,10 +8788,16 @@ async function runArSession({
           } else if (THREE.sRGBEncoding !== undefined) mat.emissiveMap.encoding = THREE.sRGBEncoding;
         }
         if (colorAttr && "vertexColors" in mat) mat.vertexColors = true;
-        if ("metalness" in mat) mat.metalness = 0;
-        if ("roughness" in mat) mat.roughness = 1;
-        if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
-        if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1;
+        if (accessoryType !== "necklace") {
+          if ("metalness" in mat) mat.metalness = 0;
+          if ("roughness" in mat) mat.roughness = 1;
+          if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
+          if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1;
+        } else {
+          if ("metalness" in mat) mat.metalness = Math.min(1, Math.max(0.72, Number(mat.metalness) || 0.88));
+          if ("roughness" in mat) mat.roughness = Math.min(0.42, Math.max(0.08, Number(mat.roughness) || 0.18));
+          if ("envMapIntensity" in mat) mat.envMapIntensity = Math.max(0.65, Number(mat.envMapIntensity) || 0.85);
+        }
         /**
          * KHR_materials_transmission: sem PMREM / pipeline de transmissão do renderer,
          * o modelo pode renderizar como totalmente transparente no AR “lite”.
@@ -8947,12 +8991,19 @@ async function runArSession({
     if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
+        const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
+        glasses.updateMatrixWorld(true);
+        const szNeck = new THREE.Vector3();
+        new THREE.Box3().setFromObject(glasses).getSize(szNeck);
         try {
-          console.log("[omafit-ar] necklace GLB centered on bbox (not lens anchor)", {
+          console.log("[omafit-ar] necklace GLB prep (bbox center + Tripo bind)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             ok: neckCenter?.ok,
-            mode: neckCenter?.mode,
-            sizeBbox: { x: sz.x, y: sz.y, z: sz.z },
+            tripBind: tripBind?.bind,
+            sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
+            sizeBboxPost: { x: szNeck.x, y: szNeck.y, z: szNeck.z },
+            neckSpanM: Math.max(szNeck.x, szNeck.z, 1e-6),
+            targetWidthM: OMAFIT_NECKLACE_REFERENCE_WIDTH_M,
           });
         } catch {
           /* ignore */
@@ -9559,9 +9610,17 @@ async function runArSession({
 
     /**
      * Escala inicial no mesh: óculos **(1,1,1)** — em cada frame `onUpdate`, `glasses.scale` = IPD×1,5.
-     * Joias (colar, …): normalizar pelo maior lado da bbox (`1/maxDim`).
+     * Colar: normalizar pela **largura do arco** (max X,Z em metros), não por maxDim (Y Tripo ~1 m).
      */
-    const accessoryMeshNormalizeScale = accessoryType === "glasses" ? 1 : 1 / maxDim;
+    let accessoryMeshNormalizeScale = accessoryType === "glasses" ? 1 : 1 / maxDim;
+    let necklaceNeckSpanM = maxDim;
+    if (accessoryType === "necklace") {
+      const szNeckFit = new THREE.Vector3();
+      new THREE.Box3().setFromObject(glasses).getSize(szNeckFit);
+      necklaceNeckSpanM = Math.max(szNeckFit.x, szNeckFit.z, 1e-6);
+      accessoryMeshNormalizeScale =
+        OMAFIT_NECKLACE_REFERENCE_WIDTH_M / necklaceNeckSpanM;
+    }
     if (accessoryType === "glasses") {
       if (!glassesManualMindarRig) {
         if (glassesSimpleFaceOnly) {
@@ -9586,6 +9645,9 @@ async function runArSession({
     }
     console.log("[omafit-ar] face scale resolved", {
       glbMaxDim: maxDim,
+      necklaceNeckSpanM: accessoryType === "necklace" ? necklaceNeckSpanM : null,
+      necklaceReferenceWidthM:
+        accessoryType === "necklace" ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M : null,
       accessoryMeshNormalizeScale,
       glassesSimpleFaceOnly,
       merchantCalibration: readGlassesMerchantCal(),
@@ -10509,7 +10571,12 @@ async function runArSession({
       })(),
     };
 
-    if (!microUxDisabled && microUxModelWrap && glasses) {
+    if (
+      !microUxDisabled &&
+      microUxModelWrap &&
+      glasses &&
+      accessoryType !== "necklace"
+    ) {
       try {
         omafitStoreMaterialOpacityBaseline(glasses);
         omafitApplyModelOpacityFactor(glasses, 0);
@@ -11592,10 +11659,11 @@ async function runArSession({
         }
         if (faceArEnhancementState?.hairUniforms && accessoryType === "necklace") {
           const nh = installNecklaceHairMaskOnGlb(THREE, glasses, faceArEnhancementState.hairUniforms);
-          const nf = installNecklaceNapeFadeOnGlb(THREE, glasses);
-          if (nh > 0) {
-            console.log("[omafit-ar] colar: máscara cabelo em", nh, "material(is); fade nuca:", nf);
-          }
+          const napeFadeOn = /^(1|true|yes|on)$/i.test(
+            String(cfgAttr("arNecklaceNapeFade", "0")).trim(),
+          );
+          const nf = napeFadeOn ? installNecklaceNapeFadeOnGlb(THREE, glasses) : 0;
+          console.log("[omafit-ar] colar: materiais joia OK; hairMask:", nh, "napeFade:", nf);
         }
       } catch (e) {
         console.warn("[omafit-ar] PMREM facial (óculos):", e?.message || e);
