@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v69";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v70";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -963,11 +963,11 @@ const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
 const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 90;
-/** Piso / teto de escala local do GLB (cm bake × fit; ~3–9). */
-const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 0.35;
-const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 9;
-/** GLB Tripo em metros → unidades nativas MindAR (cm) no load (uma vez). */
-const OMAFIT_NECKLACE_GEOMETRY_CM_BAKE = 100;
+/** Piso / teto da escala única do mesh (m→cm + 36cm / arco / âncora). */
+const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 0.2;
+const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 6.5;
+/** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
+const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
 /** Spans acima disto são profundidade Tripo (1 m), não largura do arco. */
 const OMAFIT_NECKLACE_MAX_ARC_SPAN_M = 0.72;
 /** Ajuste fino opcional (cm / m) após o ponto clavícula — attrs `data-ar-necklace-wear-fine`. */
@@ -2663,21 +2663,17 @@ function omafitMatrixAverageScale(THREE, matrix) {
 }
 
 /**
- * Rigid slot (colar): GLB em metros, landmarks/âncora MindAR em cm nativos.
- * `fitScale = normalize × mul × cheekK × (cm?100:1) / anchorScale` — o ×100 evita
- * colar invisível (v66 sem ele ≈ 0,05); dividir por `anchorScale` evita gigante (v64 ≈ 52).
+ * Escala única do colar: GLB em metros, âncora MindAR em cm.
+ * `totalScale = (36cm / arco_cm) × mul × cheekK / anchorScale` com m→cm embutido (×100 uma vez).
+ * Não altera posição/rotação — só `glasses.scale` (ou chain na partition).
  */
-function omafitComputeNecklaceRigidSlotScale(THREE, st, anchorGroup, cheekNative) {
+function omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative) {
   const norm =
     Number.isFinite(st.accessoryMeshNormalizeScale) && st.accessoryMeshNormalizeScale > 0
       ? st.accessoryMeshNormalizeScale
       : OMAFIT_NECKLACE_REFERENCE_WIDTH_M / Math.max(st.necklaceNeckSpanM || 0.48, 1e-4);
   let cheek = cheekNative;
   if (!Number.isFinite(cheek) || cheek <= 1e-5) cheek = 14;
-  const nativeCm = cheek > 1.2;
-  const cmBaked =
-    Number.isFinite(st.necklaceGeometryCmBake) && st.necklaceGeometryCmBake > 1;
-  const metersToNativeMul = nativeCm && !cmBaked ? 100 : 1;
   if (st.necklaceSwing && st.necklaceSwing.refNeckW === null) {
     st.necklaceSwing.refNeckW = cheek;
   }
@@ -2689,29 +2685,29 @@ function omafitComputeNecklaceRigidSlotScale(THREE, st, anchorGroup, cheekNative
     Number.isFinite(st.necklaceScaleMul) && st.necklaceScaleMul > 0
       ? st.necklaceScaleMul
       : OMAFIT_NECKLACE_DEFAULT_SCALE_MUL;
-  let anchorScale = 1;
+  let anchorScale = OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK;
   if (anchorGroup) {
     anchorGroup.updateMatrixWorld(true);
-    anchorScale = omafitMatrixAverageScale(THREE, anchorGroup.matrixWorld);
+    const measured = omafitMatrixAverageScale(THREE, anchorGroup.matrixWorld);
+    if (measured >= 4) anchorScale = measured;
   }
-  let fitScale =
-    (norm * merchantMul * cheekTrackK * metersToNativeMul) / Math.max(anchorScale, 0.35);
-  fitScale = THREE.MathUtils.clamp(
-    fitScale,
+  const metersToCm = cheek > 1.2 ? 100 : 1;
+  let totalScale =
+    (norm * merchantMul * cheekTrackK * metersToCm) / Math.max(anchorScale, 4);
+  totalScale = THREE.MathUtils.clamp(
+    totalScale,
     OMAFIT_NECKLACE_RIGID_SCALE_MIN,
     OMAFIT_NECKLACE_RIGID_SCALE_MAX,
   );
   const neckSpanM = Number.isFinite(st.necklaceNeckSpanM) ? st.necklaceNeckSpanM : 0.48;
   const targetArcWidthCm = OMAFIT_NECKLACE_REFERENCE_WIDTH_M * 100 * cheekTrackK * merchantMul;
-  const predictedArcWidthCm =
-    (neckSpanM * fitScale * anchorScale) / Math.max(metersToNativeMul, 1) * 100;
+  const predictedArcWidthCm = neckSpanM * totalScale * anchorScale;
   return {
-    fitScale,
+    totalScale,
     anchorScale,
     cheekTrackK,
     merchantMul,
-    nativeCm,
-    metersToNativeMul,
+    metersToCm,
     targetArcWidthCm,
     predictedArcWidthCm,
   };
@@ -2727,33 +2723,42 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
       OMAFIT_FACE_LM_LEFT_CHEEK,
     );
   }
-  const pack = omafitComputeNecklaceRigidSlotScale(THREE, st, anchorGroup, cheek);
-  const fitScale = pack.fitScale;
-  const cmBake =
-    Number.isFinite(st.necklaceGeometryCmBake) && st.necklaceGeometryCmBake > 0
-      ? st.necklaceGeometryCmBake
-      : OMAFIT_NECKLACE_GEOMETRY_CM_BAKE;
+  const pack = omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheek);
+  const totalScale = pack.totalScale;
   const part = st.necklacePartition;
-  const displayScale = cmBake * fitScale;
   if (part?.chain?.children?.length) {
-    glbRoot.scale.set(cmBake, cmBake, cmBake);
-    part.chain.scale.setScalar(fitScale);
-    if (part.pendant) part.pendant.scale.setScalar(fitScale);
+    glbRoot.scale.set(1, 1, 1);
+    part.chain.scale.setScalar(totalScale);
+    if (part.pendant) part.pendant.scale.setScalar(totalScale);
   } else {
-    glbRoot.scale.setScalar(displayScale);
+    glbRoot.scale.setScalar(totalScale);
   }
   glbRoot.visible = true;
   omafitEnsureNecklaceMeshesRenderable(THREE, glbRoot, {
     forceDepthFrontAttr: st.necklaceForceDepthFrontAttr,
   });
   st.necklaceAnchorScale = pack.anchorScale;
-  st.necklaceLastFitScale = fitScale;
+  st.necklaceLastFitScale = totalScale;
   st.necklaceTargetArcWidthCm = pack.targetArcWidthCm;
   st.necklaceCheekTrackK = pack.cheekTrackK;
   st.necklaceScaleMul = pack.merchantMul;
   st.necklacePredictedArcWidthCm = pack.predictedArcWidthCm;
-  st.necklaceNativeCm = pack.nativeCm;
-  return fitScale;
+  return totalScale;
+}
+
+/** @deprecated alias */
+function omafitComputeNecklaceRigidSlotScale(THREE, st, anchorGroup, cheekNative) {
+  const pack = omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative);
+  return {
+    fitScale: pack.totalScale,
+    anchorScale: pack.anchorScale,
+    cheekTrackK: pack.cheekTrackK,
+    merchantMul: pack.merchantMul,
+    nativeCm: cheekNative > 1.2,
+    metersToNativeMul: pack.metersToCm,
+    targetArcWidthCm: pack.targetArcWidthCm,
+    predictedArcWidthCm: pack.predictedArcWidthCm,
+  };
 }
 
 /**
@@ -9400,12 +9405,10 @@ async function runArSession({
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
         const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
-        glasses.scale.setScalar(OMAFIT_NECKLACE_GEOMETRY_CM_BAKE);
         glasses.updateMatrixWorld(true);
         const szNeck = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szNeck);
-        necklaceArcSpanPrepM =
-          omafitNecklaceArcSpanFromSize(szNeck) / OMAFIT_NECKLACE_GEOMETRY_CM_BAKE;
+        necklaceArcSpanPrepM = omafitNecklaceArcSpanFromSize(szNeck);
         try {
           console.log("[omafit-ar] necklace GLB prep (bbox center + Tripo bind)", {
             build: OMAFIT_AR_WIDGET_BUILD,
@@ -10065,7 +10068,7 @@ async function runArSession({
         }
       }
     } else if (accessoryType === "necklace") {
-      const bootPack = omafitComputeNecklaceRigidSlotScale(
+      const bootPack = omafitComputeNecklaceDisplayScale(
         THREE,
         {
           accessoryMeshNormalizeScale,
@@ -10076,16 +10079,15 @@ async function runArSession({
         anchor.group,
         14,
       );
-      const bootNeckScale = bootPack.fitScale;
-      const bootDisplay = OMAFIT_NECKLACE_GEOMETRY_CM_BAKE * bootNeckScale;
+      const bootTotal = bootPack.totalScale;
       if (necklacePartition?.chain?.children?.length) {
-        glasses.scale.setScalar(OMAFIT_NECKLACE_GEOMETRY_CM_BAKE);
-        necklacePartition.chain.scale.setScalar(bootNeckScale);
+        glasses.scale.set(1, 1, 1);
+        necklacePartition.chain.scale.setScalar(bootTotal);
         if (necklacePartition.pendant) {
-          necklacePartition.pendant.scale.setScalar(bootNeckScale);
+          necklacePartition.pendant.scale.setScalar(bootTotal);
         }
       } else {
-        glasses.scale.setScalar(bootDisplay);
+        glasses.scale.setScalar(bootTotal);
       }
     } else {
       glasses.scale.setScalar(accessoryMeshNormalizeScale);
@@ -10546,7 +10548,6 @@ async function runArSession({
       try {
         console.log("[omafit-ar] colar: slot directo na âncora (sem wearPosition/calibRot)", {
           build: OMAFIT_AR_WIDGET_BUILD,
-          cmBake: OMAFIT_NECKLACE_GEOMETRY_CM_BAKE,
         });
       } catch {
         /* ignore */
@@ -10860,8 +10861,6 @@ async function runArSession({
       necklacePredictedArcWidthNative: null,
       necklaceCheekTrackK: null,
       necklaceMeterToNative: accessoryType === "necklace" ? 0.01 : null,
-      necklaceGeometryCmBake:
-        accessoryType === "necklace" ? OMAFIT_NECKLACE_GEOMETRY_CM_BAKE : null,
       necklaceForceDepthFrontAttr:
         accessoryType === "necklace"
           ? String(cfgAttr("arNecklaceForceDepthFront", "1")).trim()
@@ -12056,7 +12055,6 @@ async function runArSession({
                 build: OMAFIT_AR_WIDGET_BUILD,
                 rigidSlot,
                 directAnchorSlot: !!st.necklaceWearGroup,
-                cmBake: st.necklaceGeometryCmBake,
                 metersMul,
                 nativeSpace,
                 necklaceNeckSpanM: st.necklaceNeckSpanM,
@@ -12077,7 +12075,7 @@ async function runArSession({
                 },
                 chainScale: Number.isFinite(chainSc) ? chainSc : null,
                 effectiveScale: effSc,
-                fitScale: st.necklaceLastFitScale ?? fitScale,
+                totalScale: st.necklaceLastFitScale ?? fitScale,
                 anchorScale: st.necklaceAnchorScale,
                 necklaceScaleMul: st.necklaceScaleMul,
                 targetArcWidthCm: st.necklaceTargetArcWidthCm,
