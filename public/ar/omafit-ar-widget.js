@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v67";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v68";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -959,8 +959,8 @@ const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
  * Escala base = (0,36 m / largura bbox) × (cm por m) × este mul × k(bochecha).
  */
 const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
-/** Wear fixo no slot (unidades nativas MindAR ≈ cm) — âncora 152 (queixo). */
-const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 0.35 };
+/** Wear fixo no slot (unidades nativas MindAR ≈ cm) — âncora 152 (queixo). Z+ = para a câmara (evita oclusão da malha 468). */
+const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 90;
 /** Piso / teto de escala local do GLB (espaço nativo cm: ~3–9 após ×100 m→cm). */
@@ -2174,6 +2174,60 @@ function omafitEnsureGlassesMeshesRenderable(THREE, root) {
 }
 
 /**
+ * Colar no peito fica atrás da malha 468 do MindAR (só depth) → invisível.
+ * Desliga depth/color nessas malhas; o colar desenha por cima com renderOrder alto.
+ */
+function omafitNecklaceSuppressMindarFaceMeshDepth(mindarThree, exceptMesh) {
+  const fms = mindarThree?.faceMeshes;
+  if (!fms?.length) return 0;
+  let n = 0;
+  for (let i = 0; i < fms.length; i++) {
+    const fm = fms[i];
+    if (!fm || fm === exceptMesh) continue;
+    fm.visible = false;
+    fm.renderOrder = -250;
+    const mats = Array.isArray(fm.material) ? fm.material : [fm.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.colorWrite = false;
+      mat.depthWrite = false;
+      mat.depthTest = false;
+      mat.needsUpdate = true;
+      n += 1;
+    }
+  }
+  return n;
+}
+
+/** Materiais do colar: DoubleSide + prioridade de depth à frente do rosto. */
+function omafitEnsureNecklaceMeshesRenderable(THREE, root) {
+  if (!THREE || !root?.traverse) return;
+  omafitEnsureGlassesMeshesRenderable(THREE, root);
+  root.traverse((child) => {
+    if (!child?.isMesh) return;
+    child.renderOrder = 48;
+    child.frustumCulled = false;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.side = THREE.DoubleSide;
+      mat.depthTest = true;
+      mat.depthWrite = true;
+      if ("transmission" in mat && Number(mat.transmission) > 0.02) {
+        mat.transmission = 0;
+        if ("thickness" in mat) mat.thickness = 0;
+      }
+      if ("polygonOffset" in mat) {
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -12;
+        mat.polygonOffsetUnits = -12;
+      }
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+/**
  * URL do Ajax Cart da Shopify. No tema é relativo (`/cart/add.js`); no iframe
  * Netlify o origin é outro — precisa de `data-shop-domain` (ex. loja.myshopify.com).
  */
@@ -2658,9 +2712,7 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
     glbRoot.scale.setScalar(fitScale);
   }
   glbRoot.visible = true;
-  glbRoot.traverse((o) => {
-    if (o) o.visible = true;
-  });
+  omafitEnsureNecklaceMeshesRenderable(THREE, glbRoot);
   st.necklaceAnchorScale = pack.anchorScale;
   st.necklaceLastFitScale = fitScale;
   st.necklaceTargetArcWidthCm = pack.targetArcWidthCm;
@@ -9129,7 +9181,11 @@ async function runArSession({
     });
     if (accessoryType === "glasses" || accessoryType === "necklace") {
       try {
-        omafitEnsureGlassesMeshesRenderable(THREE, glasses);
+        if (accessoryType === "necklace") {
+          omafitEnsureNecklaceMeshesRenderable(THREE, glasses);
+        } else {
+          omafitEnsureGlassesMeshesRenderable(THREE, glasses);
+        }
       } catch (e) {
         console.warn("[omafit-ar] ensure meshes renderable:", e?.message || e);
       }
@@ -10337,14 +10393,8 @@ async function runArSession({
       necklaceSwingGroup.add(glassesAnatomy);
       necklaceShadowParts = omafitCreateNecklaceChestDropShadow(THREE);
       necklaceSwingGroup.add(necklaceShadowParts.mesh);
-      if (!microUxDisabled) {
-        microUxModelWrap = new GroupCtor();
-        microUxModelWrap.name = "omafit-ar-micro-ux-wrap";
-        microUxModelWrap.add(glasses);
-        glassesAnatomy.add(microUxModelWrap);
-      } else {
-        glassesAnatomy.add(glasses);
-      }
+      /** Sem micro-ux wrap no colar — escala anatómica só no mesh; evita wrap 0,88× a esconder o GLB. */
+      glassesAnatomy.add(glasses);
     }
 
     /** Lerp/slerp leve no `glassesPivot` (opcional): `data-ar-glasses-pivot-smooth-ms="55"`. */
@@ -10932,6 +10982,7 @@ async function runArSession({
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       glassesAnatomy: accessoryType === "necklace" ? glassesAnatomy : null,
       necklaceDiagLogged: false,
+      necklaceFaceMeshDepthOffLogged: false,
       necklaceClavicleScratch:
         accessoryType === "necklace"
           ? {
@@ -11777,6 +11828,18 @@ async function runArSession({
         }
         }
         if (accessoryType === "necklace" && st.necklaceSwing) {
+          try {
+            const occN = omafitNecklaceSuppressMindarFaceMeshDepth(mindarThree, faceOccluderMesh);
+            if (!st.necklaceFaceMeshDepthOffLogged && occN > 0) {
+              st.necklaceFaceMeshDepthOffLogged = true;
+              console.log("[omafit-ar] colar: malha face MindAR sem depth (evita invisível no peito)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                matsPatched: occN,
+              });
+            }
+          } catch {
+            /* ignore */
+          }
           const metersMul = omafitMindarMetricToMetersScale(lm);
           const nativeSpace = metersMul < 1;
           st.necklaceMeterToNative = nativeSpace ? 1 / Math.max(metersMul, 1e-6) : 1;
@@ -12599,7 +12662,13 @@ async function runArSession({
       try {
         const stMu = faceArEnhancementState;
         const nowRaf = performance.now();
-        if (stMu && !stMu.microUxDisabled && stMu.microUxModelWrap && stMu.microUx) {
+        if (
+          accessoryType !== "necklace" &&
+          stMu &&
+          !stMu.microUxDisabled &&
+          stMu.microUxModelWrap &&
+          stMu.microUx
+        ) {
           omafitStepMicroUxIntro(
             THREE,
             stMu.microUxModelWrap,
