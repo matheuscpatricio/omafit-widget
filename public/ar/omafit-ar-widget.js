@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v62";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v63";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -956,6 +956,10 @@ const OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL = 0.14;
 const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
 /** Multiplicador visual (Tripo + fit bochecha) — colar costuma ficar pequeno sem isto. */
 const OMAFIT_NECKLACE_DISPLAY_SCALE_MUL = 2.75;
+/** Piso de escala no ecrã (evita colar “invisível” por span/dupla escala errados). */
+const OMAFIT_NECKLACE_MIN_DISPLAY_SCALE = 0.38;
+/** Spans acima disto são profundidade Tripo (1 m), não largura do arco. */
+const OMAFIT_NECKLACE_MAX_ARC_SPAN_M = 0.72;
 /** Ajuste fino opcional (cm / m) após o ponto clavícula — attrs `data-ar-necklace-wear-fine`. */
 const OMAFIT_NECKLACE_WEAR_FINE_CM = { x: 0, y: 0, z: 0 };
 const OMAFIT_NECKLACE_WEAR_FINE_M = { x: 0, y: 0, z: 0 };
@@ -2526,6 +2530,78 @@ function omafitNecklaceArcSpanFromSize(sz) {
   if (dims.length === 0) return OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
   if (dims.length === 1) return dims[0];
   return dims[1];
+}
+
+/**
+ * Largura do arco para normalização — ignora profundidade Tripo (~1 m).
+ * @param {import("three").Vector3} sz
+ * @param {number | null} prepSpanM span guardado após center+Tripo
+ */
+function omafitResolveNecklaceNeckSpanM(sz, prepSpanM) {
+  if (Number.isFinite(prepSpanM) && prepSpanM > 0.04 && prepSpanM <= OMAFIT_NECKLACE_MAX_ARC_SPAN_M) {
+    return prepSpanM;
+  }
+  const med = omafitNecklaceArcSpanFromSize(sz);
+  if (med > 0.04 && med <= OMAFIT_NECKLACE_MAX_ARC_SPAN_M) return med;
+  const inBand = [sz.x, sz.y, sz.z]
+    .filter((v) => Number.isFinite(v) && v > 0.04 && v <= OMAFIT_NECKLACE_MAX_ARC_SPAN_M)
+    .sort((a, b) => b - a);
+  if (inBand.length > 0) return inBand[0];
+  return OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
+}
+
+/**
+ * Escala de exibição do colar (sempre aplicada com face detectada).
+ * @param {typeof import("three")} THREE
+ * @param {{ accessoryMeshNormalizeScale: number, necklacePartition: { chain?: import("three").Object3D, pendant?: import("three").Object3D } | null, necklaceSwing?: { refNeckW: number | null } | null }} st
+ * @param {import("three").Object3D} glbRoot
+ * @param {any} lm metricLandmarks
+ * @param {number} cheekNative distância bochechas no espaço nativo MindAR
+ * @param {number} metersMul 1 ou 0.01 (cm→m)
+ */
+function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, lm, cheekNative, metersMul) {
+  if (!THREE || !st || !glbRoot) return 0;
+  const nativeSpace = metersMul < 1;
+  const refWidthNative = nativeSpace
+    ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M / metersMul
+    : OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
+  let cheek = cheekNative;
+  if (!Number.isFinite(cheek) || cheek <= 1e-5) {
+    cheek = omafitFaceLandmarkDist3(
+      lm,
+      OMAFIT_FACE_LM_RIGHT_CHEEK,
+      OMAFIT_FACE_LM_LEFT_CHEEK,
+    );
+  }
+  if (!Number.isFinite(cheek) || cheek <= 1e-5) {
+    cheek = nativeSpace ? 14 : 0.14;
+  }
+  if (st.necklaceSwing && st.necklaceSwing.refNeckW === null) {
+    st.necklaceSwing.refNeckW = cheek;
+  }
+  const k =
+    st.necklaceSwing && Number.isFinite(st.necklaceSwing.refNeckW) && st.necklaceSwing.refNeckW > 1e-5
+      ? THREE.MathUtils.clamp(cheek / st.necklaceSwing.refNeckW, 0.86, 1.18)
+      : 1;
+  let fitScale =
+    (cheek / Math.max(refWidthNative, 1e-5)) *
+    st.accessoryMeshNormalizeScale *
+    k *
+    OMAFIT_NECKLACE_DISPLAY_SCALE_MUL;
+  fitScale = Math.max(fitScale, OMAFIT_NECKLACE_MIN_DISPLAY_SCALE);
+  const part = st.necklacePartition;
+  if (part?.chain?.children?.length) {
+    glbRoot.scale.set(1, 1, 1);
+    part.chain.scale.setScalar(fitScale);
+    if (part.pendant) part.pendant.scale.setScalar(fitScale);
+  } else {
+    glbRoot.scale.setScalar(fitScale);
+  }
+  glbRoot.visible = true;
+  glbRoot.traverse((o) => {
+    if (o) o.visible = true;
+  });
+  return fitScale;
 }
 
 /**
@@ -9076,16 +9152,23 @@ async function runArSession({
     const originalQuat = glasses.quaternion.clone();
     let bakedMeshCount = 0;
     let skippedAnimatedMeshCount = 0;
-    try {
-      bakeGLBTransforms(THREE, glasses, (info) => {
-        bakedMeshCount = info.baked;
-        skippedAnimatedMeshCount = info.skipped;
-      });
-    } catch (e) {
-      console.warn(
-        "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
-        e?.message || e,
-      );
+    /** Colar Tripo: bake pode esvaziar hierarquia / deslocar pivots — manter transforms do GLB. */
+    if (accessoryType !== "necklace") {
+      try {
+        bakeGLBTransforms(THREE, glasses, (info) => {
+          bakedMeshCount = info.baked;
+          skippedAnimatedMeshCount = info.skipped;
+        });
+      } catch (e) {
+        console.warn(
+          "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
+          e?.message || e,
+        );
+        glasses.rotation.set(0, 0, 0);
+        glasses.quaternion.identity();
+        glasses.scale.setScalar(1);
+      }
+    } else {
       glasses.rotation.set(0, 0, 0);
       glasses.quaternion.identity();
       glasses.scale.setScalar(1);
@@ -9749,11 +9832,17 @@ async function runArSession({
       glassesFaceWideAxisX = szPivot.x >= szPivot.z;
     }
 
-    /** Colar: separar corrente vs pingente para escala radial (k,1,k) sem esticar o pingente. */
+    /** Colar: partition opcional (default off — evita reparent que quebra escala/visibilidade). */
     let necklacePartition = null;
-    if (accessoryType === "necklace") {
+    if (
+      accessoryType === "necklace" &&
+      /^(1|true|yes|on)$/i.test(String(cfgAttr("arNecklacePartition", "0")).trim())
+    ) {
       try {
         necklacePartition = omafitPartitionNecklaceChainPendant(THREE, glasses);
+        if (necklacePartition?.chain && necklacePartition.chain.children.length === 0) {
+          necklacePartition = null;
+        }
       } catch (e) {
         console.warn("[omafit-ar] necklace GLB partition:", e?.message || e);
       }
@@ -9768,10 +9857,7 @@ async function runArSession({
     if (accessoryType === "necklace") {
       const szNeckFit = new THREE.Vector3();
       new THREE.Box3().setFromObject(glasses).getSize(szNeckFit);
-      necklaceNeckSpanM =
-        Number.isFinite(necklaceArcSpanPrepM) && necklaceArcSpanPrepM > 1e-5
-          ? necklaceArcSpanPrepM
-          : omafitNecklaceArcSpanFromSize(szNeckFit);
+      necklaceNeckSpanM = omafitResolveNecklaceNeckSpanM(szNeckFit, necklaceArcSpanPrepM);
       accessoryMeshNormalizeScale =
         OMAFIT_NECKLACE_REFERENCE_WIDTH_M / necklaceNeckSpanM;
     }
@@ -9794,11 +9880,19 @@ async function runArSession({
           glasses.scale.set(1, 1, 1);
         }
       }
-    } else if (accessoryType === "necklace" && necklacePartition?.chain) {
-      glasses.scale.set(1, 1, 1);
-      necklacePartition.chain.scale.setScalar(accessoryMeshNormalizeScale);
-      if (necklacePartition.pendant) {
-        necklacePartition.pendant.scale.setScalar(accessoryMeshNormalizeScale);
+    } else if (accessoryType === "necklace") {
+      const bootNeckScale = Math.max(
+        accessoryMeshNormalizeScale * OMAFIT_NECKLACE_DISPLAY_SCALE_MUL * 0.5,
+        OMAFIT_NECKLACE_MIN_DISPLAY_SCALE,
+      );
+      if (necklacePartition?.chain?.children?.length) {
+        glasses.scale.set(1, 1, 1);
+        necklacePartition.chain.scale.setScalar(bootNeckScale);
+        if (necklacePartition.pendant) {
+          necklacePartition.pendant.scale.setScalar(bootNeckScale);
+        }
+      } else {
+        glasses.scale.setScalar(bootNeckScale);
       }
     } else {
       glasses.scale.setScalar(accessoryMeshNormalizeScale);
@@ -10243,6 +10337,9 @@ async function runArSession({
         } else {
           negModelX = !disableFaceMirror;
         }
+      } else if (accessoryType === "necklace") {
+        /** MindAR já espelha o frame selfie — não inverter o GLB (desloca/fora do ecrã). */
+        negModelX = false;
       } else {
         negModelX = !disableFaceMirror;
       }
@@ -11596,23 +11693,14 @@ async function runArSession({
           const refWidthNative = nativeSpace
             ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M / metersMul
             : OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
-          if (Number.isFinite(cheekNative) && cheekNative > 1e-5) {
-            if (st.necklaceSwing.refNeckW === null) st.necklaceSwing.refNeckW = cheekNative;
-            const k = THREE.MathUtils.clamp(cheekNative / st.necklaceSwing.refNeckW, 0.86, 1.18);
-            const fitScale =
-              (cheekNative / Math.max(refWidthNative, 1e-5)) *
-              st.accessoryMeshNormalizeScale *
-              k *
-              OMAFIT_NECKLACE_DISPLAY_SCALE_MUL;
-            const part = st.necklacePartition;
-            if (part?.chain) {
-              glasses.scale.set(1, 1, 1);
-              part.chain.scale.setScalar(fitScale);
-              if (part.pendant) part.pendant.scale.setScalar(fitScale);
-            } else {
-              glasses.scale.setScalar(fitScale);
-            }
-          }
+          const fitScale = omafitApplyNecklaceDisplayScale(
+            THREE,
+            st,
+            glasses,
+            lm,
+            cheekNative,
+            metersMul,
+          );
           let shoulderYaw = 0;
           let shoulderRxBlend = 0;
           try {
@@ -11709,6 +11797,15 @@ async function runArSession({
                 },
                 chainScale: Number.isFinite(chainSc) ? chainSc : null,
                 effectiveScale: effSc,
+                fitScale,
+                meshCount: (() => {
+                  let n = 0;
+                  glasses.traverse((o) => {
+                    if (o?.isMesh) n += 1;
+                  });
+                  return n;
+                })(),
+                partitionChainChildren: partDiag?.chain?.children?.length ?? 0,
                 worldPos: { x: wp.x, y: wp.y, z: wp.z },
                 clavicle: clavOk
                   ? {
@@ -11925,7 +12022,9 @@ async function runArSession({
           }
         }
         if (faceArEnhancementState?.hairUniforms && accessoryType === "necklace") {
-          const nh = installNecklaceHairMaskOnGlb(THREE, glasses, faceArEnhancementState.hairUniforms);
+          const nh = /^(1|true|yes|on)$/i.test(String(cfgAttr("arNecklaceHairMask", "0")).trim())
+            ? installNecklaceHairMaskOnGlb(THREE, glasses, faceArEnhancementState.hairUniforms)
+            : 0;
           const napeFadeOn = /^(1|true|yes|on)$/i.test(
             String(cfgAttr("arNecklaceNapeFade", "0")).trim(),
           );
