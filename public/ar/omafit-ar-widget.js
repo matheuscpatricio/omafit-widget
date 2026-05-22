@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v56";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v57";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2770,6 +2770,33 @@ function omafitMetricLandmarkToVec3(lm, idx, smoother, out) {
   const z = a[2] ?? a.z;
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false;
   out.set(x, y, z);
+  return true;
+}
+
+/**
+ * MindAR `metricLandmarks`: em muitos builds Tripo/loja vêm em **cm** (bochecha~15),
+ * não metros (~0,15). Detecta e devolve 0,01 para converter → m.
+ * @param {any} lm
+ * @returns {number}
+ */
+function omafitMindarMetricToMetersScale(lm) {
+  const d = omafitFaceLandmarkDist3(
+    lm,
+    OMAFIT_FACE_LM_RIGHT_CHEEK,
+    OMAFIT_FACE_LM_LEFT_CHEEK,
+  );
+  if (!Number.isFinite(d) || d <= 0) return 1;
+  if (d > 1.2) return 0.01;
+  return 1;
+}
+
+/**
+ * Landmark → Vector3 em **metros** (aplica `omafitMindarMetricToMetersScale`).
+ */
+function omafitMetricLandmarkToVec3M(lm, idx, smoother, out, metersMul) {
+  if (!omafitMetricLandmarkToVec3(lm, idx, smoother, out)) return false;
+  const mul = Number.isFinite(metersMul) && metersMul > 0 ? metersMul : 1;
+  out.multiplyScalar(mul);
   return true;
 }
 
@@ -11397,21 +11424,27 @@ async function runArSession({
         }
         }
         if (accessoryType === "necklace" && st.necklaceSwing) {
+          const metersMul = omafitMindarMetricToMetersScale(lm);
           const anchorVec = st.necklaceAnchorScratch;
           const anchorOk =
             anchorVec &&
-            omafitMetricLandmarkToVec3(lm, anchorIndex, st.lmSmoother, anchorVec);
-          const ch =
-            st.lmSmoother?.get(OMAFIT_FACE_LM_CHIN) ||
-            new THREE.Vector3(
-              lm[OMAFIT_FACE_LM_CHIN][0],
-              lm[OMAFIT_FACE_LM_CHIN][1],
-              lm[OMAFIT_FACE_LM_CHIN][2],
+            omafitMetricLandmarkToVec3M(lm, anchorIndex, st.lmSmoother, anchorVec, metersMul);
+          const ch = new THREE.Vector3();
+          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, ch, metersMul)) {
+            ch.set(
+              (lm[OMAFIT_FACE_LM_CHIN][0] ?? 0) * metersMul,
+              (lm[OMAFIT_FACE_LM_CHIN][1] ?? 0) * metersMul,
+              (lm[OMAFIT_FACE_LM_CHIN][2] ?? 0) * metersMul,
             );
-          const p234 = st.lmSmoother?.get(OMAFIT_FACE_LM_RIGHT_CHEEK);
-          const p454 = st.lmSmoother?.get(OMAFIT_FACE_LM_LEFT_CHEEK);
-          const R = p234 || new THREE.Vector3(lm[234][0], lm[234][1], lm[234][2]);
-          const L = p454 || new THREE.Vector3(lm[454][0], lm[454][1], lm[454][2]);
+          }
+          const R = new THREE.Vector3();
+          const L = new THREE.Vector3();
+          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, st.lmSmoother, R, metersMul)) {
+            R.set(lm[234][0] * metersMul, lm[234][1] * metersMul, lm[234][2] * metersMul);
+          }
+          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_LEFT_CHEEK, st.lmSmoother, L, metersMul)) {
+            L.set(lm[454][0] * metersMul, lm[454][1] * metersMul, lm[454][2] * metersMul);
+          }
           const midJ = new THREE.Vector3(
             (L.x + R.x) * 0.5,
             (L.y + R.y) * 0.5,
@@ -11433,20 +11466,26 @@ async function runArSession({
                 OMAFIT_NECKLACE_WEAR_FORWARD_M,
             );
           }
-          const cw =
-            p234 && p454
-              ? p234.distanceTo(p454)
-              : omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, OMAFIT_FACE_LM_LEFT_CHEEK);
-          if (Number.isFinite(cw) && cw > 1e-5) {
-            if (st.necklaceSwing.refNeckW === null) st.necklaceSwing.refNeckW = cw;
-            const k = THREE.MathUtils.clamp(cw / st.necklaceSwing.refNeckW, 0.86, 1.18);
+          const cheekWM = THREE.MathUtils.clamp(
+            omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, OMAFIT_FACE_LM_LEFT_CHEEK) *
+              metersMul,
+            0.1,
+            0.28,
+          );
+          if (Number.isFinite(cheekWM) && cheekWM > 1e-5) {
+            if (st.necklaceSwing.refNeckW === null) st.necklaceSwing.refNeckW = cheekWM;
+            const k = THREE.MathUtils.clamp(cheekWM / st.necklaceSwing.refNeckW, 0.86, 1.18);
+            const fitScale =
+              (cheekWM / OMAFIT_NECKLACE_REFERENCE_WIDTH_M) *
+              st.accessoryMeshNormalizeScale *
+              k;
             const part = st.necklacePartition;
-            if (part?.chain) part.chain.scale.set(k, 1, k);
-            else glasses.scale.set(
-              k * st.accessoryMeshNormalizeScale,
-              st.accessoryMeshNormalizeScale,
-              k * st.accessoryMeshNormalizeScale,
-            );
+            if (part?.chain) {
+              part.chain.scale.setScalar(fitScale);
+              if (part.pendant) part.pendant.scale.setScalar(fitScale);
+            } else {
+              glasses.scale.setScalar(fitScale);
+            }
           }
           let shoulderYaw = 0;
           let shoulderRxBlend = 0;
@@ -11522,6 +11561,7 @@ async function runArSession({
               wp.setFromMatrixPosition(glasses.matrixWorld);
               console.log("[omafit-ar] necklace tracking diag (1x)", {
                 build: OMAFIT_AR_WIDGET_BUILD,
+                metersMul,
                 wearPosition: {
                   x: wearPosition.position.x,
                   y: wearPosition.position.y,
@@ -11533,15 +11573,15 @@ async function runArSession({
                   z: glasses.scale.z,
                 },
                 worldPos: { x: wp.x, y: wp.y, z: wp.z },
-                cheekW: cw,
+                cheekWM,
                 anchorIndex,
               });
             } catch {
               /* ignore */
             }
           }
-          if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cw)) {
-            const jawW = cw;
+          if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cheekWM)) {
+            const jawW = cheekWM;
             const bot = new THREE.Vector3(
               throat.x,
               throat.y - jawW * 0.42,
@@ -11674,8 +11714,10 @@ async function runArSession({
     (async () => {
       try {
         const pmremOn =
-          accessoryType === "necklace" ||
-          /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim());
+          (accessoryType === "glasses" &&
+            /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim())) ||
+          (accessoryType === "necklace" &&
+            /^(1|on|true|yes)$/i.test(String(cfgAttr("arNecklacePmrem", "0")).trim()));
         if (!pmremOn) {
           return;
         }
