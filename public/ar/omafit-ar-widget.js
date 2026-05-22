@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v71";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v72";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -963,11 +963,12 @@ const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
 const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 90;
-/** Piso / teto da escala única do mesh (m→cm + 36cm / arco / âncora). */
-const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 0.2;
-/** MindAR cm: evita colar invisível quando `metersToCm` falha (cheek ≤ 1,2). */
-const OMAFIT_NECKLACE_RIGID_SCALE_MIN_NATIVE_CM = 2.5;
-const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 8;
+/**
+ * Escala de exibição (GLB em m, âncora em cm): `norm × 100 / anchor` ≈ 4,5–6 para arco ~36 cm.
+ * Teto baixo evita gigante (v69 chegava a ~74); piso evita invisível (v70–71 ~0,05).
+ */
+const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 4;
+const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 6.2;
 /** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
 const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
 /** Divisor da âncora (evita totalScale ~0,05 se a matriz reportar escala absurda). */
@@ -2190,14 +2191,28 @@ function omafitNecklaceSuppressFaceDepthOcclusion(mindarThree, exceptMeshes) {
   const patchMesh = (mesh) => {
     if (!mesh?.isMesh || skip.has(mesh)) return;
     const name = String(mesh.name || "").toLowerCase();
-    if (/necklace|colar|glasses-model|omafit-ar-glasses/.test(name)) return;
+    if (/necklace|colar|glasses-model|omafit-ar-glasses|omafit-ar-necklace/.test(name)) return;
+    const pos = mesh.geometry?.attributes?.position;
+    const vertCount = pos?.count ?? 0;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    let isOcc = /face|468|occlud|head|facemesh|mindar/.test(name);
+    if (!isOcc) {
+      for (const mat of mats) {
+        if (!mat) continue;
+        if (
+          mat.colorWrite === false ||
+          (mat.depthWrite === true && mat.depthTest === true && !mat.map && mat.opacity >= 0.99)
+        ) {
+          isOcc = true;
+          break;
+        }
+      }
+    }
+    /** Malha densa do MindAR (468) pode não estar em `faceMeshes` no 1.º frame. */
+    if (!isOcc && vertCount >= 900) isOcc = true;
+    if (!isOcc) return;
     for (const mat of mats) {
       if (!mat) continue;
-      const occ =
-        mat.colorWrite === false ||
-        (mat.depthWrite === true && mat.depthTest === true && !mat.map && mat.opacity >= 0.99);
-      if (!occ && !/face|468|occlud|head|facemesh/.test(name)) continue;
       mat.colorWrite = false;
       mat.depthWrite = false;
       mat.depthTest = false;
@@ -2222,10 +2237,11 @@ function omafitEnsureNecklaceMeshesRenderable(THREE, root, opts) {
   const forceFront =
     opts?.forceDepthFront !== false &&
     !/^(0|false|off|no)$/i.test(String(opts?.forceDepthFrontAttr ?? "1").trim());
+  const hasEnv = Boolean(opts?.hasSceneEnvironment);
   omafitEnsureGlassesMeshesRenderable(THREE, root);
   root.traverse((child) => {
     if (!child?.isMesh) return;
-    child.renderOrder = 64;
+    child.renderOrder = 96;
     child.frustumCulled = false;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     for (const mat of mats) {
@@ -2241,6 +2257,18 @@ function omafitEnsureNecklaceMeshesRenderable(THREE, root, opts) {
           mat.polygonOffset = true;
           mat.polygonOffsetFactor = -16;
           mat.polygonOffsetUnits = -16;
+        }
+      }
+      /** Sem PMREM o metal alto fica preto → “invisível”; mantém brilho legível. */
+      if (!hasEnv && "metalness" in mat) {
+        mat.metalness = Math.min(0.42, Math.max(0.12, Number(mat.metalness) || 0.28));
+        if ("roughness" in mat) mat.roughness = Math.max(0.28, Number(mat.roughness) || 0.42);
+        if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
+        if ("emissive" in mat && mat.color && mat.emissive?.set) {
+          mat.emissive.copy(mat.color);
+          if ("emissiveIntensity" in mat) {
+            mat.emissiveIntensity = Math.max(0.08, Number(mat.emissiveIntensity) || 0.12);
+          }
         }
       }
       if ("transmission" in mat && Number(mat.transmission) > 0.02) {
@@ -2708,25 +2736,28 @@ function omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative, 
     const measured = omafitMatrixAverageScale(THREE, anchorGroup.matrixWorld);
     if (measured >= 4) anchorScale = measured;
   }
-  const metersToCm = omafitNecklaceMetersToCmFactor(cheek, metersMul);
+  const nativeMul = omafitNecklaceMeterToNativeMul(metersMul);
   const anchorDivisor = THREE.MathUtils.clamp(
     anchorScale,
     OMAFIT_NECKLACE_ANCHOR_SCALE_CLAMP_MIN,
     OMAFIT_NECKLACE_ANCHOR_SCALE_CLAMP_MAX,
   );
-  let totalScale = (norm * merchantMul * cheekTrackK * metersToCm) / anchorDivisor;
-  const scaleMin =
-    metersToCm >= 100 ? OMAFIT_NECKLACE_RIGID_SCALE_MIN_NATIVE_CM : OMAFIT_NECKLACE_RIGID_SCALE_MIN;
-  totalScale = THREE.MathUtils.clamp(totalScale, scaleMin, OMAFIT_NECKLACE_RIGID_SCALE_MAX);
+  let totalScale = (norm * merchantMul * cheekTrackK * nativeMul) / anchorDivisor;
+  totalScale = THREE.MathUtils.clamp(
+    totalScale,
+    OMAFIT_NECKLACE_RIGID_SCALE_MIN,
+    OMAFIT_NECKLACE_RIGID_SCALE_MAX,
+  );
   const neckSpanM = Number.isFinite(st.necklaceNeckSpanM) ? st.necklaceNeckSpanM : 0.48;
   const targetArcWidthCm = OMAFIT_NECKLACE_REFERENCE_WIDTH_M * 100 * cheekTrackK * merchantMul;
-  const predictedArcWidthCm = neckSpanM * totalScale * anchorScale;
+  const predictedArcWidthCm = neckSpanM * nativeMul * totalScale * anchorDivisor;
   return {
     totalScale,
     anchorScale,
+    anchorDivisor,
     cheekTrackK,
     merchantMul,
-    metersToCm,
+    nativeMul,
     targetArcWidthCm,
     predictedArcWidthCm,
   };
@@ -2757,10 +2788,15 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
     glbRoot.scale.setScalar(totalScale);
   }
   glbRoot.visible = true;
+  glbRoot.traverse((o) => {
+    if (o) o.visible = true;
+  });
   omafitEnsureNecklaceMeshesRenderable(THREE, glbRoot, {
     forceDepthFrontAttr: st.necklaceForceDepthFrontAttr,
+    hasSceneEnvironment: Boolean(st.necklaceSceneHasEnvironment),
   });
   st.necklaceAnchorScale = pack.anchorScale;
+  st.necklaceAnchorDivisor = pack.anchorDivisor;
   st.necklaceLastFitScale = totalScale;
   st.necklaceTargetArcWidthCm = pack.targetArcWidthCm;
   st.necklaceCheekTrackK = pack.cheekTrackK;
@@ -9230,11 +9266,7 @@ async function runArSession({
           mat.polygonOffsetFactor = accessoryType === "necklace" ? -4 : -2;
           mat.polygonOffsetUnits = accessoryType === "necklace" ? -4 : -2;
         }
-        if (accessoryType === "necklace") {
-          mat.depthTest = true;
-          mat.depthWrite = true;
-          mat.toneMapped = true;
-        } else {
+        if (accessoryType !== "necklace") {
           mat.toneMapped = false;
         }
         mat.needsUpdate = true;
@@ -10890,6 +10922,7 @@ async function runArSession({
           ? String(cfgAttr("arNecklaceForceDepthFront", "1")).trim()
           : null,
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
+      necklaceSceneHasEnvironment: Boolean(mindarThree?.scene?.environment),
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -11907,8 +11940,15 @@ async function runArSession({
         }
         if (accessoryType === "necklace" && st.necklaceSwing) {
           const wearGrp = st.necklaceWearGroup || wearPosition;
+          if (wearGrp) wearGrp.visible = true;
+          if (glasses) glasses.visible = true;
           try {
             const skip = new Set([glasses, wearGrp, faceOccluderMesh, neckOccluderMesh].filter(Boolean));
+            if (wearGrp?.traverse) {
+              wearGrp.traverse((o) => {
+                if (o?.isMesh) skip.add(o);
+              });
+            }
             const occN = omafitNecklaceSuppressFaceDepthOcclusion(mindarThree, skip);
             if (!st.necklaceFaceMeshDepthOffLogged) {
               st.necklaceFaceMeshDepthOffLogged = true;
@@ -12108,7 +12148,8 @@ async function runArSession({
                 predictedArcWidthCm: Number.isFinite(st.necklacePredictedArcWidthCm)
                   ? st.necklacePredictedArcWidthCm
                   : null,
-                metersToCm: omafitNecklaceMetersToCmFactor(cheekNative, metersMul),
+                nativeMul: omafitNecklaceMeterToNativeMul(metersMul),
+                anchorDivisor: st.necklaceAnchorDivisor,
                 meshCount: (() => {
                   let n = 0;
                   glasses.traverse((o) => {
