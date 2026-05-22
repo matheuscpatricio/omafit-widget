@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v57";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v58";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -927,9 +927,14 @@ const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
 const OMAFIT_NECKLACE_CHIN_TO_THROAT = 0.42;
 /** Largura alvo do arco do colar no pescoço (metros) — normalização previsível (não usar maxDim/Y). */
 const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.36;
-/** Deslocamento wear (metros, `metricLandmarks`) — pescoço → peito, ligeiramente à frente da face. */
-const OMAFIT_NECKLACE_WEAR_DOWN_M = -0.028;
-const OMAFIT_NECKLACE_WEAR_FORWARD_M = 0.042;
+/** Multiplicador visual (Tripo + fit bochecha) — colar costuma ficar pequeno sem isto. */
+const OMAFIT_NECKLACE_DISPLAY_SCALE_MUL = 2.75;
+/** Wear em espaço nativo MindAR (cm quando landmarks ~15 entre bochechas). */
+const OMAFIT_NECKLACE_WEAR_DOWN_CM = -3.2;
+const OMAFIT_NECKLACE_WEAR_FORWARD_CM = 5.5;
+/** Wear quando landmarks já vêm em metros (cheek dist < 1,2). */
+const OMAFIT_NECKLACE_WEAR_DOWN_M = -0.032;
+const OMAFIT_NECKLACE_WEAR_FORWARD_M = 0.048;
 
 /**
  * Loga o banner de build imediatamente ao carregar o módulo.
@@ -2469,8 +2474,16 @@ function omafitApplyNecklaceTripoBind(THREE, root) {
   box.getSize(sz);
   let bind = "identity";
   if (sz.y >= sz.x * 1.15 && sz.y >= sz.z * 1.15) {
+    /** Tripo vertical (Y↑): deitar no plano do pescoço + Ry 180° (evita colar invertido). */
     root.rotateX(-Math.PI / 2);
-    bind = "rx-minus-90";
+    root.rotateY(Math.PI);
+    bind = "rx-minus-90-ry-180";
+    root.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(root);
+    box2.getSize(sz);
+  } else if (sz.z >= sz.x * 1.15 && sz.z >= sz.y * 1.15) {
+    root.rotateY(Math.PI);
+    bind = "ry-180";
     root.updateMatrixWorld(true);
     const box2 = new THREE.Box3().setFromObject(root);
     box2.getSize(sz);
@@ -11425,25 +11438,25 @@ async function runArSession({
         }
         if (accessoryType === "necklace" && st.necklaceSwing) {
           const metersMul = omafitMindarMetricToMetersScale(lm);
+          const nativeSpace = metersMul < 1;
           const anchorVec = st.necklaceAnchorScratch;
           const anchorOk =
-            anchorVec &&
-            omafitMetricLandmarkToVec3M(lm, anchorIndex, st.lmSmoother, anchorVec, metersMul);
+            anchorVec && omafitMetricLandmarkToVec3(lm, anchorIndex, st.lmSmoother, anchorVec);
           const ch = new THREE.Vector3();
-          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, ch, metersMul)) {
+          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, ch)) {
             ch.set(
-              (lm[OMAFIT_FACE_LM_CHIN][0] ?? 0) * metersMul,
-              (lm[OMAFIT_FACE_LM_CHIN][1] ?? 0) * metersMul,
-              (lm[OMAFIT_FACE_LM_CHIN][2] ?? 0) * metersMul,
+              lm[OMAFIT_FACE_LM_CHIN][0] ?? 0,
+              lm[OMAFIT_FACE_LM_CHIN][1] ?? 0,
+              lm[OMAFIT_FACE_LM_CHIN][2] ?? 0,
             );
           }
           const R = new THREE.Vector3();
           const L = new THREE.Vector3();
-          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, st.lmSmoother, R, metersMul)) {
-            R.set(lm[234][0] * metersMul, lm[234][1] * metersMul, lm[234][2] * metersMul);
+          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, st.lmSmoother, R)) {
+            R.set(lm[234][0], lm[234][1], lm[234][2]);
           }
-          if (!omafitMetricLandmarkToVec3M(lm, OMAFIT_FACE_LM_LEFT_CHEEK, st.lmSmoother, L, metersMul)) {
-            L.set(lm[454][0] * metersMul, lm[454][1] * metersMul, lm[454][2] * metersMul);
+          if (!omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_LEFT_CHEEK, st.lmSmoother, L)) {
+            L.set(lm[454][0], lm[454][1], lm[454][2]);
           }
           const midJ = new THREE.Vector3(
             (L.x + R.x) * 0.5,
@@ -11456,29 +11469,35 @@ async function runArSession({
             z: THREE.MathUtils.lerp(ch.z, midJ.z, OMAFIT_NECKLACE_CHIN_TO_THROAT),
           };
           if (anchorOk) {
+            const wearDown = nativeSpace
+              ? OMAFIT_NECKLACE_WEAR_DOWN_CM
+              : OMAFIT_NECKLACE_WEAR_DOWN_M;
+            const wearFwd = nativeSpace
+              ? OMAFIT_NECKLACE_WEAR_FORWARD_CM
+              : OMAFIT_NECKLACE_WEAR_FORWARD_M;
             wearPosition.position.set(
               wearPosM.x + (throat.x - anchorVec.x),
-              wearPosM.y +
-                (throat.y - anchorVec.y) +
-                OMAFIT_NECKLACE_WEAR_DOWN_M,
-              wearPosM.z +
-                (throat.z - anchorVec.z) +
-                OMAFIT_NECKLACE_WEAR_FORWARD_M,
+              wearPosM.y + (throat.y - anchorVec.y) + wearDown,
+              wearPosM.z + (throat.z - anchorVec.z) + wearFwd,
             );
           }
-          const cheekWM = THREE.MathUtils.clamp(
-            omafitFaceLandmarkDist3(lm, OMAFIT_FACE_LM_RIGHT_CHEEK, OMAFIT_FACE_LM_LEFT_CHEEK) *
-              metersMul,
-            0.1,
-            0.28,
+          const cheekNative = omafitFaceLandmarkDist3(
+            lm,
+            OMAFIT_FACE_LM_RIGHT_CHEEK,
+            OMAFIT_FACE_LM_LEFT_CHEEK,
           );
-          if (Number.isFinite(cheekWM) && cheekWM > 1e-5) {
-            if (st.necklaceSwing.refNeckW === null) st.necklaceSwing.refNeckW = cheekWM;
-            const k = THREE.MathUtils.clamp(cheekWM / st.necklaceSwing.refNeckW, 0.86, 1.18);
+          const cheekWM = THREE.MathUtils.clamp(cheekNative * metersMul, 0.1, 0.28);
+          const refWidthNative = nativeSpace
+            ? OMAFIT_NECKLACE_REFERENCE_WIDTH_M / metersMul
+            : OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
+          if (Number.isFinite(cheekNative) && cheekNative > 1e-5) {
+            if (st.necklaceSwing.refNeckW === null) st.necklaceSwing.refNeckW = cheekNative;
+            const k = THREE.MathUtils.clamp(cheekNative / st.necklaceSwing.refNeckW, 0.86, 1.18);
             const fitScale =
-              (cheekWM / OMAFIT_NECKLACE_REFERENCE_WIDTH_M) *
+              (cheekNative / Math.max(refWidthNative, 1e-5)) *
               st.accessoryMeshNormalizeScale *
-              k;
+              k *
+              OMAFIT_NECKLACE_DISPLAY_SCALE_MUL;
             const part = st.necklacePartition;
             if (part?.chain) {
               part.chain.scale.setScalar(fitScale);
@@ -11562,6 +11581,7 @@ async function runArSession({
               console.log("[omafit-ar] necklace tracking diag (1x)", {
                 build: OMAFIT_AR_WIDGET_BUILD,
                 metersMul,
+                nativeSpace,
                 wearPosition: {
                   x: wearPosition.position.x,
                   y: wearPosition.position.y,
@@ -11573,15 +11593,17 @@ async function runArSession({
                   z: glasses.scale.z,
                 },
                 worldPos: { x: wp.x, y: wp.y, z: wp.z },
+                cheekNative,
                 cheekWM,
+                refWidthNative,
                 anchorIndex,
               });
             } catch {
               /* ignore */
             }
           }
-          if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cheekWM)) {
-            const jawW = cheekWM;
+          if (anchorOk && neckOccluderMesh && neckOccGeomState && Number.isFinite(cheekNative)) {
+            const jawW = cheekNative * (nativeSpace ? 1 : metersMul);
             const bot = new THREE.Vector3(
               throat.x,
               throat.y - jawW * 0.42,
