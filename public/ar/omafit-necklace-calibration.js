@@ -1,9 +1,20 @@
 /**
- * Calibração de colar (escala / "Tamanho") — partilhado entre:
- *   - `omafit-ar-widget.js` (provador na loja)
- *   - `app/routes/app.ar-eyewear_.calibrate.$assetId.jsx` (preview admin)
- *   - `app/ar-calibration.shared.js` (sanitização / defaults)
+ * Calibração e orientação de colar — partilhado entre widget AR, tema Shopify e admin.
+ *
+ * --- Export canónico Omafit (Blender / pipeline) ---
+ * 1. Origem no **centro do arco** (garganta / ponto médio do colar).
+ * 2. Apply Location / Rotation / Scale no root; exportar com rotação (0,0,0).
+ * 3. **+X** = largura do arco (orelha a orelha), **+Y** = subida ao queixo,
+ *    **−Z** = frente (peito / câmara em repouso), **pingente em −Y**.
+ * 4. Na loja: `data-ar-necklace-canonical-blender-export="1"` — sem auto-bind por vértices.
+ *
+ * GLBs Tripo / não canónicos: `applyNecklaceAutoBind` (detecção de eixos + heurística
+ * de massa do pingente), depois `applyNecklaceMerchantCalibRotation` (rx/ry/rz loja).
  */
+
+import {
+  detectGlassesAxes,
+} from "./omafit-glasses-orient.js";
 
 /** Largura alvo do arco no pescoço (m) — alinhada ao fit no widget. */
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
@@ -24,15 +35,18 @@ export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.8;
 /** Slerp da orientação do pescoço (0–1 por frame). */
 export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.22;
 
-/**
- * Correcção fixa pós-bind Tripo no mesh (graus) — pingente deixa de apontar para a câmara.
- * @deprecated prefer dynamic basis; mantido para preview admin estático.
- */
-export const OMAFIT_NECKLACE_ANCHOR_ORIENT_DEG = Object.freeze({
-  rx: 0,
-  ry: 0,
-  rz: 0,
-});
+/** Confiança mínima da largura do arco para auto-bind por vértices. */
+export const OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF = 0.38;
+
+function snapNecklaceMerchantRotationDeg(deg) {
+  const n = Number(deg);
+  if (!Number.isFinite(n)) return 0;
+  const clamped = Math.min(180, Math.max(-180, n));
+  const snapped = Math.round(clamped / 5) * 5;
+  if (snapped > 180) return 180;
+  if (snapped < -180) return -180;
+  return snapped;
+}
 
 export function clampNecklaceMerchantScaleMul(n) {
   const v = Number(n);
@@ -47,6 +61,9 @@ export function normalizeNecklaceMerchantCalibration(cal) {
   const src = cal && typeof cal === "object" ? cal : {};
   const sc = Number(src.scale);
   return {
+    rx: snapNecklaceMerchantRotationDeg(src.rx),
+    ry: snapNecklaceMerchantRotationDeg(src.ry),
+    rz: snapNecklaceMerchantRotationDeg(src.rz),
     scale: clampNecklaceMerchantScaleMul(
       Number.isFinite(sc) && sc > 0 ? sc : OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT,
     ),
@@ -59,6 +76,28 @@ export function resolveNecklaceMerchantScaleMul(cal, attrMul) {
     return clampNecklaceMerchantScaleMul(fromAttr);
   }
   return normalizeNecklaceMerchantCalibration(cal).scale;
+}
+
+/**
+ * Rotação de calibração do lojista (rx/ry/rz) — ordem Y → X → Z (paridade óculos / admin).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} group
+ * @param {{ rx?: number, ry?: number, rz?: number }} cal
+ */
+export function applyNecklaceMerchantCalibRotation(THREE, group, cal) {
+  if (!THREE || !group?.quaternion || typeof group.rotateOnWorldAxis !== "function") {
+    return;
+  }
+  const toRad = (d) => ((Number(d) || 0) * Math.PI) / 180;
+  const rx = toRad(cal?.rx);
+  const ry = toRad(cal?.ry);
+  const rz = toRad(cal?.rz);
+  group.quaternion.identity();
+  if (ry) group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), ry);
+  if (rx) group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rx);
+  if (rz) group.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz);
+  group.updateMatrix();
 }
 
 export function omafitNecklaceArcSpanFromBbox(sz, depthMinM = OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M) {
@@ -78,12 +117,119 @@ export function omafitNecklaceHorizontalArcSpanFromSize(sz) {
 }
 
 /**
- * Tripo vertical: deita o arco (`Rx -90°`) + `Rz 180°` para o pingente pendurar em −Y local (não +Z frente).
+ * Heurística: massa de vértices na metade inferior do eixo “altura” → pingente em −altura.
  *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} root
+ * @returns {1|-1} heightSign para `computeNecklaceAutoBindQuat`
  */
-export function omafitApplyNecklaceTripoBind(THREE, root) {
+export function detectNecklacePendantHeuristic(THREE, root, wIdx, hIdx) {
+  if (!root) return 1;
+  root.updateMatrixWorld(true);
+  const v = new THREE.Vector3();
+  const pairs = [];
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
+    const pa = obj.geometry.attributes.position;
+    const n = pa.count;
+    if (n < 3) return;
+    const step = Math.max(1, Math.floor(n / 500));
+    const mw = obj.matrixWorld;
+    for (let i = 0; i < n; i += step) {
+      v.fromBufferAttribute(pa, i);
+      v.applyMatrix4(mw);
+      pairs.push({ h: v.getComponent(hIdx), w: v.getComponent(wIdx) });
+    }
+  });
+  if (pairs.length < 24) return 1;
+  pairs.sort((a, b) => a.h - b.h);
+  const n = pairs.length;
+  const sn = Math.max(6, Math.floor(n * 0.12));
+  const bSlice = pairs.slice(0, sn);
+  const tSlice = pairs.slice(n - sn);
+  const bSpread =
+    Math.max(...bSlice.map((p) => p.w)) - Math.min(...bSlice.map((p) => p.w));
+  const tSpread =
+    Math.max(...tSlice.map((p) => p.w)) - Math.min(...tSlice.map((p) => p.w));
+  if (tSpread < 1e-9) return 1;
+  if (bSpread > tSpread * 1.06) return 1;
+  if (tSpread > bSpread * 1.06) return -1;
+  return 1;
+}
+
+/**
+ * Mapeia eixos detectados → canónico Omafit: +X arco, +Y garganta, −Z frente, pingente −Y.
+ *
+ * @param {import("./omafit-glasses-orient.js").GlassesAxesDetect} detected
+ * @param {1|-1} heightSign
+ */
+export function computeNecklaceAutoBindQuat(THREE, detected, heightSign = 1) {
+  const { widthAxisIdx, heightAxisIdx, depthAxisIdx, depthFrontSign } = detected;
+  let widthSign = 1;
+  const cols = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const setCols = (w) => {
+    const ws = w ?? widthSign;
+    cols[0].set(0, 0, 0);
+    cols[1].set(0, 0, 0);
+    cols[2].set(0, 0, 0);
+    cols[widthAxisIdx].set(ws, 0, 0);
+    cols[heightAxisIdx].set(0, heightSign, 0);
+    cols[depthAxisIdx].set(0, 0, -depthFrontSign);
+  };
+  setCols(widthSign);
+  const matrix = new THREE.Matrix4().makeBasis(cols[0], cols[1], cols[2]);
+  let flippedWidthForRotation = false;
+  if (matrix.determinant() < 0) {
+    widthSign = -1;
+    setCols();
+    matrix.makeBasis(cols[0], cols[1], cols[2]);
+    flippedWidthForRotation = true;
+  }
+  const quat = new THREE.Quaternion().setFromRotationMatrix(matrix);
+  return {
+    quat,
+    matrix,
+    widthSign,
+    heightSign,
+    depthFrontSign,
+    flippedWidthForRotation,
+  };
+}
+
+/**
+ * Bind determinístico por vértices (previsível multi-GLB).
+ *
+ * @returns {{ bind: string, detected: object, signs: object } | null}
+ */
+export function applyNecklaceAutoBind(THREE, root) {
+  if (!THREE || !root) return null;
+  const detected = detectGlassesAxes(THREE, root);
+  if (!detected) return null;
+  if (detected.confidence.width < OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF) {
+    return null;
+  }
+  const heightSign = detectNecklacePendantHeuristic(
+    THREE,
+    root,
+    detected.widthAxisIdx,
+    detected.heightAxisIdx,
+  );
+  const { quat, ...signs } = computeNecklaceAutoBindQuat(THREE, detected, heightSign);
+  root.rotation.set(0, 0, 0);
+  root.quaternion.copy(quat);
+  root.updateMatrix();
+  root.updateMatrixWorld(true);
+  return {
+    bind: "vertex-auto",
+    detected,
+    signs,
+  };
+}
+
+/**
+ * Fallback bbox Tripo: deita o arco e corrige pingente (+Z → −Y com segundo Rx).
+ *
+ * @deprecated Prefer `applyNecklaceAutoBind`; mantido como fallback de baixa confiança.
+ */
+export function omafitApplyNecklaceTripoBindLegacy(THREE, root) {
   if (!THREE || !root) return null;
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(root);
@@ -92,8 +238,8 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
   let bind = "identity";
   if (sz.y >= sz.x * 1.15 && sz.y >= sz.z * 1.15) {
     root.rotateX(-Math.PI / 2);
-    root.rotateZ(Math.PI);
-    bind = "rx-minus-90-rz-180";
+    root.rotateX(Math.PI / 2);
+    bind = "tripo-y-rx-neg90-rx-pos90";
     root.updateMatrixWorld(true);
     const box2 = new THREE.Box3().setFromObject(root);
     box2.getSize(sz);
@@ -108,21 +254,31 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
 }
 
 /**
- * Base ortonormal do pescoço em espaço metricLandmarks (RHS):
- *   X = lateral (bochecha D − E), Y = −down (pingente pendura em −Y do mesh), Z = frente.
+ * Auto-bind por vértices; se falhar, fallback Tripo legado.
  *
  * @param {typeof import("three")} THREE
- * @param {any} lm
- * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
- * @param {{ chin: number, nose: number, cheekL: number, cheekR: number }} idx
- * @param {{
- *   pick: (idx: number, out: import("three").Vector3) => boolean,
- *   lateral: import("three").Vector3,
- *   down: import("three").Vector3,
- *   fwd: import("three").Vector3,
- *   hangNeg: import("three").Vector3,
- * }} scratch
- * @returns {boolean}
+ * @param {import("three").Object3D} root
+ */
+export function omafitApplyNecklaceTripoBind(THREE, root) {
+  if (!THREE || !root) return null;
+  const auto = applyNecklaceAutoBind(THREE, root);
+  if (auto) {
+    root.updateMatrixWorld(true);
+    const sz = new THREE.Vector3();
+    new THREE.Box3().setFromObject(root).getSize(sz);
+    return {
+      bind: auto.bind,
+      size: { x: sz.x, y: sz.y, z: sz.z },
+      auto: true,
+      detected: auto.detected,
+    };
+  }
+  const legacy = omafitApplyNecklaceTripoBindLegacy(THREE, root);
+  return legacy ? { ...legacy, auto: false } : null;
+}
+
+/**
+ * Base ortonormal (paridade óculos): X = 454−234, down = queixo−nariz, Z = X×down.
  */
 export function omafitNecklaceNeckBasisVectors(
   THREE,
@@ -141,10 +297,9 @@ export function omafitNecklaceNeckBasisVectors(
   if (!scratch.pick(idx.cheekL, L)) return false;
   if (!scratch.pick(idx.cheekR, R)) return false;
 
-  const lateral = scratch.lateral.subVectors(R, L);
+  const lateral = scratch.lateral.subVectors(L, R);
   if (lateral.lengthSq() < 1e-12) return false;
   lateral.normalize();
-  if (lateral.x < 0) lateral.multiplyScalar(-1);
 
   const down = scratch.down.subVectors(chin, nose);
   if (down.lengthSq() < 1e-12) return false;
@@ -158,19 +313,6 @@ export function omafitNecklaceNeckBasisVectors(
   return true;
 }
 
-/**
- * Orientação do colar relativa à âncora: `qOrient = qAnchor⁻¹ × qNeck`.
- *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} anchorGroup
- * @param {import("three").Object3D} orientGroup
- * @param {any} lm
- * @param {object} idx landmark indices
- * @param {object} scratch vetores + quaternions reutilizáveis
- * @param {(from: import("three").Quaternion, to: import("three").Quaternion) => void} [shortestPath]
- * @param {number} [slerpAlpha] 1 = instantâneo
- * @returns {boolean}
- */
 export function omafitApplyNecklaceNeckBasisOrientation(
   THREE,
   anchorGroup,
@@ -183,9 +325,7 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   slerpAlpha = OMAFIT_NECKLACE_ORIENT_SLERP,
 ) {
   if (!THREE || !anchorGroup || !orientGroup || !scratch) return false;
-  if (
-    !omafitNecklaceNeckBasisVectors(THREE, lm, smoother, idx, scratch)
-  ) {
+  if (!omafitNecklaceNeckBasisVectors(THREE, lm, smoother, idx, scratch)) {
     return false;
   }
 
@@ -218,14 +358,13 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   return true;
 }
 
-/** Preview admin sem landmarks: base estática (silhueta de frente). */
+/** Preview admin: mesh já em canónico / auto-bind; grupo de tracking estático. */
 export function applyNecklacePreviewStaticOrient(THREE, group) {
   if (!THREE || !group) return;
   group.quaternion.identity();
-  group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI);
 }
 
-/** @deprecated use `omafitApplyNecklaceNeckBasisOrientation` */
+/** @deprecated */
 export function applyNecklaceAnchorOrientRotation(THREE, group) {
   applyNecklacePreviewStaticOrient(THREE, group);
 }

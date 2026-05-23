@@ -40,6 +40,8 @@ import {
   OMAFIT_NECKLACE_REFERENCE_WIDTH_M,
   OMAFIT_NECKLACE_RIGID_SCALE_MAX,
   OMAFIT_NECKLACE_RIGID_SCALE_MIN,
+  applyNecklaceAutoBind,
+  applyNecklaceMerchantCalibRotation,
   clampNecklaceMerchantScaleMul,
   computeNecklaceArDisplayScale,
   normalizeNecklaceMerchantCalibration,
@@ -527,7 +529,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v78";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v79";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8566,9 +8568,13 @@ async function runArSession({
       if (typeof v.error === "string" && Object.keys(v).length <= 2) return null;
       return v;
     }
-    /** Rotação de calibração loja (Y→X→Z) — `omafit-glasses-calibration.js`. */
+    /** Rotação de calibração loja (Y→X→Z) — `omafit-glasses-calibration.js` / colar. */
     function applyThreeGroupCalibRot(group, cal) {
-      applyGlassesMerchantCalibRotation(THREE, group, cal);
+      if (accessoryType === "necklace") {
+        applyNecklaceMerchantCalibRotation(THREE, group, cal);
+      } else {
+        applyGlassesMerchantCalibRotation(THREE, group, cal);
+      }
     }
     const initialFaceCal = parseOmafitCalibrationRaw(
       arCfg?.dataset?.arOmafitCalibration || "",
@@ -9492,6 +9498,12 @@ async function runArSession({
     glasses.traverse((obj) => {
       if (obj && obj.name === "omafit_ar_canonical") hasOmafitCanonicalNode = true;
     });
+    const necklaceCanonicalBlenderExport =
+      accessoryType === "necklace" &&
+      (/^(1|true|yes|on)$/i.test(
+        String(cfgAttr("arNecklaceCanonicalBlenderExport", "0")).trim(),
+      ) ||
+        hasOmafitCanonicalNode);
 
     /** Frame de assentamento (materiais/morphs/skin) antes do bbox. */
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -9609,16 +9621,31 @@ async function runArSession({
     if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
-        const tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
+        let tripBind = null;
+        if (!necklaceCanonicalBlenderExport) {
+          tripBind = applyNecklaceAutoBind(THREE, glasses);
+          if (!tripBind) tripBind = omafitApplyNecklaceTripoBind(THREE, glasses);
+        } else {
+          try {
+            console.log("[omafit-ar] colar: export canónico — sem auto-bind por vértices", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              hasOmafitCanonicalNode,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
         glasses.updateMatrixWorld(true);
         const szNeck = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szNeck);
         necklaceArcSpanPrepM = omafitNecklaceArcSpanFromBbox(szNeck);
         try {
-          console.log("[omafit-ar] necklace GLB prep (bbox center + Tripo bind)", {
+          console.log("[omafit-ar] necklace GLB prep (center + bind)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             ok: neckCenter?.ok,
+            canonicalBlenderExport: necklaceCanonicalBlenderExport,
             tripBind: tripBind?.bind,
+            bindAuto: tripBind?.auto ?? null,
             sizeBboxPre: { x: sz.x, y: sz.y, z: sz.z },
             sizeBboxPost: { x: szNeck.x, y: szNeck.y, z: szNeck.z },
             neckArcSpanHorizM: necklaceArcSpanPrepM,
@@ -9819,15 +9846,16 @@ async function runArSession({
       );
       return normalizeGlassesMerchantCalibration(parsed || initialFaceCal);
     };
-    const readNecklaceMerchantScaleMul = () => {
-      const parsed = parseOmafitCalibrationRaw(
-        arCfg?.dataset?.arOmafitCalibration || "",
+    const readNecklaceMerchantCal = () =>
+      normalizeNecklaceMerchantCalibration(
+        parseOmafitCalibrationRaw(arCfg?.dataset?.arOmafitCalibration || "") ||
+          initialFaceCal,
       );
-      return resolveNecklaceMerchantScaleMul(
-        parsed || initialFaceCal,
+    const readNecklaceMerchantScaleMul = () =>
+      resolveNecklaceMerchantScaleMul(
+        readNecklaceMerchantCal(),
         cfgAttr("arNecklaceScaleMul", ""),
       );
-    };
     if (accessoryType === "glasses") {
       try {
         console.log("[omafit-ar] merchant calibration loaded", readGlassesMerchantCal(), {
@@ -10455,6 +10483,7 @@ async function runArSession({
     let necklaceSwingGroup = null;
     /** Wear (cm/anchor) + orientação fixa âncora 152. */
     let necklaceWearGroup = null;
+    let necklaceBindGroup = null;
     let necklaceOrientGroup = null;
     let necklaceShadowParts = null;
     /** Grupo intermédio: escala + fade de entrada sem afectar escalas anatómicas no mesh. */
@@ -10771,15 +10800,21 @@ async function runArSession({
     if (accessoryType === "necklace") {
       necklaceWearGroup = new GroupCtor();
       necklaceWearGroup.name = "omafit-ar-necklace-wear";
+      necklaceBindGroup = new GroupCtor();
+      necklaceBindGroup.name = "omafit-ar-necklace-bind";
       necklaceOrientGroup = new GroupCtor();
       necklaceOrientGroup.name = "omafit-ar-necklace-orient";
       necklaceOrientGroup.quaternion.identity();
+      applyNecklaceMerchantCalibRotation(THREE, necklaceBindGroup, readNecklaceMerchantCal());
       anchor.group.add(necklaceWearGroup);
-      necklaceWearGroup.add(necklaceOrientGroup);
+      necklaceWearGroup.add(necklaceBindGroup);
+      necklaceBindGroup.add(necklaceOrientGroup);
       necklaceOrientGroup.add(glasses);
       try {
-        console.log("[omafit-ar] colar: wear + base pescoço (clavícula + orient)", {
+        console.log("[omafit-ar] colar: wear + bind (rx/ry/rz) + base pescoço", {
           build: OMAFIT_AR_WIDGET_BUILD,
+          canonicalBlenderExport: necklaceCanonicalBlenderExport,
+          merchantCal: readNecklaceMerchantCal(),
         });
       } catch {
         /* ignore */
@@ -11100,7 +11135,10 @@ async function runArSession({
           ? String(cfgAttr("arNecklaceForceDepthFront", "1")).trim()
           : null,
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
+      necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
       necklaceOrientGroup: accessoryType === "necklace" ? necklaceOrientGroup : null,
+      necklaceCanonicalBlenderExport: accessoryType === "necklace" ? !!necklaceCanonicalBlenderExport : false,
+      readNecklaceMerchantCal: accessoryType === "necklace" ? readNecklaceMerchantCal : null,
       necklaceBasisScratch:
         accessoryType === "necklace"
           ? {
@@ -12225,9 +12263,11 @@ async function runArSession({
               }
               console.log("[omafit-ar] necklace tracking diag (1x)", {
                 build: OMAFIT_AR_WIDGET_BUILD,
+                canonicalBlenderExport: st.necklaceCanonicalBlenderExport,
                 neckBasisOrient: !!st.necklaceOrientGroup,
                 clavicleTracking: clavOk,
                 directAnchorSlot: !!st.necklaceWearGroup,
+                merchantRot: st.readNecklaceMerchantCal?.() || null,
                 metersMul,
                 nativeSpace,
                 necklaceNeckSpanM: st.necklaceNeckSpanM,
@@ -13010,7 +13050,14 @@ async function runArSession({
       try {
         if (cal && typeof cal === "object") {
           applyOmafitCalibration(cal, arCfg);
-          if (accessoryType === "glasses") {
+          if (accessoryType === "necklace" && faceArEnhancementState?.necklaceBindGroup) {
+            applyThreeGroupCalibRot(
+              faceArEnhancementState.necklaceBindGroup,
+              normalizeNecklaceMerchantCalibration(cal),
+            );
+            faceArEnhancementState.necklaceBindGroup.updateMatrix();
+            faceArEnhancementState.necklaceBindGroup.updateMatrixWorld(true);
+          } else if (accessoryType === "glasses") {
             applyThreeGroupCalibRot(calibRot, cal);
             calibRot.updateMatrix();
             calibRot.updateMatrixWorld(true);
