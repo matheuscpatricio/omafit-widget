@@ -196,13 +196,48 @@ export function computeNecklaceAutoBindQuat(THREE, detected, heightSign = 1) {
 }
 
 /**
+ * Eixos para colar: maior dim = arco (X), menor = espessura (Z frente), média = altura/pingente (Y).
+ *
+ * @returns {import("./omafit-glasses-orient.js").GlassesAxesDetect | null}
+ */
+export function detectNecklaceAxes(THREE, root) {
+  const base = detectGlassesAxes(THREE, root);
+  if (!base?.sizes) return null;
+  const axes = [
+    { idx: 0, size: base.sizes.x, offset: base.centroidOffset?.x ?? 0 },
+    { idx: 1, size: base.sizes.y, offset: base.centroidOffset?.y ?? 0 },
+    { idx: 2, size: base.sizes.z, offset: base.centroidOffset?.z ?? 0 },
+  ].sort((a, b) => b.size - a.size);
+  const widthAxis = axes[0];
+  const heightAxis = axes[1];
+  const depthAxis = axes[2];
+  if (!widthAxis || !heightAxis || !depthAxis) return null;
+  const widthConfidence =
+    widthAxis.size > heightAxis.size * 1.12 ? 1 : 0.55;
+  return {
+    widthAxisIdx: widthAxis.idx,
+    heightAxisIdx: heightAxis.idx,
+    depthAxisIdx: depthAxis.idx,
+    depthFrontSign: depthAxis.offset >= 0 ? 1 : -1,
+    sizes: base.sizes,
+    centroidOffset: base.centroidOffset,
+    confidence: {
+      width: widthConfidence,
+      depth: Math.min(1, Math.abs(depthAxis.offset) * 2),
+      depthAgreement: true,
+    },
+    vertexCount: base.vertexCount,
+  };
+}
+
+/**
  * Bind determinístico por vértices (previsível multi-GLB).
  *
  * @returns {{ bind: string, detected: object, signs: object } | null}
  */
 export function applyNecklaceAutoBind(THREE, root) {
   if (!THREE || !root) return null;
-  const detected = detectGlassesAxes(THREE, root);
+  const detected = detectNecklaceAxes(THREE, root);
   if (!detected) return null;
   if (detected.confidence.width < OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF) {
     return null;
