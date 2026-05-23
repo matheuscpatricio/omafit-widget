@@ -31,6 +31,7 @@ const arDir = join(pub, "ar");
 const AR_BUNDLE = [
   "omafit-ar-widget.js",
   "omafit-glasses-calibration.js",
+  "omafit-necklace-calibration.js",
   "omafit-glasses-orient.js",
   "omafit-glb-bbox-center.js",
   "omafit-bracelet-wrist-placement.js",
