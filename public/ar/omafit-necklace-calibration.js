@@ -3,48 +3,37 @@
  *   - `omafit-ar-widget.js` (provador na loja)
  *   - `app/routes/app.ar-eyewear_.calibrate.$assetId.jsx` (preview admin)
  *   - `app/ar-calibration.shared.js` (sanitização / defaults)
- *
- * Semântica:
- *   - Escala base automática no AR ≈ arco de 30 cm no pescoço (por GLB).
- *   - `scale` = 1 → tamanho padrão; 0,88–1,12 = ajuste fino do lojista (±12%).
  */
 
 /** Largura alvo do arco no pescoço (m) — alinhada ao fit no widget. */
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
-/**
- * Tripo costuma ter profundidade ~1 m; o arco visível é menor que a bbox “horizontal”.
- * Reduz escala global (~0,68) para não parecer gigante com `×100/anchor`.
- */
+/** Calibração visual global da escala (evita colar gigante). */
 export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.68;
 
-/** Bbox acima disto no eixo maior = profundidade (não usar como largura do arco). */
 export const OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M = 0.78;
 
-/** Intervalo do slider "Tamanho" na página de calibração (colar). */
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_MIN = 0.88;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.12;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.02;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-/** Clamps de `glasses.scale` no AR (após fórmula m→cm / anchor). */
 export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.4;
 export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.8;
 
+/** Slerp da orientação do pescoço (0–1 por frame). */
+export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.22;
+
 /**
- * Rotação fixa no grupo sob a âncora 152 (graus) — alinha arco ao pescoço.
- * Mesh Tripo só recebe `Rx(-90°)`; `Ry(180°)` fica aqui (evita duplicar no GLB).
+ * Correcção fixa pós-bind Tripo no mesh (graus) — pingente deixa de apontar para a câmara.
+ * @deprecated prefer dynamic basis; mantido para preview admin estático.
  */
 export const OMAFIT_NECKLACE_ANCHOR_ORIENT_DEG = Object.freeze({
   rx: 0,
-  ry: 180,
+  ry: 0,
   rz: 0,
 });
 
-/**
- * @param {number} n
- * @returns {number}
- */
 export function clampNecklaceMerchantScaleMul(n) {
   const v = Number(n);
   if (!Number.isFinite(v) || v <= 0) return OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT;
@@ -54,10 +43,6 @@ export function clampNecklaceMerchantScaleMul(n) {
   );
 }
 
-/**
- * @param {unknown} cal
- * @returns {{ scale: number }}
- */
 export function normalizeNecklaceMerchantCalibration(cal) {
   const src = cal && typeof cal === "object" ? cal : {};
   const sc = Number(src.scale);
@@ -68,11 +53,6 @@ export function normalizeNecklaceMerchantCalibration(cal) {
   };
 }
 
-/**
- * @param {unknown} cal
- * @param {string | number | null | undefined} attrMul
- * @returns {number}
- */
 export function resolveNecklaceMerchantScaleMul(cal, attrMul) {
   const fromAttr = Number(attrMul);
   if (Number.isFinite(fromAttr) && fromAttr > 0) {
@@ -81,13 +61,6 @@ export function resolveNecklaceMerchantScaleMul(cal, attrMul) {
   return normalizeNecklaceMerchantCalibration(cal).scale;
 }
 
-/**
- * Largura do arco (m): ignora eixo de profundidade Tripo (~1 m).
- *
- * @param {{ x?: number, y?: number, z?: number } | null} sz
- * @param {number} [depthMinM]
- * @returns {number}
- */
 export function omafitNecklaceArcSpanFromBbox(sz, depthMinM = OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M) {
   if (!sz) return OMAFIT_NECKLACE_REFERENCE_WIDTH_M;
   const dims = [Number(sz.x) || 0, Number(sz.y) || 0, Number(sz.z) || 0].sort((a, b) => b - a);
@@ -100,14 +73,15 @@ export function omafitNecklaceArcSpanFromBbox(sz, depthMinM = OMAFIT_NECKLACE_DE
   return Math.max(largest, mid, smallest, 0.04);
 }
 
-/** @deprecated alias */
 export function omafitNecklaceHorizontalArcSpanFromSize(sz) {
   return omafitNecklaceArcSpanFromBbox(sz);
 }
 
 /**
- * Tripo vertical (Y↑): deitar no plano do pescoço — só `Rx(-90°)` no mesh.
- * `Ry(180°)` na âncora via `OMAFIT_NECKLACE_ANCHOR_ORIENT_DEG`.
+ * Tripo vertical: deita o arco (`Rx -90°`) + `Rz 180°` para o pingente pendurar em −Y local (não +Z frente).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
  */
 export function omafitApplyNecklaceTripoBind(THREE, root) {
   if (!THREE || !root) return null;
@@ -118,45 +92,144 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
   let bind = "identity";
   if (sz.y >= sz.x * 1.15 && sz.y >= sz.z * 1.15) {
     root.rotateX(-Math.PI / 2);
-    bind = "rx-minus-90";
+    root.rotateZ(Math.PI);
+    bind = "rx-minus-90-rz-180";
     root.updateMatrixWorld(true);
     const box2 = new THREE.Box3().setFromObject(root);
     box2.getSize(sz);
   } else if (sz.z >= sz.x * 1.15 && sz.z >= sz.y * 1.15) {
-    bind = "depth-z-dominant";
+    root.rotateY(Math.PI);
+    bind = "ry-180-z-dominant";
     root.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(root);
+    box2.getSize(sz);
   }
   return { bind, size: { x: sz.x, y: sz.y, z: sz.z } };
 }
 
 /**
+ * Base ortonormal do pescoço em espaço metricLandmarks (RHS):
+ *   X = lateral (bochecha D − E), Y = −down (pingente pendura em −Y do mesh), Z = frente.
+ *
  * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} group
+ * @param {any} lm
+ * @param {{ get(i: number): { x: number, y: number, z: number } | null } | null} smoother
+ * @param {{ chin: number, nose: number, cheekL: number, cheekR: number }} idx
+ * @param {{
+ *   pick: (idx: number, out: import("three").Vector3) => boolean,
+ *   lateral: import("three").Vector3,
+ *   down: import("three").Vector3,
+ *   fwd: import("three").Vector3,
+ *   hangNeg: import("three").Vector3,
+ * }} scratch
+ * @returns {boolean}
  */
-export function applyNecklaceAnchorOrientRotation(THREE, group) {
-  if (!THREE || !group?.rotateOnWorldAxis) return;
-  const toRad = (d) => ((Number(d) || 0) * Math.PI) / 180;
-  const o = OMAFIT_NECKLACE_ANCHOR_ORIENT_DEG;
-  group.quaternion.identity();
-  const ry = toRad(o.ry);
-  const rx = toRad(o.rx);
-  const rz = toRad(o.rz);
-  if (ry) group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), ry);
-  if (rx) group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rx);
-  if (rz) group.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz);
+export function omafitNecklaceNeckBasisVectors(
+  THREE,
+  lm,
+  smoother,
+  idx,
+  scratch,
+) {
+  if (!THREE || !lm || !scratch?.pick) return false;
+  const chin = scratch.chin || new THREE.Vector3();
+  const nose = scratch.nose || new THREE.Vector3();
+  const L = scratch.L || new THREE.Vector3();
+  const R = scratch.R || new THREE.Vector3();
+  if (!scratch.pick(idx.chin, chin)) return false;
+  if (!scratch.pick(idx.nose, nose)) return false;
+  if (!scratch.pick(idx.cheekL, L)) return false;
+  if (!scratch.pick(idx.cheekR, R)) return false;
+
+  const lateral = scratch.lateral.subVectors(R, L);
+  if (lateral.lengthSq() < 1e-12) return false;
+  lateral.normalize();
+  if (lateral.x < 0) lateral.multiplyScalar(-1);
+
+  const down = scratch.down.subVectors(chin, nose);
+  if (down.lengthSq() < 1e-12) return false;
+  down.normalize();
+
+  const fwd = scratch.fwd.crossVectors(lateral, down);
+  if (fwd.lengthSq() < 1e-12) return false;
+  fwd.normalize();
+
+  scratch.hangNeg.copy(down).negate();
+  return true;
 }
 
 /**
- * Escala total do mesh no AR (GLB em m, landmarks/âncora em cm).
+ * Orientação do colar relativa à âncora: `qOrient = qAnchor⁻¹ × qNeck`.
  *
- * @param {{
- *   neckSpanM: number,
- *   merchantMul?: number,
- *   cheekTrackK?: number,
- *   anchorDivisor: number,
- *   metersMul?: number,
- * }} p
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} anchorGroup
+ * @param {import("three").Object3D} orientGroup
+ * @param {any} lm
+ * @param {object} idx landmark indices
+ * @param {object} scratch vetores + quaternions reutilizáveis
+ * @param {(from: import("three").Quaternion, to: import("three").Quaternion) => void} [shortestPath]
+ * @param {number} [slerpAlpha] 1 = instantâneo
+ * @returns {boolean}
  */
+export function omafitApplyNecklaceNeckBasisOrientation(
+  THREE,
+  anchorGroup,
+  orientGroup,
+  lm,
+  smoother,
+  idx,
+  scratch,
+  shortestPath,
+  slerpAlpha = OMAFIT_NECKLACE_ORIENT_SLERP,
+) {
+  if (!THREE || !anchorGroup || !orientGroup || !scratch) return false;
+  if (
+    !omafitNecklaceNeckBasisVectors(THREE, lm, smoother, idx, scratch)
+  ) {
+    return false;
+  }
+
+  if (!scratch.basisM4) scratch.basisM4 = new THREE.Matrix4();
+  if (!scratch.qTarget) scratch.qTarget = new THREE.Quaternion();
+  if (!scratch.qAnchor) scratch.qAnchor = new THREE.Quaternion();
+  if (!scratch.qOrient) scratch.qOrient = new THREE.Quaternion();
+
+  scratch.basisM4.makeBasis(scratch.lateral, scratch.hangNeg, scratch.fwd);
+  scratch.qTarget.setFromRotationMatrix(scratch.basisM4);
+
+  anchorGroup.updateMatrixWorld(true);
+  anchorGroup.getWorldQuaternion(scratch.qAnchor);
+  scratch.qAnchor.invert();
+  scratch.qOrient.copy(scratch.qAnchor).multiply(scratch.qTarget);
+
+  if (typeof shortestPath === "function") {
+    shortestPath(orientGroup.quaternion, scratch.qOrient);
+  }
+
+  const a = Math.min(1, Math.max(0, Number(slerpAlpha) || 0));
+  if (a >= 0.999 || orientGroup.userData?.omafitNeckOrientPrimed !== true) {
+    orientGroup.quaternion.copy(scratch.qOrient);
+    orientGroup.userData = orientGroup.userData || {};
+    orientGroup.userData.omafitNeckOrientPrimed = true;
+  } else {
+    orientGroup.quaternion.slerp(scratch.qOrient, a);
+  }
+  orientGroup.updateMatrix();
+  return true;
+}
+
+/** Preview admin sem landmarks: base estática (silhueta de frente). */
+export function applyNecklacePreviewStaticOrient(THREE, group) {
+  if (!THREE || !group) return;
+  group.quaternion.identity();
+  group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI);
+}
+
+/** @deprecated use `omafitApplyNecklaceNeckBasisOrientation` */
+export function applyNecklaceAnchorOrientRotation(THREE, group) {
+  applyNecklacePreviewStaticOrient(THREE, group);
+}
+
 export function computeNecklaceArDisplayScale(p) {
   const span = Math.max(Number(p.neckSpanM) || 0, 0.04);
   const norm = OMAFIT_NECKLACE_REFERENCE_WIDTH_M / span;
@@ -185,12 +258,6 @@ export function computeNecklaceArDisplayScale(p) {
   };
 }
 
-/**
- * Preview admin (sem âncora MindAR).
- *
- * @param {number} neckSpanM
- * @returns {number}
- */
 export function computeNecklacePreviewBaseScale(neckSpanM) {
   const span = Math.max(Number(neckSpanM) || 0, 0.04);
   return (
