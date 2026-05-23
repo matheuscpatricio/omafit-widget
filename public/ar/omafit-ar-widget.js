@@ -514,7 +514,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v73";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v74";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -964,11 +964,11 @@ const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 90;
 /**
- * Escala de exibição (GLB em m, âncora em cm): `norm × 100 / anchor` ≈ 4,5–6 para arco ~36 cm.
- * Teto baixo evita gigante (v69 chegava a ~74); piso evita invisível (v70–71 ~0,05).
+ * Escala no mesh (GLB em m): `norm / anchor` ≈ 0,045 — a âncora MindAR já multiplica ~14–16× no mundo.
+ * Não usar `×100` aqui (v72–73 davam ~4,6 → gigante); wear em cm continua com `/anchor` (v73).
  */
-const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 4;
-const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 6.2;
+const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 0.038;
+const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 0.058;
 /** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
 const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
 /** Divisor da âncora (evita totalScale ~0,05 se a matriz reportar escala absurda). */
@@ -2259,17 +2259,8 @@ function omafitEnsureNecklaceMeshesRenderable(THREE, root, opts) {
           mat.polygonOffsetUnits = -16;
         }
       }
-      /** Sem PMREM o metal alto fica preto → “invisível”; mantém brilho legível. */
-      if (!hasEnv && "metalness" in mat) {
-        mat.metalness = Math.min(0.42, Math.max(0.12, Number(mat.metalness) || 0.28));
-        if ("roughness" in mat) mat.roughness = Math.max(0.28, Number(mat.roughness) || 0.42);
-        if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
-        if ("emissive" in mat && mat.color && mat.emissive?.set) {
-          mat.emissive.copy(mat.color);
-          if ("emissiveIntensity" in mat) {
-            mat.emissiveIntensity = Math.max(0.08, Number(mat.emissiveIntensity) || 0.12);
-          }
-        }
+      if (!hasEnv && opts?.refreshLitePbr) {
+        omafitTuneNecklaceMaterialLitePbr(THREE, mat);
       }
       if ("transmission" in mat && Number(mat.transmission) > 0.02) {
         mat.transmission = 0;
@@ -2509,6 +2500,46 @@ function upgradeFaceArEyewearRendering(THREE, root, envTexture) {
       return m;
     });
     obj.material = Array.isArray(obj.material) ? next : next[0];
+  });
+}
+
+/**
+ * PBR legível sem env map (antes do PMREM): mantém texturas, metal moderado (evita preto).
+ */
+function omafitTuneNecklaceMaterialLitePbr(THREE, mat) {
+  if (!mat) return;
+  if ("metalness" in mat) {
+    mat.metalness = Math.min(0.48, Math.max(0.18, Number(mat.metalness) || 0.32));
+  }
+  if ("roughness" in mat) {
+    mat.roughness = Math.min(0.62, Math.max(0.22, Number(mat.roughness) || 0.4));
+  }
+  if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
+  if ("emissiveIntensity" in mat && Number(mat.emissiveIntensity) > 0.35) {
+    mat.emissiveIntensity = 0.12;
+  }
+  mat.toneMapped = true;
+  mat.needsUpdate = true;
+}
+
+function omafitPrepareNecklaceMaterialsForAr(THREE, root) {
+  if (!THREE || !root?.traverse) return;
+  root.traverse((child) => {
+    if (!child?.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      omafitTuneNecklaceMaterialLitePbr(THREE, mat);
+      if (mat.map) {
+        if (THREE.SRGBColorSpace !== undefined && "colorSpace" in mat.map) {
+          mat.map.colorSpace = THREE.SRGBColorSpace;
+        } else if (THREE.sRGBEncoding !== undefined) mat.map.encoding = THREE.sRGBEncoding;
+      }
+      if (Number(mat.opacity) < 0.05) {
+        mat.opacity = 1;
+        mat.transparent = false;
+      }
+    }
   });
 }
 
@@ -2758,7 +2789,8 @@ function omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative, 
     OMAFIT_NECKLACE_ANCHOR_SCALE_CLAMP_MIN,
     OMAFIT_NECKLACE_ANCHOR_SCALE_CLAMP_MAX,
   );
-  let totalScale = (norm * merchantMul * cheekTrackK * nativeMul) / anchorDivisor;
+  /** `×100` só para diagnóstico cm; escala do mesh compensa a escala da âncora uma vez. */
+  let totalScale = (norm * merchantMul * cheekTrackK) / anchorDivisor;
   totalScale = THREE.MathUtils.clamp(
     totalScale,
     OMAFIT_NECKLACE_RIGID_SCALE_MIN,
@@ -2766,7 +2798,7 @@ function omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative, 
   );
   const neckSpanM = Number.isFinite(st.necklaceNeckSpanM) ? st.necklaceNeckSpanM : 0.48;
   const targetArcWidthCm = OMAFIT_NECKLACE_REFERENCE_WIDTH_M * 100 * cheekTrackK * merchantMul;
-  const predictedArcWidthCm = neckSpanM * nativeMul * totalScale;
+  const predictedArcWidthCm = neckSpanM * nativeMul * totalScale * anchorDivisor;
   return {
     totalScale,
     anchorScale,
@@ -2810,6 +2842,7 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
   omafitEnsureNecklaceMeshesRenderable(THREE, glbRoot, {
     forceDepthFrontAttr: st.necklaceForceDepthFrontAttr,
     hasSceneEnvironment: Boolean(st.necklaceSceneHasEnvironment),
+    refreshLitePbr: !st.necklaceSceneHasEnvironment && !st.necklacePmremApplied,
   });
   st.necklaceAnchorScale = pack.anchorScale;
   st.necklaceAnchorDivisor = pack.anchorDivisor;
@@ -9260,10 +9293,6 @@ async function runArSession({
           if ("roughness" in mat) mat.roughness = 1;
           if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
           if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1;
-        } else {
-          if ("metalness" in mat) mat.metalness = Math.min(1, Math.max(0.72, Number(mat.metalness) || 0.88));
-          if ("roughness" in mat) mat.roughness = Math.min(0.42, Math.max(0.08, Number(mat.roughness) || 0.18));
-          if ("envMapIntensity" in mat) mat.envMapIntensity = Math.max(0.65, Number(mat.envMapIntensity) || 0.85);
         }
         /**
          * KHR_materials_transmission: sem PMREM / pipeline de transmissão do renderer,
@@ -9291,8 +9320,11 @@ async function runArSession({
     if (accessoryType === "glasses" || accessoryType === "necklace") {
       try {
         if (accessoryType === "necklace") {
+          omafitPrepareNecklaceMaterialsForAr(THREE, glasses);
           omafitEnsureNecklaceMeshesRenderable(THREE, glasses, {
             forceDepthFrontAttr: cfgAttr("arNecklaceForceDepthFront", "1"),
+            hasSceneEnvironment: Boolean(mindarThree?.scene?.environment),
+            refreshLitePbr: true,
           });
         } else {
           omafitEnsureGlassesMeshesRenderable(THREE, glasses);
@@ -10939,6 +10971,7 @@ async function runArSession({
           : null,
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
       necklaceSceneHasEnvironment: Boolean(mindarThree?.scene?.environment),
+      necklacePmremApplied: false,
       glassesPivotBaseLocalPos: glassesPivotBaseLocalPos ? glassesPivotBaseLocalPos.clone() : null,
       glassesContactRig,
       ndcWearLock:
@@ -12355,7 +12388,7 @@ async function runArSession({
           (accessoryType === "glasses" &&
             /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim())) ||
           (accessoryType === "necklace" &&
-            /^(1|on|true|yes)$/i.test(String(cfgAttr("arNecklacePmrem", "0")).trim()));
+            !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklacePmrem", "1")).trim()));
         if (!pmremOn) {
           return;
         }
@@ -12386,7 +12419,13 @@ async function runArSession({
           envScene.dispose?.();
         }
         scene.environment = pmremRT.texture;
-        if (faceArEnhancementState) faceArEnhancementState.facePmremRT = pmremRT;
+        if (faceArEnhancementState) {
+          faceArEnhancementState.facePmremRT = pmremRT;
+          if (accessoryType === "necklace") {
+            faceArEnhancementState.necklaceSceneHasEnvironment = true;
+            faceArEnhancementState.necklacePmremApplied = true;
+          }
+        }
         pmrem.dispose();
         try {
           renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -12397,6 +12436,18 @@ async function runArSession({
         upgradeFaceArEyewearRendering(THREE, glasses, pmremRT.texture);
         if (accessoryType === "necklace") {
           upgradeFaceArNecklaceJewelryMaterials(THREE, glasses, pmremRT.texture);
+          omafitEnsureNecklaceMeshesRenderable(THREE, glasses, {
+            forceDepthFrontAttr: String(cfgAttr("arNecklaceForceDepthFront", "1")).trim(),
+            hasSceneEnvironment: true,
+            refreshLitePbr: false,
+          });
+          try {
+            console.log("[omafit-ar] colar: PMREM / materiais joia aplicados", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+            });
+          } catch {
+            /* ignore */
+          }
         }
         try {
           omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
