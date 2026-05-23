@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-ar-widget-v80';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-20-ar-widget-v81';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -1261,6 +1261,17 @@ export function WidgetPage() {
     if (eyewearBootstrap.preferredCamera) arExtraAttrs['data-ar-preferred-camera'] = eyewearBootstrap.preferredCamera;
     if (eyewearBootstrap.mindarAnchor) arExtraAttrs['data-ar-mindar-anchor'] = eyewearBootstrap.mindarAnchor;
     if (eyewearBootstrap.calibration) arExtraAttrs['data-ar-omafit-calibration'] = eyewearBootstrap.calibration;
+    if (arAccessory === 'necklace' && eyewearBootstrap.calibration) {
+      try {
+        const calObj = JSON.parse(eyewearBootstrap.calibration) as { scale?: unknown };
+        const sc = Number(calObj?.scale);
+        if (Number.isFinite(sc) && sc > 0) {
+          arExtraAttrs['data-ar-necklace-scale-mul'] = String(sc);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     if (eyewearBootstrap.arManifestJson) {
       arExtraAttrs['data-ar-manifest-json'] = eyewearBootstrap.arManifestJson;
     }

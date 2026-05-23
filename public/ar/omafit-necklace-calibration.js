@@ -72,11 +72,33 @@ export function normalizeNecklaceMerchantCalibration(cal) {
 }
 
 export function resolveNecklaceMerchantScaleMul(cal, attrMul) {
+  const norm = normalizeNecklaceMerchantCalibration(cal);
+  const fromCal = Number(cal && typeof cal === "object" ? cal.scale : NaN);
+  if (Number.isFinite(fromCal) && fromCal > 0) {
+    return norm.scale;
+  }
   const fromAttr = Number(attrMul);
   if (Number.isFinite(fromAttr) && fromAttr > 0) {
     return clampNecklaceMerchantScaleMul(fromAttr);
   }
-  return normalizeNecklaceMerchantCalibration(cal).scale;
+  return norm.scale;
+}
+
+/**
+ * Quaternion de calibração loja (YXZ local) — paridade com preview admin e provador.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {object} cal
+ */
+export function omafitNecklaceMerchantCalibQuaternion(THREE, cal) {
+  const norm = normalizeNecklaceMerchantCalibration(cal);
+  const e = new THREE.Euler(
+    (norm.rx * Math.PI) / 180,
+    (norm.ry * Math.PI) / 180,
+    (norm.rz * Math.PI) / 180,
+    "YXZ",
+  );
+  return new THREE.Quaternion().setFromEuler(e);
 }
 
 /**
@@ -314,7 +336,11 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
 }
 
 /**
- * Base ortonormal (paridade óculos): X = 454−234, down = queixo−nariz, Z = X×down.
+ * Base ortonormal (paridade óculos / MindAR selfie):
+ *   X = 454−234 (com espelho opcional no X), down = queixo−nariz,
+ *   Z = X×down, Y = Z×X (pingente em −Y local do mesh).
+ *
+ * @param {boolean} [mirrorSelfieX] negar X dos landmarks (vídeo frontal espelhado)
  */
 export function omafitNecklaceNeckBasisVectors(
   THREE,
@@ -322,6 +348,7 @@ export function omafitNecklaceNeckBasisVectors(
   smoother,
   idx,
   scratch,
+  mirrorSelfieX = false,
 ) {
   if (!THREE || !lm || !scratch?.pick) return false;
   const chin = scratch.chin || new THREE.Vector3();
@@ -332,6 +359,13 @@ export function omafitNecklaceNeckBasisVectors(
   if (!scratch.pick(idx.nose, nose)) return false;
   if (!scratch.pick(idx.cheekL, L)) return false;
   if (!scratch.pick(idx.cheekR, R)) return false;
+  const mx = mirrorSelfieX ? -1 : 1;
+  if (mx < 0) {
+    chin.x *= -1;
+    nose.x *= -1;
+    L.x *= -1;
+    R.x *= -1;
+  }
 
   const lateral = scratch.lateral.subVectors(L, R);
   if (lateral.lengthSq() < 1e-12) return false;
@@ -345,7 +379,9 @@ export function omafitNecklaceNeckBasisVectors(
   if (fwd.lengthSq() < 1e-12) return false;
   fwd.normalize();
 
-  scratch.hangNeg.copy(down).negate();
+  scratch.hangNeg.crossVectors(fwd, lateral);
+  if (scratch.hangNeg.lengthSq() < 1e-12) return false;
+  scratch.hangNeg.normalize();
   return true;
 }
 
@@ -359,9 +395,20 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   scratch,
   shortestPath,
   slerpAlpha = OMAFIT_NECKLACE_ORIENT_SLERP,
+  merchantCal = null,
+  mirrorSelfieX = false,
 ) {
   if (!THREE || !anchorGroup || !orientGroup || !scratch) return false;
-  if (!omafitNecklaceNeckBasisVectors(THREE, lm, smoother, idx, scratch)) {
+  if (
+    !omafitNecklaceNeckBasisVectors(
+      THREE,
+      lm,
+      smoother,
+      idx,
+      scratch,
+      mirrorSelfieX,
+    )
+  ) {
     return false;
   }
 
@@ -369,14 +416,24 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   if (!scratch.qTarget) scratch.qTarget = new THREE.Quaternion();
   if (!scratch.qAnchor) scratch.qAnchor = new THREE.Quaternion();
   if (!scratch.qOrient) scratch.qOrient = new THREE.Quaternion();
+  if (!scratch.qMerchant) scratch.qMerchant = new THREE.Quaternion();
 
-  scratch.basisM4.makeBasis(scratch.lateral, scratch.hangNeg, scratch.fwd);
+  if (!scratch.fwdNeg) scratch.fwdNeg = new THREE.Vector3();
+  scratch.fwdNeg.copy(scratch.fwd).negate();
+  scratch.basisM4.makeBasis(scratch.lateral, scratch.hangNeg, scratch.fwdNeg);
   scratch.qTarget.setFromRotationMatrix(scratch.basisM4);
 
   anchorGroup.updateMatrixWorld(true);
   anchorGroup.getWorldQuaternion(scratch.qAnchor);
   scratch.qAnchor.invert();
   scratch.qOrient.copy(scratch.qAnchor).multiply(scratch.qTarget);
+  scratch.qMerchant.identity();
+  if (merchantCal) {
+    scratch.qMerchant.copy(
+      omafitNecklaceMerchantCalibQuaternion(THREE, merchantCal),
+    );
+    scratch.qOrient.multiply(scratch.qMerchant);
+  }
 
   if (typeof shortestPath === "function") {
     shortestPath(orientGroup.quaternion, scratch.qOrient);
