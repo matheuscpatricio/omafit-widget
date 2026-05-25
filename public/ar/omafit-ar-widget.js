@@ -532,7 +532,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v92";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v93";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -969,6 +969,17 @@ const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
  */
 /** 0,47 ≈ base do pescoço (entre nariz e queixo), estável no freeze. */
 const OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL = 0.47;
+
+/** `data-ar-necklace-neck-wear-along` vazio não deve virar 0 (Number("") === 0). */
+function resolveNecklaceNeckWearAlongFromCfg(cfgAttr) {
+  if (typeof cfgAttr !== "function") return OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL;
+  const raw = String(cfgAttr("arNecklaceNeckWearAlong", "")).trim();
+  if (!raw) return OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL;
+  return Math.min(0.72, Math.max(0.34, n));
+}
+
 /**
  * Extensão abaixo do queixo (só oclusor do pescoço — mais baixo que o wear do colar).
  */
@@ -3051,11 +3062,7 @@ function omafitNecklaceWearAndOrientStep(
     anchorVec && omafitMetricLandmarkToVec3(lm, anchorIndex, st.lmSmoother, anchorVec);
   const clavScratch = st.necklaceClavicleScratch;
   const neckWearPt = clavScratch?.clavicle;
-  let neckAlong = OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL;
-  if (typeof cfgAttr === "function") {
-    const n = Number(String(cfgAttr("arNecklaceNeckWearAlong", "")).trim());
-    if (Number.isFinite(n)) neckAlong = n;
-  }
+  const neckAlong = resolveNecklaceNeckWearAlongFromCfg(cfgAttr);
   const neckWearOk =
     clavScratch &&
     neckWearPt &&
@@ -3958,6 +3965,24 @@ function omafitDampMatrix4(THREE, out, raw, lambda) {
   q0.slerp(q1, t);
   s0.lerp(s1, t);
   out.compose(p0, q0, s0);
+}
+
+/**
+ * MindAR `faceMatrix` pode incluir escala não-uniforme; no colar isso esmaga o mesh
+ * (aparece bem → «linha fina» quando o damp da âncora converge).
+ * @returns {number} desvio máximo |s−1| antes de forçar unidade
+ */
+function omafitAnchorMatrixForceUnitScale(matrix, dec) {
+  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return 0;
+  matrix.decompose(dec.p, dec.q, dec.s);
+  const dev = Math.max(
+    Math.abs(dec.s.x - 1),
+    Math.abs(dec.s.y - 1),
+    Math.abs(dec.s.z - 1),
+  );
+  dec.s.set(1, 1, 1);
+  matrix.compose(dec.p, dec.q, dec.s);
+  return dev;
 }
 
 /**
@@ -11473,9 +11498,11 @@ async function runArSession({
             vMeas: new THREE.Vector3(),
           }
         : null,
-      anchorDec: glassesAnchorOneEuro
-        ? { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() }
-        : null,
+      anchorDec:
+        accessoryType === "glasses" || accessoryType === "necklace"
+          ? { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() }
+          : null,
+      necklaceAnchorScaleWarned: false,
       faceControllerPrev: null,
       smoothAnchorMat: new THREE.Matrix4(),
       smoothFaceMats: [],
@@ -11899,6 +11926,16 @@ async function runArSession({
             st.anchorEuroQuatState.logState = { xPrev: null, tPrev: null, dxPrev: [0, 0, 0] };
           }
           st.smoothAnchorMat.copy(anchor.group.matrix);
+          if (accessoryType === "necklace" && st.anchorDec) {
+            const dev0 = omafitAnchorMatrixForceUnitScale(st.smoothAnchorMat, st.anchorDec);
+            if (dev0 > 0.08 && !st.necklaceAnchorScaleWarned) {
+              st.necklaceAnchorScaleWarned = true;
+              console.warn("[omafit-ar] colar: escala âncora MindAR removida (init)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                anchorScaleDev: dev0,
+              });
+            }
+          }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -11953,6 +11990,16 @@ async function runArSession({
             anchor.group.matrix.copy(st.smoothAnchorMat);
           } else {
             omafitDampMatrix4(THREE, st.smoothAnchorMat, anchor.group.matrix, faceMatrixExtraLambda);
+            if (accessoryType === "necklace" && st.anchorDec) {
+              const devA = omafitAnchorMatrixForceUnitScale(st.smoothAnchorMat, st.anchorDec);
+              if (devA > 0.08 && !st.necklaceAnchorScaleWarned) {
+                st.necklaceAnchorScaleWarned = true;
+                console.warn("[omafit-ar] colar: escala âncora MindAR removida (evita colar fino)", {
+                  build: OMAFIT_AR_WIDGET_BUILD,
+                  anchorScaleDev: devA,
+                });
+              }
+            }
             anchor.group.matrix.copy(st.smoothAnchorMat);
           }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
