@@ -546,7 +546,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v111-trapezius-eye-ruler";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v112-relative-cache";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3176,45 +3176,24 @@ function omafitNecklaceWearAndOrientStep(
       try {
         const chinV = clavScratch?.chin;
         const fhV = clavScratch?.fh;
-        const eyeLV = clavScratch?.eyeL;
-        const eyeRV = clavScratch?.eyeR;
-        const shMidV = clavScratch?.shMid;
         const faceLen = chinV && fhV
           ? Math.hypot(chinV.x - fhV.x, chinV.y - fhV.y, chinV.z - fhV.z)
           : null;
-        const eyeMetric = eyeLV && eyeRV ? eyeLV.distanceTo(eyeRV) : null;
-        const eyeNorm = st.poseShoulders?.eyeL && st.poseShoulders?.eyeR
-          ? Math.hypot(
-              st.poseShoulders.eyeL.x - st.poseShoulders.eyeR.x,
-              st.poseShoulders.eyeL.y - st.poseShoulders.eyeR.y,
-            )
-          : null;
-        const ruler = eyeMetric && eyeNorm ? eyeMetric / eyeNorm : null;
-        console.log("[omafit-ar] colar: trapézio (régua olhos)", {
+        console.log("[omafit-ar] colar: trapézio (cache relativo)", {
           build: OMAFIT_AR_WIDGET_BUILD,
           source: clavScratch?.neckSource,
           poseShoulderOk: st.poseShoulderOk,
           poseConfidence: st.poseShoulders?.confidence?.toFixed?.(2) ?? null,
-          eyeDistMetric: eyeMetric?.toFixed?.(2) ?? null,
-          eyeDistNorm: eyeNorm?.toFixed?.(4) ?? null,
-          metricPerNormUnit: ruler?.toFixed?.(2) ?? null,
-          shoulderMidMetric: shMidV ? {
-            x: shMidV.x.toFixed(2),
-            y: shMidV.y.toFixed(2),
-          } : null,
-          chin: chinV ? { x: chinV.x.toFixed(2), y: chinV.y.toFixed(2) } : null,
-          trapeziusPos: {
-            x: neckWearPt.x.toFixed(2),
-            y: neckWearPt.y.toFixed(2),
-          },
-          fraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
+          dropPerFace: clavScratch?.lastDropPerFace?.toFixed?.(3) ?? null,
+          xOffsetPerFace: clavScratch?.lastXOffsetPerFace?.toFixed?.(3) ?? null,
           faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
-          chinToShoulder: shMidV && chinV
-            ? Math.hypot(shMidV.x - chinV.x, shMidV.y - chinV.y).toFixed(2)
+          predictedDescent: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lastDropPerFace)
+            ? (faceLen * clavScratch.lastDropPerFace).toFixed(2)
             : null,
           actualBelowChin: chinV
             ? (neckWearPt.y - chinV.y).toFixed(2)
             : null,
+          fraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
         });
       } catch {
         /* ignore */
@@ -11721,7 +11700,9 @@ async function runArSession({
               faceNeck: new THREE.Vector3(),
               poseNeck: new THREE.Vector3(),
               shMid: new THREE.Vector3(),
-              lastTrapPos: null,
+              lastDropPerFace: null,
+              lastXOffsetPerFace: null,
+              lastValidPoseMs: 0,
             }
           : null,
       necklaceSwing:

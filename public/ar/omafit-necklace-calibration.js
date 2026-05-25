@@ -490,32 +490,77 @@ export function omafitComputeNecklaceNeckWearPoint(
           ? cfg.trapeziusFraction
           : 0.58;
 
-      out.x = chin.x + (shMid.x - chin.x) * fraction;
-      out.y = chin.y + (shMid.y - chin.y) * fraction;
-      out.z = chin.z + (shMid.z - chin.z) * fraction;
+      const trapY = chin.y + (shMid.y - chin.y) * fraction;
+      const trapZ = chin.z + (shMid.z - chin.z) * fraction;
 
       const mxFace = (L.x + R.x) * 0.5;
       const xPoseDelta = shMidNormX - eyeMidNormX;
       const xMetricDelta = xPoseDelta * scale;
-      out.x = mxFace + xMetricDelta * 0.85;
+      const trapX = mxFace + xMetricDelta * 0.85;
 
-      if (scratch.lastTrapPos == null) {
-        scratch.lastTrapPos = new THREE.Vector3().copy(out);
+      /**
+       * SANIDADE: o trapézio tem que estar **abaixo** do queixo no eixo down.
+       * (chin → trap) projetado em down deve ser positivo e ≥ 0.4 × faceLen.
+       * Se não for (pose ruidosa), descarta e usa fallback.
+       */
+      const dx = trapX - chin.x;
+      const dy = trapY - chin.y;
+      const dz = trapZ - chin.z;
+      const projDown = dx * down.x + dy * down.y + dz * down.z;
+      const dropPerFace = projDown / faceLen;
+      const xOffsetPerFace = (trapX - mxFace) / faceLen;
+
+      const validDrop = dropPerFace >= 0.35 && dropPerFace <= 2.5;
+      const validX = Math.abs(xOffsetPerFace) <= 0.8;
+
+      if (validDrop && validX) {
+        if (!Number.isFinite(scratch.lastDropPerFace)) {
+          scratch.lastDropPerFace = dropPerFace;
+        } else {
+          scratch.lastDropPerFace +=
+            (dropPerFace - scratch.lastDropPerFace) * 0.25;
+        }
+        if (!Number.isFinite(scratch.lastXOffsetPerFace)) {
+          scratch.lastXOffsetPerFace = xOffsetPerFace;
+        } else {
+          scratch.lastXOffsetPerFace +=
+            (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.25;
+        }
+        scratch.neckSource = "trapezius-eye-ruler";
+        scratch.lastValidPoseMs = poseShoulders.lastMs ?? Date.now();
       } else {
-        scratch.lastTrapPos.lerp(out, 0.6);
+        scratch.neckSource = scratch.lastDropPerFace
+          ? "trapezius-rejected-cached"
+          : "face-only";
       }
-      scratch.neckSource = "trapezius-eye-ruler";
+
+      const useDropPF = Number.isFinite(scratch.lastDropPerFace)
+        ? scratch.lastDropPerFace
+        : dropPerFace;
+      const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
+        ? scratch.lastXOffsetPerFace
+        : xOffsetPerFace;
+
+      out.copy(chin).addScaledVector(down, faceLen * useDropPF);
+      out.x = mxFace + useXPF * faceLen;
       return true;
     }
   }
 
   /**
-   * FALLBACK 1: temos ombros em pose mas sem olhos do face mesh —
-   * usa último ponto trapézio em cache (continuidade).
+   * FALLBACK: usa razões cacheadas (relativas à face atual).
+   * Como `dropPerFace` é uma razão (não posição absoluta), o ponto SEGUE a face
+   * mesmo sem pose — não há salto para coordenadas obsoletas.
    */
-  if (scratch.lastTrapPos) {
-    out.copy(scratch.lastTrapPos);
-    scratch.neckSource = "trapezius-cached";
+  if (Number.isFinite(scratch.lastDropPerFace)) {
+    const useDropPF = scratch.lastDropPerFace;
+    const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
+      ? scratch.lastXOffsetPerFace
+      : 0;
+    const mxFace = (L.x + R.x) * 0.5;
+    out.copy(chin).addScaledVector(down, faceLen * useDropPF);
+    out.x = mxFace + useXPF * faceLen;
+    scratch.neckSource = "trapezius-cached-ratio";
     return true;
   }
 
