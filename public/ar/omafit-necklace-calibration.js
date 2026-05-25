@@ -39,6 +39,9 @@ export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.22;
 /** Confiança mínima da largura do arco para auto-bind por vértices. */
 export const OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF = 0.38;
 
+/** Roll padrão (°) — «Inclinar lateralmente» na calibração admin. */
+export const OMAFIT_NECKLACE_DEFAULT_MERCHANT_RZ_DEG = -90;
+
 function snapNecklaceMerchantRotationDeg(deg) {
   const n = Number(deg);
   if (!Number.isFinite(n)) return 0;
@@ -61,10 +64,14 @@ export function clampNecklaceMerchantScaleMul(n) {
 export function normalizeNecklaceMerchantCalibration(cal) {
   const src = cal && typeof cal === "object" ? cal : {};
   const sc = Number(src.scale);
+  const rzRaw =
+    cal && typeof cal === "object" && "rz" in src
+      ? src.rz
+      : OMAFIT_NECKLACE_DEFAULT_MERCHANT_RZ_DEG;
   return {
     rx: snapNecklaceMerchantRotationDeg(src.rx),
     ry: snapNecklaceMerchantRotationDeg(src.ry),
-    rz: snapNecklaceMerchantRotationDeg(src.rz),
+    rz: snapNecklaceMerchantRotationDeg(rzRaw),
     scale: clampNecklaceMerchantScaleMul(
       Number.isFinite(sc) && sc > 0 ? sc : OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT,
     ),
@@ -99,6 +106,13 @@ export function omafitNecklaceMerchantCalibQuaternion(THREE, cal) {
     "YXZ",
   );
   return new THREE.Quaternion().setFromEuler(e);
+}
+
+/** Paridade preview admin: rotação loja no filho `bind`, não na base do pescoço. */
+export function omafitApplyNecklaceMerchantCalibToBindGroup(THREE, bindGroup, cal) {
+  if (!THREE || !bindGroup?.quaternion) return;
+  bindGroup.quaternion.copy(omafitNecklaceMerchantCalibQuaternion(THREE, cal));
+  bindGroup.updateMatrix();
 }
 
 /**
@@ -395,7 +409,6 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   scratch,
   shortestPath,
   slerpAlpha = OMAFIT_NECKLACE_ORIENT_SLERP,
-  merchantCal = null,
   mirrorSelfieX = false,
 ) {
   if (!THREE || !anchorGroup || !orientGroup || !scratch) return false;
@@ -416,7 +429,6 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   if (!scratch.qTarget) scratch.qTarget = new THREE.Quaternion();
   if (!scratch.qAnchor) scratch.qAnchor = new THREE.Quaternion();
   if (!scratch.qOrient) scratch.qOrient = new THREE.Quaternion();
-  if (!scratch.qMerchant) scratch.qMerchant = new THREE.Quaternion();
 
   if (!scratch.fwdNeg) scratch.fwdNeg = new THREE.Vector3();
   scratch.fwdNeg.copy(scratch.fwd).negate();
@@ -427,13 +439,6 @@ export function omafitApplyNecklaceNeckBasisOrientation(
   anchorGroup.getWorldQuaternion(scratch.qAnchor);
   scratch.qAnchor.invert();
   scratch.qOrient.copy(scratch.qAnchor).multiply(scratch.qTarget);
-  scratch.qMerchant.identity();
-  if (merchantCal) {
-    scratch.qMerchant.copy(
-      omafitNecklaceMerchantCalibQuaternion(THREE, merchantCal),
-    );
-    scratch.qOrient.multiply(scratch.qMerchant);
-  }
 
   if (typeof shortestPath === "function") {
     shortestPath(orientGroup.quaternion, scratch.qOrient);
