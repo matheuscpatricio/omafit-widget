@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { omafitDetectMetaQuestBrowser } from "./omafit-ar-meta-perf.js";
 
 /** Fator base ajustável para escala biométrica (pulso). */
 export const SCALE_FACTOR = 1.0;
@@ -500,8 +501,7 @@ export class OmafitArSceneBase {
   }
 
   initRenderer() {
-    const ua = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
-    const isQuestBrowser = /OculusBrowser/i.test(ua) || /\bQuest\s*\d/i.test(ua);
+    const isQuestBrowser = omafitDetectMetaQuestBrowser();
     const maxDpr = isQuestBrowser ? 1.25 : 2;
     this.renderer = new THREE.WebGLRenderer({
       antialias: !isQuestBrowser,
