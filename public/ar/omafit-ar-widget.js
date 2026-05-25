@@ -49,7 +49,6 @@ import {
   omafitApplyNecklaceNeckBasisOrientation,
   omafitApplyNecklaceTripoBind,
   omafitComputeNecklaceNeckWearPoint,
-  omafitNecklaceMetricPointToAnchorLocal,
   omafitNecklaceArcSpanFromBbox,
   resolveNecklaceNeckJawWidthDropMul,
   resolveNecklaceMerchantScaleMul,
@@ -547,7 +546,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-21-ar-widget-v105-neck-direct";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v107-adaptive-neck";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3101,40 +3100,46 @@ function omafitNecklaceWearAndOrientStep(
 
   if (!st.necklaceWearTarget) st.necklaceWearTarget = new THREE.Vector3();
 
-  if (anchorOk && neckWearOk && neckWearPt) {
-    const metricWear = st.necklaceMetricWearScratch || new THREE.Vector3();
-    metricWear.copy(neckWearPt);
-    metricWear.x += (nativeSpace ? wearPosM.x * 100 : wearPosM.x) + fineX + rigid.x;
-    metricWear.y += (nativeSpace ? wearPosM.y * 100 : wearPosM.y) + fineY + rigid.y;
-    metricWear.z += (nativeSpace ? wearPosM.z * 100 : wearPosM.z) + fineZ + rigid.z;
-    omafitNecklaceMetricPointToAnchorLocal(
-      THREE,
-      anchorGroup,
-      metricWear,
-      st.necklaceWearTarget,
-    );
-    st.necklaceWearCmNative = st.necklaceWearCmNative || { x: 0, y: 0, z: 0 };
-    st.necklaceWearCmNative.x = metricWear.x;
-    st.necklaceWearCmNative.y = metricWear.y;
-    st.necklaceWearCmNative.z = metricWear.z;
+  let wearDx = (nativeSpace ? wearPosM.x * 100 : wearPosM.x) + fineX + rigid.x;
+  let wearDy = (nativeSpace ? wearPosM.y * 100 : wearPosM.y) + fineY + rigid.y;
+  let wearDz = (nativeSpace ? wearPosM.z * 100 : wearPosM.z) + fineZ + rigid.z;
+
+  if (anchorOk && neckWearOk && neckWearPt && anchorVec) {
+    wearDx += neckWearPt.x - anchorVec.x;
+    wearDy += neckWearPt.y - anchorVec.y;
+    wearDz += neckWearPt.z - anchorVec.z;
     if (!st.necklaceWearDiagLogged) {
       st.necklaceWearDiagLogged = true;
       try {
         const chinY = clavScratch?.chin?.y;
+        const noseY = clavScratch?.nose?.y;
         const neckY = neckWearPt.y;
-        console.log("[omafit-ar] colar: pescoço (métrico)", {
+        const jawW = clavScratch?.L && clavScratch?.R
+          ? clavScratch.L.distanceTo(clavScratch.R)
+          : null;
+        const faceH = Number.isFinite(chinY) && Number.isFinite(noseY)
+          ? Math.abs(chinY - noseY)
+          : null;
+        const faceRatio = Number.isFinite(faceH) && Number.isFinite(jawW) && jawW > 0
+          ? faceH / jawW
+          : null;
+        console.log("[omafit-ar] colar: pescoço adaptativo", {
           build: OMAFIT_AR_WIDGET_BUILD,
           jawDropMul,
-          jawWidth: clavScratch?.L && clavScratch?.R
-            ? clavScratch.L.distanceTo(clavScratch.R)
+          jawWidth: jawW,
+          faceHeight: faceH,
+          faceRatio,
+          adaptedDrop: Number.isFinite(faceRatio) 
+            ? (jawDropMul * Math.max(0.85, Math.min(1.18, 0.82 + faceRatio * 0.32))).toFixed(3)
             : null,
+          poseActive: st.poseShoulderOk,
           chinY,
           neckY,
-          belowChin: Number.isFinite(chinY) && Number.isFinite(neckY) ? neckY - chinY : null,
-          wearLocal: {
-            x: st.necklaceWearTarget.x,
-            y: st.necklaceWearTarget.y,
-            z: st.necklaceWearTarget.z,
+          belowChin: Number.isFinite(chinY) && Number.isFinite(neckY) ? (neckY - chinY).toFixed(2) : null,
+          deltaNative: {
+            x: (neckWearPt.x - anchorVec.x).toFixed(2),
+            y: (neckWearPt.y - anchorVec.y).toFixed(2),
+            z: (neckWearPt.z - anchorVec.z).toFixed(2),
           },
         });
       } catch {
@@ -3142,6 +3147,28 @@ function omafitNecklaceWearAndOrientStep(
       }
     }
   }
+
+  anchorGroup.updateMatrixWorld(true);
+  if (st.necklaceWearAnchorScaleSmooth) {
+    omafitNecklaceResolveWearAnchorScale(
+      THREE,
+      anchorGroup,
+      st.necklaceWearAnchorScaleSmooth,
+    );
+  }
+  omafitNecklaceNativeDeltaToAnchorLocal(
+    THREE,
+    anchorGroup,
+    wearDx,
+    wearDy,
+    wearDz,
+    st.necklaceWearTarget,
+    st.necklaceWearAnchorScaleSmooth,
+  );
+  st.necklaceWearCmNative = st.necklaceWearCmNative || { x: 0, y: 0, z: 0 };
+  st.necklaceWearCmNative.x = wearDx;
+  st.necklaceWearCmNative.y = wearDy;
+  st.necklaceWearCmNative.z = wearDz;
 
   omafitNecklaceRigidWearStep(THREE, st, wearGrp, st.necklaceWearTarget, dtSec);
 }
