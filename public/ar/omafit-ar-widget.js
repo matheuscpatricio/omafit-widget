@@ -546,7 +546,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v107-adaptive-neck";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v108-deep-neck";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -878,6 +878,10 @@ const OMAFIT_FACE_ONE_EURO_D_CUTOFF = 1.05;
 const OMAFIT_FACE_ONE_EURO_GLASSES_MIN_CUTOFF = 0.36;
 const OMAFIT_FACE_ONE_EURO_GLASSES_BETA = 0.035;
 const OMAFIT_FACE_ONE_EURO_GLASSES_D_CUTOFF = 0.98;
+
+const OMAFIT_FACE_ONE_EURO_NECKLACE_MIN_CUTOFF = 0.85;
+const OMAFIT_FACE_ONE_EURO_NECKLACE_BETA = 0.012;
+const OMAFIT_FACE_ONE_EURO_NECKLACE_D_CUTOFF = 1.2;
 /** One Euro na descomposição posição+quaternion da âncora 168 (pós MindAR). */
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.24;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.052;
@@ -11244,9 +11248,9 @@ async function runArSession({
                 OMAFIT_FACE_LM_NOSE_BRIDGE,
                 OMAFIT_FACE_LM_FOREHEAD_TOP,
               ],
-              OMAFIT_FACE_ONE_EURO_GLASSES_MIN_CUTOFF,
-              OMAFIT_FACE_ONE_EURO_GLASSES_BETA,
-              OMAFIT_FACE_ONE_EURO_GLASSES_D_CUTOFF,
+              OMAFIT_FACE_ONE_EURO_NECKLACE_MIN_CUTOFF,
+              OMAFIT_FACE_ONE_EURO_NECKLACE_BETA,
+              OMAFIT_FACE_ONE_EURO_NECKLACE_D_CUTOFF,
             )
           : null;
     const faceMatrixExtraLambda =

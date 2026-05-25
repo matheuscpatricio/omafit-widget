@@ -56,15 +56,15 @@ export const OMAFIT_NECK_LM_RIGHT_CHEEK = 234;
 
 /**
  * Base de descida abaixo do queixo (× largura maxilar).
- * Ajustado automaticamente por proporções faciais (altura/largura).
+ * Valor alto (0.65) garante pescoço, não boca; ajustado por proporções faciais.
  */
-export const OMAFIT_NECKLACE_JAW_WIDTH_DROP_BASE = 0.48;
+export const OMAFIT_NECKLACE_JAW_WIDTH_DROP_BASE = 0.65;
 
 /**
  * Fusão com ombros (Pose) para corrigir pescoços longos/curtos automaticamente.
- * Conservador (0.25) para manter previsibilidade; aumenta com confiança da pose.
+ * Moderado (0.35) para adaptar bem mantendo previsibilidade.
  */
-export const OMAFIT_NECKLACE_POSE_SHOULDER_BLEND = 0.25;
+export const OMAFIT_NECKLACE_POSE_SHOULDER_BLEND = 0.35;
 
 function snapNecklaceMerchantRotationDeg(deg) {
   const n = Number(deg);
@@ -381,8 +381,8 @@ export function resolveNecklaceNeckJawWidthDropMul(alongMul) {
   if (!Number.isFinite(along) || along === 0) {
     return OMAFIT_NECKLACE_JAW_WIDTH_DROP_BASE;
   }
-  const a = Math.min(0.72, Math.max(0.34, along));
-  return Math.min(0.72, Math.max(0.38, 0.28 + a * 0.48));
+  const a = Math.min(0.85, Math.max(0.42, along));
+  return Math.min(0.88, Math.max(0.52, 0.38 + a * 0.55));
 }
 
 /**
@@ -433,13 +433,13 @@ export function omafitComputeNecklaceNeckWearPoint(
     ? jawWidthDropMul
     : OMAFIT_NECKLACE_JAW_WIDTH_DROP_BASE;
 
-  const ratioAdj = Math.max(0.85, Math.min(1.18, 0.82 + faceRatio * 0.32));
+  const ratioAdj = Math.max(0.92, Math.min(1.30, 0.88 + faceRatio * 0.38));
   const dropAdapted = dropBase * ratioAdj;
   
   const out = scratch.neckWear || scratch.out;
   if (!out) return false;
 
-  const drop = Math.min(0.72, Math.max(0.42, dropAdapted));
+  const drop = Math.min(0.88, Math.max(0.55, dropAdapted));
   out.copy(chin).addScaledVector(down, jawW * drop);
   out.x = (chin.x + scratch.midCheek.x) * 0.5;
 
@@ -452,13 +452,13 @@ export function omafitComputeNecklaceNeckWearPoint(
     const poseNeck = scratch.poseNeck || new THREE.Vector3();
     const mx = (L.x + R.x) * 0.5;
     const normDrop = Math.max(0, poseShoulderMid.y - (poseShoulderMid.poseNoseY ?? 0.38));
-    const poseDropBase = 0.35 + normDrop * (faceH / jawW) * 0.48;
+    const poseDropBase = 0.42 + normDrop * (faceH / jawW) * 0.55;
     poseNeck
       .copy(chin)
-      .addScaledVector(down, jawW * Math.min(0.72, Math.max(0.38, poseDropBase)));
-    poseNeck.x = mx + (poseShoulderMid.x - 0.5) * jawW * 1.75;
+      .addScaledVector(down, jawW * Math.min(0.85, Math.max(0.45, poseDropBase)));
+    poseNeck.x = mx + (poseShoulderMid.x - 0.5) * jawW * 1.8;
     
-    const poseBlend = OMAFIT_NECKLACE_POSE_SHOULDER_BLEND * Math.min(1, normDrop * 2.2);
+    const poseBlend = OMAFIT_NECKLACE_POSE_SHOULDER_BLEND * Math.min(1, normDrop * 1.8);
     out.lerp(poseNeck, poseBlend);
   }
 
