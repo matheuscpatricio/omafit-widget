@@ -546,7 +546,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v110-shoulder-anchored";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v111-trapezius-eye-ruler";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -890,23 +890,18 @@ const OMAFIT_FACE_ONE_EURO_NECKLACE_D_CUTOFF = 1.8;
 
 /**
  * Activa amostragem de PoseLandmarker (ombros) para posicionar o colar.
- * Os ombros são a referência anatómica MAIS PREVISÍVEL para o pescoço.
+ * Os ombros são a referência anatómica MAIS PREVISÍVEL para o trapézio.
  */
 const OMAFIT_NECKLACE_POSE_BLEND_ACTIVE = true;
 
 /**
- * Fração da distância chin→shoulder onde o colar pousa.
- * Anatomicamente: garganta ≈ 35–45% do caminho do queixo até ao centro dos ombros.
- * Valor alto (0.42) = colar bem no pescoço/garganta, longe do queixo.
+ * Fração no segmento queixo → mid-ombros onde o colar pousa.
+ *  - 0.42 ≈ garganta (pescoço alto)
+ *  - 0.58 ≈ **linha do trapézio** (base do pescoço, onde o colar pousa naturalmente)
+ *  - 0.72 ≈ clavícula
+ * Constante anatómica universal — idêntica para todos os utilizadores.
  */
-const OMAFIT_NECKLACE_CHIN_TO_SHOULDER_FRACTION = 0.42;
-
-/**
- * Quanto a faceLen (testa→queixo) ocupa em normalized image coords (típico).
- * Usado como régua para converter ombros normalizados → métrico MindAR.
- * 0.13 = framing típico onde rosto ocupa ~30–40% do frame.
- */
-const OMAFIT_NECKLACE_FACE_LEN_NORM_HINT = 0.13;
+const OMAFIT_NECKLACE_TRAPEZIUS_FRACTION = 0.58;
 /** One Euro na descomposição posição+quaternion da âncora 168 (pós MindAR). */
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.24;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.052;
@@ -2965,7 +2960,11 @@ function omafitNecklaceRigidWearStep(THREE, st, wearGroup, target, dtSec) {
   wearGroup.position.lerp(target, a);
 }
 
-/** Amostra ombros (Pose) para fundir com o ponto de pescoço estimado pela face. */
+/**
+ * Amostra Pose: nariz, olhos (régua), ombros L/R (alvo trapézio).
+ * Os olhos servem como régua para converter coords normalizadas Pose → métrico MindAR
+ * (sem heurísticas de framing — escala medida por frame).
+ */
 function omafitNecklaceSamplePoseShoulders(st, video, nowMs) {
   if (!st?.poseLandmarker || !video || video.readyState < 2) {
     st.poseShoulderOk = false;
@@ -2974,31 +2973,44 @@ function omafitNecklaceSamplePoseShoulders(st, video, nowMs) {
   try {
     const res = st.poseLandmarker.detectForVideo(video, nowMs);
     const pl = res?.landmarks?.[0];
-    if (!pl?.[OMAFIT_POSE_L_SHOULDER] || !pl?.[OMAFIT_POSE_R_SHOULDER]) {
+    const pn = pl?.[0];
+    const lEye = pl?.[2];
+    const rEye = pl?.[5];
+    const lSh = pl?.[OMAFIT_POSE_L_SHOULDER];
+    const rSh = pl?.[OMAFIT_POSE_R_SHOULDER];
+    if (!pn || !lEye || !rEye || !lSh || !rSh) {
       st.poseShoulderOk = false;
       return false;
     }
-    if (!st.poseShoulderMid) st.poseShoulderMid = { x: 0, y: 0, z: 0, poseNoseY: 0.4 };
-    const ls = pl[OMAFIT_POSE_L_SHOULDER];
-    const rs = pl[OMAFIT_POSE_R_SHOULDER];
-    const pn = pl[0];
-    /** Visibilidade ≥ 0.6 para evitar saltos quando ombros saem do enquadramento. */
-    const lv = ls.visibility ?? 1;
-    const rv = rs.visibility ?? 1;
+    /** Visibilidade ≥ 0.55 para evitar saltos quando ombros saem do enquadramento. */
+    const lv = lSh.visibility ?? 1;
+    const rv = rSh.visibility ?? 1;
     if (lv < 0.55 || rv < 0.55) {
       st.poseShoulderOk = false;
       return false;
     }
-    st.poseShoulderMid.x = (ls.x + rs.x) * 0.5;
-    st.poseShoulderMid.y = (ls.y + rs.y) * 0.5;
-    st.poseShoulderMid.z = ((ls.z ?? 0) + (rs.z ?? 0)) * 0.5;
-    st.poseShoulderMid.poseNoseY = pn?.y ?? 0.4;
-    st.poseShoulderMid.poseNoseX = pn?.x ?? 0.5;
-    st.poseShoulderMid.confidence = Math.min(lv, rv);
+    if (!st.poseShoulders) {
+      st.poseShoulders = {
+        nose: { x: 0, y: 0 },
+        eyeL: { x: 0, y: 0 },
+        eyeR: { x: 0, y: 0 },
+        shL: { x: 0, y: 0, z: 0 },
+        shR: { x: 0, y: 0, z: 0 },
+        confidence: 0,
+      };
+    }
+    const ps = st.poseShoulders;
+    ps.nose.x = pn.x; ps.nose.y = pn.y;
+    ps.eyeL.x = lEye.x; ps.eyeL.y = lEye.y;
+    ps.eyeR.x = rEye.x; ps.eyeR.y = rEye.y;
+    ps.shL.x = lSh.x; ps.shL.y = lSh.y; ps.shL.z = lSh.z ?? 0;
+    ps.shR.x = rSh.x; ps.shR.y = rSh.y; ps.shR.z = rSh.z ?? 0;
+    ps.confidence = Math.min(lv, rv);
     st.poseShoulderOk = true;
     st.poseShoulderLastMs = nowMs;
     return true;
   } catch {
+    st.poseShoulderOk = false;
     return false;
   }
 }
@@ -3102,13 +3114,14 @@ function omafitNecklaceWearAndOrientStep(
         forehead: OMAFIT_FACE_LM_FOREHEAD_TOP,
         cheekL: OMAFIT_FACE_LM_LEFT_CHEEK,
         cheekR: OMAFIT_FACE_LM_RIGHT_CHEEK,
+        eyeL: OMAFIT_FACE_LM_EYE_L_OUT,
+        eyeR: OMAFIT_FACE_LM_EYE_R_OUT,
       },
       clavScratch,
       jawDropMul,
-      st.poseShoulderOk ? st.poseShoulderMid : null,
+      st.poseShoulderOk ? st.poseShoulders : null,
       {
-        chinToShoulderFraction: OMAFIT_NECKLACE_CHIN_TO_SHOULDER_FRACTION,
-        faceLenNormHint: OMAFIT_NECKLACE_FACE_LEN_NORM_HINT,
+        trapeziusFraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
       },
     );
 
@@ -3162,31 +3175,45 @@ function omafitNecklaceWearAndOrientStep(
       st.necklaceLastNeckSource = clavScratch?.neckSource;
       try {
         const chinV = clavScratch?.chin;
-        const fhV = clavScratch?.fh || clavScratch?.forehead;
-        const neckY = neckWearPt.y;
+        const fhV = clavScratch?.fh;
+        const eyeLV = clavScratch?.eyeL;
+        const eyeRV = clavScratch?.eyeR;
+        const shMidV = clavScratch?.shMid;
         const faceLen = chinV && fhV
           ? Math.hypot(chinV.x - fhV.x, chinV.y - fhV.y, chinV.z - fhV.z)
           : null;
-        const downY = chinV && fhV && faceLen > 0
-          ? (chinV.y - fhV.y) / faceLen
+        const eyeMetric = eyeLV && eyeRV ? eyeLV.distanceTo(eyeRV) : null;
+        const eyeNorm = st.poseShoulders?.eyeL && st.poseShoulders?.eyeR
+          ? Math.hypot(
+              st.poseShoulders.eyeL.x - st.poseShoulders.eyeR.x,
+              st.poseShoulders.eyeL.y - st.poseShoulders.eyeR.y,
+            )
           : null;
-        console.log("[omafit-ar] colar: posição pescoço", {
+        const ruler = eyeMetric && eyeNorm ? eyeMetric / eyeNorm : null;
+        console.log("[omafit-ar] colar: trapézio (régua olhos)", {
           build: OMAFIT_AR_WIDGET_BUILD,
           source: clavScratch?.neckSource,
           poseShoulderOk: st.poseShoulderOk,
-          poseConfidence: st.poseShoulderMid?.confidence?.toFixed?.(2) ?? null,
-          poseNoseY: st.poseShoulderMid?.poseNoseY?.toFixed?.(3) ?? null,
-          poseShoulderY: st.poseShoulderMid?.y?.toFixed?.(3) ?? null,
-          noseToShoulderNorm: st.poseShoulderOk
-            ? (st.poseShoulderMid.y - st.poseShoulderMid.poseNoseY).toFixed(3)
-            : null,
-          neckBelowChinFaceLens: clavScratch?.lastNeckBelowChinFL?.toFixed?.(3) ?? null,
+          poseConfidence: st.poseShoulders?.confidence?.toFixed?.(2) ?? null,
+          eyeDistMetric: eyeMetric?.toFixed?.(2) ?? null,
+          eyeDistNorm: eyeNorm?.toFixed?.(4) ?? null,
+          metricPerNormUnit: ruler?.toFixed?.(2) ?? null,
+          shoulderMidMetric: shMidV ? {
+            x: shMidV.x.toFixed(2),
+            y: shMidV.y.toFixed(2),
+          } : null,
+          chin: chinV ? { x: chinV.x.toFixed(2), y: chinV.y.toFixed(2) } : null,
+          trapeziusPos: {
+            x: neckWearPt.x.toFixed(2),
+            y: neckWearPt.y.toFixed(2),
+          },
+          fraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
           faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
-          downAxisY: Number.isFinite(downY) ? downY.toFixed(3) : null,
-          chinY: chinV?.y?.toFixed?.(2),
-          neckY: neckY?.toFixed?.(2),
-          actualBelowChin: Number.isFinite(chinV?.y) && Number.isFinite(neckY)
-            ? (neckY - chinV.y).toFixed(2)
+          chinToShoulder: shMidV && chinV
+            ? Math.hypot(shMidV.x - chinV.x, shMidV.y - chinV.y).toFixed(2)
+            : null,
+          actualBelowChin: chinV
+            ? (neckWearPt.y - chinV.y).toFixed(2)
             : null,
         });
       } catch {
@@ -11657,6 +11684,16 @@ async function runArSession({
       neckOccGeomState,
       poseLandmarker: null,
       poseShoulderMid: accessoryType === "necklace" ? { x: 0, y: 0, z: 0, poseNoseY: 0.4 } : null,
+      poseShoulders: accessoryType === "necklace"
+        ? {
+            nose: { x: 0, y: 0 },
+            eyeL: { x: 0, y: 0 },
+            eyeR: { x: 0, y: 0 },
+            shL: { x: 0, y: 0, z: 0 },
+            shR: { x: 0, y: 0, z: 0 },
+            confidence: 0,
+          }
+        : null,
       poseShoulderOk: false,
       lastPoseLandmarks: null,
       lastNecklaceFrameMs: 0,
@@ -11674,6 +11711,8 @@ async function runArSession({
               fh: new THREE.Vector3(),
               L: new THREE.Vector3(),
               R: new THREE.Vector3(),
+              eyeL: new THREE.Vector3(),
+              eyeR: new THREE.Vector3(),
               down: new THREE.Vector3(),
               cheekX: new THREE.Vector3(),
               fwd: new THREE.Vector3(),
@@ -11681,6 +11720,8 @@ async function runArSession({
               neckWear: new THREE.Vector3(),
               faceNeck: new THREE.Vector3(),
               poseNeck: new THREE.Vector3(),
+              shMid: new THREE.Vector3(),
+              lastTrapPos: null,
             }
           : null,
       necklaceSwing:

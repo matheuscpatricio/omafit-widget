@@ -405,7 +405,7 @@ export function omafitComputeNecklaceNeckWearPoint(
   idx,
   scratch,
   faceHeightDropMul,
-  poseShoulderMid = null,
+  poseShoulders = null,
   cfg = null,
 ) {
   if (!THREE || typeof pick !== "function" || !scratch) return false;
@@ -413,6 +413,8 @@ export function omafitComputeNecklaceNeckWearPoint(
   const forehead = scratch.fh || scratch.forehead || new THREE.Vector3();
   const L = scratch.L || new THREE.Vector3();
   const R = scratch.R || new THREE.Vector3();
+  const eyeL = scratch.eyeL || new THREE.Vector3();
+  const eyeR = scratch.eyeR || new THREE.Vector3();
 
   if (!pick(idx.chin, chin)) return false;
   if (!pick(idx.cheekL, L)) return false;
@@ -426,6 +428,14 @@ export function omafitComputeNecklaceNeckWearPoint(
   }
   scratch.fh = forehead;
 
+  const hasEyes =
+    idx.eyeL != null &&
+    idx.eyeR != null &&
+    pick(idx.eyeL, eyeL) &&
+    pick(idx.eyeR, eyeR);
+  scratch.eyeL = eyeL;
+  scratch.eyeR = eyeR;
+
   if (!scratch.midCheek) scratch.midCheek = new THREE.Vector3();
   scratch.midCheek.copy(L).add(R).multiplyScalar(0.5);
 
@@ -438,73 +448,87 @@ export function omafitComputeNecklaceNeckWearPoint(
   if (!out) return false;
 
   /**
-   * MÉTODO PRIMÁRIO: ombros (Pose). Anatomicamente garantido —
-   * o pescoço fica entre queixo e ombros, fração fixa do caminho.
+   * MÉTODO PRIMÁRIO: ombros L/R em métrico real, via régua de olhos.
+   * Olhos do face mesh (33/263) e olhos da Pose (2/5) são os MESMOS pontos
+   * em espaços diferentes — distância entre eles dá escala de conversão exacta.
+   * Trapézio = lerp(chin_metric, mid_shoulders_metric, 0.58)
    */
   const useShoulders =
-    poseShoulderMid &&
-    Number.isFinite(poseShoulderMid.x) &&
-    Number.isFinite(poseShoulderMid.y) &&
+    poseShoulders &&
+    poseShoulders.shL &&
+    poseShoulders.shR &&
+    poseShoulders.eyeL &&
+    poseShoulders.eyeR &&
+    poseShoulders.nose &&
     OMAFIT_NECKLACE_POSE_SHOULDER_BLEND > 0;
 
-  if (useShoulders) {
-    const noseY = poseShoulderMid.poseNoseY ?? 0.38;
-    const shoulderY = poseShoulderMid.y;
-    const noseToShoulderNorm = shoulderY - noseY;
+  if (useShoulders && hasEyes) {
+    const eyeDistMetric = eyeL.distanceTo(eyeR);
+    const eyeDxNorm = poseShoulders.eyeL.x - poseShoulders.eyeR.x;
+    const eyeDyNorm = poseShoulders.eyeL.y - poseShoulders.eyeR.y;
+    const eyeDistNorm = Math.hypot(eyeDxNorm, eyeDyNorm);
 
-    if (noseToShoulderNorm > 0.05) {
-      const faceLenNormHint =
-        cfg?.faceLenNormHint && cfg.faceLenNormHint > 0
-          ? cfg.faceLenNormHint
-          : 0.13;
-      const shoulderInFaceLens = Math.min(
-        2.5,
-        Math.max(0.7, noseToShoulderNorm / faceLenNormHint),
-      );
-      const shoulderBelowChinFaceLens = Math.max(0, shoulderInFaceLens - 0.5);
+    if (eyeDistNorm > 1e-4 && eyeDistMetric > 1e-3) {
+      const scale = eyeDistMetric / eyeDistNorm;
+
+      const eyeMidNormX = (poseShoulders.eyeL.x + poseShoulders.eyeR.x) * 0.5;
+      const eyeMidNormY = (poseShoulders.eyeL.y + poseShoulders.eyeR.y) * 0.5;
+      const eyeMidMetricX = (eyeL.x + eyeR.x) * 0.5;
+      const eyeMidMetricY = (eyeL.y + eyeR.y) * 0.5;
+
+      const shMidNormX = (poseShoulders.shL.x + poseShoulders.shR.x) * 0.5;
+      const shMidNormY = (poseShoulders.shL.y + poseShoulders.shR.y) * 0.5;
+
+      if (!scratch.shMid) scratch.shMid = new THREE.Vector3();
+      const shMid = scratch.shMid;
+      shMid.x = eyeMidMetricX + (shMidNormX - eyeMidNormX) * scale;
+      shMid.y = eyeMidMetricY + (shMidNormY - eyeMidNormY) * scale;
+      shMid.z = chin.z;
+
       const fraction =
-        cfg?.chinToShoulderFraction && cfg.chinToShoulderFraction > 0
-          ? cfg.chinToShoulderFraction
-          : 0.42;
-      const neckBelowChinFaceLens = shoulderBelowChinFaceLens * fraction;
-      const neckBelowChinClamped = Math.min(
-        1.5,
-        Math.max(0.45, neckBelowChinFaceLens),
-      );
+        cfg?.trapeziusFraction && cfg.trapeziusFraction > 0
+          ? cfg.trapeziusFraction
+          : 0.58;
 
-      out.copy(chin).addScaledVector(down, faceLen * neckBelowChinClamped);
+      out.x = chin.x + (shMid.x - chin.x) * fraction;
+      out.y = chin.y + (shMid.y - chin.y) * fraction;
+      out.z = chin.z + (shMid.z - chin.z) * fraction;
 
       const mxFace = (L.x + R.x) * 0.5;
-      const xOffsetNorm = poseShoulderMid.x - (poseShoulderMid.poseNoseX ?? 0.5);
-      const jawW = L.distanceTo(R);
-      const xOffsetFaceLens = xOffsetNorm / faceLenNormHint;
-      out.x = mxFace + xOffsetFaceLens * jawW * 0.4;
+      const xPoseDelta = shMidNormX - eyeMidNormX;
+      const xMetricDelta = xPoseDelta * scale;
+      out.x = mxFace + xMetricDelta * 0.85;
 
-      if (scratch.lastNeckBelowChinFL == null) {
-        scratch.lastNeckBelowChinFL = neckBelowChinClamped;
+      if (scratch.lastTrapPos == null) {
+        scratch.lastTrapPos = new THREE.Vector3().copy(out);
       } else {
-        scratch.lastNeckBelowChinFL +=
-          (neckBelowChinClamped - scratch.lastNeckBelowChinFL) * 0.2;
+        scratch.lastTrapPos.lerp(out, 0.6);
       }
-      scratch.neckSource = "pose-shoulders";
+      scratch.neckSource = "trapezius-eye-ruler";
       return true;
     }
   }
 
   /**
-   * FALLBACK: pose indisponível ou pouco confiável → fórmula proporcional
-   * à altura facial. Usa último valor de pose se disponível para continuidade.
+   * FALLBACK 1: temos ombros em pose mas sem olhos do face mesh —
+   * usa último ponto trapézio em cache (continuidade).
    */
-  const lastPoseDrop = scratch.lastNeckBelowChinFL;
-  const dropMul = Number.isFinite(lastPoseDrop) && lastPoseDrop > 0
-    ? lastPoseDrop
-    : Number.isFinite(faceHeightDropMul) && faceHeightDropMul > 0
-      ? Math.min(1.2, Math.max(0.40, faceHeightDropMul))
-      : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
+  if (scratch.lastTrapPos) {
+    out.copy(scratch.lastTrapPos);
+    scratch.neckSource = "trapezius-cached";
+    return true;
+  }
+
+  /**
+   * FALLBACK 2: sem pose nunca disponível → fórmula proporcional à altura facial.
+   */
+  const dropMul = Number.isFinite(faceHeightDropMul) && faceHeightDropMul > 0
+    ? Math.min(1.2, Math.max(0.40, faceHeightDropMul))
+    : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
 
   out.copy(chin).addScaledVector(down, faceLen * dropMul);
   out.x = (chin.x + scratch.midCheek.x) * 0.5;
-  scratch.neckSource = lastPoseDrop ? "pose-cached" : "face-only";
+  scratch.neckSource = "face-only";
   return true;
 }
 
