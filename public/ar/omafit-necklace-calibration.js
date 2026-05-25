@@ -48,6 +48,21 @@ export const OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF = 0.38;
 /** Roll padrão (°) — «Inclinar lateralmente» na calibração admin. */
 export const OMAFIT_NECKLACE_DEFAULT_MERCHANT_RZ_DEG = -90;
 
+/** Landmarks MediaPipe (malha 468) — pescoço / maxilar. */
+export const OMAFIT_NECK_LM_NOSE_BRIDGE = 168;
+export const OMAFIT_NECK_LM_CHIN = 152;
+export const OMAFIT_NECK_LM_LEFT_CHEEK = 454;
+export const OMAFIT_NECK_LM_RIGHT_CHEEK = 234;
+
+/**
+ * Descida do ponto de wear em × largura maxilar (bochecha–bochecha).
+ * Escala com pessoas: pescoço largo → ponto mais baixo; fino → menos descida.
+ */
+export const OMAFIT_NECKLACE_JAW_WIDTH_DROP_DEFAULT = 0.34;
+
+/** Mistura pescoço estimado (face) + colo (ombros Pose) quando pose disponível. */
+export const OMAFIT_NECKLACE_POSE_SHOULDER_BLEND = 0.52;
+
 function snapNecklaceMerchantRotationDeg(deg) {
   const n = Number(deg);
   if (!Number.isFinite(n)) return 0;
@@ -353,6 +368,91 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
   }
   const legacy = omafitApplyNecklaceTripoBindLegacy(THREE, root);
   return legacy ? { ...legacy, auto: false } : null;
+}
+
+/**
+ * `data-ar-necklace-neck-wear-along` → multiplicador de descida (× largura maxilar).
+ */
+export function resolveNecklaceNeckJawWidthDropMul(alongMul) {
+  const along = Number(alongMul);
+  const a = Number.isFinite(along)
+    ? Math.min(0.72, Math.max(0.34, along))
+    : 0.47;
+  return Math.min(0.42, Math.max(0.26, 0.18 + a * 0.38));
+}
+
+/**
+ * Ponto de wear do colar no **pescoço** (garganta), não no queixo.
+ * Centro do maxilar (média bochechas) + descida proporcional à largura do maxilar;
+ * opcionalmente funde com o meio dos ombros (Pose, coords normalizadas 0–1).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {(idx: number, out: import("three").Vector3) => boolean} pick
+ * @param {{ chin: number, nose: number, cheekL: number, cheekR: number }} idx
+ * @param {Record<string, import("three").Vector3>} scratch
+ * @param {number} jawWidthDropMul ver `resolveNecklaceNeckJawWidthDropMul`
+ * @param {{ x: number, y: number, z?: number, poseNoseY?: number } | null} poseShoulderMid
+ */
+export function omafitComputeNecklaceNeckWearPoint(
+  THREE,
+  pick,
+  idx,
+  scratch,
+  jawWidthDropMul,
+  poseShoulderMid = null,
+) {
+  if (!THREE || typeof pick !== "function" || !scratch) return false;
+  const chin = scratch.chin || new THREE.Vector3();
+  const nose = scratch.nose || new THREE.Vector3();
+  const L = scratch.L || new THREE.Vector3();
+  const R = scratch.R || new THREE.Vector3();
+  if (!pick(idx.chin, chin)) return false;
+  if (!pick(idx.nose, nose)) return false;
+  if (!pick(idx.cheekL, L)) return false;
+  if (!pick(idx.cheekR, R)) return false;
+
+  if (!scratch.midCheek) scratch.midCheek = new THREE.Vector3();
+  scratch.midCheek.copy(L).add(R).multiplyScalar(0.5);
+  const jawW = L.distanceTo(R);
+  if (!(jawW > 1e-5)) return false;
+
+  const down = scratch.down.subVectors(scratch.midCheek, nose);
+  if (down.lengthSq() < 1e-12) {
+    down.subVectors(chin, nose);
+  }
+  if (down.lengthSq() < 1e-12) return false;
+  down.normalize();
+
+  const dropMul = Number.isFinite(jawWidthDropMul)
+    ? Math.min(0.42, Math.max(0.26, jawWidthDropMul))
+    : OMAFIT_NECKLACE_JAW_WIDTH_DROP_DEFAULT;
+
+  if (!scratch.faceNeck) scratch.faceNeck = new THREE.Vector3();
+  const faceNeck = scratch.faceNeck;
+  faceNeck.copy(scratch.midCheek).addScaledVector(down, jawW * dropMul);
+
+  const out = scratch.neckWear || scratch.out;
+  if (!out) return false;
+
+  if (
+    poseShoulderMid &&
+    Number.isFinite(poseShoulderMid.x) &&
+    Number.isFinite(poseShoulderMid.y)
+  ) {
+    const poseNeck = scratch.poseNeck || new THREE.Vector3();
+    const mx = (L.x + R.x) * 0.5;
+    const faceH = Math.max(1e-4, Math.abs(chin.y - nose.y));
+    const normDrop = Math.max(0, poseShoulderMid.y - (poseShoulderMid.poseNoseY ?? 0.38));
+    poseNeck
+      .copy(scratch.midCheek)
+      .addScaledVector(down, jawW * (0.28 + normDrop * (faceH / jawW) * 0.55));
+    poseNeck.x = mx + (poseShoulderMid.x - 0.5) * jawW * 2.05;
+    out.copy(faceNeck).lerp(poseNeck, OMAFIT_NECKLACE_POSE_SHOULDER_BLEND);
+    return true;
+  }
+
+  out.copy(faceNeck);
+  return true;
 }
 
 /**
