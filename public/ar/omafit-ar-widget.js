@@ -532,7 +532,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v91";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v92";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -967,7 +967,8 @@ const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
  * Ponto de wear do colar ao longo do eixo nariz→queixo: 0 = nariz, 1 = queixo.
  * ~0,52 = base do pescoço / clavícula alta (arco à volta do pescoço).
  */
-const OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL = 0.52;
+/** 0,47 ≈ base do pescoço (entre nariz e queixo), estável no freeze. */
+const OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL = 0.47;
 /**
  * Extensão abaixo do queixo (só oclusor do pescoço — mais baixo que o wear do colar).
  */
@@ -985,7 +986,7 @@ const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
  * Ajuste fino no lock do slot (cm nativos) até a 1.ª leitura da clavícula.
  * Âncora 168 (nariz): y negativo ≈ pescoço/peito; z+ ≈ para a câmara.
  */
-const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -6.5, z: 1.85 };
+const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.0, z: 1.2 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
@@ -3213,14 +3214,27 @@ function omafitNecklaceWearAndOrientStep(
         );
     }
     try {
+      const cheekW = omafitFaceLandmarkDist3(
+        lm,
+        OMAFIT_FACE_LM_RIGHT_CHEEK,
+        OMAFIT_FACE_LM_LEFT_CHEEK,
+      );
       console.log("[omafit-ar] colar: slot rígido congelado", {
         build: OMAFIT_AR_WIDGET_BUILD,
+        contract: {
+          scale: "displaySpanRef/neckSpanM × mul_loja (≈1× quando span≈0,48 m)",
+          wear: "nariz→queixo × along + offset cm (congelado em local)",
+          orient: "quaternion congelado (não segue queixo)",
+        },
+        neckSpanM: st.necklaceNeckSpanM,
+        neckWearAlong: neckAlong,
         wearLocal: {
           x: st.necklaceWearLockedLocal.x,
           y: st.necklaceWearLockedLocal.y,
           z: st.necklaceWearLockedLocal.z,
         },
         wearCmNative: { ...st.necklaceWearCmNative },
+        cheekNative: cheekW,
         stableFrames: st.necklaceWearLockStableFrames,
       });
     } catch {
