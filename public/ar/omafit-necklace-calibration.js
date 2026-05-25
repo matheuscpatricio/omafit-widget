@@ -20,7 +20,8 @@ import {
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
 /** Calibração visual global da escala (evita colar gigante). */
-export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.68;
+/** Multiplicador global de escala no provador (menor = colar menos “gigante” por defeito). */
+export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.52;
 
 export const OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M = 0.78;
 
@@ -30,11 +31,12 @@ export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.01;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.4;
-export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.8;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.0;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.0;
 
 /** Slerp da orientação do pescoço (0–1 por frame). */
-export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.22;
+/** Slerp da base do pescoço — mais baixo = menos “balanço” vertical/lateral por frame. */
+export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.11;
 
 /** Confiança mínima da largura do arco para auto-bind por vértices. */
 export const OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF = 0.38;

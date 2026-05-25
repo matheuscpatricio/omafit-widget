@@ -530,7 +530,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v82";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v83";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -978,7 +978,7 @@ const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
 /** Wear fixo no slot (unidades nativas MindAR ≈ cm) — âncora 152 (queixo). Z+ = para a câmara (evita oclusão da malha 468). */
 const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
 /** Lerp do wear no rigid slot (ms). */
-const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 90;
+const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
 /** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
 const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
@@ -2981,7 +2981,15 @@ function omafitNecklaceWearAndOrientStep(
   let offY = wearPosM.y + rigid.y + fineY;
   let offZ = wearPosM.z + rigid.z + fineZ;
 
-  if (anchorOk && clavOk && clavicle) {
+  /**
+   * Posição fixa no slot (âncora 152 + wear rígido). Não somar o delta clavícula→âncora
+   * por frame — o queixo/nariz jitter fazia o colar “subir e descer”.
+   * Opt-in: `data-ar-necklace-clavicle-wear="1"` para o comportamento antigo.
+   */
+  const useClavicleWear =
+    typeof cfgAttr === "function" &&
+    /^(1|true|yes|on)$/i.test(String(cfgAttr("arNecklaceClavicleWear", "0")).trim());
+  if (useClavicleWear && anchorOk && clavOk && clavicle) {
     let dx = clavicle.x - anchorVec.x;
     let dy = clavicle.y - anchorVec.y;
     let dz = clavicle.z - anchorVec.z;
@@ -2996,7 +3004,7 @@ function omafitNecklaceWearAndOrientStep(
     offX += dx;
     offY += dy;
     offZ += dz;
-  } else if (anchorOk && clavScratch?.chin && clavScratch?.nose) {
+  } else if (useClavicleWear && anchorOk && clavScratch?.chin && clavScratch?.nose) {
     if (
       omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, clavScratch.chin) &&
       omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_NOSE_BRIDGE, st.lmSmoother, clavScratch.nose)
@@ -11030,9 +11038,9 @@ async function runArSession({
                 OMAFIT_FACE_LM_NOSE_BRIDGE,
                 OMAFIT_FACE_LM_FOREHEAD_TOP,
               ],
-              OMAFIT_FACE_ONE_EURO_MIN_CUTOFF,
-              OMAFIT_FACE_ONE_EURO_BETA,
-              OMAFIT_FACE_ONE_EURO_D_CUTOFF,
+              OMAFIT_FACE_ONE_EURO_GLASSES_MIN_CUTOFF,
+              OMAFIT_FACE_ONE_EURO_GLASSES_BETA,
+              OMAFIT_FACE_ONE_EURO_GLASSES_D_CUTOFF,
             )
           : null;
     const faceMatrixExtraLambda =
