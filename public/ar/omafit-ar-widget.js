@@ -532,7 +532,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v94";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v95";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2862,7 +2862,12 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
         mul = lm ? omafitMindarMetricToMetersScale(lm) : 0.01;
       }
       const pack = omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheek, mul);
-      st.necklaceFrozenMeshScale = pack.totalScale;
+      let frozen = pack.totalScale;
+      const prev = st.necklaceLastFitScale;
+      if (Number.isFinite(prev) && prev > 0.05 && frozen < prev * 0.88) {
+        frozen = prev;
+      }
+      st.necklaceFrozenMeshScale = frozen;
     }
     const frozen = st.necklaceFrozenMeshScale;
     const part = st.necklacePartition;
@@ -3987,17 +3992,42 @@ function omafitNecklaceUniformAnchorScaleVec(s) {
   }
 }
 
+/** Congela escala uniforme da âncora no 1.º valor válido (≈14) — evita colar «normal → minúsculo». */
+function omafitNecklaceLockAnchorScaleVec(s, st) {
+  if (!s) return;
+  omafitNecklaceUniformAnchorScaleVec(s);
+  if (!st) return;
+  const u = (Number(s.x) + Number(s.y) + Number(s.z)) / 3;
+  if (
+    (!Number.isFinite(st.necklaceAnchorUniformScale) || st.necklaceAnchorUniformScale < 4) &&
+    u >= 4
+  ) {
+    st.necklaceAnchorUniformScale = u;
+  }
+  const locked = st.necklaceAnchorUniformScale;
+  if (Number.isFinite(locked) && locked >= 4) {
+    s.set(locked, locked, locked);
+  }
+}
+
+function omafitNecklaceLockAnchorScaleOnMatrix(matrix, st, dec) {
+  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return;
+  matrix.decompose(dec.p, dec.q, dec.s);
+  omafitNecklaceLockAnchorScaleVec(dec.s, st);
+  matrix.compose(dec.p, dec.q, dec.s);
+}
+
 /**
- * Suaviza posição/rotação da âncora; escala vem do frame MindAR (sem lerp entre eixos).
+ * Suaviza posição/rotação da âncora; escala uniforme travada (não segue queda do PnP).
  */
-function omafitDampMatrix4PosRotOnly(THREE, out, raw, lambda, dec) {
+function omafitDampMatrix4PosRotOnly(THREE, out, raw, lambda, dec, st) {
   if (!THREE || !out || !raw || !dec?.p || !dec.q || !dec.s || !dec.pSm || !dec.qSm) return;
   raw.decompose(dec.p, dec.q, dec.s);
   out.decompose(dec.pSm, dec.qSm, dec.sSm);
   const t = THREE.MathUtils.clamp(lambda, 0, 1);
   dec.pSm.lerp(dec.p, t);
   dec.qSm.slerp(dec.q, t);
-  omafitNecklaceUniformAnchorScaleVec(dec.s);
+  omafitNecklaceLockAnchorScaleVec(dec.s, st);
   out.compose(dec.pSm, dec.qSm, dec.s);
 }
 
@@ -11421,6 +11451,7 @@ async function runArSession({
       necklaceWearSlotLocked: false,
       necklaceWearLockStableFrames: 0,
       necklaceRigidFrozen: false,
+      necklaceAnchorUniformScale: null,
       necklaceOrientLockedQuat:
         accessoryType === "necklace" ? new THREE.Quaternion() : null,
       necklaceFrozenMeshScale:
@@ -11813,6 +11844,7 @@ async function runArSession({
             st.necklaceWearLockStableFrames = 0;
             st.necklaceRigidFrozen = false;
             st.necklaceRigidFreezeLogged = false;
+            st.necklaceAnchorUniformScale = null;
             st.necklaceFrozenMeshScale = null;
             if (st.necklaceWearLockedLocal) st.necklaceWearLockedLocal.set(0, 0, 0);
             if (st.necklaceWearSlotOffsetNative) {
@@ -11950,6 +11982,10 @@ async function runArSession({
             st.anchorEuroQuatState.logState = { xPrev: null, tPrev: null, dxPrev: [0, 0, 0] };
           }
           st.smoothAnchorMat.copy(anchor.group.matrix);
+          if (accessoryType === "necklace" && st.anchorDec) {
+            omafitNecklaceLockAnchorScaleOnMatrix(st.smoothAnchorMat, st, st.anchorDec);
+            anchor.group.matrix.copy(st.smoothAnchorMat);
+          }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -12010,6 +12046,7 @@ async function runArSession({
                 anchor.group.matrix,
                 faceMatrixExtraLambda,
                 st.anchorDec,
+                st,
               );
             } else {
               omafitDampMatrix4(THREE, st.smoothAnchorMat, anchor.group.matrix, faceMatrixExtraLambda);
