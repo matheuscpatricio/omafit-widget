@@ -544,7 +544,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-21-ar-widget-v100-neck-live";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-21-ar-widget-v102-neck-anchor168";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -971,11 +971,12 @@ const OMAFIT_NECKLACE_ROT_DAMP = 6.5;
 /** Mistura rotação cabeça vs inclinação ombros (0 = só face). */
 const OMAFIT_NECKLACE_SHOULDER_ROT_BLEND = 0.38;
 /**
- * Ponto de wear do colar ao longo do eixo nariz→queixo: 0 = nariz, 1 = queixo.
- * ~0,52 = base do pescoço / clavícula alta (arco à volta do pescoço).
+ * `data-ar-necklace-neck-wear-along` (legado): mapeado para extensão **abaixo do queixo**
+ * (não interpolação nariz→queixo — isso deixava o colar no rosto).
  */
-/** 0,47 ≈ base do pescoço (entre nariz e queixo), estável no freeze. */
 const OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL = 0.47;
+/** Extensão abaixo do queixo (× distância nariz–queixo) — base do pescoço / clavícula. */
+const OMAFIT_NECKLACE_NECK_WEAR_BELOW_CHIN_MUL = 0.44;
 
 /** `data-ar-necklace-neck-wear-along` vazio não deve virar 0 (Number("") === 0). */
 function resolveNecklaceNeckWearAlongFromCfg(cfgAttr) {
@@ -1001,10 +1002,10 @@ const OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL = 0;
  */
 const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
 /**
- * Ajuste fino no lock do slot (cm nativos) até a 1.ª leitura da clavícula.
- * Âncora 168 (nariz): y negativo ≈ pescoço/peito; z+ ≈ para a câmara.
+ * Offset fino no slot (cm nativos) com âncora **168** (nariz). O grosso do deslocamento
+ * vem do landmark abaixo do queixo; estes valores só corrigem calibração loja.
  */
-const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.0, z: 1.2 };
+const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -1.8, z: 0.35 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
@@ -2916,7 +2917,7 @@ function omafitComputeNecklaceRigidSlotScale(THREE, st, anchorGroup, cheekNative
 }
 
 /**
- * Wear pré-definido no slot (cm nativos): offset fixo desde a âncora 152 + ajuste fino.
+ * Wear pré-definido no slot (cm nativos): offset fino desde a âncora 168 + ponto abaixo do queixo.
  */
 function omafitNecklaceRigidWearStep(THREE, st, wearGroup, target, dtSec) {
   if (!THREE || !st || !wearGroup || !target) return;
@@ -2939,7 +2940,7 @@ function omafitNecklaceRigidWearStep(THREE, st, wearGroup, target, dtSec) {
 }
 
 /**
- * Ponto de wear do colar: ao longo de nariz→queixo (~52%), base do pescoço (não peito baixo).
+ * Ponto de wear do colar: **abaixo do queixo** (base do pescoço), não entre nariz e queixo.
  */
 function omafitComputeNecklaceNeckWearPoint(lm, smoother, out, scratch, alongMul) {
   if (!lm || !out || !scratch) return false;
@@ -2962,11 +2963,12 @@ function omafitComputeNecklaceNeckWearPoint(lm, smoother, out, scratch, alongMul
     return true;
   }
   down.multiplyScalar(1 / segLen);
-  let along = OMAFIT_NECKLACE_NECK_WEAR_ALONG_FACE_MUL;
+  let belowMul = OMAFIT_NECKLACE_NECK_WEAR_BELOW_CHIN_MUL;
   if (Number.isFinite(alongMul)) {
-    along = Math.min(0.72, Math.max(0.34, alongMul));
+    const along = Math.min(0.72, Math.max(0.34, alongMul));
+    belowMul = Math.min(0.58, Math.max(0.28, along * 0.94));
   }
-  out.copy(nb).addScaledVector(down, segLen * along);
+  out.copy(ch).addScaledVector(down, segLen * belowMul);
   return true;
 }
 
@@ -3051,7 +3053,8 @@ function omafitNecklaceWearAndOrientStep(
   const anchorOk =
     anchorVec && omafitMetricLandmarkToVec3(lm, anchorIndex, st.lmSmoother, anchorVec);
   const clavScratch = st.necklaceClavicleScratch;
-  const neckWearPt = clavScratch?.clavicle;
+  if (clavScratch && !clavScratch.neckWear) clavScratch.neckWear = new THREE.Vector3();
+  const neckWearPt = clavScratch?.neckWear;
   const neckAlong = resolveNecklaceNeckWearAlongFromCfg(cfgAttr);
   const neckWearOk =
     clavScratch &&
@@ -8866,6 +8869,14 @@ async function runArSession({
       );
       anchorIndex = OMAFIT_FACE_LM_NOSE_BRIDGE;
     }
+    if (accessoryType === "necklace" && anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE) {
+      console.warn(
+        "[omafit-ar] colar: âncora MindAR fixa no landmark 168 (ponte nasal). arMindarAnchor=",
+        anchorIndex,
+        "→ a forçar 168 (152/queixo coloca o colar no rosto).",
+      );
+      anchorIndex = OMAFIT_FACE_LM_NOSE_BRIDGE;
+    }
     /** Uma vez no load: `omafitAutoAlignGlassesModel` — `data-ar-glasses-auto-align-model="1"`. */
     const glassesAutoAlignModel =
       accessoryType === "glasses" &&
@@ -9238,7 +9249,7 @@ async function runArSession({
     faceKeyLight.position.set(0.32, 0.82, 0.38);
     mindarThree.scene.add(faceKeyLight);
 
-    /** Óculos: `anchorIndex` já foi forçado a **168** (nariz / eixo médio); colar: 152 ou attr. */
+    /** Óculos e colar: `anchorIndex` forçado a **168** (ponte nasal / eixo médio estável). */
     const anchor = mindarThree.addAnchor(anchorIndex);
     /** Grupos sob `anchor.group` devem ser da mesma classe `Group` que o MindAR usa (mesmo `three`). */
     const GroupCtor = anchor.group.constructor;
@@ -10692,7 +10703,7 @@ async function runArSession({
     }
     /** @type {THREE.Group | null} */
     let necklaceSwingGroup = null;
-    /** Wear (cm/anchor) + orientação fixa âncora 152. */
+    /** Wear (cm/anchor 168) + orientação base pescoço. */
     let necklaceWearGroup = null;
     let necklaceOrientGroup = null;
     let necklaceBindGroup = null;
@@ -11599,6 +11610,7 @@ async function runArSession({
               cheekX: new THREE.Vector3(),
               fwd: new THREE.Vector3(),
               clavicle: new THREE.Vector3(),
+              neckWear: new THREE.Vector3(),
             }
           : null,
       necklaceSwing:

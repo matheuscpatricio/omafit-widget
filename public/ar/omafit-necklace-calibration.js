@@ -443,7 +443,7 @@ export function omafitApplyNecklaceNeckBasisOrientation(
 
   /** Canónico Omafit: +X arco, +Y subida ao queixo, −Z frente (câmara). */
   const upAxis = scratch.upAxis || scratch.hangNeg || new THREE.Vector3();
-  upAxis.copy(down).negate();
+  upAxis.copy(scratch.down).negate();
   scratch.basisM4.makeBasis(scratch.lateral, upAxis, scratch.fwd);
   scratch.qTarget.setFromRotationMatrix(scratch.basisM4);
 
