@@ -19,27 +19,29 @@ import {
 /** Largura alvo do arco no pescoço (m) — alinhada ao fit no widget. */
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
-/** Calibração visual global da escala (equilíbrio: não gigante, não minúsculo). */
-/** Multiplicador global no provador — 0,36 ficou pequeno; 0,68 era excessivo. */
-export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.54;
+/**
+ * Multiplicador global de escala no provador.
+ * Histórico: 0,68 (tamanho OK) → 0,36/0,54 (muito pequeno após “colar gigante”).
+ */
+export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.65;
 
-/** Largura mínima do arco usada no fit (evita bbox minúscula → escala no teto mesmo com 65%). */
-export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.24;
+/** Piso do arco na fórmula — valor alto demais (0,24) encolhia GLBs pequenos. */
+export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.1;
 
 export const OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M = 0.78;
 
 /** Paridade `AR_NECKLACE_SCALE_*` em `app/ar-calibration.shared.js`. */
-export const OMAFIT_NECKLACE_MERCHANT_SCALE_MIN = 0.45;
+export const OMAFIT_NECKLACE_MERCHANT_SCALE_MIN = 0.65;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.01;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 1.15;
-export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 2.45;
+/** Teto/mínimo de escala no mesh — antes 2,4–3,8; 1,1–1,75 deixou o colar minúsculo. */
+export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.2;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.4;
 
-/** Slerp da orientação do pescoço (0–1 por frame). */
-/** Slerp da base do pescoço — mais baixo = menos “balanço” vertical/lateral por frame. */
-export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.11;
+/** Slerp da base do pescoço (0,11 congelava tilt errado na 1.ª frame com slot travado). */
+export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.2;
 
 /** Confiança mínima da largura do arco para auto-bind por vértices. */
 export const OMAFIT_NECKLACE_AUTO_BIND_MIN_WIDTH_CONF = 0.38;

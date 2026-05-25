@@ -530,7 +530,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v88";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v89";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3132,7 +3132,7 @@ function omafitNecklaceWearAndOrientStep(
 
   const orientGrp = st.necklaceOrientGroup;
   const basisScratch = st.necklaceBasisScratch;
-  if (orientGrp && basisScratch && !st.necklaceOrientLocked) {
+  if (orientGrp && basisScratch) {
     basisScratch.pick = (idx, out) =>
       omafitMetricLandmarkToVec3(lm, idx, st.lmSmoother, out);
     const idx = {
@@ -3141,7 +3141,7 @@ function omafitNecklaceWearAndOrientStep(
       cheekL: OMAFIT_FACE_LM_LEFT_CHEEK,
       cheekR: OMAFIT_FACE_LM_RIGHT_CHEEK,
     };
-    const orientOk = omafitApplyNecklaceNeckBasisOrientation(
+    omafitApplyNecklaceNeckBasisOrientation(
       THREE,
       anchorGroup,
       orientGrp,
@@ -3150,12 +3150,9 @@ function omafitNecklaceWearAndOrientStep(
       idx,
       basisScratch,
       omafitQuatShortestPathToward,
-      st.necklaceWearSlotLocked ? 1 : OMAFIT_NECKLACE_ORIENT_SLERP,
+      OMAFIT_NECKLACE_ORIENT_SLERP,
       st.necklaceMirrorSelfieX === true,
     );
-    if (orientOk && st.necklaceWearSlotLocked) {
-      st.necklaceOrientLocked = true;
-    }
   }
 }
 
