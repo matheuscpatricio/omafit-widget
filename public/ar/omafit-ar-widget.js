@@ -532,7 +532,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v93";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v94";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3221,6 +3221,8 @@ function omafitNecklaceWearAndOrientStep(
         );
     }
     try {
+      if (st.necklaceRigidFreezeLogged) return;
+      st.necklaceRigidFreezeLogged = true;
       const cheekW = omafitFaceLandmarkDist3(
         lm,
         OMAFIT_FACE_LM_RIGHT_CHEEK,
@@ -3968,21 +3970,35 @@ function omafitDampMatrix4(THREE, out, raw, lambda) {
 }
 
 /**
- * MindAR `faceMatrix` pode incluir escala não-uniforme; no colar isso esmaga o mesh
- * (aparece bem → «linha fina» quando o damp da âncora converge).
- * @returns {number} desvio máximo |s−1| antes de forçar unidade
+ * Escala MindAR na âncora ≈ 14 (cm→unidades) — não zerar. Só uniformizar se os eixos
+ * divergem (evita «linha fina» sem tornar o colar invisível).
  */
-function omafitAnchorMatrixForceUnitScale(matrix, dec) {
-  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return 0;
-  matrix.decompose(dec.p, dec.q, dec.s);
-  const dev = Math.max(
-    Math.abs(dec.s.x - 1),
-    Math.abs(dec.s.y - 1),
-    Math.abs(dec.s.z - 1),
-  );
-  dec.s.set(1, 1, 1);
-  matrix.compose(dec.p, dec.q, dec.s);
-  return dev;
+function omafitNecklaceUniformAnchorScaleVec(s) {
+  if (!s) return;
+  const sx = Number(s.x) || 0;
+  const sy = Number(s.y) || 0;
+  const sz = Number(s.z) || 0;
+  const mn = Math.min(sx, sy, sz);
+  const mx = Math.max(sx, sy, sz);
+  if (mn < 1e-6) return;
+  if (mx / mn > 1.1) {
+    const u = (sx + sy + sz) / 3;
+    s.set(u, u, u);
+  }
+}
+
+/**
+ * Suaviza posição/rotação da âncora; escala vem do frame MindAR (sem lerp entre eixos).
+ */
+function omafitDampMatrix4PosRotOnly(THREE, out, raw, lambda, dec) {
+  if (!THREE || !out || !raw || !dec?.p || !dec.q || !dec.s || !dec.pSm || !dec.qSm) return;
+  raw.decompose(dec.p, dec.q, dec.s);
+  out.decompose(dec.pSm, dec.qSm, dec.sSm);
+  const t = THREE.MathUtils.clamp(lambda, 0, 1);
+  dec.pSm.lerp(dec.p, t);
+  dec.qSm.slerp(dec.q, t);
+  omafitNecklaceUniformAnchorScaleVec(dec.s);
+  out.compose(dec.pSm, dec.qSm, dec.s);
 }
 
 /**
@@ -11500,9 +11516,16 @@ async function runArSession({
         : null,
       anchorDec:
         accessoryType === "glasses" || accessoryType === "necklace"
-          ? { p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() }
+          ? {
+              p: new THREE.Vector3(),
+              q: new THREE.Quaternion(),
+              s: new THREE.Vector3(),
+              pSm: new THREE.Vector3(),
+              qSm: new THREE.Quaternion(),
+              sSm: new THREE.Vector3(),
+            }
           : null,
-      necklaceAnchorScaleWarned: false,
+      necklaceRigidFreezeLogged: false,
       faceControllerPrev: null,
       smoothAnchorMat: new THREE.Matrix4(),
       smoothFaceMats: [],
@@ -11789,6 +11812,7 @@ async function runArSession({
             st.necklaceWearSlotLocked = false;
             st.necklaceWearLockStableFrames = 0;
             st.necklaceRigidFrozen = false;
+            st.necklaceRigidFreezeLogged = false;
             st.necklaceFrozenMeshScale = null;
             if (st.necklaceWearLockedLocal) st.necklaceWearLockedLocal.set(0, 0, 0);
             if (st.necklaceWearSlotOffsetNative) {
@@ -11926,16 +11950,6 @@ async function runArSession({
             st.anchorEuroQuatState.logState = { xPrev: null, tPrev: null, dxPrev: [0, 0, 0] };
           }
           st.smoothAnchorMat.copy(anchor.group.matrix);
-          if (accessoryType === "necklace" && st.anchorDec) {
-            const dev0 = omafitAnchorMatrixForceUnitScale(st.smoothAnchorMat, st.anchorDec);
-            if (dev0 > 0.08 && !st.necklaceAnchorScaleWarned) {
-              st.necklaceAnchorScaleWarned = true;
-              console.warn("[omafit-ar] colar: escala âncora MindAR removida (init)", {
-                build: OMAFIT_AR_WIDGET_BUILD,
-                anchorScaleDev: dev0,
-              });
-            }
-          }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -11989,16 +12003,16 @@ async function runArSession({
             );
             anchor.group.matrix.copy(st.smoothAnchorMat);
           } else {
-            omafitDampMatrix4(THREE, st.smoothAnchorMat, anchor.group.matrix, faceMatrixExtraLambda);
             if (accessoryType === "necklace" && st.anchorDec) {
-              const devA = omafitAnchorMatrixForceUnitScale(st.smoothAnchorMat, st.anchorDec);
-              if (devA > 0.08 && !st.necklaceAnchorScaleWarned) {
-                st.necklaceAnchorScaleWarned = true;
-                console.warn("[omafit-ar] colar: escala âncora MindAR removida (evita colar fino)", {
-                  build: OMAFIT_AR_WIDGET_BUILD,
-                  anchorScaleDev: devA,
-                });
-              }
+              omafitDampMatrix4PosRotOnly(
+                THREE,
+                st.smoothAnchorMat,
+                anchor.group.matrix,
+                faceMatrixExtraLambda,
+                st.anchorDec,
+              );
+            } else {
+              omafitDampMatrix4(THREE, st.smoothAnchorMat, anchor.group.matrix, faceMatrixExtraLambda);
             }
             anchor.group.matrix.copy(st.smoothAnchorMat);
           }
