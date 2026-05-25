@@ -546,7 +546,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v108-deep-neck";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v109-face-axis";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -879,9 +879,17 @@ const OMAFIT_FACE_ONE_EURO_GLASSES_MIN_CUTOFF = 0.36;
 const OMAFIT_FACE_ONE_EURO_GLASSES_BETA = 0.035;
 const OMAFIT_FACE_ONE_EURO_GLASSES_D_CUTOFF = 0.98;
 
-const OMAFIT_FACE_ONE_EURO_NECKLACE_MIN_CUTOFF = 0.85;
-const OMAFIT_FACE_ONE_EURO_NECKLACE_BETA = 0.012;
-const OMAFIT_FACE_ONE_EURO_NECKLACE_D_CUTOFF = 1.2;
+/**
+ * Suavização One Euro **mínima** para colar — fluidez máxima sem lag visível.
+ * minCutoff alto = baseline pouco suave (segue rápido); beta baixo = sem inércia
+ * em movimentos rápidos; dCutoff alto = derivadas cruas para resposta imediata.
+ */
+const OMAFIT_FACE_ONE_EURO_NECKLACE_MIN_CUTOFF = 1.5;
+const OMAFIT_FACE_ONE_EURO_NECKLACE_BETA = 0.005;
+const OMAFIT_FACE_ONE_EURO_NECKLACE_D_CUTOFF = 1.8;
+
+/** Activa amostragem de PoseLandmarker (ombros) — desligado para máxima fluidez. */
+const OMAFIT_NECKLACE_POSE_BLEND_ACTIVE = false;
 /** One Euro na descomposição posição+quaternion da âncora 168 (pós MindAR). */
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.24;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.052;
@@ -3059,6 +3067,7 @@ function omafitNecklaceWearAndOrientStep(
       {
         chin: OMAFIT_FACE_LM_CHIN,
         nose: OMAFIT_FACE_LM_NOSE_BRIDGE,
+        forehead: OMAFIT_FACE_LM_FOREHEAD_TOP,
         cheekL: OMAFIT_FACE_LM_LEFT_CHEEK,
         cheekR: OMAFIT_FACE_LM_RIGHT_CHEEK,
       },
@@ -3115,31 +3124,29 @@ function omafitNecklaceWearAndOrientStep(
     if (!st.necklaceWearDiagLogged) {
       st.necklaceWearDiagLogged = true;
       try {
-        const chinY = clavScratch?.chin?.y;
-        const noseY = clavScratch?.nose?.y;
+        const chinV = clavScratch?.chin;
+        const fhV = clavScratch?.fh || clavScratch?.forehead;
         const neckY = neckWearPt.y;
-        const jawW = clavScratch?.L && clavScratch?.R
-          ? clavScratch.L.distanceTo(clavScratch.R)
+        const faceLen = chinV && fhV
+          ? Math.hypot(chinV.x - fhV.x, chinV.y - fhV.y, chinV.z - fhV.z)
           : null;
-        const faceH = Number.isFinite(chinY) && Number.isFinite(noseY)
-          ? Math.abs(chinY - noseY)
+        const downY = chinV && fhV && faceLen > 0
+          ? (chinV.y - fhV.y) / faceLen
           : null;
-        const faceRatio = Number.isFinite(faceH) && Number.isFinite(jawW) && jawW > 0
-          ? faceH / jawW
-          : null;
-        console.log("[omafit-ar] colar: pescoço adaptativo", {
+        console.log("[omafit-ar] colar: eixo facial (testa→queixo)", {
           build: OMAFIT_AR_WIDGET_BUILD,
-          jawDropMul,
-          jawWidth: jawW,
-          faceHeight: faceH,
-          faceRatio,
-          adaptedDrop: Number.isFinite(faceRatio) 
-            ? (jawDropMul * Math.max(0.85, Math.min(1.18, 0.82 + faceRatio * 0.32))).toFixed(3)
+          dropMul: jawDropMul,
+          faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
+          downAxisYComponent: Number.isFinite(downY) ? downY.toFixed(3) : null,
+          predictedDescent: Number.isFinite(faceLen)
+            ? (faceLen * jawDropMul).toFixed(2)
+            : null,
+          chinY: chinV?.y,
+          neckY,
+          actualBelowChin: Number.isFinite(chinV?.y) && Number.isFinite(neckY)
+            ? (neckY - chinV.y).toFixed(2)
             : null,
           poseActive: st.poseShoulderOk,
-          chinY,
-          neckY,
-          belowChin: Number.isFinite(chinY) && Number.isFinite(neckY) ? (neckY - chinY).toFixed(2) : null,
           deltaNative: {
             x: (neckWearPt.x - anchorVec.x).toFixed(2),
             y: (neckWearPt.y - anchorVec.y).toFixed(2),
@@ -12558,8 +12565,12 @@ async function runArSession({
               : 1 / 60;
           st.lastNecklaceFrameMs = nowMs;
           const fine = parseXyzMeters(String(cfgAttr("arNecklaceWearFine", "0 0 0")).trim(), 0, 0, 0);
-          const arVideo = mindarHost?.querySelector?.("video") || st.arVideo;
-          omafitNecklaceSamplePoseShoulders(st, arVideo, nowMs);
+          if (OMAFIT_NECKLACE_POSE_BLEND_ACTIVE) {
+            const arVideo = mindarHost?.querySelector?.("video") || st.arVideo;
+            omafitNecklaceSamplePoseShoulders(st, arVideo, nowMs);
+          } else {
+            st.poseShoulderOk = false;
+          }
           if (st.necklaceWearTarget && anchor?.group) {
             omafitNecklaceWearAndOrientStep(
               THREE,
