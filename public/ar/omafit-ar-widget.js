@@ -530,7 +530,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v83";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-20-ar-widget-v85";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -975,8 +975,11 @@ const OMAFIT_NECKLACE_CLAVICLE_FORWARD_MUL = 0;
  * Escala base = (0,36 m / largura bbox) × (cm por m) × este mul × k(bochecha).
  */
 const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
-/** Wear fixo no slot (unidades nativas MindAR ≈ cm) — âncora 152 (queixo). Z+ = para a câmara (evita oclusão da malha 468). */
-const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -5.8, z: 2.2 };
+/**
+ * Ajuste fino no lock do slot (cm nativos) até a 1.ª leitura da clavícula.
+ * Âncora 168 (nariz): y negativo ≈ pescoço/peito; z+ ≈ para a câmara.
+ */
+const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: -9.0, z: 2.0 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
@@ -2977,19 +2980,38 @@ function omafitNecklaceWearAndOrientStep(
   const fineY = nativeSpace ? fine.y * 100 : fine.y;
   const fineZ = nativeSpace ? fine.z * 100 : fine.z;
 
-  let offX = wearPosM.x + rigid.x + fineX;
-  let offY = wearPosM.y + rigid.y + fineY;
-  let offZ = wearPosM.z + rigid.z + fineZ;
+  let offX = wearPosM.x + fineX;
+  let offY = wearPosM.y + fineY;
+  let offZ = wearPosM.z + fineZ;
 
   /**
-   * Posição fixa no slot (âncora 152 + wear rígido). Não somar o delta clavícula→âncora
-   * por frame — o queixo/nariz jitter fazia o colar “subir e descer”.
-   * Opt-in: `data-ar-necklace-clavicle-wear="1"` para o comportamento antigo.
+   * Slot pescoço→peito: na 1.ª frame válida, grava o deslocamento âncora→clavícula
+   * (base do pescoço / topo do peito) e reutiliza-o — não segue o queixo a abrir/fechar.
+   * Opt-in `data-ar-necklace-clavicle-wear="1"` = seguir clavícula em tempo real (antigo).
    */
-  const useClavicleWear =
+  const useLiveClavicleWear =
     typeof cfgAttr === "function" &&
     /^(1|true|yes|on)$/i.test(String(cfgAttr("arNecklaceClavicleWear", "0")).trim());
-  if (useClavicleWear && anchorOk && clavOk && clavicle) {
+  if (
+    !useLiveClavicleWear &&
+    !st.necklaceWearSlotLocked &&
+    anchorOk &&
+    clavOk &&
+    clavicle
+  ) {
+    st.necklaceWearSlotOffsetNative = {
+      x: clavicle.x - anchorVec.x + rigid.x,
+      y: clavicle.y - anchorVec.y + rigid.y,
+      z: clavicle.z - anchorVec.z + rigid.z,
+    };
+    st.necklaceWearSlotLocked = true;
+  }
+  if (!useLiveClavicleWear && st.necklaceWearSlotLocked && st.necklaceWearSlotOffsetNative) {
+    const o = st.necklaceWearSlotOffsetNative;
+    offX += o.x;
+    offY += o.y;
+    offZ += o.z;
+  } else if (useLiveClavicleWear && anchorOk && clavOk && clavicle) {
     let dx = clavicle.x - anchorVec.x;
     let dy = clavicle.y - anchorVec.y;
     let dz = clavicle.z - anchorVec.z;
@@ -3001,23 +3023,13 @@ function omafitNecklaceWearAndOrientStep(
       dy *= s;
       dz *= s;
     }
-    offX += dx;
-    offY += dy;
-    offZ += dz;
-  } else if (useClavicleWear && anchorOk && clavScratch?.chin && clavScratch?.nose) {
-    if (
-      omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_CHIN, st.lmSmoother, clavScratch.chin) &&
-      omafitMetricLandmarkToVec3(lm, OMAFIT_FACE_LM_NOSE_BRIDGE, st.lmSmoother, clavScratch.nose)
-    ) {
-      const downFb = clavScratch.down.subVectors(clavScratch.chin, clavScratch.nose);
-      const lenFb = downFb.length();
-      if (lenFb > 1e-5) {
-        downFb.multiplyScalar(OMAFIT_NECKLACE_CLAVICLE_BELOW_CHIN_MUL);
-        offX += downFb.x;
-        offY += downFb.y;
-        offZ += downFb.z;
-      }
-    }
+    offX += dx + rigid.x;
+    offY += dy + rigid.y;
+    offZ += dz + rigid.z;
+  } else {
+    offX += rigid.x;
+    offY += rigid.y;
+    offZ += rigid.z;
   }
 
   if (!st.necklaceWearTarget) st.necklaceWearTarget = new THREE.Vector3();
@@ -8691,14 +8703,14 @@ async function runArSession({
     /**
      * MindAR `addAnchor(i)`: i na malha facial 468. **Óculos** — sempre **168** (ponte nasal,
      * eixo médio estável). `data-ar-mindar-anchor` lateral (ex. 33, 263 olhos) é ignorado para
-     * não deslocar estruturalmente o modelo. **Colar** — default **152** (zona mandíbula); aí
-     * `arMindarAnchor` continua configurável dentro do clamp 0…477.
+     * não deslocar estruturalmente o modelo. **Colar** — default **168** (ponte nasal);
+     * o queixo (152) segue a mandíbula e fazia o colar subir/descer.
      */
-    const defaultMindarAnchor = accessoryType === "necklace" ? "152" : "168";
+    const defaultMindarAnchor = "168";
     const anchorRaw = cfgAttr("arMindarAnchor", defaultMindarAnchor);
     let anchorIndex = Math.max(
       0,
-      Math.min(477, Math.floor(Number(anchorRaw)) || (accessoryType === "necklace" ? 152 : 168)),
+      Math.min(477, Math.floor(Number(anchorRaw)) || OMAFIT_FACE_LM_NOSE_BRIDGE),
     );
     if (accessoryType === "glasses" && anchorIndex !== OMAFIT_FACE_LM_NOSE_BRIDGE) {
       console.warn(
@@ -11170,6 +11182,8 @@ async function runArSession({
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       necklaceWearLerp: accessoryType === "necklace" ? new THREE.Vector3() : null,
       necklaceWearPrimed: false,
+      necklaceWearSlotLocked: false,
+      necklaceWearSlotOffsetNative: accessoryType === "necklace" ? { x: 0, y: 0, z: 0 } : null,
       necklaceAnchorScale: null,
       necklaceLastFitScale: null,
       necklaceTargetArcWidthNative: null,
@@ -11200,6 +11214,7 @@ async function runArSession({
               L: new THREE.Vector3(),
               R: new THREE.Vector3(),
               lateral: new THREE.Vector3(),
+              midCheek: new THREE.Vector3(),
               down: new THREE.Vector3(),
               fwd: new THREE.Vector3(),
               fwdNeg: new THREE.Vector3(),

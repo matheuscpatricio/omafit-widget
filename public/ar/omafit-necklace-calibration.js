@@ -21,18 +21,21 @@ export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
 /** Calibração visual global da escala (evita colar gigante). */
 /** Multiplicador global de escala no provador (menor = colar menos “gigante” por defeito). */
-export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.52;
+export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.36;
+
+/** Largura mínima do arco usada no fit (evita bbox minúscula → escala no teto mesmo com 65%). */
+export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.24;
 
 export const OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M = 0.78;
 
 /** Paridade `AR_NECKLACE_SCALE_*` em `app/ar-calibration.shared.js`. */
-export const OMAFIT_NECKLACE_MERCHANT_SCALE_MIN = 0.65;
+export const OMAFIT_NECKLACE_MERCHANT_SCALE_MIN = 0.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.01;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.0;
-export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.0;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 1.1;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 1.75;
 
 /** Slerp da orientação do pescoço (0–1 por frame). */
 /** Slerp da base do pescoço — mais baixo = menos “balanço” vertical/lateral por frame. */
@@ -353,8 +356,8 @@ export function omafitApplyNecklaceTripoBind(THREE, root) {
 
 /**
  * Base ortonormal (paridade óculos / MindAR selfie):
- *   X = 454−234 (com espelho opcional no X), down = queixo−nariz,
- *   Z = X×down, Y = Z×X (pingente em −Y local do mesh).
+ *   X = 454−234 (com espelho opcional no X), down = média(bochechas)−nariz
+ *   (estável quando o queixo abre/fecha), Z = X×down, Y = Z×X.
  *
  * @param {boolean} [mirrorSelfieX] negar X dos landmarks (vídeo frontal espelhado)
  */
@@ -387,7 +390,12 @@ export function omafitNecklaceNeckBasisVectors(
   if (lateral.lengthSq() < 1e-12) return false;
   lateral.normalize();
 
-  const down = scratch.down.subVectors(chin, nose);
+  if (!scratch.midCheek) scratch.midCheek = new THREE.Vector3();
+  scratch.midCheek.copy(L).add(R).multiplyScalar(0.5);
+  const down = scratch.down.subVectors(scratch.midCheek, nose);
+  if (down.lengthSq() < 1e-12) {
+    down.subVectors(chin, nose);
+  }
   if (down.lengthSq() < 1e-12) return false;
   down.normalize();
 
@@ -470,7 +478,11 @@ export function applyNecklaceAnchorOrientRotation(THREE, group) {
 }
 
 export function computeNecklaceArDisplayScale(p) {
-  const span = Math.max(Number(p.neckSpanM) || 0, 0.04);
+  const span = Math.max(
+    Number(p.neckSpanM) || 0,
+    OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M,
+    0.04,
+  );
   const norm = OMAFIT_NECKLACE_REFERENCE_WIDTH_M / span;
   const merchantMul =
     Number.isFinite(p.merchantMul) && p.merchantMul > 0
