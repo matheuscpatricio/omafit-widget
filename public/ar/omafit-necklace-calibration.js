@@ -20,13 +20,13 @@ import {
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
 /**
- * Multiplicador global de escala no provador.
- * Histórico: 0,68 (tamanho OK) → 0,36/0,54 (muito pequeno após “colar gigante”).
+ * Multiplicador global (só metros: largura_arco_GLB → largura_pescoço).
+ * Evita `×100/anchorDiv` que no log v90 dava ~2,9× no mesh (colar gigante).
  */
-export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.65;
+export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.92;
 
-/** Piso do arco na fórmula — valor alto demais (0,24) encolhia GLBs pequenos. */
-export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.1;
+/** Piso do arco na fórmula (GLBs ~0,45–0,55 m). */
+export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.35;
 
 export const OMAFIT_NECKLACE_DEPTH_AXIS_MIN_M = 0.78;
 
@@ -36,9 +36,9 @@ export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.01;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-/** Teto/mínimo de escala no mesh — antes 2,4–3,8; 1,1–1,75 deixou o colar minúsculo. */
-export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 2.2;
-export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 3.4;
+/** Clamps de escala no mesh (provador previsível, metros). */
+export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 0.72;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 1.18;
 
 /** Slerp da base do pescoço (0,11 congelava tilt errado na 1.ª frame com slot travado). */
 export const OMAFIT_NECKLACE_ORIENT_SLERP = 0.2;
@@ -491,22 +491,22 @@ export function computeNecklaceArDisplayScale(p) {
       ? p.merchantMul
       : OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT;
   const cheekTrackK =
-    Number.isFinite(p.cheekTrackK) && p.cheekTrackK > 0 ? p.cheekTrackK : 1;
-  const m = Number(p.metersMul);
-  const cmPerMeter = Number.isFinite(m) && m > 0 && m < 1 ? 1 / m : 1;
-  const anchorDiv = Math.max(Number(p.anchorDivisor) || 14, 1e-6);
+    p.freezeCheekTrack === true
+      ? 1
+      : Number.isFinite(p.cheekTrackK) && p.cheekTrackK > 0
+        ? p.cheekTrackK
+        : 1;
   let totalScale =
-    (norm * merchantMul * cheekTrackK * cmPerMeter * OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB) /
-    anchorDiv;
+    norm * merchantMul * cheekTrackK * OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB;
   totalScale = Math.min(
     OMAFIT_NECKLACE_RIGID_SCALE_MAX,
     Math.max(OMAFIT_NECKLACE_RIGID_SCALE_MIN, totalScale),
   );
-  const predictedArcWidthCm = span * totalScale * anchorDiv;
+  const predictedArcWidthM = span * totalScale;
   return {
     totalScale,
     norm,
-    predictedArcWidthCm,
+    predictedArcWidthCm: predictedArcWidthM * 100,
     targetArcWidthCm: OMAFIT_NECKLACE_REFERENCE_WIDTH_M * 100 * cheekTrackK * merchantMul,
   };
 }
