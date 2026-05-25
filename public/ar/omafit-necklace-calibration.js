@@ -19,9 +19,9 @@ import {
 /** Largura alvo do arco no pescoço (m) — alinhada ao fit no widget. */
 export const OMAFIT_NECKLACE_REFERENCE_WIDTH_M = 0.3;
 
-/** Calibração visual global da escala (evita colar gigante). */
-/** Multiplicador global de escala no provador (menor = colar menos “gigante” por defeito). */
-export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.36;
+/** Calibração visual global da escala (equilíbrio: não gigante, não minúsculo). */
+/** Multiplicador global no provador — 0,36 ficou pequeno; 0,68 era excessivo. */
+export const OMAFIT_NECKLACE_WORLD_DISPLAY_CALIB = 0.54;
 
 /** Largura mínima do arco usada no fit (evita bbox minúscula → escala no teto mesmo com 65%). */
 export const OMAFIT_NECKLACE_MIN_ARC_SPAN_FOR_SCALE_M = 0.24;
@@ -34,8 +34,8 @@ export const OMAFIT_NECKLACE_MERCHANT_SCALE_MAX = 1.45;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_STEP = 0.01;
 export const OMAFIT_NECKLACE_MERCHANT_SCALE_DEFAULT = 1;
 
-export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 1.1;
-export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 1.75;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MIN = 1.15;
+export const OMAFIT_NECKLACE_RIGID_SCALE_MAX = 2.45;
 
 /** Slerp da orientação do pescoço (0–1 por frame). */
 /** Slerp da base do pescoço — mais baixo = menos “balanço” vertical/lateral por frame. */
