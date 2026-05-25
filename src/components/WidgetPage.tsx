@@ -1253,6 +1253,7 @@ export function WidgetPage() {
      *  o `/ar/omafit-ar-widget.js` hosteado lê — sem isto o widget cai em
      *  `glasses` por default (era esse o bug "conteúdo de óculos no relógio"). */
     const arExtraAttrs: Record<string, string> = {};
+    const arAccessory = String(eyewearBootstrap.accessoryType || 'glasses').trim().toLowerCase();
     if (eyewearBootstrap.accessoryType) arExtraAttrs['data-ar-accessory-type'] = eyewearBootstrap.accessoryType;
     if (eyewearBootstrap.categoryPath) arExtraAttrs['data-ar-category-path'] = eyewearBootstrap.categoryPath;
     if (eyewearBootstrap.productType) arExtraAttrs['data-ar-product-type'] = eyewearBootstrap.productType;
@@ -1285,7 +1286,6 @@ export function WidgetPage() {
       arExtraAttrs['data-ar-variants-glb'] = eyewearBootstrap.arVariantsGlb;
     }
     /** Óculos: bind Ry 180° — paridade com export Blender (−Z → MindAR +Z). */
-    const arAccessory = String(eyewearBootstrap.accessoryType || 'glasses').trim().toLowerCase();
     if (arAccessory === 'glasses' || arAccessory === 'eyewear') {
       arExtraAttrs['data-ar-glasses-bind-rotation-y-deg'] = '180';
       arExtraAttrs['data-ar-glasses-canonical-blender-export'] = '1';

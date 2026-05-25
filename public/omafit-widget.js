@@ -2413,6 +2413,7 @@
           passAttr('arGlassesEyeMidDebugVisual', 'data-ar-glasses-eye-mid-debug-visual');
           passAttr('arGlassesManualMindarRig', 'data-ar-glasses-manual-mindar-rig');
           passAttr('arOmafitCalibration', 'data-ar-omafit-calibration');
+          passAttr('arNecklaceScaleMul', 'data-ar-necklace-scale-mul');
           passAttr('arManifestJson', 'data-ar-manifest-json');
           passAttr('arManifestUrl', 'data-ar-manifest-url');
           passAttr('arBraceletRadial', 'data-ar-bracelet-radial');
