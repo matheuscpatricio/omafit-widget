@@ -549,7 +549,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v116-trap-center-x";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v117-trap-center-x";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11469,14 +11469,16 @@ async function runArSession({
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
       necklaceOrientGroup: accessoryType === "necklace" ? necklaceOrientGroup : null,
       necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
+      /**
+       * Por defeito **false**: MindAR já espelha o frame antes do solvePnP em selfie;
+       * negar X outra vez inverte a base do pescoço (colar «de cabeça para baixo» / espelhado).
+       * Só activar com `data-ar-necklace-mirror-landmarks-x="1"` se o GLB/pipeline exigir.
+       */
       necklaceMirrorSelfieX:
         accessoryType === "necklace"
-          ? (() => {
-              const attr = String(cfgAttr("arNecklaceMirrorLandmarksX", "")).trim();
-              if (/^(1|true|yes|on)$/i.test(attr)) return true;
-              if (/^(0|false|no|off)$/i.test(attr)) return false;
-              return !disableFaceMirror;
-            })()
+          ? /^(1|true|yes|on)$/i.test(
+              String(cfgAttr("arNecklaceMirrorLandmarksX", "0")).trim(),
+            )
           : false,
       necklaceOrientStableFrames: 0,
       necklaceMerchantCalApplied:
