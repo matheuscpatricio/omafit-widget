@@ -50,6 +50,7 @@ import {
   omafitApplyNecklaceTripoBind,
   omafitComputeNecklaceNeckWearPoint,
   omafitNecklaceArcSpanFromBbox,
+  OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
   resolveNecklaceNeckJawWidthDropMul,
   resolveNecklaceMerchantScaleMul,
 } from "./omafit-necklace-calibration.js";
@@ -546,7 +547,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v112-relative-cache";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v113-norm-y-down";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3122,6 +3123,7 @@ function omafitNecklaceWearAndOrientStep(
       st.poseShoulderOk ? st.poseShoulders : null,
       {
         trapeziusFraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
+        chinNormAlong: OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
       },
     );
 
@@ -11872,6 +11874,11 @@ async function runArSession({
             }
             if (st.necklaceSwing) st.necklaceSwing.refNeckW = null;
             st.poseShoulderOk = false;
+            if (st.necklaceClavicleScratch) {
+              st.necklaceClavicleScratch.lastDropPerFace = null;
+              st.necklaceClavicleScratch.lastXOffsetPerFace = null;
+              st.necklaceClavicleScratch.poseStableFrames = 0;
+            }
           }
           if (st.anchorEuroPosState) {
             st.anchorEuroPosState.xPrev = null;
@@ -12623,7 +12630,7 @@ async function runArSession({
               : 1 / 60;
           st.lastNecklaceFrameMs = nowMs;
           const fine = parseXyzMeters(String(cfgAttr("arNecklaceWearFine", "0 0 0")).trim(), 0, 0, 0);
-          if (OMAFIT_NECKLACE_POSE_BLEND_ACTIVE) {
+          if (OMAFIT_NECKLACE_POSE_BLEND_ACTIVE && st.poseLandmarker) {
             const arVideo = mindarHost?.querySelector?.("video") || st.arVideo;
             omafitNecklaceSamplePoseShoulders(st, arVideo, nowMs);
           } else {
@@ -12683,7 +12690,7 @@ async function runArSession({
                 necklaceRigidSlot: st.necklaceRigidSlot !== false,
                 wearAnchorScale: st.necklaceWearAnchorScaleSmooth?.value ?? null,
                 wearAnchorScaleLocked: st.necklaceWearAnchorScaleSmooth?.locked === true,
-                neckWearSource: "chin-drop",
+                neckWearSource: clavScratch?.neckSource || "unknown",
                 jawWidthDropMul: resolveNecklaceNeckJawWidthDropMul(
                   resolveNecklaceNeckWearAlongFromCfg(cfgAttr),
                 ),

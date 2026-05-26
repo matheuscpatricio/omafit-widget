@@ -55,11 +55,13 @@ export const OMAFIT_NECK_LM_LEFT_CHEEK = 454;
 export const OMAFIT_NECK_LM_RIGHT_CHEEK = 234;
 
 /**
- * Descida abaixo do queixo em fração da **altura facial real** (testa→queixo)
- * usada APENAS como fallback quando os ombros (Pose) não estão disponíveis.
- * Anatomicamente: garganta ≈ 0.65 × altura testa→queixo abaixo do queixo.
+ * Fallback face-only: descida em × faceLen (testa→queixo) abaixo do queixo.
+ * Trapézio sem pose ≈ 0,78 × faceLen (abaixo do queixo, não na testa).
  */
-export const OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE = 0.65;
+export const OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE = 0.78;
+
+/** Queixo estimado a esta fração do segmento nariz→ombros (coords norm 0–1, Y↓). */
+export const OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER = 0.26;
 
 /**
  * Quando ombros visíveis: o colar é colocado **directamente entre queixo e ombros**,
@@ -462,7 +464,7 @@ export function omafitComputeNecklaceNeckWearPoint(
     poseShoulders.nose &&
     OMAFIT_NECKLACE_POSE_SHOULDER_BLEND > 0;
 
-  if (useShoulders && hasEyes) {
+  if (useShoulders && hasEyes && poseShoulders.nose) {
     const eyeDistMetric = eyeL.distanceTo(eyeR);
     const eyeDxNorm = poseShoulders.eyeL.x - poseShoulders.eyeR.x;
     const eyeDyNorm = poseShoulders.eyeL.y - poseShoulders.eyeR.y;
@@ -472,78 +474,76 @@ export function omafitComputeNecklaceNeckWearPoint(
       const scale = eyeDistMetric / eyeDistNorm;
 
       const eyeMidNormX = (poseShoulders.eyeL.x + poseShoulders.eyeR.x) * 0.5;
-      const eyeMidNormY = (poseShoulders.eyeL.y + poseShoulders.eyeR.y) * 0.5;
-      const eyeMidMetricX = (eyeL.x + eyeR.x) * 0.5;
-      const eyeMidMetricY = (eyeL.y + eyeR.y) * 0.5;
-
       const shMidNormX = (poseShoulders.shL.x + poseShoulders.shR.x) * 0.5;
-      const shMidNormY = (poseShoulders.shL.y + poseShoulders.shR.y) * 0.5;
-
-      if (!scratch.shMid) scratch.shMid = new THREE.Vector3();
-      const shMid = scratch.shMid;
-      shMid.x = eyeMidMetricX + (shMidNormX - eyeMidNormX) * scale;
-      shMid.y = eyeMidMetricY + (shMidNormY - eyeMidNormY) * scale;
-      shMid.z = chin.z;
-
-      const fraction =
-        cfg?.trapeziusFraction && cfg.trapeziusFraction > 0
-          ? cfg.trapeziusFraction
-          : 0.58;
-
-      const trapY = chin.y + (shMid.y - chin.y) * fraction;
-      const trapZ = chin.z + (shMid.z - chin.z) * fraction;
-
-      const mxFace = (L.x + R.x) * 0.5;
-      const xPoseDelta = shMidNormX - eyeMidNormX;
-      const xMetricDelta = xPoseDelta * scale;
-      const trapX = mxFace + xMetricDelta * 0.85;
+      const shMidNormY = (poseShoulders.shR.y + poseShoulders.shL.y) * 0.5;
+      const noseNormY = poseShoulders.nose.y;
 
       /**
-       * SANIDADE: o trapézio tem que estar **abaixo** do queixo no eixo down.
-       * (chin → trap) projetado em down deve ser positivo e ≥ 0.4 × faceLen.
-       * Se não for (pose ruidosa), descarta e usa fallback.
+       * Só usar eixo Y **normalizado** (imagem: Y↓). Nunca converter Y pose → métrico
+       * directamente — MindAR tem Y invertido e empurra o colar para a testa.
+       * offsetNorm = distância vertical queixo→trapézio em coords 0–1.
        */
-      const dx = trapX - chin.x;
-      const dy = trapY - chin.y;
-      const dz = trapZ - chin.z;
-      const projDown = dx * down.x + dy * down.y + dz * down.z;
-      const dropPerFace = projDown / faceLen;
-      const xOffsetPerFace = (trapX - mxFace) / faceLen;
+      const noseToShoulderNorm = shMidNormY - noseNormY;
+      if (noseToShoulderNorm > 0.04) {
+        const chinAlong =
+          cfg?.chinNormAlong != null && cfg.chinNormAlong > 0
+            ? cfg.chinNormAlong
+            : OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER;
+        const fraction =
+          cfg?.trapeziusFraction && cfg.trapeziusFraction > 0
+            ? cfg.trapeziusFraction
+            : 0.58;
 
-      const validDrop = dropPerFace >= 0.35 && dropPerFace <= 2.5;
-      const validX = Math.abs(xOffsetPerFace) <= 0.8;
+        const chinNormDelta = noseToShoulderNorm * chinAlong;
+        const offsetBelowChinNorm =
+          (noseToShoulderNorm - chinNormDelta) * fraction;
 
-      if (validDrop && validX) {
-        if (!Number.isFinite(scratch.lastDropPerFace)) {
-          scratch.lastDropPerFace = dropPerFace;
+        const dropAlongDown = offsetBelowChinNorm * scale;
+        const dropPerFace = dropAlongDown / faceLen;
+
+        const mxFace = (L.x + R.x) * 0.5;
+        const xOffsetNorm = shMidNormX - eyeMidNormX;
+        const xOffsetPerFace = (xOffsetNorm * scale) / faceLen;
+
+        const validDrop = dropPerFace >= 0.35 && dropPerFace <= 2.2;
+        const validX = Math.abs(xOffsetPerFace) <= 0.85;
+
+        if (validDrop && validX) {
+          if (!Number.isFinite(scratch.lastDropPerFace)) {
+            scratch.lastDropPerFace = dropPerFace;
+          } else {
+            scratch.lastDropPerFace +=
+              (dropPerFace - scratch.lastDropPerFace) * 0.2;
+          }
+          if (!Number.isFinite(scratch.lastXOffsetPerFace)) {
+            scratch.lastXOffsetPerFace = xOffsetPerFace;
+          } else {
+            scratch.lastXOffsetPerFace +=
+              (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.2;
+          }
+          scratch.neckSource = "trapezius-norm-y";
+          scratch.poseStableFrames = (scratch.poseStableFrames || 0) + 1;
+        } else if (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0) {
+          scratch.neckSource = "trapezius-cached-ratio";
         } else {
-          scratch.lastDropPerFace +=
-            (dropPerFace - scratch.lastDropPerFace) * 0.25;
+          scratch.neckSource = "face-only";
         }
-        if (!Number.isFinite(scratch.lastXOffsetPerFace)) {
-          scratch.lastXOffsetPerFace = xOffsetPerFace;
-        } else {
-          scratch.lastXOffsetPerFace +=
-            (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.25;
-        }
-        scratch.neckSource = "trapezius-eye-ruler";
-        scratch.lastValidPoseMs = poseShoulders.lastMs ?? Date.now();
-      } else {
-        scratch.neckSource = scratch.lastDropPerFace
-          ? "trapezius-rejected-cached"
-          : "face-only";
+
+        const useDropPF =
+          validDrop && validX
+            ? dropPerFace
+            : Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0
+              ? scratch.lastDropPerFace
+              : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
+        const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
+          ? scratch.lastXOffsetPerFace
+          : 0;
+
+        out.copy(chin).addScaledVector(down, faceLen * useDropPF);
+        out.x = mxFace + useXPF * faceLen;
+        out.z = chin.z;
+        return true;
       }
-
-      const useDropPF = Number.isFinite(scratch.lastDropPerFace)
-        ? scratch.lastDropPerFace
-        : dropPerFace;
-      const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
-        ? scratch.lastXOffsetPerFace
-        : xOffsetPerFace;
-
-      out.copy(chin).addScaledVector(down, faceLen * useDropPF);
-      out.x = mxFace + useXPF * faceLen;
-      return true;
     }
   }
 
@@ -552,7 +552,7 @@ export function omafitComputeNecklaceNeckWearPoint(
    * Como `dropPerFace` é uma razão (não posição absoluta), o ponto SEGUE a face
    * mesmo sem pose — não há salto para coordenadas obsoletas.
    */
-  if (Number.isFinite(scratch.lastDropPerFace)) {
+  if (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0) {
     const useDropPF = scratch.lastDropPerFace;
     const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
       ? scratch.lastXOffsetPerFace
