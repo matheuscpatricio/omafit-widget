@@ -549,7 +549,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v114-trap-locked";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v115-trap-freeze";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3189,14 +3189,17 @@ function omafitNecklaceWearAndOrientStep(
           build: OMAFIT_AR_WIDGET_BUILD,
           source: clavScratch?.neckSource,
           poseShoulderOk: st.poseShoulderOk,
+          lockFrozen: !!clavScratch?.lockFrozen,
           lockedDropPerFace: clavScratch?.lockedDropPerFace?.toFixed?.(3) ?? null,
-          smoothDropPerFace: clavScratch?.lastDropPerFace?.toFixed?.(3) ?? null,
+          warmupDropPerFace: clavScratch?.warmupDropPerFace?.toFixed?.(3) ?? null,
           faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
           descentCm: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lockedDropPerFace)
             ? (faceLen * clavScratch.lockedDropPerFace).toFixed(2)
-            : Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lastDropPerFace)
-              ? (faceLen * clavScratch.lastDropPerFace).toFixed(2)
-              : null,
+            : Number.isFinite(faceLen) && Number.isFinite(clavScratch?.warmupDropPerFace)
+              ? (faceLen * clavScratch.warmupDropPerFace).toFixed(2)
+              : Number.isFinite(faceLen)
+                ? (faceLen * 0.92).toFixed(2)
+                : null,
           actualBelowChin: chinV
             ? (neckWearPt.y - chinV.y).toFixed(2)
             : null,
@@ -11706,8 +11709,12 @@ async function runArSession({
               faceNeck: new THREE.Vector3(),
               poseNeck: new THREE.Vector3(),
               shMid: new THREE.Vector3(),
-              lastDropPerFace: null,
+              warmupDropPerFace: null,
               lastXOffsetPerFace: null,
+              lockedDropPerFace: null,
+              lockedXOffsetPerFace: null,
+              lockFrozen: false,
+              trapDropHistory: null,
               lastValidPoseMs: 0,
             }
           : null,
@@ -11879,10 +11886,11 @@ async function runArSession({
             if (st.necklaceSwing) st.necklaceSwing.refNeckW = null;
             st.poseShoulderOk = false;
             if (st.necklaceClavicleScratch) {
-              st.necklaceClavicleScratch.lastDropPerFace = null;
+              st.necklaceClavicleScratch.warmupDropPerFace = null;
               st.necklaceClavicleScratch.lastXOffsetPerFace = null;
               st.necklaceClavicleScratch.lockedDropPerFace = null;
               st.necklaceClavicleScratch.lockedXOffsetPerFace = null;
+              st.necklaceClavicleScratch.lockFrozen = false;
               st.necklaceClavicleScratch.trapDropHistory = null;
               st.necklaceClavicleScratch.poseStableFrames = 0;
             }
