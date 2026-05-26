@@ -549,7 +549,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v115-trap-freeze";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v116-trap-center-x";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11471,9 +11471,12 @@ async function runArSession({
       necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
       necklaceMirrorSelfieX:
         accessoryType === "necklace"
-          ? /^(1|true|yes|on)$/i.test(
-              String(cfgAttr("arNecklaceMirrorLandmarksX", "0")).trim(),
-            )
+          ? (() => {
+              const attr = String(cfgAttr("arNecklaceMirrorLandmarksX", "")).trim();
+              if (/^(1|true|yes|on)$/i.test(attr)) return true;
+              if (/^(0|false|no|off)$/i.test(attr)) return false;
+              return !disableFaceMirror;
+            })()
           : false,
       necklaceOrientStableFrames: 0,
       necklaceMerchantCalApplied:

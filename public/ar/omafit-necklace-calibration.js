@@ -76,6 +76,40 @@ export const OMAFIT_NECKLACE_TRAP_DROP_MAX = 1.02;
 /** Mediana mínima para aceitar lock (evita lock em 0,62 por glitch pose). */
 export const OMAFIT_NECKLACE_TRAP_LOCK_MIN_MEDIAN = 0.88;
 
+/** Peso do queixo no centro X (0 = só bochechas, 1 = só queixo). */
+export const OMAFIT_NECKLACE_TRAP_CHIN_X_BLEND = 0.55;
+
+/** Influência do offset horizontal dos ombros (0 = ignorar pose em X). */
+export const OMAFIT_NECKLACE_TRAP_SHOULDER_X_BLEND = 0.35;
+
+/**
+ * Correção selfie: desvio ligeiro para a direita do ecrã (× faceLen).
+ * Negativo desloca o colar para a esquerda do ecrã.
+ */
+export const OMAFIT_NECKLACE_TRAP_CENTER_X_BIAS_PER_FACE = -0.02;
+
+function omafitNecklaceTrapCenterX(chin, mxFace, cfg) {
+  const blend =
+    cfg?.trapChinXBlend != null && cfg.trapChinXBlend >= 0
+      ? Math.min(1, cfg.trapChinXBlend)
+      : OMAFIT_NECKLACE_TRAP_CHIN_X_BLEND;
+  return chin.x * blend + mxFace * (1 - blend);
+}
+
+function omafitNecklaceTrapXBias(faceLen, cfg) {
+  const perFace =
+    cfg?.trapCenterXBiasPerFace != null && Number.isFinite(cfg.trapCenterXBiasPerFace)
+      ? cfg.trapCenterXBiasPerFace
+      : OMAFIT_NECKLACE_TRAP_CENTER_X_BIAS_PER_FACE;
+  return perFace * faceLen;
+}
+
+function omafitNecklaceTrapShoulderXMul(cfg) {
+  return cfg?.trapShoulderXBlend != null && cfg.trapShoulderXBlend >= 0
+    ? Math.min(1, cfg.trapShoulderXBlend)
+    : OMAFIT_NECKLACE_TRAP_SHOULDER_X_BLEND;
+}
+
 function omafitMedianFinite(nums) {
   const a = nums.filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
   if (!a.length) return NaN;
@@ -523,7 +557,10 @@ export function omafitComputeNecklaceNeckWearPoint(
 
         const mxFace = (L.x + R.x) * 0.5;
         const xOffsetNorm = shMidNormX - eyeMidNormX;
-        const xOffsetPerFace = (xOffsetNorm * scale) / faceLen;
+        const xOffsetPerFace =
+          ((xOffsetNorm * scale) / faceLen) * omafitNecklaceTrapShoulderXMul(cfg);
+        const centerX = omafitNecklaceTrapCenterX(chin, mxFace, cfg);
+        const xBias = omafitNecklaceTrapXBias(faceLen, cfg);
 
         const trapMin =
           cfg?.trapDropMin > 0 ? cfg.trapDropMin : OMAFIT_NECKLACE_TRAP_DROP_MIN;
@@ -617,7 +654,7 @@ export function omafitComputeNecklaceNeckWearPoint(
               : 0;
 
         out.copy(chin).addScaledVector(down, faceLen * useDropPF);
-        out.x = mxFace + useXPF * faceLen;
+        out.x = centerX + useXPF * faceLen + xBias;
         out.z = chin.z;
         return true;
       }
@@ -631,11 +668,13 @@ export function omafitComputeNecklaceNeckWearPoint(
    */
   if (scratch.lockFrozen && Number.isFinite(scratch.lockedDropPerFace)) {
     const mxFace = (L.x + R.x) * 0.5;
+    const centerX = omafitNecklaceTrapCenterX(chin, mxFace, cfg);
+    const xBias = omafitNecklaceTrapXBias(faceLen, cfg);
     const useXPF = Number.isFinite(scratch.lockedXOffsetPerFace)
       ? scratch.lockedXOffsetPerFace
       : 0;
     out.copy(chin).addScaledVector(down, faceLen * scratch.lockedDropPerFace);
-    out.x = mxFace + useXPF * faceLen;
+    out.x = centerX + useXPF * faceLen + xBias;
     out.z = chin.z;
     scratch.neckSource = "trapezius-locked";
     return true;
@@ -648,8 +687,9 @@ export function omafitComputeNecklaceNeckWearPoint(
     ? Math.min(1.2, Math.max(0.40, faceHeightDropMul))
     : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
 
+  const mxFaceFb = (L.x + R.x) * 0.5;
   out.copy(chin).addScaledVector(down, faceLen * dropMul);
-  out.x = (chin.x + scratch.midCheek.x) * 0.5;
+  out.x = omafitNecklaceTrapCenterX(chin, mxFaceFb, cfg) + omafitNecklaceTrapXBias(faceLen, cfg);
   scratch.neckSource = "face-only";
   return true;
 }
