@@ -63,6 +63,19 @@ export const OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE = 0.78;
 /** Queixo estimado a esta fração do segmento nariz→ombros (coords norm 0–1, Y↓). */
 export const OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER = 0.26;
 
+/** Frames consecutivos estáveis antes de bloquear o ratio trapézio. */
+export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES = 10;
+
+/** Variação máxima (× faceLen) entre frames para contar como «estável». */
+export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS = 0.035;
+
+function omafitMedianFinite(nums) {
+  const a = nums.filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+  if (!a.length) return NaN;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
 /**
  * Quando ombros visíveis: o colar é colocado **directamente entre queixo e ombros**,
  * não por fórmula heurística. 1 = exclusivamente pose, 0 = exclusivamente face.
@@ -505,39 +518,82 @@ export function omafitComputeNecklaceNeckWearPoint(
         const xOffsetNorm = shMidNormX - eyeMidNormX;
         const xOffsetPerFace = (xOffsetNorm * scale) / faceLen;
 
-        const validDrop = dropPerFace >= 0.35 && dropPerFace <= 2.2;
-        const validX = Math.abs(xOffsetPerFace) <= 0.85;
+        const validDrop = dropPerFace >= 0.48 && dropPerFace <= 1.05;
+        const validX = Math.abs(xOffsetPerFace) <= 0.45;
+
+        const lockStableN =
+          cfg?.trapLockStableFrames > 0
+            ? cfg.trapLockStableFrames
+            : OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES;
+        const lockStableEps =
+          cfg?.trapLockStableEps > 0
+            ? cfg.trapLockStableEps
+            : OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS;
 
         if (validDrop && validX) {
+          if (!scratch.trapDropHistory) scratch.trapDropHistory = [];
+          scratch.trapDropHistory.push(dropPerFace);
+          if (scratch.trapDropHistory.length > 24) scratch.trapDropHistory.shift();
+
           if (!Number.isFinite(scratch.lastDropPerFace)) {
             scratch.lastDropPerFace = dropPerFace;
           } else {
             scratch.lastDropPerFace +=
-              (dropPerFace - scratch.lastDropPerFace) * 0.2;
+              (dropPerFace - scratch.lastDropPerFace) * 0.06;
           }
           if (!Number.isFinite(scratch.lastXOffsetPerFace)) {
             scratch.lastXOffsetPerFace = xOffsetPerFace;
           } else {
             scratch.lastXOffsetPerFace +=
-              (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.2;
+              (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.08;
           }
-          scratch.neckSource = "trapezius-norm-y";
-          scratch.poseStableFrames = (scratch.poseStableFrames || 0) + 1;
-        } else if (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0) {
-          scratch.neckSource = "trapezius-cached-ratio";
+
+          const hist = scratch.trapDropHistory;
+          if (hist.length >= lockStableN) {
+            const recent = hist.slice(-lockStableN);
+            const med = omafitMedianFinite(recent);
+            const stable = recent.every((v) => Math.abs(v - med) < lockStableEps);
+            if (stable) {
+              if (!Number.isFinite(scratch.lockedDropPerFace)) {
+                scratch.lockedDropPerFace = med;
+                scratch.lockedXOffsetPerFace = scratch.lastXOffsetPerFace;
+                scratch.neckSource = "trapezius-locked";
+              } else {
+                scratch.lockedDropPerFace +=
+                  (med - scratch.lockedDropPerFace) * 0.015;
+                scratch.lockedXOffsetPerFace +=
+                  (scratch.lastXOffsetPerFace - scratch.lockedXOffsetPerFace) *
+                  0.015;
+                scratch.neckSource = "trapezius-locked";
+              }
+            } else {
+              scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+                ? "trapezius-locked"
+                : "trapezius-warmup";
+            }
+          } else {
+            scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+              ? "trapezius-locked"
+              : "trapezius-warmup";
+          }
         } else {
-          scratch.neckSource = "face-only";
+          scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+            ? "trapezius-locked"
+            : Number.isFinite(scratch.lastDropPerFace)
+              ? "trapezius-smooth"
+              : "face-only";
         }
 
-        const useDropPF =
-          validDrop && validX
-            ? dropPerFace
-            : Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0
-              ? scratch.lastDropPerFace
-              : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
-        const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
-          ? scratch.lastXOffsetPerFace
-          : 0;
+        const useDropPF = Number.isFinite(scratch.lockedDropPerFace)
+          ? scratch.lockedDropPerFace
+          : Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0
+            ? scratch.lastDropPerFace
+            : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
+        const useXPF = Number.isFinite(scratch.lockedXOffsetPerFace)
+          ? scratch.lockedXOffsetPerFace
+          : Number.isFinite(scratch.lastXOffsetPerFace)
+            ? scratch.lastXOffsetPerFace
+            : 0;
 
         out.copy(chin).addScaledVector(down, faceLen * useDropPF);
         out.x = mxFace + useXPF * faceLen;
@@ -552,15 +608,25 @@ export function omafitComputeNecklaceNeckWearPoint(
    * Como `dropPerFace` é uma razão (não posição absoluta), o ponto SEGUE a face
    * mesmo sem pose — não há salto para coordenadas obsoletas.
    */
-  if (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0) {
-    const useDropPF = scratch.lastDropPerFace;
-    const useXPF = Number.isFinite(scratch.lastXOffsetPerFace)
-      ? scratch.lastXOffsetPerFace
-      : 0;
+  if (
+    Number.isFinite(scratch.lockedDropPerFace) ||
+    (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0)
+  ) {
+    const useDropPF = Number.isFinite(scratch.lockedDropPerFace)
+      ? scratch.lockedDropPerFace
+      : scratch.lastDropPerFace;
+    const useXPF = Number.isFinite(scratch.lockedXOffsetPerFace)
+      ? scratch.lockedXOffsetPerFace
+      : Number.isFinite(scratch.lastXOffsetPerFace)
+        ? scratch.lastXOffsetPerFace
+        : 0;
     const mxFace = (L.x + R.x) * 0.5;
     out.copy(chin).addScaledVector(down, faceLen * useDropPF);
     out.x = mxFace + useXPF * faceLen;
-    scratch.neckSource = "trapezius-cached-ratio";
+    out.z = chin.z;
+    scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+      ? "trapezius-locked"
+      : "trapezius-smooth";
     return true;
   }
 

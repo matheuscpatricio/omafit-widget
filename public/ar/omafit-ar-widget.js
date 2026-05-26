@@ -51,6 +51,8 @@ import {
   omafitComputeNecklaceNeckWearPoint,
   omafitNecklaceArcSpanFromBbox,
   OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
+  OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES,
+  OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS,
   resolveNecklaceNeckJawWidthDropMul,
   resolveNecklaceMerchantScaleMul,
 } from "./omafit-necklace-calibration.js";
@@ -547,7 +549,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v113-norm-y-down";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-25-ar-widget-v114-trap-locked";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3124,6 +3126,8 @@ function omafitNecklaceWearAndOrientStep(
       {
         trapeziusFraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
         chinNormAlong: OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
+        trapLockStableFrames: OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES,
+        trapLockStableEps: OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS,
       },
     );
 
@@ -3181,21 +3185,21 @@ function omafitNecklaceWearAndOrientStep(
         const faceLen = chinV && fhV
           ? Math.hypot(chinV.x - fhV.x, chinV.y - fhV.y, chinV.z - fhV.z)
           : null;
-        console.log("[omafit-ar] colar: trapézio (cache relativo)", {
+        console.log("[omafit-ar] colar: trapézio", {
           build: OMAFIT_AR_WIDGET_BUILD,
           source: clavScratch?.neckSource,
           poseShoulderOk: st.poseShoulderOk,
-          poseConfidence: st.poseShoulders?.confidence?.toFixed?.(2) ?? null,
-          dropPerFace: clavScratch?.lastDropPerFace?.toFixed?.(3) ?? null,
-          xOffsetPerFace: clavScratch?.lastXOffsetPerFace?.toFixed?.(3) ?? null,
+          lockedDropPerFace: clavScratch?.lockedDropPerFace?.toFixed?.(3) ?? null,
+          smoothDropPerFace: clavScratch?.lastDropPerFace?.toFixed?.(3) ?? null,
           faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
-          predictedDescent: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lastDropPerFace)
-            ? (faceLen * clavScratch.lastDropPerFace).toFixed(2)
-            : null,
+          descentCm: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lockedDropPerFace)
+            ? (faceLen * clavScratch.lockedDropPerFace).toFixed(2)
+            : Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lastDropPerFace)
+              ? (faceLen * clavScratch.lastDropPerFace).toFixed(2)
+              : null,
           actualBelowChin: chinV
             ? (neckWearPt.y - chinV.y).toFixed(2)
             : null,
-          fraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
         });
       } catch {
         /* ignore */
@@ -11877,6 +11881,9 @@ async function runArSession({
             if (st.necklaceClavicleScratch) {
               st.necklaceClavicleScratch.lastDropPerFace = null;
               st.necklaceClavicleScratch.lastXOffsetPerFace = null;
+              st.necklaceClavicleScratch.lockedDropPerFace = null;
+              st.necklaceClavicleScratch.lockedXOffsetPerFace = null;
+              st.necklaceClavicleScratch.trapDropHistory = null;
               st.necklaceClavicleScratch.poseStableFrames = 0;
             }
           }
