@@ -471,8 +471,8 @@ const OMAFIT_WATCH_SCALE_TAU_MS = 260;
 const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
 const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 /**
- * Relógio: palma voltada à câmara quando `dot(palmTriN, wrist→camera) > 0`
- * (mostrar fundo); dorso quando < 0 (mostrar topo).
+ * Relógio: `tmpY` = dorsal. Palma à câmara quando `dot(tmpY, wrist→camera) < 0`
+ * (mostrar fundo); dorso quando > 0 (mostrar topo). Invariante a Left/Right.
  */
 const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.08;
 const OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES = 2;
@@ -559,7 +559,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v127-watch-palm-dot-camera";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v128-watch-dorsal-y-camera";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -15410,6 +15410,31 @@ async function runHandArSession({
           wrapFraction,
           postBbox: { x: size.x, y: size.y, z: size.z },
         });
+      } else {
+        const bboxCenter = new THREE.Vector3();
+        bbox.getCenter(bboxCenter);
+        const dorsalN = dorsal.vec.clone();
+        if (bboxCenter.dot(dorsalN) < 0) dorsalN.negate();
+        const bendN = bend.vec.clone();
+        const armN = arm.vec.clone();
+        const expectedArm = new THREE.Vector3().crossVectors(bendN, dorsalN);
+        if (expectedArm.dot(armN) < 0) armN.negate();
+        const M = new THREE.Matrix4().makeBasis(bendN, dorsalN, armN);
+        const invM = new THREE.Matrix4().copy(M).transpose();
+        const q = new THREE.Quaternion().setFromRotationMatrix(invM);
+        if (Math.abs(q.x) + Math.abs(q.y) + Math.abs(q.z) > 1e-6) {
+          glbScene.quaternion.premultiply(q);
+          glbScene.updateMatrixWorld(true);
+        }
+        bbox = new THREE.Box3().setFromObject(glbScene);
+        bbox.getSize(size);
+        console.log("[omafit-ar] watch orientation canonicalized (already wrapped)", {
+          armAxis: arm.name,
+          bendAxis: bend.name,
+          dorsalAxis: dorsal.name,
+          flatRatio: Number(flatRatio.toFixed(3)),
+          postBbox: { x: size.x, y: size.y, z: size.z },
+        });
       }
     }
 
@@ -16468,12 +16493,15 @@ async function runHandArSession({
     tmpY.crossVectors(handZForearm, tmpX).normalize();
 
     tmpZ.copy(handZForearm);
-    if (accessoryType === "watch" && triLenPalm > 1e-7) {
-      /** +tmpY = dorsal (oposto à normal de palma no plano do punho). */
-      if (tmpY.dot(palmTriN) > 0) tmpY.negate();
-    }
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
+    if (accessoryType === "watch") {
+      tmpCamToWrist.subVectors(camera.position, w0);
+      if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
+      /** +tmpY = dorsal (aponta para a câmara quando o dorso está voltado para ela). */
+      if (tmpY.dot(tmpCamToWrist) < 0) tmpY.negate();
+      tmpX.crossVectors(tmpY, tmpZ).normalize();
+    }
     if (accessoryType === "bracelet") {
       handMidThumbPinky.addVectors(w5, w17).multiplyScalar(0.5);
       handToMcpScratch.subVectors(handMidThumbPinky, w0);
@@ -16584,14 +16612,14 @@ async function runHandArSession({
      */
     basisMat.makeBasis(tmpX, tmpY, tmpZ);
     tmpQuat.setFromRotationMatrix(basisMat);
-    if (accessoryType === "watch" && triLenPalm > 1e-7) {
+    if (accessoryType === "watch") {
       tmpCamToWrist.subVectors(camera.position, w0);
       if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
-      const palmDotCam = palmTriN.dot(tmpCamToWrist);
+      const dorsalDotCam = tmpY.dot(tmpCamToWrist);
       let nextHalfTurn = stableWatchHalfTurn;
-      if (palmDotCam >= OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+      if (dorsalDotCam <= -OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
         nextHalfTurn = true;
-      } else if (palmDotCam <= -OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+      } else if (dorsalDotCam >= OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
         nextHalfTurn = false;
       }
       if (nextHalfTurn === stableWatchHalfTurn) {
