@@ -445,8 +445,7 @@ const OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED = true;
 /** Occluder usa mesma regra de lado para todos os acessórios. */
 const OMAFIT_WATCH_OCCLUDER_INVERT_SIDE = false;
 /**
- * Relógio: não espelhar só com `Left` (regra da pulseira). Pulso direito precisa
- * de flip 180° no plano do mostrador (tmpX+tmpY); ver bloco em `updateAnchorFromHand`.
+ * Relógio: manter por compatibilidade, mas a decisão de flip usa dorso/palma vs câmara.
  */
 const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 /**
@@ -472,11 +471,11 @@ const OMAFIT_WATCH_SCALE_TAU_MS = 260;
 const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
 const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 /**
- * Relógio: estabiliza o sinal anatómico do polegar no eixo X local.
- * Evita meia-volta intermitente no braço direito sem depender de handedness.
+ * Relógio: decisão dorso/palma baseada em `dot(tmpY, cameraForward)`.
+ * +dot: dorso para a câmara (mostrar topo), -dot: palma para a câmara (mostrar fundo).
  */
-const OMAFIT_WATCH_THUMB_SIGN_DEADZONE_M = 0.0035;
-const OMAFIT_WATCH_THUMB_SIGN_PERSIST_FRAMES = 3;
+const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.1;
+const OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES = 2;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
 const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
@@ -560,7 +559,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v125-watch-stable-orientation-scale";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v126-watch-dorsal-palm-deterministic";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -16278,9 +16277,9 @@ async function runHandArSession({
   let smoothKnuckleSpan = OMAFIT_BASE_KNUCKLE_SPAN_M;
   let smoothKnuckleSpanInit = false;
   let smoothWatchScale = NaN;
-  let stableWatchThumbSign = 1;
-  let pendingWatchThumbSign = 0;
-  let pendingWatchThumbFrames = 0;
+  let stableWatchHalfTurn = false;
+  let pendingWatchHalfTurn = false;
+  let pendingWatchHalfTurnFrames = 0;
   /** Jitter span 5–17 (m) + histerese para aviso “aproxime o pulso”. */
   let prevKnuckleSpan3d = 0;
   let knuckleJitterEma = 0;
@@ -16482,25 +16481,27 @@ async function runHandArSession({
       if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
     }
     if (accessoryType === "watch") {
-      const thumbAxisDot = handW0to1Scratch.subVectors(w1, w0).dot(tmpX);
-      if (Math.abs(thumbAxisDot) >= OMAFIT_WATCH_THUMB_SIGN_DEADZONE_M) {
-        const thumbSign = thumbAxisDot >= 0 ? 1 : -1;
-        if (thumbSign === stableWatchThumbSign) {
-          pendingWatchThumbSign = 0;
-          pendingWatchThumbFrames = 0;
-        } else if (thumbSign === pendingWatchThumbSign) {
-          pendingWatchThumbFrames += 1;
-        } else {
-          pendingWatchThumbSign = thumbSign;
-          pendingWatchThumbFrames = 1;
-        }
-        if (pendingWatchThumbFrames >= OMAFIT_WATCH_THUMB_SIGN_PERSIST_FRAMES) {
-          stableWatchThumbSign = pendingWatchThumbSign;
-          pendingWatchThumbSign = 0;
-          pendingWatchThumbFrames = 0;
-        }
+      handNAltScratch.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      const dorsalDotCam = tmpY.dot(handNAltScratch);
+      let nextHalfTurn = stableWatchHalfTurn;
+      if (dorsalDotCam <= -OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+        nextHalfTurn = true; // palma voltada para a câmara -> mostrar fundo
+      } else if (dorsalDotCam >= OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+        nextHalfTurn = false; // dorso voltado para a câmara -> mostrar topo
       }
-      if (stableWatchThumbSign < 0) {
+      if (nextHalfTurn === stableWatchHalfTurn) {
+        pendingWatchHalfTurnFrames = 0;
+      } else if (nextHalfTurn === pendingWatchHalfTurn) {
+        pendingWatchHalfTurnFrames += 1;
+      } else {
+        pendingWatchHalfTurn = nextHalfTurn;
+        pendingWatchHalfTurnFrames = 1;
+      }
+      if (pendingWatchHalfTurnFrames >= OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES) {
+        stableWatchHalfTurn = pendingWatchHalfTurn;
+        pendingWatchHalfTurnFrames = 0;
+      }
+      if (stableWatchHalfTurn) {
         tmpX.negate();
         tmpY.negate();
       }
@@ -17612,9 +17613,9 @@ async function runHandArSession({
         }
         smoothedStrapK = 1;
         smoothWatchScale = NaN;
-        stableWatchThumbSign = 1;
-        pendingWatchThumbSign = 0;
-        pendingWatchThumbFrames = 0;
+        stableWatchHalfTurn = false;
+        pendingWatchHalfTurn = false;
+        pendingWatchHalfTurnFrames = 0;
         if (watchStrapRadial?.strap) {
           watchStrapRadial.strap.scale.set(1, 1, 1);
         }
@@ -17956,9 +17957,9 @@ async function runHandArSession({
               }
               smoothedStrapK = 1;
               smoothWatchScale = NaN;
-              stableWatchThumbSign = 1;
-              pendingWatchThumbSign = 0;
-              pendingWatchThumbFrames = 0;
+              stableWatchHalfTurn = false;
+              pendingWatchHalfTurn = false;
+              pendingWatchHalfTurnFrames = 0;
               upgradeHandArMetalMaterials(THREE, next);
               omafitEnsureGlassesMeshesRenderable(THREE, next);
               setHandArMeshRenderOrder(glbRoot, 1);
