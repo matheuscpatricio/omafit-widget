@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-27-ar-widget-v128-watch-dorsal-y-camera';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-05-27-ar-widget-v129-watch-face-flip-sign';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');

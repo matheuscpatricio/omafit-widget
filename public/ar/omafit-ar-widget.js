@@ -471,8 +471,8 @@ const OMAFIT_WATCH_SCALE_TAU_MS = 260;
 const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
 const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 /**
- * Relógio: `tmpY` = dorsal. Palma à câmara quando `dot(tmpY, wrist→camera) < 0`
- * (mostrar fundo); dorso quando > 0 (mostrar topo). Invariante a Left/Right.
+ * Relógio: `tmpY` = dorsal (alinhado para `dot(tmpY, wrist→camera) > 0` no dorso).
+ * Meia-volta π no eixo do braço: dorso (`dot` alto) → topo; palma (`dot` baixo) → fundo.
  */
 const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.08;
 const OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES = 2;
@@ -559,7 +559,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v128-watch-dorsal-y-camera";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v129-watch-face-flip-sign";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
