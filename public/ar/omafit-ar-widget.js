@@ -471,10 +471,10 @@ const OMAFIT_WATCH_SCALE_TAU_MS = 260;
 const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
 const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 /**
- * Relógio: decisão dorso/palma baseada em `dot(tmpY, cameraForward)`.
- * +dot: dorso para a câmara (mostrar topo), -dot: palma para a câmara (mostrar fundo).
+ * Relógio: palma voltada à câmara quando `dot(palmTriN, wrist→camera) > 0`
+ * (mostrar fundo); dorso quando < 0 (mostrar topo).
  */
-const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.1;
+const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.08;
 const OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES = 2;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
 const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
@@ -559,7 +559,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v126-watch-dorsal-palm-deterministic";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v127-watch-palm-dot-camera";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -16467,54 +16467,11 @@ async function runHandArSession({
     }
     tmpY.crossVectors(handZForearm, tmpX).normalize();
 
-    if (accessoryType === "watch" && triLenPalm > 1e-7) {
-      handNAltScratch.subVectors(w1, w0).cross(wristTriA);
-      if (handNAltScratch.lengthSq() > 1e-12) {
-        handNAltScratch.normalize();
-        if (handNAltScratch.dot(palmTriN) < 0) handNAltScratch.negate();
-        palmTriN.lerp(handNAltScratch, 0.22).normalize();
-      }
-      if (palmTriN.dot(tmpY) < 0) palmTriN.negate();
-      tmpY.lerp(palmTriN, 0.52).normalize();
-      tmpY.addScaledVector(handZForearm, -tmpY.dot(handZForearm));
-      const yLenBlend = tmpY.length();
-      if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
-    }
-    if (accessoryType === "watch") {
-      handNAltScratch.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-      const dorsalDotCam = tmpY.dot(handNAltScratch);
-      let nextHalfTurn = stableWatchHalfTurn;
-      if (dorsalDotCam <= -OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
-        nextHalfTurn = true; // palma voltada para a câmara -> mostrar fundo
-      } else if (dorsalDotCam >= OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
-        nextHalfTurn = false; // dorso voltado para a câmara -> mostrar topo
-      }
-      if (nextHalfTurn === stableWatchHalfTurn) {
-        pendingWatchHalfTurnFrames = 0;
-      } else if (nextHalfTurn === pendingWatchHalfTurn) {
-        pendingWatchHalfTurnFrames += 1;
-      } else {
-        pendingWatchHalfTurn = nextHalfTurn;
-        pendingWatchHalfTurnFrames = 1;
-      }
-      if (pendingWatchHalfTurnFrames >= OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES) {
-        stableWatchHalfTurn = pendingWatchHalfTurn;
-        pendingWatchHalfTurnFrames = 0;
-      }
-      if (stableWatchHalfTurn) {
-        tmpX.negate();
-        tmpY.negate();
-      }
-    }
-
-    /**
-     * Relógio: NÃO aplicar meia-volta por handedness no tracking.
-     * A orientação previsível deve vir da canonização do GLB no load e
-     * da base geométrica da mão neste frame; flip por Left/Right tende a
-     * introduzir inversões intermitentes em torso/palma.
-     */
-
     tmpZ.copy(handZForearm);
+    if (accessoryType === "watch" && triLenPalm > 1e-7) {
+      /** +tmpY = dorsal (oposto à normal de palma no plano do punho). */
+      if (tmpY.dot(palmTriN) > 0) tmpY.negate();
+    }
     tmpX.crossVectors(tmpY, tmpZ).normalize();
     tmpY.crossVectors(tmpZ, tmpX).normalize();
     if (accessoryType === "bracelet") {
@@ -16627,14 +16584,40 @@ async function runHandArSession({
      */
     basisMat.makeBasis(tmpX, tmpY, tmpZ);
     tmpQuat.setFromRotationMatrix(basisMat);
-    const palmNx = palmTriN.dot(tmpX);
-    const palmNy = palmTriN.dot(tmpY);
-    const wristRoll = Math.atan2(palmNx, palmNy);
-    handRollQuat.setFromAxisAngle(
-      handZForearm,
-      wristRoll * OMAFIT_HAND_WRIST_ROLL_GAIN,
-    );
-    if (accessoryType !== "bracelet") {
+    if (accessoryType === "watch" && triLenPalm > 1e-7) {
+      tmpCamToWrist.subVectors(camera.position, w0);
+      if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
+      const palmDotCam = palmTriN.dot(tmpCamToWrist);
+      let nextHalfTurn = stableWatchHalfTurn;
+      if (palmDotCam >= OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+        nextHalfTurn = true;
+      } else if (palmDotCam <= -OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT) {
+        nextHalfTurn = false;
+      }
+      if (nextHalfTurn === stableWatchHalfTurn) {
+        pendingWatchHalfTurnFrames = 0;
+      } else if (nextHalfTurn === pendingWatchHalfTurn) {
+        pendingWatchHalfTurnFrames += 1;
+      } else {
+        pendingWatchHalfTurn = nextHalfTurn;
+        pendingWatchHalfTurnFrames = 1;
+      }
+      if (pendingWatchHalfTurnFrames >= OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES) {
+        stableWatchHalfTurn = pendingWatchHalfTurn;
+        pendingWatchHalfTurnFrames = 0;
+      }
+      if (stableWatchHalfTurn) {
+        handRollQuat.setFromAxisAngle(handZForearm, Math.PI);
+        tmpQuat.multiply(handRollQuat);
+      }
+    } else if (accessoryType === "bracelet") {
+      const palmNx = palmTriN.dot(tmpX);
+      const palmNy = palmTriN.dot(tmpY);
+      const wristRoll = Math.atan2(palmNx, palmNy);
+      handRollQuat.setFromAxisAngle(
+        handZForearm,
+        wristRoll * OMAFIT_HAND_WRIST_ROLL_GAIN,
+      );
       tmpQuat.premultiply(handRollQuat);
     }
     if (!smoothInitialized) {
