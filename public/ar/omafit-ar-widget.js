@@ -560,7 +560,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v130-watch-face-local-axis";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v130b-watch-face-local-dupfix";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -15943,6 +15943,8 @@ async function runHandArSession({
   const braceletRadTangent = new THREE.Vector3();
   const braceletRadQuat = new THREE.Quaternion();
   const braceletRadScaleOne = new THREE.Vector3(1, 1, 1);
+  /** Eixo local da face do mostrador (±Y); declarado antes do `await` do GLB. */
+  const watchFaceLocal = new THREE.Vector3(0, 1, 0);
   let braceletIsBangle = false;
   /**
    * Modo "rigid slot": quando verdadeiro, o GLB é tratado como objeto rígido
@@ -16314,8 +16316,6 @@ async function runHandArSession({
   const tmpZ = new THREE.Vector3();
   const tmpPos = new THREE.Vector3();
   const tmpCamToWrist = new THREE.Vector3();
-  /** Eixo local da face do mostrador (±Y) resolvido em `fitWristGlb`. */
-  const watchFaceLocal = new THREE.Vector3(0, 1, 0);
   /** Triângulo punho→MCP índice / mindinho: normal ≈ palma vs dorso (só relógio). */
   const wristTriA = new THREE.Vector3();
   const wristTriB = new THREE.Vector3();
