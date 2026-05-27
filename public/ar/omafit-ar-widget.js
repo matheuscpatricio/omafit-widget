@@ -547,7 +547,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v123-watch-roll-guard";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v124-watch-deterministic-orientation";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -16465,22 +16465,12 @@ async function runHandArSession({
       if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
     }
 
-    const watchPalmNxPreFlip = palmTriN.dot(tmpX);
-    const watchPalmNyPreFlip = palmTriN.dot(tmpY);
-    let watchHalfTurnApplied = false;
     /**
-     * Pulso direito: sem este flip o mostrador fica invertido (hastes/topo trocados)
-     * enquanto o esquerdo já está correcto. Equivalente a π rad em torno do antebraço.
+     * Relógio: NÃO aplicar meia-volta por handedness no tracking.
+     * A orientação previsível deve vir da canonização do GLB no load e
+     * da base geométrica da mão neste frame; flip por Left/Right tende a
+     * introduzir inversões intermitentes em torso/palma.
      */
-    if (
-      accessoryType === "watch" &&
-      !OMAFIT_WATCH_USE_HANDEDNESS_LABEL &&
-      handLabel === "Right"
-    ) {
-      tmpX.negate();
-      tmpY.negate();
-      watchHalfTurnApplied = true;
-    }
 
     tmpZ.copy(handZForearm);
     tmpX.crossVectors(tmpY, tmpZ).normalize();
@@ -16595,14 +16585,8 @@ async function runHandArSession({
      */
     basisMat.makeBasis(tmpX, tmpY, tmpZ);
     tmpQuat.setFromRotationMatrix(basisMat);
-    const palmNx =
-      watchHalfTurnApplied && accessoryType === "watch"
-        ? watchPalmNxPreFlip
-        : palmTriN.dot(tmpX);
-    const palmNy =
-      watchHalfTurnApplied && accessoryType === "watch"
-        ? watchPalmNyPreFlip
-        : palmTriN.dot(tmpY);
+    const palmNx = palmTriN.dot(tmpX);
+    const palmNy = palmTriN.dot(tmpY);
     const wristRoll = Math.atan2(palmNx, palmNy);
     handRollQuat.setFromAxisAngle(
       handZForearm,
