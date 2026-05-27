@@ -624,7 +624,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-26-ar-widget-v120-bracelet-occ-split";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v121-watch-orientation-fix";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -16595,14 +16595,12 @@ async function runHandArSession({
     }
 
     /**
-     * Pulso direito: sem este flip o mostrador fica invertido (hastes/topo trocados)
-     * enquanto o esquerdo já está correcto. Equivalente a π rad em torno do antebraço.
+     * Guarda final de orientação do relógio:
+     * aplica meia-volta fixa no plano local (X/Y) para manter o sentido
+     * consistente do mostrador (dorso = topo, palma = fundo), independentemente
+     * de handedness e pequenas oscilações de classificação por frame.
      */
-    if (
-      accessoryType === "watch" &&
-      !OMAFIT_WATCH_USE_HANDEDNESS_LABEL &&
-      handLabel === "Right"
-    ) {
+    if (accessoryType === "watch") {
       tmpX.negate();
       tmpY.negate();
     }
