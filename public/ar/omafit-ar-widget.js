@@ -51,8 +51,6 @@ import {
   omafitComputeNecklaceNeckWearPoint,
   omafitNecklaceArcSpanFromBbox,
   OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
-  OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES,
-  OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS,
   resolveNecklaceNeckJawWidthDropMul,
   resolveNecklaceMerchantScaleMul,
 } from "./omafit-necklace-calibration.js";
@@ -225,62 +223,6 @@ let __omafitSharedDracoLoader = null;
 let __omafitSharedDracoLoaderPromise = null;
 /** URL já avisada por excesso de triângulos (evita spam na consola). */
 let __omafitGlbTriWarnUrl = null;
-
-/**
- * Cache em memória de GLTFs parseados (evita re-parse ao trocar variantes / reabrir modal).
- * IMPORTANTE:
- * - Nunca reutilizar a mesma `scene` diretamente (o runtime faz bake/reparent).
- * - Ao servir do cache, devolvemos `scene.clone(true)` (materiais/texturas partilhados).
- */
-const OMAFIT_GLB_MEM_CACHE_MAX = 10;
-let __omafitGlbMemCache = null;
-
-function omafitGetGlbMemCache() {
-  try {
-    if (typeof window !== "undefined") {
-      if (!window.__omafitGlbMemCache) window.__omafitGlbMemCache = new Map();
-      return window.__omafitGlbMemCache;
-    }
-  } catch {
-    /* ignore */
-  }
-  if (!__omafitGlbMemCache) __omafitGlbMemCache = new Map();
-  return __omafitGlbMemCache;
-}
-
-function omafitGlbMemCacheSet(key, val) {
-  const c = omafitGetGlbMemCache();
-  c.set(key, val);
-  if (c.size <= OMAFIT_GLB_MEM_CACHE_MAX) return;
-  // FIFO simples: remove a entrada mais antiga (ordem de inserção do Map).
-  const first = c.keys().next();
-  if (!first?.done) c.delete(first.value);
-}
-
-async function omafitLoadGltfSceneCached(loader, url, onProgress) {
-  const u = String(url || "").trim();
-  if (!u) throw new Error("glb_url_vazia");
-  const key = `gltf:${u}`;
-  const c = omafitGetGlbMemCache();
-  let p = c.get(key);
-  if (!p) {
-    p = new Promise((resolve, reject) => {
-      loader.load(
-        u,
-        resolve,
-        onProgress,
-        (err) => reject(err),
-      );
-    });
-    omafitGlbMemCacheSet(key, p);
-  }
-  const gltf = await p;
-  const srcScene = gltf?.scene || gltf?.scenes?.[0];
-  if (!srcScene || typeof srcScene.clone !== "function") {
-    throw new Error("gltf_sem_scene");
-  }
-  return srcScene.clone(true);
-}
 
 /**
  * DracoLoader partilhado (lazy `import()` da primeira vez) — descodifica GLB Draco sem duplicar WASM.
@@ -513,25 +455,6 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
  * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
  */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
-
-/**
- * Dois planos depth-only (eixo dorsal↔palmar `smY`) quando o anel é visto «de cima/baixo»
- * ou ao longo do braço — o cilindro só oclui o arco traseiro em perfil.
- */
-const OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN = 0.32;
-/** Vista por cima/baixo: câmara alinhada com `smY` (dorso/palma), não com `smZ`. */
-const OMAFIT_BRACELET_OCC_DUAL_ALONG_DORSAL_MIN = 0.28;
-/** Offset do plano (m) proporcional ao span punho LM5–LM17. */
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MUL = 0.014;
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MIN_M = 0.0011;
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MAX_M = 0.0032;
-/** Banda onde ambos planos ficam ON (suaviza o limiar dorsal/palmar). */
-const OMAFIT_BRACELET_OCC_DUAL_HYSTERESIS_Y = 0.1;
-/** Escala local do `PlaneGeometry` (metros do GLB). */
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MIN_M = 0.18;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MAX_M = 0.62;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MIN_M = 0.14;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MAX_M = 0.52;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -624,7 +547,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v121-watch-orientation-fix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v123-watch-roll-guard";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3201,8 +3124,6 @@ function omafitNecklaceWearAndOrientStep(
       {
         trapeziusFraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
         chinNormAlong: OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
-        trapLockStableFrames: OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES,
-        trapLockStableEps: OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS,
       },
     );
 
@@ -3260,24 +3181,21 @@ function omafitNecklaceWearAndOrientStep(
         const faceLen = chinV && fhV
           ? Math.hypot(chinV.x - fhV.x, chinV.y - fhV.y, chinV.z - fhV.z)
           : null;
-        console.log("[omafit-ar] colar: trapézio", {
+        console.log("[omafit-ar] colar: trapézio (cache relativo)", {
           build: OMAFIT_AR_WIDGET_BUILD,
           source: clavScratch?.neckSource,
           poseShoulderOk: st.poseShoulderOk,
-          lockFrozen: !!clavScratch?.lockFrozen,
-          lockedDropPerFace: clavScratch?.lockedDropPerFace?.toFixed?.(3) ?? null,
-          warmupDropPerFace: clavScratch?.warmupDropPerFace?.toFixed?.(3) ?? null,
+          poseConfidence: st.poseShoulders?.confidence?.toFixed?.(2) ?? null,
+          dropPerFace: clavScratch?.lastDropPerFace?.toFixed?.(3) ?? null,
+          xOffsetPerFace: clavScratch?.lastXOffsetPerFace?.toFixed?.(3) ?? null,
           faceLen: Number.isFinite(faceLen) ? faceLen.toFixed(2) : null,
-          descentCm: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lockedDropPerFace)
-            ? (faceLen * clavScratch.lockedDropPerFace).toFixed(2)
-            : Number.isFinite(faceLen) && Number.isFinite(clavScratch?.warmupDropPerFace)
-              ? (faceLen * clavScratch.warmupDropPerFace).toFixed(2)
-              : Number.isFinite(faceLen)
-                ? (faceLen * 0.92).toFixed(2)
-                : null,
+          predictedDescent: Number.isFinite(faceLen) && Number.isFinite(clavScratch?.lastDropPerFace)
+            ? (faceLen * clavScratch.lastDropPerFace).toFixed(2)
+            : null,
           actualBelowChin: chinV
             ? (neckWearPt.y - chinV.y).toFixed(2)
             : null,
+          fraction: OMAFIT_NECKLACE_TRAPEZIUS_FRACTION,
         });
       } catch {
         /* ignore */
@@ -9687,21 +9605,30 @@ async function runArSession({
     const loader = new GLTFLoader();
     loader.setCrossOrigin("anonymous");
     if (dracoLoaderFace) loader.setDRACOLoader(dracoLoaderFace);
-    /**
-     * Performance: manter cache (URL já é versionado por `data-ar-glb-version` via `buildGlbLoaderUrl`).
-     * Não remover `THREE.Cache` aqui — isso força re-download/re-parse.
-     * Se a loja publicar sem bump de versão, é esperado conteúdo antigo em cache.
-     */
-    let glasses;
     try {
-      glasses = await omafitLoadGltfSceneCached(loader, glbLoadUrl);
-    } catch (err) {
-      console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
-        url: glbLoadUrl,
-        message: err?.message || String(err),
-      });
-      throw err;
+      if (THREE.Cache && typeof THREE.Cache.remove === "function") {
+        THREE.Cache.remove(glbLoadUrl);
+        THREE.Cache.remove(sessionGlbUrl);
+        THREE.Cache.remove(glbUrl);
+      }
+    } catch {
+      /* ignore */
     }
+    const gltf = await new Promise((resolve, reject) => {
+      loader.load(
+        glbLoadUrl,
+        resolve,
+        undefined,
+        (err) => {
+          console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
+            url: glbLoadUrl,
+            message: err?.message || String(err),
+          });
+          reject(err);
+        },
+      );
+    });
+    let glasses = gltf.scene;
     /** Root GLB: estado conhecido antes de bake / bind (óculos). */
     if (accessoryType === "glasses") {
       glasses.position.set(0, 0, 0);
@@ -9792,28 +9719,6 @@ async function runArSession({
         mat.needsUpdate = true;
       }
     });
-
-    /**
-     * Pré-carga (face): puxar GLBs das outras variantes para cache HTTP do browser.
-     * Non-blocking; acelera troca no strip e reabertura no mesmo PDP.
-     */
-    try {
-      const rootArEl = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
-      const rawVarsPreload = rootArEl ? (rootArEl.getAttribute("data-ar-variants-glb") || "").trim() : "";
-      if (rawVarsPreload) {
-        const parsedPreload = JSON.parse(rawVarsPreload);
-        if (Array.isArray(parsedPreload)) {
-          const currentUrl = String(glbLoadUrl || "");
-          parsedPreload.forEach((vp) => {
-            const vpUrl = buildGlbLoaderUrl(String(vp?.g || "").trim(), glbVersion);
-            if (!vpUrl || vpUrl === currentUrl) return;
-            fetch(vpUrl, { cache: "force-cache", mode: "cors" }).catch(() => {});
-          });
-        }
-      }
-    } catch {
-      /* ignore */
-    }
     if (accessoryType === "glasses" || accessoryType === "necklace") {
       try {
         if (accessoryType === "necklace") {
@@ -11557,11 +11462,6 @@ async function runArSession({
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
       necklaceOrientGroup: accessoryType === "necklace" ? necklaceOrientGroup : null,
       necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
-      /**
-       * Por defeito **false**: MindAR já espelha o frame antes do solvePnP em selfie;
-       * negar X outra vez inverte a base do pescoço (colar «de cabeça para baixo» / espelhado).
-       * Só activar com `data-ar-necklace-mirror-landmarks-x="1"` se o GLB/pipeline exigir.
-       */
       necklaceMirrorSelfieX:
         accessoryType === "necklace"
           ? /^(1|true|yes|on)$/i.test(
@@ -11802,12 +11702,8 @@ async function runArSession({
               faceNeck: new THREE.Vector3(),
               poseNeck: new THREE.Vector3(),
               shMid: new THREE.Vector3(),
-              warmupDropPerFace: null,
+              lastDropPerFace: null,
               lastXOffsetPerFace: null,
-              lockedDropPerFace: null,
-              lockedXOffsetPerFace: null,
-              lockFrozen: false,
-              trapDropHistory: null,
               lastValidPoseMs: 0,
             }
           : null,
@@ -11979,12 +11875,8 @@ async function runArSession({
             if (st.necklaceSwing) st.necklaceSwing.refNeckW = null;
             st.poseShoulderOk = false;
             if (st.necklaceClavicleScratch) {
-              st.necklaceClavicleScratch.warmupDropPerFace = null;
+              st.necklaceClavicleScratch.lastDropPerFace = null;
               st.necklaceClavicleScratch.lastXOffsetPerFace = null;
-              st.necklaceClavicleScratch.lockedDropPerFace = null;
-              st.necklaceClavicleScratch.lockedXOffsetPerFace = null;
-              st.necklaceClavicleScratch.lockFrozen = false;
-              st.necklaceClavicleScratch.trapDropHistory = null;
               st.necklaceClavicleScratch.poseStableFrames = 0;
             }
           }
@@ -14693,46 +14585,34 @@ async function runHandArSession({
   anchor.add(armOccluder);
 
   /**
-   * Planos depth-only pulseira — legado (corrente / vista lateral) + par dorsal↔palmar
-   * (`occDual`) quando rigid + câmara alinhada com o braço (`smZ`).
+   * Plano de oclusão (depth-only), criado uma única vez.
+   * Escreve no depth buffer sem pintar cor para ajudar a esconder
+   * geometrias da pulseira que deveriam ficar atrás do punho.
    */
-  let occPlaneBraceletLegacy = null;
-  let braceletOccDualA = null;
-  let braceletOccDualB = null;
-  if (accessoryType === "bracelet") {
-    const braceletOccPlaneGeomShared = new THREE.PlaneGeometry(0.26, 0.22);
-    const createBraceletOccDepthPlaneMesh = () => {
-      const mesh = new THREE.Mesh(
-        braceletOccPlaneGeomShared,
-        new THREE.MeshBasicMaterial({
-          colorWrite: false,
-          depthWrite: true,
-          depthTest: true,
-          depthFunc: THREE.LessEqualDepth,
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0,
-          polygonOffset: true,
-          polygonOffsetFactor: 1,
-          polygonOffsetUnits: 1,
-          /**
-           * Transparente mantém comportamento igual ao antigo (`occPlane`): fila transparente +
-           * `depthWrite`; evita inconsistências com meshes do GLB nas fronteiras.
-           */
-          toneMapped: false,
-        }),
-      );
-      mesh.visible = false;
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 1;
-      mesh.scale.set(0.12, 0.08, 1);
-      scene.add(mesh);
-      return mesh;
-    };
-    occPlaneBraceletLegacy = createBraceletOccDepthPlaneMesh();
-    braceletOccDualA = createBraceletOccDepthPlaneMesh();
-    braceletOccDualB = createBraceletOccDepthPlaneMesh();
-  }
+  const occPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.2, 0.2),
+    new THREE.MeshBasicMaterial({
+      colorWrite: false,
+      depthWrite: true,
+      depthTest: true,
+      depthFunc: THREE.LessEqualDepth,
+      side: THREE.DoubleSide,
+      /**
+       * O antigo overlay vermelho (`opacity` 0.2 + `transparent`) punha o plano na
+       * fila transparente e o depth combinava com o GLB curvo; só `colorWrite:false`
+       * opaco mudava o comportamento e a pulseira parecia “plana” no pulso.
+       * Mantemos fila transparente com opacidade 0 — invisível, mesmo efeito 3D.
+       */
+      transparent: true,
+      opacity: 0,
+    }),
+  );
+  occPlane.visible = false;
+  occPlane.frustumCulled = false;
+  occPlane.renderOrder = 1;
+  occPlane.scale.set(0.12, 0.08, 1);
+  scene.add(occPlane);
+
   /** Sombra de contacto (multiply) ligeira sob o mostrador — pele escurecida ao centro. */
   const contactRadialTex = createHandArRadialShadowTexture(THREE);
   const contactShadow = new THREE.Mesh(
@@ -15981,8 +15861,6 @@ async function runHandArSession({
    * sólidas (elong ≤ OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD).
    */
   let braceletIsRigidSlot = false;
-  /** Planos dorsal/palmar activos neste frame (rigid slot, vista topo/baixo ou ao longo do braço). */
-  let braceletUseDualOcc = false;
   let braceletLinkRadial = null;
   let braceletVertexDeform = null;
   let braceletOcclusionMaterials = [];
@@ -15991,9 +15869,6 @@ async function runHandArSession({
   const braceletOccWidth = new THREE.Vector3();
   const braceletOccForward = new THREE.Vector3();
   const braceletOccNormal = new THREE.Vector3();
-  const braceletOccAxisAz = new THREE.Vector3();
-  const braceletOccTanTmp = new THREE.Vector3();
-
   /** Deslize ao longo do antebraço (inércia dupla). */
   let braceletWristPrev = null;
   let braceletSlideFast = 0;
@@ -16145,21 +16020,17 @@ async function runHandArSession({
             if (!obj?.isMesh) return;
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
             let writesDepth = false;
-            const isBraceletOccPlane =
-              obj === occPlaneBraceletLegacy ||
-              obj === braceletOccDualA ||
-              obj === braceletOccDualB;
             for (let i = 0; i < mats.length; i++) {
               const mat = mats[i];
               if (!mat) continue;
               if (mat.depthWrite) {
                 writesDepth = true;
-                if (!isBraceletOccPlane) mat.depthWrite = false;
+                if (obj !== occPlane) mat.depthWrite = false;
               }
             }
             if (writesDepth && debug) {
               console.log(
-                isBraceletOccPlane ? "DEPTH WRITER: bracelet occ planes" : "DEPTH WRITER: disabled",
+                obj === occPlane ? "DEPTH WRITER: occPlane" : "DEPTH WRITER: disabled",
                 obj.name || obj.type || "mesh",
               );
             }
@@ -16594,15 +16465,21 @@ async function runHandArSession({
       if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
     }
 
+    const watchPalmNxPreFlip = palmTriN.dot(tmpX);
+    const watchPalmNyPreFlip = palmTriN.dot(tmpY);
+    let watchHalfTurnApplied = false;
     /**
-     * Guarda final de orientação do relógio:
-     * aplica meia-volta fixa no plano local (X/Y) para manter o sentido
-     * consistente do mostrador (dorso = topo, palma = fundo), independentemente
-     * de handedness e pequenas oscilações de classificação por frame.
+     * Pulso direito: sem este flip o mostrador fica invertido (hastes/topo trocados)
+     * enquanto o esquerdo já está correcto. Equivalente a π rad em torno do antebraço.
      */
-    if (accessoryType === "watch") {
+    if (
+      accessoryType === "watch" &&
+      !OMAFIT_WATCH_USE_HANDEDNESS_LABEL &&
+      handLabel === "Right"
+    ) {
       tmpX.negate();
       tmpY.negate();
+      watchHalfTurnApplied = true;
     }
 
     tmpZ.copy(handZForearm);
@@ -16718,8 +16595,14 @@ async function runHandArSession({
      */
     basisMat.makeBasis(tmpX, tmpY, tmpZ);
     tmpQuat.setFromRotationMatrix(basisMat);
-    const palmNx = palmTriN.dot(tmpX);
-    const palmNy = palmTriN.dot(tmpY);
+    const palmNx =
+      watchHalfTurnApplied && accessoryType === "watch"
+        ? watchPalmNxPreFlip
+        : palmTriN.dot(tmpX);
+    const palmNy =
+      watchHalfTurnApplied && accessoryType === "watch"
+        ? watchPalmNyPreFlip
+        : palmTriN.dot(tmpY);
     const wristRoll = Math.atan2(palmNx, palmNy);
     handRollQuat.setFromAxisAngle(
       handZForearm,
@@ -17043,121 +16926,43 @@ async function runHandArSession({
     armOccluder.updateMatrix();
     armOccluder.updateMatrixWorld(true);
     /**
-     * Oclusão por planos depth-only (pulseira):
-     * — **Rigid slot** + câmara alinhada com dorso/palma (`smY`) ou antebraço (`smZ`):
-     * dois planos depth-only com normal ± dorsal para ocultar metade oposta do anel.
-     * — **Correntes / vista lateral pura**: plano legado único.
+     * occPlane: reativado para rigid slot após orientação estabilizada (v6).
+     * O plano depth-only entre pele e parte posterior do anel faz a pulseira
+     * parecer envolver o punho — sem ele a metade traseira aparece à frente da pele.
      */
-    if (
-      accessoryType === "bracelet" &&
-      OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED &&
-      occPlaneBraceletLegacy &&
-      braceletOccDualA &&
-      braceletOccDualB
-    ) {
-      const wristWidthOcc = w5.distanceTo(w17);
-
+    occPlane.visible = accessoryType === "bracelet";
+    if (occPlane.visible) {
+      // T/B/N: normal do plano deve apontar para DENTRO do braço.
+      braceletOccWidth.copy(smX).normalize();   // T
+      braceletOccForward.copy(smY).normalize(); // B
+      braceletOccNormal.crossVectors(braceletOccWidth, braceletOccForward).normalize(); // N
+      braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      if (braceletOccNormal.dot(braceletCameraDir) > 0) {
+        braceletOccNormal.negate();
+      }
+      const dotOcc = THREE.MathUtils.clamp(
+        braceletOccNormal.dot(braceletCameraDir),
+        -1,
+        1,
+      );
       tmpCamToWrist.subVectors(camera.position, smPos);
       if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
       else tmpCamToWrist.set(0, 0, 1);
-
-      occPlaneBraceletLegacy.visible = false;
-      braceletOccDualA.visible = false;
-      braceletOccDualB.visible = false;
-      braceletUseDualOcc = false;
-
-      const towardArmAbs = THREE.MathUtils.clamp(
-        Math.abs(tmpCamToWrist.dot(smZ)),
-        0,
-        1,
+      const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
+      occPlane.visible = isInFront && dotOcc < -0.2;
+      basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
+      occPlane.quaternion.setFromRotationMatrix(basisMat);
+      const wristWidthOcc = w5.distanceTo(w17);
+      const dynamicOffset = THREE.MathUtils.clamp(
+        wristWidthOcc * 0.015,
+        0.0008,
+        0.0015,
       );
-      const towardDorsalAbs = THREE.MathUtils.clamp(
-        Math.abs(tmpCamToWrist.dot(smY)),
-        0,
-        1,
-      );
-      const useDualRingSplit =
-        braceletIsRigidSlot &&
-        (towardDorsalAbs >= OMAFIT_BRACELET_OCC_DUAL_ALONG_DORSAL_MIN ||
-          towardArmAbs >= OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN);
-
-      if (useDualRingSplit) {
-        braceletUseDualOcc = true;
-        const ax = braceletOccWidth.copy(smX).normalize();
-        const ay = braceletOccForward.copy(smY).normalize();
-        braceletOccAxisAz.crossVectors(ax, ay).normalize();
-        const dz = THREE.MathUtils.clamp(tmpCamToWrist.dot(ay), -1, 1);
-
-        const off = THREE.MathUtils.clamp(
-          wristWidthOcc * OMAFIT_BRACELET_OCC_DUAL_OFFSET_MUL,
-          OMAFIT_BRACELET_OCC_DUAL_OFFSET_MIN_M,
-          OMAFIT_BRACELET_OCC_DUAL_OFFSET_MAX_M,
-        );
-
-        basisMat.makeBasis(ax, braceletOccAxisAz, ay);
-        braceletOccDualA.quaternion.setFromRotationMatrix(basisMat);
-        braceletOccDualA.position.copy(smPos).addScaledVector(ay, -off);
-
-        braceletOccNormal.copy(ay).negate();
-        braceletOccTanTmp.copy(braceletOccAxisAz).multiplyScalar(-1);
-        basisMat.makeBasis(ax, braceletOccTanTmp, braceletOccNormal);
-        braceletOccDualB.quaternion.setFromRotationMatrix(basisMat);
-        braceletOccDualB.position.copy(smPos).addScaledVector(ay, off);
-
-        const sx = THREE.MathUtils.clamp(
-          wristWidthOcc * 18,
-          OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MIN_M,
-          OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MAX_M,
-        );
-        const sy = THREE.MathUtils.clamp(
-          wristWidthOcc * 14,
-          OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MIN_M,
-          OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MAX_M,
-        );
-        braceletOccDualA.scale.set(sx, sy, 1);
-        braceletOccDualB.scale.set(sx, sy, 1);
-
-        const hb = OMAFIT_BRACELET_OCC_DUAL_HYSTERESIS_Y;
-        braceletOccDualA.visible = dz >= -hb;
-        braceletOccDualB.visible = dz <= hb;
-
-        braceletOccDualA.updateMatrixWorld(true);
-        braceletOccDualB.updateMatrixWorld(true);
-
-        braceletOccNormal.copy(smZ).normalize();
-      } else {
-        occPlaneBraceletLegacy.visible = true;
-        braceletOccWidth.copy(smX).normalize(); // T
-        braceletOccForward.copy(smY).normalize(); // B
-        braceletOccNormal.crossVectors(braceletOccWidth, braceletOccForward).normalize(); // N
-        braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-        if (braceletOccNormal.dot(braceletCameraDir) > 0) {
-          braceletOccNormal.negate();
-        }
-        const dotOcc = THREE.MathUtils.clamp(
-          braceletOccNormal.dot(braceletCameraDir),
-          -1,
-          1,
-        );
-        const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
-        const legacyDotGate = braceletIsRigidSlot ? -0.55 : -0.2;
-        occPlaneBraceletLegacy.visible = isInFront && dotOcc < legacyDotGate;
-        basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
-        occPlaneBraceletLegacy.quaternion.setFromRotationMatrix(basisMat);
-        const dynamicOffset = THREE.MathUtils.clamp(
-          wristWidthOcc * 0.015,
-          0.0008,
-          0.0015,
-        );
-        occPlaneBraceletLegacy.position
-          .copy(smPos)
-          .addScaledVector(braceletOccNormal, dynamicOffset);
-        if (occPlaneBraceletLegacy.visible) {
-          occPlaneBraceletLegacy.updateMatrix();
-          occPlaneBraceletLegacy.updateMatrixWorld(true);
-        }
+      occPlane.position.copy(smPos).addScaledVector(braceletOccNormal, dynamicOffset);
+      if (occPlane.visible) {
+        occPlane.updateMatrix();
+        occPlane.updateMatrixWorld(true);
       }
-
       if (braceletOccNormalDebugLine?.geometry?.attributes?.position) {
         const occPos = braceletOccNormalDebugLine.geometry.attributes.position;
         occPos.setXYZ(0, smPos.x, smPos.y, smPos.z);
@@ -17170,6 +16975,7 @@ async function runHandArSession({
         occPos.needsUpdate = true;
       }
     }
+
     /**
      * Oclusão adaptativa visual (material) para pulseira:
      * - factor por angulação normal-do-pulso vs direcção da câmara
@@ -17180,7 +16986,6 @@ async function runHandArSession({
     if (
       OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
       accessoryType === "bracelet" &&
-      !braceletUseDualOcc &&
       braceletOcclusionMaterials.length > 0
     ) {
       braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
@@ -17728,14 +17533,7 @@ async function runHandArSession({
         accessoryType === "bracelet"
           ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && armOccluder.visible
           : true;
-      if (
-        accessoryType !== "bracelet" ||
-        !OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED
-      ) {
-        if (occPlaneBraceletLegacy) occPlaneBraceletLegacy.visible = false;
-        if (braceletOccDualA) braceletOccDualA.visible = false;
-        if (braceletOccDualB) braceletOccDualB.visible = false;
-      }
+      occPlane.visible = accessoryType === "bracelet" && occPlane.visible;
       if (braceletAxisDebugLine) braceletAxisDebugLine.visible = accessoryType === "bracelet";
       if (braceletOccNormalDebugLine) braceletOccNormalDebugLine.visible = accessoryType === "bracelet";
       contactShadow.visible = true;
@@ -17752,9 +17550,7 @@ async function runHandArSession({
           }
         }
         armOccluder.visible = false;
-        if (occPlaneBraceletLegacy) occPlaneBraceletLegacy.visible = false;
-        if (braceletOccDualA) braceletOccDualA.visible = false;
-        if (braceletOccDualB) braceletOccDualB.visible = false;
+        occPlane.visible = false;
         if (braceletAxisDebugLine) braceletAxisDebugLine.visible = false;
         if (braceletOccNormalDebugLine) braceletOccNormalDebugLine.visible = false;
         contactShadow.visible = false;

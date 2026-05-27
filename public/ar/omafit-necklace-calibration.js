@@ -55,60 +55,19 @@ export const OMAFIT_NECK_LM_LEFT_CHEEK = 454;
 export const OMAFIT_NECK_LM_RIGHT_CHEEK = 234;
 
 /**
- * Descida trapézio (× faceLen abaixo do queixo) — valor alvo até pose confirmar.
- * ~0,92 × faceLen ≈ linha do trapézio em selfie típica.
+ * Fallback face-only: descida em × faceLen (testa→queixo) abaixo do queixo.
+ * Trapézio sem pose ≈ 0,78 × faceLen (abaixo do queixo, não na testa).
  */
-export const OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE = 0.92;
+export const OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE = 0.78;
 
 /** Queixo estimado a esta fração do segmento nariz→ombros (coords norm 0–1, Y↓). */
 export const OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER = 0.26;
 
 /** Frames consecutivos estáveis antes de bloquear o ratio trapézio. */
-export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES = 12;
+export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_FRAMES = 10;
 
 /** Variação máxima (× faceLen) entre frames para contar como «estável». */
-export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS = 0.028;
-
-/** Faixa anatómica trapézio (× faceLen) — fora disto = frame pose rejeitado. */
-export const OMAFIT_NECKLACE_TRAP_DROP_MIN = 0.84;
-export const OMAFIT_NECKLACE_TRAP_DROP_MAX = 1.02;
-
-/** Mediana mínima para aceitar lock (evita lock em 0,62 por glitch pose). */
-export const OMAFIT_NECKLACE_TRAP_LOCK_MIN_MEDIAN = 0.88;
-
-/** Peso do queixo no centro X (0 = só bochechas, 1 = só queixo). */
-export const OMAFIT_NECKLACE_TRAP_CHIN_X_BLEND = 0.55;
-
-/** Influência do offset horizontal dos ombros (0 = ignorar pose em X). */
-export const OMAFIT_NECKLACE_TRAP_SHOULDER_X_BLEND = 0.35;
-
-/**
- * Correção selfie: desvio ligeiro para a direita do ecrã (× faceLen).
- * Negativo desloca o colar para a esquerda do ecrã.
- */
-export const OMAFIT_NECKLACE_TRAP_CENTER_X_BIAS_PER_FACE = -0.02;
-
-function omafitNecklaceTrapCenterX(chin, mxFace, cfg) {
-  const blend =
-    cfg?.trapChinXBlend != null && cfg.trapChinXBlend >= 0
-      ? Math.min(1, cfg.trapChinXBlend)
-      : OMAFIT_NECKLACE_TRAP_CHIN_X_BLEND;
-  return chin.x * blend + mxFace * (1 - blend);
-}
-
-function omafitNecklaceTrapXBias(faceLen, cfg) {
-  const perFace =
-    cfg?.trapCenterXBiasPerFace != null && Number.isFinite(cfg.trapCenterXBiasPerFace)
-      ? cfg.trapCenterXBiasPerFace
-      : OMAFIT_NECKLACE_TRAP_CENTER_X_BIAS_PER_FACE;
-  return perFace * faceLen;
-}
-
-function omafitNecklaceTrapShoulderXMul(cfg) {
-  return cfg?.trapShoulderXBlend != null && cfg.trapShoulderXBlend >= 0
-    ? Math.min(1, cfg.trapShoulderXBlend)
-    : OMAFIT_NECKLACE_TRAP_SHOULDER_X_BLEND;
-}
+export const OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS = 0.035;
 
 function omafitMedianFinite(nums) {
   const a = nums.filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
@@ -557,17 +516,10 @@ export function omafitComputeNecklaceNeckWearPoint(
 
         const mxFace = (L.x + R.x) * 0.5;
         const xOffsetNorm = shMidNormX - eyeMidNormX;
-        const xOffsetPerFace =
-          ((xOffsetNorm * scale) / faceLen) * omafitNecklaceTrapShoulderXMul(cfg);
-        const centerX = omafitNecklaceTrapCenterX(chin, mxFace, cfg);
-        const xBias = omafitNecklaceTrapXBias(faceLen, cfg);
+        const xOffsetPerFace = (xOffsetNorm * scale) / faceLen;
 
-        const trapMin =
-          cfg?.trapDropMin > 0 ? cfg.trapDropMin : OMAFIT_NECKLACE_TRAP_DROP_MIN;
-        const trapMax =
-          cfg?.trapDropMax > 0 ? cfg.trapDropMax : OMAFIT_NECKLACE_TRAP_DROP_MAX;
-        const inTrapBand = dropPerFace >= trapMin && dropPerFace <= trapMax;
-        const validX = Math.abs(xOffsetPerFace) <= 0.35;
+        const validDrop = dropPerFace >= 0.48 && dropPerFace <= 1.05;
+        const validX = Math.abs(xOffsetPerFace) <= 0.45;
 
         const lockStableN =
           cfg?.trapLockStableFrames > 0
@@ -577,84 +529,74 @@ export function omafitComputeNecklaceNeckWearPoint(
           cfg?.trapLockStableEps > 0
             ? cfg.trapLockStableEps
             : OMAFIT_NECKLACE_TRAP_LOCK_STABLE_EPS;
-        const lockMinMed =
-          cfg?.trapLockMinMedian > 0
-            ? cfg.trapLockMinMedian
-            : OMAFIT_NECKLACE_TRAP_LOCK_MIN_MEDIAN;
 
-        if (!scratch.trapDropHistory) scratch.trapDropHistory = [];
+        if (validDrop && validX) {
+          if (!scratch.trapDropHistory) scratch.trapDropHistory = [];
+          scratch.trapDropHistory.push(dropPerFace);
+          if (scratch.trapDropHistory.length > 24) scratch.trapDropHistory.shift();
 
-        if (inTrapBand && validX) {
-          const prev = scratch.trapDropHistory;
-          let acceptSample = true;
-          if (prev.length >= 4) {
-            const medPrev = omafitMedianFinite(prev.slice(-6));
-            if (Math.abs(dropPerFace - medPrev) > 0.1) acceptSample = false;
-          }
-          if (acceptSample) {
-            prev.push(dropPerFace);
-            if (prev.length > 28) prev.shift();
-          }
-          if (!Number.isFinite(scratch.warmupDropPerFace)) {
-            scratch.warmupDropPerFace = dropPerFace;
+          if (!Number.isFinite(scratch.lastDropPerFace)) {
+            scratch.lastDropPerFace = dropPerFace;
           } else {
-            scratch.warmupDropPerFace +=
-              (dropPerFace - scratch.warmupDropPerFace) * 0.04;
+            scratch.lastDropPerFace +=
+              (dropPerFace - scratch.lastDropPerFace) * 0.06;
           }
           if (!Number.isFinite(scratch.lastXOffsetPerFace)) {
             scratch.lastXOffsetPerFace = xOffsetPerFace;
           } else {
             scratch.lastXOffsetPerFace +=
-              (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.06;
+              (xOffsetPerFace - scratch.lastXOffsetPerFace) * 0.08;
           }
-        }
 
-        if (!scratch.lockFrozen && scratch.trapDropHistory.length >= lockStableN) {
-          const recent = scratch.trapDropHistory.slice(-lockStableN);
-          const med = omafitMedianFinite(recent);
-          const minR = Math.min(...recent);
-          const stable = recent.every((v) => Math.abs(v - med) < lockStableEps);
-          if (
-            stable &&
-            med >= lockMinMed &&
-            minR >= trapMin &&
-            !Number.isFinite(scratch.lockedDropPerFace)
-          ) {
-            scratch.lockedDropPerFace = med;
-            scratch.lockedXOffsetPerFace = Number.isFinite(scratch.lastXOffsetPerFace)
-              ? scratch.lastXOffsetPerFace
-              : 0;
-            scratch.lockFrozen = true;
+          const hist = scratch.trapDropHistory;
+          if (hist.length >= lockStableN) {
+            const recent = hist.slice(-lockStableN);
+            const med = omafitMedianFinite(recent);
+            const stable = recent.every((v) => Math.abs(v - med) < lockStableEps);
+            if (stable) {
+              if (!Number.isFinite(scratch.lockedDropPerFace)) {
+                scratch.lockedDropPerFace = med;
+                scratch.lockedXOffsetPerFace = scratch.lastXOffsetPerFace;
+                scratch.neckSource = "trapezius-locked";
+              } else {
+                scratch.lockedDropPerFace +=
+                  (med - scratch.lockedDropPerFace) * 0.015;
+                scratch.lockedXOffsetPerFace +=
+                  (scratch.lastXOffsetPerFace - scratch.lockedXOffsetPerFace) *
+                  0.015;
+                scratch.neckSource = "trapezius-locked";
+              }
+            } else {
+              scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+                ? "trapezius-locked"
+                : "trapezius-warmup";
+            }
+          } else {
+            scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+              ? "trapezius-locked"
+              : "trapezius-warmup";
           }
-        }
-
-        if (scratch.lockFrozen && Number.isFinite(scratch.lockedDropPerFace)) {
-          scratch.neckSource = "trapezius-locked";
-        } else if (Number.isFinite(scratch.warmupDropPerFace)) {
-          scratch.neckSource = "trapezius-warmup";
         } else {
-          scratch.neckSource = "face-only";
+          scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+            ? "trapezius-locked"
+            : Number.isFinite(scratch.lastDropPerFace)
+              ? "trapezius-smooth"
+              : "face-only";
         }
 
-        let useDropPF = OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
-        if (scratch.lockFrozen && Number.isFinite(scratch.lockedDropPerFace)) {
-          useDropPF = scratch.lockedDropPerFace;
-        } else if (Number.isFinite(scratch.warmupDropPerFace)) {
-          useDropPF = Math.min(
-            trapMax,
-            Math.max(trapMin, scratch.warmupDropPerFace),
-          );
-        }
-
-        const useXPF =
-          scratch.lockFrozen && Number.isFinite(scratch.lockedXOffsetPerFace)
-            ? scratch.lockedXOffsetPerFace
-            : Number.isFinite(scratch.lastXOffsetPerFace)
-              ? scratch.lastXOffsetPerFace
-              : 0;
+        const useDropPF = Number.isFinite(scratch.lockedDropPerFace)
+          ? scratch.lockedDropPerFace
+          : Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0
+            ? scratch.lastDropPerFace
+            : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
+        const useXPF = Number.isFinite(scratch.lockedXOffsetPerFace)
+          ? scratch.lockedXOffsetPerFace
+          : Number.isFinite(scratch.lastXOffsetPerFace)
+            ? scratch.lastXOffsetPerFace
+            : 0;
 
         out.copy(chin).addScaledVector(down, faceLen * useDropPF);
-        out.x = centerX + useXPF * faceLen + xBias;
+        out.x = mxFace + useXPF * faceLen;
         out.z = chin.z;
         return true;
       }
@@ -666,17 +608,25 @@ export function omafitComputeNecklaceNeckWearPoint(
    * Como `dropPerFace` é uma razão (não posição absoluta), o ponto SEGUE a face
    * mesmo sem pose — não há salto para coordenadas obsoletas.
    */
-  if (scratch.lockFrozen && Number.isFinite(scratch.lockedDropPerFace)) {
-    const mxFace = (L.x + R.x) * 0.5;
-    const centerX = omafitNecklaceTrapCenterX(chin, mxFace, cfg);
-    const xBias = omafitNecklaceTrapXBias(faceLen, cfg);
+  if (
+    Number.isFinite(scratch.lockedDropPerFace) ||
+    (Number.isFinite(scratch.lastDropPerFace) && scratch.lastDropPerFace > 0)
+  ) {
+    const useDropPF = Number.isFinite(scratch.lockedDropPerFace)
+      ? scratch.lockedDropPerFace
+      : scratch.lastDropPerFace;
     const useXPF = Number.isFinite(scratch.lockedXOffsetPerFace)
       ? scratch.lockedXOffsetPerFace
-      : 0;
-    out.copy(chin).addScaledVector(down, faceLen * scratch.lockedDropPerFace);
-    out.x = centerX + useXPF * faceLen + xBias;
+      : Number.isFinite(scratch.lastXOffsetPerFace)
+        ? scratch.lastXOffsetPerFace
+        : 0;
+    const mxFace = (L.x + R.x) * 0.5;
+    out.copy(chin).addScaledVector(down, faceLen * useDropPF);
+    out.x = mxFace + useXPF * faceLen;
     out.z = chin.z;
-    scratch.neckSource = "trapezius-locked";
+    scratch.neckSource = Number.isFinite(scratch.lockedDropPerFace)
+      ? "trapezius-locked"
+      : "trapezius-smooth";
     return true;
   }
 
@@ -687,9 +637,8 @@ export function omafitComputeNecklaceNeckWearPoint(
     ? Math.min(1.2, Math.max(0.40, faceHeightDropMul))
     : OMAFIT_NECKLACE_FACE_HEIGHT_DROP_BASE;
 
-  const mxFaceFb = (L.x + R.x) * 0.5;
   out.copy(chin).addScaledVector(down, faceLen * dropMul);
-  out.x = omafitNecklaceTrapCenterX(chin, mxFaceFb, cfg) + omafitNecklaceTrapXBias(faceLen, cfg);
+  out.x = (chin.x + scratch.midCheek.x) * 0.5;
   scratch.neckSource = "face-only";
   return true;
 }
