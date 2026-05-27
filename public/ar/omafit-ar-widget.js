@@ -227,6 +227,62 @@ let __omafitSharedDracoLoaderPromise = null;
 let __omafitGlbTriWarnUrl = null;
 
 /**
+ * Cache em memória de GLTFs parseados (evita re-parse ao trocar variantes / reabrir modal).
+ * IMPORTANTE:
+ * - Nunca reutilizar a mesma `scene` diretamente (o runtime faz bake/reparent).
+ * - Ao servir do cache, devolvemos `scene.clone(true)` (materiais/texturas partilhados).
+ */
+const OMAFIT_GLB_MEM_CACHE_MAX = 10;
+let __omafitGlbMemCache = null;
+
+function omafitGetGlbMemCache() {
+  try {
+    if (typeof window !== "undefined") {
+      if (!window.__omafitGlbMemCache) window.__omafitGlbMemCache = new Map();
+      return window.__omafitGlbMemCache;
+    }
+  } catch {
+    /* ignore */
+  }
+  if (!__omafitGlbMemCache) __omafitGlbMemCache = new Map();
+  return __omafitGlbMemCache;
+}
+
+function omafitGlbMemCacheSet(key, val) {
+  const c = omafitGetGlbMemCache();
+  c.set(key, val);
+  if (c.size <= OMAFIT_GLB_MEM_CACHE_MAX) return;
+  // FIFO simples: remove a entrada mais antiga (ordem de inserção do Map).
+  const first = c.keys().next();
+  if (!first?.done) c.delete(first.value);
+}
+
+async function omafitLoadGltfSceneCached(loader, url, onProgress) {
+  const u = String(url || "").trim();
+  if (!u) throw new Error("glb_url_vazia");
+  const key = `gltf:${u}`;
+  const c = omafitGetGlbMemCache();
+  let p = c.get(key);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      loader.load(
+        u,
+        resolve,
+        onProgress,
+        (err) => reject(err),
+      );
+    });
+    omafitGlbMemCacheSet(key, p);
+  }
+  const gltf = await p;
+  const srcScene = gltf?.scene || gltf?.scenes?.[0];
+  if (!srcScene || typeof srcScene.clone !== "function") {
+    throw new Error("gltf_sem_scene");
+  }
+  return srcScene.clone(true);
+}
+
+/**
  * DracoLoader partilhado (lazy `import()` da primeira vez) — descodifica GLB Draco sem duplicar WASM.
  * @returns {Promise<any>}
  */
@@ -567,7 +623,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-26-ar-widget-v118-bracelet-occ-dual";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-26-ar-widget-v119-glb-cache";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -9630,30 +9686,21 @@ async function runArSession({
     const loader = new GLTFLoader();
     loader.setCrossOrigin("anonymous");
     if (dracoLoaderFace) loader.setDRACOLoader(dracoLoaderFace);
+    /**
+     * Performance: manter cache (URL já é versionado por `data-ar-glb-version` via `buildGlbLoaderUrl`).
+     * Não remover `THREE.Cache` aqui — isso força re-download/re-parse.
+     * Se a loja publicar sem bump de versão, é esperado conteúdo antigo em cache.
+     */
+    let glasses;
     try {
-      if (THREE.Cache && typeof THREE.Cache.remove === "function") {
-        THREE.Cache.remove(glbLoadUrl);
-        THREE.Cache.remove(sessionGlbUrl);
-        THREE.Cache.remove(glbUrl);
-      }
-    } catch {
-      /* ignore */
+      glasses = await omafitLoadGltfSceneCached(loader, glbLoadUrl);
+    } catch (err) {
+      console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
+        url: glbLoadUrl,
+        message: err?.message || String(err),
+      });
+      throw err;
     }
-    const gltf = await new Promise((resolve, reject) => {
-      loader.load(
-        glbLoadUrl,
-        resolve,
-        undefined,
-        (err) => {
-          console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
-            url: glbLoadUrl,
-            message: err?.message || String(err),
-          });
-          reject(err);
-        },
-      );
-    });
-    let glasses = gltf.scene;
     /** Root GLB: estado conhecido antes de bake / bind (óculos). */
     if (accessoryType === "glasses") {
       glasses.position.set(0, 0, 0);
@@ -9744,6 +9791,28 @@ async function runArSession({
         mat.needsUpdate = true;
       }
     });
+
+    /**
+     * Pré-carga (face): puxar GLBs das outras variantes para cache HTTP do browser.
+     * Non-blocking; acelera troca no strip e reabertura no mesmo PDP.
+     */
+    try {
+      const rootArEl = typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+      const rawVarsPreload = rootArEl ? (rootArEl.getAttribute("data-ar-variants-glb") || "").trim() : "";
+      if (rawVarsPreload) {
+        const parsedPreload = JSON.parse(rawVarsPreload);
+        if (Array.isArray(parsedPreload)) {
+          const currentUrl = String(glbLoadUrl || "");
+          parsedPreload.forEach((vp) => {
+            const vpUrl = buildGlbLoaderUrl(String(vp?.g || "").trim(), glbVersion);
+            if (!vpUrl || vpUrl === currentUrl) return;
+            fetch(vpUrl, { cache: "force-cache", mode: "cors" }).catch(() => {});
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     if (accessoryType === "glasses" || accessoryType === "necklace") {
       try {
         if (accessoryType === "necklace") {
