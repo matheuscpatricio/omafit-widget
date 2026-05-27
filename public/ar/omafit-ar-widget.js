@@ -464,6 +464,19 @@ const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 const OMAFIT_HAND_KNUCKLE_SPAN_SCALE_K = 1.2;
 const OMAFIT_HAND_KNUCKLE_SPAN_SCALE_MIN = 0.78;
 const OMAFIT_HAND_KNUCKLE_SPAN_SCALE_MAX = 1.32;
+/** Relógio: envelope de escala relativo a `baseScale` para bloquear picos. */
+const OMAFIT_WATCH_SCALE_REL_MIN = 0.66;
+const OMAFIT_WATCH_SCALE_REL_MAX = 1.16;
+/** Relógio: suavização + limitador de variação por segundo (up/down). */
+const OMAFIT_WATCH_SCALE_TAU_MS = 260;
+const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
+const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
+/**
+ * Relógio: estabiliza o sinal anatómico do polegar no eixo X local.
+ * Evita meia-volta intermitente no braço direito sem depender de handedness.
+ */
+const OMAFIT_WATCH_THUMB_SIGN_DEADZONE_M = 0.0035;
+const OMAFIT_WATCH_THUMB_SIGN_PERSIST_FRAMES = 3;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
 const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
@@ -547,7 +560,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v124-watch-deterministic-orientation";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v125-watch-stable-orientation-scale";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -16264,6 +16277,10 @@ async function runHandArSession({
   let handKnuckleSpanRef = 0;
   let smoothKnuckleSpan = OMAFIT_BASE_KNUCKLE_SPAN_M;
   let smoothKnuckleSpanInit = false;
+  let smoothWatchScale = NaN;
+  let stableWatchThumbSign = 1;
+  let pendingWatchThumbSign = 0;
+  let pendingWatchThumbFrames = 0;
   /** Jitter span 5–17 (m) + histerese para aviso “aproxime o pulso”. */
   let prevKnuckleSpan3d = 0;
   let knuckleJitterEma = 0;
@@ -16463,6 +16480,30 @@ async function runHandArSession({
       tmpY.addScaledVector(handZForearm, -tmpY.dot(handZForearm));
       const yLenBlend = tmpY.length();
       if (yLenBlend > 1e-7) tmpY.multiplyScalar(1 / yLenBlend);
+    }
+    if (accessoryType === "watch") {
+      const thumbAxisDot = handW0to1Scratch.subVectors(w1, w0).dot(tmpX);
+      if (Math.abs(thumbAxisDot) >= OMAFIT_WATCH_THUMB_SIGN_DEADZONE_M) {
+        const thumbSign = thumbAxisDot >= 0 ? 1 : -1;
+        if (thumbSign === stableWatchThumbSign) {
+          pendingWatchThumbSign = 0;
+          pendingWatchThumbFrames = 0;
+        } else if (thumbSign === pendingWatchThumbSign) {
+          pendingWatchThumbFrames += 1;
+        } else {
+          pendingWatchThumbSign = thumbSign;
+          pendingWatchThumbFrames = 1;
+        }
+        if (pendingWatchThumbFrames >= OMAFIT_WATCH_THUMB_SIGN_PERSIST_FRAMES) {
+          stableWatchThumbSign = pendingWatchThumbSign;
+          pendingWatchThumbSign = 0;
+          pendingWatchThumbFrames = 0;
+        }
+      }
+      if (stableWatchThumbSign < 0) {
+        tmpX.negate();
+        tmpY.negate();
+      }
     }
 
     /**
@@ -17092,6 +17133,25 @@ async function runHandArSession({
          * inflar muito quando `localInnerR` vinha subestimado no GLB.
          */
         suBase = THREE.MathUtils.clamp(suBase, baseScale * 0.52, baseScale * 1.02);
+      } else if (accessoryType === "watch") {
+        const watchMin = baseScale * OMAFIT_WATCH_SCALE_REL_MIN;
+        const watchMax = baseScale * OMAFIT_WATCH_SCALE_REL_MAX;
+        let watchTarget = THREE.MathUtils.clamp(suBase, watchMin, watchMax);
+        if (!Number.isFinite(smoothWatchScale) || smoothWatchScale <= 1e-8) {
+          smoothWatchScale = watchTarget;
+        } else {
+          const dtScaleSec = Math.max(1e-3, clampDt / 1000);
+          const maxGrow = smoothWatchScale * (1 + OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC * dtScaleSec);
+          const maxShrink = smoothWatchScale * (1 - OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC * dtScaleSec);
+          watchTarget = THREE.MathUtils.clamp(
+            watchTarget,
+            Math.max(1e-6, maxShrink),
+            Math.max(maxGrow, maxShrink + 1e-6),
+          );
+          const aWatch = 1 - Math.exp(-clampDt / OMAFIT_WATCH_SCALE_TAU_MS);
+          smoothWatchScale += (watchTarget - smoothWatchScale) * aWatch;
+        }
+        suBase = smoothWatchScale;
       }
       const Wb = wristExpandMul;
       if (accessoryType === "bracelet" && braceletPlaceState) {
@@ -17551,6 +17611,10 @@ async function runHandArSession({
           /* ignore */
         }
         smoothedStrapK = 1;
+        smoothWatchScale = NaN;
+        stableWatchThumbSign = 1;
+        pendingWatchThumbSign = 0;
+        pendingWatchThumbFrames = 0;
         if (watchStrapRadial?.strap) {
           watchStrapRadial.strap.scale.set(1, 1, 1);
         }
@@ -17891,6 +17955,10 @@ async function runHandArSession({
                 }
               }
               smoothedStrapK = 1;
+              smoothWatchScale = NaN;
+              stableWatchThumbSign = 1;
+              pendingWatchThumbSign = 0;
+              pendingWatchThumbFrames = 0;
               upgradeHandArMetalMaterials(THREE, next);
               omafitEnsureGlassesMeshesRenderable(THREE, next);
               setHandArMeshRenderOrder(glbRoot, 1);
