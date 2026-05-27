@@ -515,22 +515,23 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 
 /**
- * Dois planos depth-only quando a câmara está alinhada com o antebraço (|\cos| alto):
- * o anel cruza inteiro á frente da câmara; cilindros não cortam dorsal vs palmar.
- * split axis = dorso→palma (mesma coluna Y da âncora, `smY`).
+ * Dois planos depth-only (eixo dorsal↔palmar `smY`) quando o anel é visto «de cima/baixo»
+ * ou ao longo do braço — o cilindro só oclui o arco traseiro em perfil.
  */
-const OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN = 0.42;
+const OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN = 0.32;
+/** Vista por cima/baixo: câmara alinhada com `smY` (dorso/palma), não com `smZ`. */
+const OMAFIT_BRACELET_OCC_DUAL_ALONG_DORSAL_MIN = 0.28;
 /** Offset do plano (m) proporcional ao span punho LM5–LM17. */
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MUL = 0.012;
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MIN_M = 0.00095;
-const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MAX_M = 0.00235;
+const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MUL = 0.014;
+const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MIN_M = 0.0011;
+const OMAFIT_BRACELET_OCC_DUAL_OFFSET_MAX_M = 0.0032;
 /** Banda onde ambos planos ficam ON (suaviza o limiar dorsal/palmar). */
-const OMAFIT_BRACELET_OCC_DUAL_HYSTERESIS_Y = 0.08;
+const OMAFIT_BRACELET_OCC_DUAL_HYSTERESIS_Y = 0.1;
 /** Escala local do `PlaneGeometry` (metros do GLB). */
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MIN_M = 0.16;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MAX_M = 0.58;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MIN_M = 0.12;
-const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MAX_M = 0.48;
+const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MIN_M = 0.18;
+const OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MAX_M = 0.62;
+const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MIN_M = 0.14;
+const OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MAX_M = 0.52;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -623,7 +624,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-26-ar-widget-v119-glb-cache";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-26-ar-widget-v120-bracelet-occ-split";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -15980,6 +15981,8 @@ async function runHandArSession({
    * sólidas (elong ≤ OMAFIT_BRACELET_RADIAL_AUTO_ELONG_THRESHOLD).
    */
   let braceletIsRigidSlot = false;
+  /** Planos dorsal/palmar activos neste frame (rigid slot, vista topo/baixo ou ao longo do braço). */
+  let braceletUseDualOcc = false;
   let braceletLinkRadial = null;
   let braceletVertexDeform = null;
   let braceletOcclusionMaterials = [];
@@ -17043,10 +17046,9 @@ async function runHandArSession({
     armOccluder.updateMatrixWorld(true);
     /**
      * Oclusão por planos depth-only (pulseira):
-     * — **Rigid slot** + câmara quase paralela ao braço (`|dot(cam→pulso, smZ)|` alto):
-     * dois planos com normal ± dorsal (`smY`) para ocultar metade interior do anel
-     * (vista «por cima / por baixo» do donut; o cilindro não divide nesse eixo).
-     * — **Correntes / vista lateral**: plano legado único.
+     * — **Rigid slot** + câmara alinhada com dorso/palma (`smY`) ou antebraço (`smZ`):
+     * dois planos depth-only com normal ± dorsal para ocultar metade oposta do anel.
+     * — **Correntes / vista lateral pura**: plano legado único.
      */
     if (
       accessoryType === "bracelet" &&
@@ -17064,17 +17066,25 @@ async function runHandArSession({
       occPlaneBraceletLegacy.visible = false;
       braceletOccDualA.visible = false;
       braceletOccDualB.visible = false;
+      braceletUseDualOcc = false;
 
       const towardArmAbs = THREE.MathUtils.clamp(
         Math.abs(tmpCamToWrist.dot(smZ)),
         0,
         1,
       );
-      const ringSplitAlongArm =
+      const towardDorsalAbs = THREE.MathUtils.clamp(
+        Math.abs(tmpCamToWrist.dot(smY)),
+        0,
+        1,
+      );
+      const useDualRingSplit =
         braceletIsRigidSlot &&
-        towardArmAbs >= OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN;
+        (towardDorsalAbs >= OMAFIT_BRACELET_OCC_DUAL_ALONG_DORSAL_MIN ||
+          towardArmAbs >= OMAFIT_BRACELET_OCC_DUAL_ALONG_ARM_MIN);
 
-      if (ringSplitAlongArm) {
+      if (useDualRingSplit) {
+        braceletUseDualOcc = true;
         const ax = braceletOccWidth.copy(smX).normalize();
         const ay = braceletOccForward.copy(smY).normalize();
         braceletOccAxisAz.crossVectors(ax, ay).normalize();
@@ -17097,12 +17107,12 @@ async function runHandArSession({
         braceletOccDualB.position.copy(smPos).addScaledVector(ay, off);
 
         const sx = THREE.MathUtils.clamp(
-          wristWidthOcc * 16,
+          wristWidthOcc * 18,
           OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MIN_M,
           OMAFIT_BRACELET_OCC_DUAL_SCALE_X_MAX_M,
         );
         const sy = THREE.MathUtils.clamp(
-          wristWidthOcc * 12,
+          wristWidthOcc * 14,
           OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MIN_M,
           OMAFIT_BRACELET_OCC_DUAL_SCALE_Y_MAX_M,
         );
@@ -17132,7 +17142,8 @@ async function runHandArSession({
           1,
         );
         const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
-        occPlaneBraceletLegacy.visible = isInFront && dotOcc < -0.2;
+        const legacyDotGate = braceletIsRigidSlot ? -0.55 : -0.2;
+        occPlaneBraceletLegacy.visible = isInFront && dotOcc < legacyDotGate;
         basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
         occPlaneBraceletLegacy.quaternion.setFromRotationMatrix(basisMat);
         const dynamicOffset = THREE.MathUtils.clamp(
@@ -17171,6 +17182,7 @@ async function runHandArSession({
     if (
       OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
       accessoryType === "bracelet" &&
+      !braceletUseDualOcc &&
       braceletOcclusionMaterials.length > 0
     ) {
       braceletCameraDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
