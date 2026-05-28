@@ -572,7 +572,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v134-necklace-chest-anchor";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v135-necklace-chest-scale-fix";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2921,13 +2921,21 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
   }
   const pack = omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheek, mul);
   const totalScale = pack.totalScale;
+  /**
+   * Quando o colar sai da hierarquia do `anchor.group` (world chest anchor),
+   * já não herda a escala ~14x do MindAR; compensar para manter tamanho real.
+   */
+  const appliedScale =
+    st.necklaceWorldAnchorMode === true
+      ? totalScale * Math.max(1, Number(pack.anchorDivisor) || 1)
+      : totalScale;
   const part = st.necklacePartition;
   if (part?.chain?.children?.length) {
     glbRoot.scale.set(1, 1, 1);
-    part.chain.scale.setScalar(totalScale);
-    if (part.pendant) part.pendant.scale.setScalar(totalScale);
+    part.chain.scale.setScalar(appliedScale);
+    if (part.pendant) part.pendant.scale.setScalar(appliedScale);
   } else {
-    glbRoot.scale.setScalar(totalScale);
+    glbRoot.scale.setScalar(appliedScale);
   }
   glbRoot.visible = true;
   glbRoot.traverse((o) => {
@@ -2940,12 +2948,12 @@ function omafitApplyNecklaceDisplayScale(THREE, st, glbRoot, anchorGroup, lm, ch
   });
   st.necklaceAnchorScale = pack.anchorScale;
   st.necklaceAnchorDivisor = pack.anchorDivisor;
-  st.necklaceLastFitScale = totalScale;
+  st.necklaceLastFitScale = appliedScale;
   st.necklaceTargetArcWidthCm = pack.targetArcWidthCm;
   st.necklaceCheekTrackK = pack.cheekTrackK;
   st.necklaceScaleMul = pack.merchantMul;
   st.necklacePredictedArcWidthCm = pack.predictedArcWidthCm;
-  return totalScale;
+  return appliedScale;
 }
 
 /** @deprecated alias */
@@ -10804,7 +10812,8 @@ async function runArSession({
         14,
         0.01,
       );
-      const bootTotal = bootPack.totalScale;
+      const bootTotal =
+        bootPack.totalScale * Math.max(1, Number(bootPack.anchorDivisor) || 1);
       if (necklacePartition?.chain?.children?.length) {
         glasses.scale.set(1, 1, 1);
         necklacePartition.chain.scale.setScalar(bootTotal);
