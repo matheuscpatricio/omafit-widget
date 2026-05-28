@@ -724,21 +724,14 @@ export function omafitApplyNecklaceNeckBasisOrientation(
     return false;
   }
 
-  if (!scratch.basisM4) scratch.basisM4 = new THREE.Matrix4();
-  if (!scratch.qTarget) scratch.qTarget = new THREE.Quaternion();
-  if (!scratch.qAnchor) scratch.qAnchor = new THREE.Quaternion();
   if (!scratch.qOrient) scratch.qOrient = new THREE.Quaternion();
 
-  /** Canónico Omafit: +X arco, +Y subida ao queixo, −Z frente (câmara). */
-  const upAxis = scratch.upAxis || scratch.hangNeg || new THREE.Vector3();
-  upAxis.copy(scratch.down).negate();
-  scratch.basisM4.makeBasis(scratch.lateral, upAxis, scratch.fwd);
-  scratch.qTarget.setFromRotationMatrix(scratch.basisM4);
-
-  anchorGroup.updateMatrixWorld(true);
-  anchorGroup.getWorldQuaternion(scratch.qAnchor);
-  scratch.qAnchor.invert();
-  scratch.qOrient.copy(scratch.qAnchor).multiply(scratch.qTarget);
+  /**
+   * Orientação previsível: manter rotação do colar dirigida pelo anchor
+   * (PnP/MindAR). Evita recompôr quaternion absoluto de `metricLandmarks`
+   * que gera efeito "sempre de frente para a câmera".
+   */
+  scratch.qOrient.identity();
 
   if (typeof shortestPath === "function") {
     shortestPath(orientGroup.quaternion, scratch.qOrient);
