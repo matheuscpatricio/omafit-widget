@@ -572,7 +572,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v133-necklace-anchor-orient";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v134-necklace-chest-anchor";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3111,6 +3111,7 @@ function omafitNecklaceWearAndOrientStep(
   rigidWearNative,
   dtSec,
   cfgAttr,
+  worldSpace = false,
 ) {
   if (!THREE || !st || !anchorGroup || !wearGrp || !lm) return;
   if (typeof cfgAttr === "function") {
@@ -3245,12 +3246,22 @@ function omafitNecklaceWearAndOrientStep(
     st.necklaceWearTarget,
     st.necklaceWearAnchorScaleSmooth,
   );
+  if (worldSpace && st.necklaceWearTargetWorld && anchorGroup?.localToWorld) {
+    st.necklaceWearTargetWorld.copy(st.necklaceWearTarget);
+    anchorGroup.localToWorld(st.necklaceWearTargetWorld);
+  }
   st.necklaceWearCmNative = st.necklaceWearCmNative || { x: 0, y: 0, z: 0 };
   st.necklaceWearCmNative.x = wearDx;
   st.necklaceWearCmNative.y = wearDy;
   st.necklaceWearCmNative.z = wearDz;
 
-  omafitNecklaceRigidWearStep(THREE, st, wearGrp, st.necklaceWearTarget, dtSec);
+  omafitNecklaceRigidWearStep(
+    THREE,
+    st,
+    wearGrp,
+    worldSpace && st.necklaceWearTargetWorld ? st.necklaceWearTargetWorld : st.necklaceWearTarget,
+    dtSec,
+  );
 }
 
 /**
@@ -11266,7 +11277,7 @@ async function runArSession({
       necklaceBindGroup = new GroupCtor();
       necklaceBindGroup.name = "omafit-ar-necklace-bind";
       necklaceBindGroup.quaternion.identity();
-      anchor.group.add(necklaceWearGroup);
+      mindarThree.scene.add(necklaceWearGroup);
       necklaceWearGroup.add(necklaceOrientGroup);
       necklaceOrientGroup.add(necklaceBindGroup);
       necklaceBindGroup.add(glasses);
@@ -11595,6 +11606,8 @@ async function runArSession({
         : null,
       necklaceWearTarget:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
+      necklaceWearTargetWorld:
+        accessoryType === "necklace" ? new THREE.Vector3() : null,
       necklaceMetricWearScratch:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       necklaceWearLerp: accessoryType === "necklace" ? new THREE.Vector3() : null,
@@ -11626,6 +11639,7 @@ async function runArSession({
           ? String(cfgAttr("arNecklaceForceDepthFront", "1")).trim()
           : null,
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
+      necklaceWorldAnchorMode: accessoryType === "necklace" ? true : false,
       necklaceOrientGroup: accessoryType === "necklace" ? necklaceOrientGroup : null,
       necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
       necklaceMirrorSelfieX:
@@ -12815,6 +12829,7 @@ async function runArSession({
               st.necklaceRigidWearNative,
               dtSec,
               cfgAttr,
+              st.necklaceWorldAnchorMode === true,
             );
           }
           const neckCalFrame = st.necklaceMerchantCalApplied;
