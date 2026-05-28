@@ -572,7 +572,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v136-necklace-pose-strict";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v137-necklace-pose-strict-visibility-fix";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1056,7 +1056,7 @@ const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: 0, z: 0 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
 /** Pose strict: manter último ponto world por um curto período sem ombros confiáveis. */
-const OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS = 700;
+const OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS = 1800;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
 /** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
 const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
@@ -3165,11 +3165,7 @@ function omafitNecklaceWearAndOrientStep(
     );
   const strictPose = st.necklacePoseStrict === true;
   const neckSource = String(clavScratch?.neckSource || "");
-  const strictPoseOk =
-    st.poseShoulderOk &&
-    neckWearOk &&
-    neckWearPt &&
-    neckSource.startsWith("trapezius");
+  const strictPoseOk = neckWearOk && neckWearPt && neckSource.startsWith("trapezius");
 
   const rigid =
     rigidWearNative || OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE;
@@ -3222,8 +3218,12 @@ function omafitNecklaceWearAndOrientStep(
       if (!st.necklaceWearTargetWorld) st.necklaceWearTargetWorld = new THREE.Vector3();
       st.necklaceWearTargetWorld.copy(st.necklaceStrictPoseLastWorld);
       omafitNecklaceRigidWearStep(THREE, st, wearGrp, st.necklaceWearTargetWorld, dtSec);
+      return;
     }
-    return;
+    /**
+     * Bootstrap de visibilidade: sem trapézio válido ainda, mantém update normal
+     * até obter o 1º ponto estrito; evita colar “sumir” no arranque.
+     */
   }
 
   if (anchorOk && neckWearOk && neckWearPt && anchorVec) {
