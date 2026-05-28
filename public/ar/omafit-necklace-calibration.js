@@ -653,7 +653,10 @@ export const OMAFIT_POSE_R_HIP = 24;
 export const OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M = 0.38;
 /** Trapézio/peito: fração do segmento ombro→quadril abaixo dos ombros. */
 export const OMAFIT_NECKLACE_TORSO_CHEST_FRAC = 0.14;
+/** Trapézio só com ombros: deslocamento fixo abaixo do mid-ombro (m). */
+export const OMAFIT_NECKLACE_TRAPEZIUS_SHOULDER_DOWN_M = 0.048;
 export const OMAFIT_NECKLACE_TORSO_POSE_MIN_VIS = 0.55;
+export const OMAFIT_NECKLACE_TORSO_SHOULDER_MIN_VIS = 0.5;
 export const OMAFIT_NECKLACE_TORSO_ZDIST_MIN = 0.28;
 export const OMAFIT_NECKLACE_TORSO_ZDIST_MAX = 2.4;
 
@@ -793,6 +796,111 @@ export function omafitComputeNecklaceTorsoAnchorWorld(
   quat.setFromRotationMatrix(basisM);
 
   scratch.neckSource = "torso-pose-world";
+  return true;
+}
+
+/**
+ * Ancoragem máxima: **só ombros** (sem ancas/queixo). Orientação = linha dos ombros + «baixo»
+ * da câmara (não segue nariz/queixo). Profundidade pode ser travada (`lockedZDist`).
+ *
+ * @returns {boolean}
+ */
+export function omafitComputeNecklaceTorsoAnchorShouldersOnly(
+  THREE,
+  poseLm,
+  camera,
+  scratch,
+  opts = {},
+) {
+  if (!THREE || !poseLm || !camera || !scratch) return false;
+  const lSh = poseLm[OMAFIT_POSE_L_SHOULDER];
+  const rSh = poseLm[OMAFIT_POSE_R_SHOULDER];
+  if (!lSh || !rSh) return false;
+
+  const minVis =
+    Number.isFinite(opts.minVis) && opts.minVis > 0
+      ? opts.minVis
+      : OMAFIT_NECKLACE_TORSO_SHOULDER_MIN_VIS;
+  const lv = Math.min(lSh.visibility ?? 1, rSh.visibility ?? 1);
+  if (lv < minVis) return false;
+
+  const aspect = Math.max(0.05, Number(opts.aspect) || 1);
+  const mirrorX = opts.mirrorX === true;
+  const downM =
+    Number.isFinite(opts.downOffsetM) && opts.downOffsetM > 0
+      ? opts.downOffsetM
+      : OMAFIT_NECKLACE_TRAPEZIUS_SHOULDER_DOWN_M;
+
+  if (!scratch.shL) scratch.shL = new THREE.Vector3();
+  if (!scratch.shR) scratch.shR = new THREE.Vector3();
+  if (!scratch.midSh) scratch.midSh = new THREE.Vector3();
+  if (!scratch.chest) scratch.chest = new THREE.Vector3();
+  if (!scratch.xAxis) scratch.xAxis = new THREE.Vector3();
+  if (!scratch.yAxis) scratch.yAxis = new THREE.Vector3();
+  if (!scratch.zAxis) scratch.zAxis = new THREE.Vector3();
+  if (!scratch.basisM) scratch.basisM = new THREE.Matrix4();
+  if (!scratch.qTorso) scratch.qTorso = new THREE.Quaternion();
+
+  const shL = scratch.shL;
+  const shR = scratch.shR;
+  const midSh = scratch.midSh;
+  const chest = scratch.chest;
+  const xAxis = scratch.xAxis;
+  const yAxis = scratch.yAxis;
+  const zAxis = scratch.zAxis;
+  const basisM = scratch.basisM;
+  const quat = scratch.qTorso;
+
+  const dx = (rSh.x - lSh.x) * aspect;
+  const dy = rSh.y - lSh.y;
+  const spanNorm = Math.hypot(dx, dy);
+  if (spanNorm < 0.03) return false;
+
+  const fovDeg = Number(camera.fov) || 60;
+  const fov = (fovDeg * Math.PI) / 180;
+  const focalN = 1 / (2 * Math.tan(fov * 0.5));
+  let zDist = Number(opts.lockedZDist);
+  if (!Number.isFinite(zDist) || zDist <= 0) {
+    zDist =
+      (OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M * focalN) / Math.max(0.04, spanNorm);
+    zDist = Math.min(
+      OMAFIT_NECKLACE_TORSO_ZDIST_MAX,
+      Math.max(OMAFIT_NECKLACE_TORSO_ZDIST_MIN, zDist),
+    );
+    const zRef = opts.zDistSmooth;
+    if (zRef && typeof zRef === "object") {
+      const prev = Number(zRef.value);
+      if (!Number.isFinite(prev) || prev <= 0) {
+        zRef.value = zDist;
+      } else {
+        zRef.value += (zDist - prev) * 0.08;
+      }
+      zDist = zRef.value;
+    }
+  }
+
+  omafitUnprojectNormLmToCameraSpace(shL, lSh, zDist, aspect, mirrorX, fovDeg);
+  omafitUnprojectNormLmToCameraSpace(shR, rSh, zDist, aspect, mirrorX, fovDeg);
+  midSh.copy(shL).add(shR).multiplyScalar(0.5);
+
+  yAxis.set(0, -1, 0);
+  xAxis.subVectors(shR, shL);
+  if (xAxis.lengthSq() < 1e-10) return false;
+  xAxis.normalize();
+  zAxis.crossVectors(xAxis, yAxis);
+  if (zAxis.lengthSq() < 1e-10) return false;
+  zAxis.normalize();
+  yAxis.crossVectors(zAxis, xAxis).normalize();
+  xAxis.crossVectors(yAxis, zAxis).normalize();
+
+  chest.copy(midSh).addScaledVector(yAxis, downM);
+
+  basisM.makeBasis(xAxis, yAxis, zAxis);
+  quat.setFromRotationMatrix(basisM);
+
+  scratch.lockedZDistUsed = zDist;
+  scratch.shoulderSpan3d = shL.distanceTo(shR);
+  scratch.neckSource = "torso-shoulders-frozen";
   return true;
 }
 
