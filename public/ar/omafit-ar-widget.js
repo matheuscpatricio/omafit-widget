@@ -572,7 +572,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v135-necklace-chest-scale-fix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v136-necklace-pose-strict";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1055,6 +1055,8 @@ const OMAFIT_NECKLACE_DEFAULT_SCALE_MUL = 1;
 const OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE = { x: 0, y: 0, z: 0 };
 /** Lerp do wear no rigid slot (ms). */
 const OMAFIT_NECKLACE_RIGID_WEAR_LERP_MS = 340;
+/** Pose strict: manter último ponto world por um curto período sem ombros confiáveis. */
+const OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS = 700;
 /** Clamps de escala no mesh — ver `OMAFIT_NECKLACE_RIGID_SCALE_*` em `omafit-necklace-calibration.js`. */
 /** Escala média da âncora antes do 1º faceMatrix (evita flash gigante no boot). */
 const OMAFIT_NECKLACE_ANCHOR_SCALE_FALLBACK = 14;
@@ -3120,6 +3122,7 @@ function omafitNecklaceWearAndOrientStep(
   dtSec,
   cfgAttr,
   worldSpace = false,
+  nowMs = 0,
 ) {
   if (!THREE || !st || !anchorGroup || !wearGrp || !lm) return;
   if (typeof cfgAttr === "function") {
@@ -3160,6 +3163,13 @@ function omafitNecklaceWearAndOrientStep(
         chinNormAlong: OMAFIT_NECKLACE_CHIN_NORM_ALONG_NOSE_SHOULDER,
       },
     );
+  const strictPose = st.necklacePoseStrict === true;
+  const neckSource = String(clavScratch?.neckSource || "");
+  const strictPoseOk =
+    st.poseShoulderOk &&
+    neckWearOk &&
+    neckWearPt &&
+    neckSource.startsWith("trapezius");
 
   const rigid =
     rigidWearNative || OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE;
@@ -3201,6 +3211,20 @@ function omafitNecklaceWearAndOrientStep(
   let wearDx = (nativeSpace ? wearPosM.x * 100 : wearPosM.x) + fineX + rigid.x;
   let wearDy = (nativeSpace ? wearPosM.y * 100 : wearPosM.y) + fineY + rigid.y;
   let wearDz = (nativeSpace ? wearPosM.z * 100 : wearPosM.z) + fineZ + rigid.z;
+
+  if (strictPose && !strictPoseOk) {
+    if (
+      worldSpace &&
+      st.necklaceStrictPoseLastWorld &&
+      Number.isFinite(st.necklaceStrictPoseLastMs) &&
+      nowMs - st.necklaceStrictPoseLastMs <= OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS
+    ) {
+      if (!st.necklaceWearTargetWorld) st.necklaceWearTargetWorld = new THREE.Vector3();
+      st.necklaceWearTargetWorld.copy(st.necklaceStrictPoseLastWorld);
+      omafitNecklaceRigidWearStep(THREE, st, wearGrp, st.necklaceWearTargetWorld, dtSec);
+    }
+    return;
+  }
 
   if (anchorOk && neckWearOk && neckWearPt && anchorVec) {
     wearDx += neckWearPt.x - anchorVec.x;
@@ -3257,6 +3281,10 @@ function omafitNecklaceWearAndOrientStep(
   if (worldSpace && st.necklaceWearTargetWorld && anchorGroup?.localToWorld) {
     st.necklaceWearTargetWorld.copy(st.necklaceWearTarget);
     anchorGroup.localToWorld(st.necklaceWearTargetWorld);
+    if (strictPose && strictPoseOk && st.necklaceStrictPoseLastWorld) {
+      st.necklaceStrictPoseLastWorld.copy(st.necklaceWearTargetWorld);
+      st.necklaceStrictPoseLastMs = nowMs;
+    }
   }
   st.necklaceWearCmNative = st.necklaceWearCmNative || { x: 0, y: 0, z: 0 };
   st.necklaceWearCmNative.x = wearDx;
@@ -11865,6 +11893,13 @@ async function runArSession({
           }
         : null,
       poseShoulderOk: false,
+      necklacePoseStrict:
+        accessoryType === "necklace"
+          ? !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklacePoseStrict", "1")).trim())
+          : false,
+      necklaceStrictPoseLastWorld:
+        accessoryType === "necklace" ? new THREE.Vector3() : null,
+      necklaceStrictPoseLastMs: 0,
       lastPoseLandmarks: null,
       lastNecklaceFrameMs: 0,
       necklacePartition,
@@ -12839,6 +12874,7 @@ async function runArSession({
               dtSec,
               cfgAttr,
               st.necklaceWorldAnchorMode === true,
+              nowMs,
             );
           }
           const neckCalFrame = st.necklaceMerchantCalApplied;
