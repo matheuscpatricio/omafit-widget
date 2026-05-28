@@ -643,6 +643,159 @@ export function omafitComputeNecklaceNeckWearPoint(
   return true;
 }
 
+/** MediaPipe Pose — índices para ancoragem torácica (world/camera). */
+export const OMAFIT_POSE_L_SHOULDER = 11;
+export const OMAFIT_POSE_R_SHOULDER = 12;
+export const OMAFIT_POSE_L_HIP = 23;
+export const OMAFIT_POSE_R_HIP = 24;
+
+/** Largura biacromial média (m) — régua de profundidade para unproject dos ombros. */
+export const OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M = 0.38;
+/** Trapézio/peito: fração do segmento ombro→quadril abaixo dos ombros. */
+export const OMAFIT_NECKLACE_TORSO_CHEST_FRAC = 0.14;
+export const OMAFIT_NECKLACE_TORSO_POSE_MIN_VIS = 0.55;
+export const OMAFIT_NECKLACE_TORSO_ZDIST_MIN = 0.28;
+export const OMAFIT_NECKLACE_TORSO_ZDIST_MAX = 2.4;
+
+/**
+ * Landmark MediaPipe normalizado (x,y ∈ [0,1]) → espaço da câmara Three.js
+ * (mesma convenção que o path da mão: Z negativo = à frente da câmara).
+ */
+export function omafitUnprojectNormLmToCameraSpace(
+  out,
+  lm,
+  zDist,
+  aspect,
+  mirrorX,
+  fovDeg,
+) {
+  if (!out || !lm || !Number.isFinite(zDist) || zDist <= 0) return out;
+  const fov = (Math.max(10, Number(fovDeg) || 60) * Math.PI) / 180;
+  const hView = 2 * Math.tan(fov * 0.5) * zDist;
+  const wView = hView * Math.max(0.05, Number(aspect) || 1);
+  const xNorm = mirrorX ? 1 - lm.x : lm.x;
+  out.set((xNorm - 0.5) * wView, -(lm.y - 0.5) * hView, -zDist);
+  return out;
+}
+
+/**
+ * Ancoragem torácica em espaço de câmara/cena: posição + quaternion a partir de
+ * ombros e ancas (Pose), sem depender do queixo/âncora facial.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {Array<{ x: number, y: number, z?: number, visibility?: number }>} poseLm
+ * @param {import("three").PerspectiveCamera} camera
+ * @param {Record<string, import("three").Vector3 | import("three").Matrix4 | import("three").Quaternion>} scratch
+ * @param {{ aspect?: number, mirrorX?: boolean, zDistSmooth?: { value: number }, chestFrac?: number, minVis?: number }} opts
+ * @returns {boolean}
+ */
+export function omafitComputeNecklaceTorsoAnchorWorld(
+  THREE,
+  poseLm,
+  camera,
+  scratch,
+  opts = {},
+) {
+  if (!THREE || !poseLm || !camera || !scratch) return false;
+  const lSh = poseLm[OMAFIT_POSE_L_SHOULDER];
+  const rSh = poseLm[OMAFIT_POSE_R_SHOULDER];
+  const lHi = poseLm[OMAFIT_POSE_L_HIP];
+  const rHi = poseLm[OMAFIT_POSE_R_HIP];
+  if (!lSh || !rSh || !lHi || !rHi) return false;
+
+  const minVis =
+    Number.isFinite(opts.minVis) && opts.minVis > 0
+      ? opts.minVis
+      : OMAFIT_NECKLACE_TORSO_POSE_MIN_VIS;
+  const lv = Math.min(lSh.visibility ?? 1, rSh.visibility ?? 1, lHi.visibility ?? 1, rHi.visibility ?? 1);
+  if (lv < minVis) return false;
+
+  const aspect = Math.max(0.05, Number(opts.aspect) || 1);
+  const mirrorX = opts.mirrorX === true;
+  const chestFrac =
+    Number.isFinite(opts.chestFrac) && opts.chestFrac >= 0 && opts.chestFrac <= 0.45
+      ? opts.chestFrac
+      : OMAFIT_NECKLACE_TORSO_CHEST_FRAC;
+
+  const shL = scratch.shL || (scratch.shL = new THREE.Vector3());
+  const shR = scratch.shR || (scratch.shR = new THREE.Vector3());
+  const hipL = scratch.hipL || (scratch.hipL = new THREE.Vector3());
+  const hipR = scratch.hipR || (scratch.hipR = new THREE.Vector3());
+  const midSh = scratch.midSh || (scratch.midSh = new THREE.Vector3());
+  const midHi = scratch.midHi || (scratch.midHi = new THREE.Vector3());
+  if (!scratch.chest) scratch.chest = new THREE.Vector3();
+  if (!scratch.xAxis) scratch.xAxis = new THREE.Vector3();
+  if (!scratch.yAxis) scratch.yAxis = new THREE.Vector3();
+  if (!scratch.zAxis) scratch.zAxis = new THREE.Vector3();
+  if (!scratch.basisM) scratch.basisM = new THREE.Matrix4();
+  if (!scratch.qTorso) scratch.qTorso = new THREE.Quaternion();
+  const chest = scratch.chest;
+  const xAxis = scratch.xAxis;
+  const yAxis = scratch.yAxis;
+  const zAxis = scratch.zAxis;
+  const basisM = scratch.basisM;
+  const quat = scratch.qTorso;
+
+  const dx = (rSh.x - lSh.x) * aspect;
+  const dy = rSh.y - lSh.y;
+  const spanNorm = Math.hypot(dx, dy);
+  if (spanNorm < 0.035) return false;
+
+  const fovDeg = Number(camera.fov) || 60;
+  const fov = (fovDeg * Math.PI) / 180;
+  const focalN = 1 / (2 * Math.tan(fov * 0.5));
+  let zDist =
+    (OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M * focalN) / Math.max(0.04, spanNorm);
+  zDist = Math.min(
+    OMAFIT_NECKLACE_TORSO_ZDIST_MAX,
+    Math.max(OMAFIT_NECKLACE_TORSO_ZDIST_MIN, zDist),
+  );
+
+  const zRef = opts.zDistSmooth;
+  if (zRef && typeof zRef === "object") {
+    const prev = Number(zRef.value);
+    if (!Number.isFinite(prev) || prev <= 0) {
+      zRef.value = zDist;
+    } else {
+      zRef.value += (zDist - prev) * 0.12;
+    }
+    zDist = zRef.value;
+  }
+
+  omafitUnprojectNormLmToCameraSpace(shL, lSh, zDist, aspect, mirrorX, fovDeg);
+  omafitUnprojectNormLmToCameraSpace(shR, rSh, zDist, aspect, mirrorX, fovDeg);
+  omafitUnprojectNormLmToCameraSpace(hipL, lHi, zDist, aspect, mirrorX, fovDeg);
+  omafitUnprojectNormLmToCameraSpace(hipR, rHi, zDist, aspect, mirrorX, fovDeg);
+
+  midSh.copy(shL).add(shR).multiplyScalar(0.5);
+  midHi.copy(hipL).add(hipR).multiplyScalar(0.5);
+  chest.copy(midSh).lerp(midHi, chestFrac);
+
+  xAxis.subVectors(shR, shL);
+  if (xAxis.lengthSq() < 1e-10) return false;
+  xAxis.normalize();
+
+  yAxis.subVectors(midHi, midSh);
+  if (yAxis.lengthSq() < 1e-10) {
+    yAxis.set(0, -1, 0);
+  } else {
+    yAxis.normalize();
+  }
+
+  zAxis.crossVectors(xAxis, yAxis);
+  if (zAxis.lengthSq() < 1e-10) return false;
+  zAxis.normalize();
+
+  yAxis.crossVectors(zAxis, xAxis).normalize();
+  xAxis.crossVectors(yAxis, zAxis).normalize();
+
+  basisM.makeBasis(xAxis, yAxis, zAxis);
+  quat.setFromRotationMatrix(basisM);
+
+  scratch.neckSource = "torso-pose-world";
+  return true;
+}
+
 /**
  * Base ortonormal (paridade óculos / MindAR selfie):
  *   X = 454−234 (com espelho opcional no X), down = média(bochechas)−nariz
