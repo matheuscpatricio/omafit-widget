@@ -477,6 +477,18 @@ const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 const OMAFIT_WATCH_DORSAL_CAMERA_HYST_DOT = 0.08;
 const OMAFIT_WATCH_DORSAL_CAMERA_PERSIST_FRAMES = 2;
 const OMAFIT_WATCH_DIAL_UP_ALIGN_MIN_DOT = 0.12;
+/**
+ * One Euro nos landmarks da mão (normalizados) antes do unproject — menos jitter
+ * que filtrar só posição/rotação depois. Aplica-se a punho + MCPs chave.
+ */
+const OMAFIT_HAND_LANDMARK_ONE_EURO_INDICES = [0, 1, 5, 9, 17];
+const OMAFIT_HAND_ONE_EURO_MIN_CUTOFF = 1.05;
+const OMAFIT_HAND_ONE_EURO_BETA = 0.022;
+const OMAFIT_HAND_ONE_EURO_D_CUTOFF = 1.15;
+/** Tau da profundidade estimada (punho→MCP) — evita pulsar em Z. */
+const OMAFIT_HAND_ZDIST_TAU_MS = 95;
+/** Relógio: rotação SLERP um pouco mais suave que o adaptativo máximo. */
+const OMAFIT_WATCH_ROT_ALPHA_CAP = 0.13;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
 const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
@@ -560,7 +572,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v131-watch-dial-up-predictable";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-27-ar-widget-v132-watch-landmark-smooth";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -4409,6 +4421,52 @@ function createFaceLandmarkOneEuroSmoother(THREE, indices, minCutoff, beta, dCut
     /** @param {number} i */
     get(i) {
       return states[i]?.xPrev ? vecs[i] : null;
+    },
+  };
+}
+
+/**
+ * One Euro em landmarks MediaPipe Hand (objetos `{x,y,z}` normalizados).
+ * @param {number[]} indices índices a filtrar (ex. punho + MCPs)
+ */
+function createHandLandmarkOneEuroSmoother(indices, minCutoff, beta, dCutoff) {
+  const set = new Set(indices);
+  /** @type {Record<number, { xPrev: number[] | null, tPrev: number | null, dxPrev: number[] }>} */
+  const states = {};
+  /** @type {Record<number, { x: number, y: number, z: number }>} */
+  const out = {};
+  for (const i of indices) {
+    states[i] = { xPrev: null, tPrev: null, dxPrev: [0, 0, 0] };
+    out[i] = { x: 0, y: 0, z: 0 };
+  }
+  return {
+    reset() {
+      for (const i of indices) {
+        states[i] = { xPrev: null, tPrev: null, dxPrev: [0, 0, 0] };
+      }
+    },
+    /** @param {Array<{ x: number, y: number, z: number }>} lms */
+    sample(lms, nowMs) {
+      const tSec = nowMs * 0.001;
+      for (const i of set) {
+        const raw = lms[i];
+        if (!raw) continue;
+        const xh = omafitOneEuroFilterVec3(
+          [raw.x, raw.y, raw.z],
+          tSec,
+          states[i],
+          minCutoff,
+          beta,
+          dCutoff,
+        );
+        out[i].x = xh[0];
+        out[i].y = xh[1];
+        out[i].z = xh[2];
+      }
+    },
+    /** @param {number} i */
+    get(i) {
+      return states[i]?.xPrev ? out[i] : null;
     },
   };
 }
@@ -16476,6 +16534,14 @@ async function runHandArSession({
   const HANDEDNESS_SCORE_THRESHOLD = 0.75;
   const HANDEDNESS_PERSIST_FRAMES = 3;
 
+  const handLandmarkEuro = createHandLandmarkOneEuroSmoother(
+    OMAFIT_HAND_LANDMARK_ONE_EURO_INDICES,
+    OMAFIT_HAND_ONE_EURO_MIN_CUTOFF,
+    OMAFIT_HAND_ONE_EURO_BETA,
+    OMAFIT_HAND_ONE_EURO_D_CUTOFF,
+  );
+  let smoothZDist = NaN;
+
   /**
    * Desprojecta um landmark normalizado do MediaPipe (x,y ∈ [0,1]) para
    * espaço da câmara Three.js, assumindo `camera.aspect = videoAspect`
@@ -16500,6 +16566,7 @@ async function runHandArSession({
   }
 
   function updateAnchorFromHand(lms, dtMs, handLabel) {
+    const pickHandLm = (i) => handLandmarkEuro.get(i) || lms[i];
     /**
      * Profundidade: `zDist = L * focalNormalY / spanY`, onde:
      *   - L = 0,10 m (comprimento real punho→MCP-médio em adulto)
@@ -16510,9 +16577,9 @@ async function runHandArSession({
      * Derivação: um segmento de comprimento L a distância Z projecta-se
      * com tamanho aparente (L · focal / Z). Resolvendo: Z = L · focal / span.
      */
-    const wristN = lms[0];
-    const lm5n = lms[5];
-    const lm17n = lms[17];
+    const wristN = pickHandLm(0);
+    const lm5n = pickHandLm(5);
+    const lm17n = pickHandLm(17);
     const dBaseNx = (lm17n.x - lm5n.x) * videoAspect();
     const dBaseNy = lm17n.y - lm5n.y;
     const distanciaBaseNorm = Math.hypot(dBaseNx, dBaseNy);
@@ -16536,7 +16603,7 @@ async function runHandArSession({
       OMAFIT_BRACELET_EXPAND_WIDE,
       tWristExpand,
     );
-    const middleMcpN = lms[9] || lms[5];
+    const middleMcpN = pickHandLm(9) || pickHandLm(5);
     const dx = (middleMcpN.x - wristN.x) * videoAspect();
     const dy = middleMcpN.y - wristN.y;
     const spanY = Math.sqrt(dx * dx + dy * dy);
@@ -16544,13 +16611,20 @@ async function runHandArSession({
     const focalN = 1 / (2 * Math.tan(fov / 2));
     let zDist = (OMAFIT_WRIST_TO_MCP_M * focalN) / Math.max(0.02, spanY);
     zDist = Math.max(0.15, Math.min(1.5, zDist));
-    /** Usar o mesmo zDist para todos os landmarks evita escala relativa errada ao combinar. */
-    const w0 = unprojectLandmark(wristN, zDist);
-    const w1 = unprojectLandmark(lms[1] || wristN, zDist);
-    const w5 = unprojectLandmark(lms[5], zDist);
-    const w9 = unprojectLandmark(lms[9], zDist);
-    const w17 = unprojectLandmark(lms[17], zDist);
     const clampDt = Math.max(8, Math.min(80, Number.isFinite(dtMs) ? dtMs : 16));
+    if (!Number.isFinite(smoothZDist) || smoothZDist <= 0) {
+      smoothZDist = zDist;
+    } else {
+      const aZ = 1 - Math.exp(-clampDt / OMAFIT_HAND_ZDIST_TAU_MS);
+      smoothZDist += (zDist - smoothZDist) * aZ;
+    }
+    const zDistUse = smoothZDist;
+    /** Mesmo zDist suavizado para todos os landmarks (escala relativa estável). */
+    const w0 = unprojectLandmark(wristN, zDistUse);
+    const w1 = unprojectLandmark(pickHandLm(1) || wristN, zDistUse);
+    const w5 = unprojectLandmark(pickHandLm(5), zDistUse);
+    const w9 = unprojectLandmark(pickHandLm(9), zDistUse);
+    const w17 = unprojectLandmark(pickHandLm(17), zDistUse);
 
     if (accessoryType === "bracelet" && braceletPlaceState) {
       omafitBraceletWristMetricsStep(THREE, braceletPlaceState, {
@@ -16822,14 +16896,21 @@ async function runHandArSession({
       smoothInitialized = true;
     } else {
       const dtSec = Math.max(1e-3, clampDt / 1000);
-      const posSpeed = tmpPos.distanceTo(smPos) / dtSec;
+      const aPre = 1 - Math.exp(-clampDt / OMAFIT_HAND_POS_PRETAU_MS);
+      prePos.lerp(tmpPos, aPre);
+      const posTarget =
+        accessoryType === "watch" || accessoryType === "bracelet" ? prePos : tmpPos;
+      const posSpeed = posTarget.distanceTo(smPos) / dtSec;
       let posAlpha = OMAFIT_HAND_POS_ALPHA_MIN + OMAFIT_HAND_POS_ALPHA_SPEED_GAIN * posSpeed;
       posAlpha = THREE.MathUtils.clamp(posAlpha, OMAFIT_HAND_POS_ALPHA_MIN, OMAFIT_HAND_POS_ALPHA_MAX);
       if (!closeEnoughHand) posAlpha *= 0.62;
       posAlpha = THREE.MathUtils.clamp(posAlpha, 0.035, OMAFIT_HAND_POS_ALPHA_MAX);
       posAlpha = THREE.MathUtils.lerp(posAlpha, OMAFIT_HAND_EMA_POS_ALPHA, 0.18);
       if (accessoryType === "bracelet") posAlpha = 0.2;
-      smPos.lerp(tmpPos, posAlpha);
+      if (accessoryType === "watch") {
+        posAlpha = THREE.MathUtils.clamp(posAlpha * 0.88, 0.05, OMAFIT_HAND_POS_ALPHA_MAX);
+      }
+      smPos.lerp(posTarget, posAlpha);
       /**
        * Anti-flip guard: medir ângulo entre smoothedQuat e tmpQuat.
        * dot < 0 significa que estão no hemisfério oposto da esfera 4D
@@ -16860,6 +16941,9 @@ async function runHandArSession({
         rotAlpha = THREE.MathUtils.clamp(rotAlpha, 0.03, OMAFIT_HAND_ROT_ALPHA_MAX);
         rotAlpha = THREE.MathUtils.lerp(rotAlpha, OMAFIT_HAND_EMA_ROT_ALPHA, 0.2);
         if (accessoryType === "bracelet") rotAlpha = 0.2;
+        if (accessoryType === "watch") {
+          rotAlpha = Math.min(rotAlpha, OMAFIT_WATCH_ROT_ALPHA_CAP);
+        }
         smoothedQuat.slerp(tmpQuat, rotAlpha);
       }
     }
@@ -17727,6 +17811,7 @@ async function runHandArSession({
         });
       }
       missedFrames = 0;
+      handLandmarkEuro.sample(landmarks, nowTs);
       updateAnchorFromHand(landmarks, dtMs, handLabel);
       anchor.visible = true;
       if (accessoryType === "bracelet" && !braceletH2DebugLogged) {
@@ -17779,6 +17864,8 @@ async function runHandArSession({
         contactShadow.visible = false;
         smoothInitialized = false;
         smoothOccluderInitialized = false;
+        handLandmarkEuro.reset();
+        smoothZDist = NaN;
         handKnuckleSpanRef = 0;
         prevKnuckleSpan3d = 0;
         knuckleJitterEma = 0;
