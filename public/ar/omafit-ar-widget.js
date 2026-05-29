@@ -574,7 +574,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v142-necklace-pose-visible-bootstrap";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v143-necklace-shoulder-continuous";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1063,10 +1063,16 @@ const OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS = 1800;
 const OMAFIT_NECKLACE_TORSO_POS_TAU_MS = 95;
 /** Slerp da orientação do torso (ombros/ancas). */
 const OMAFIT_NECKLACE_TORSO_ORIENT_SLERP = 0.28;
-/** Frames estáveis de ombros antes de congelar posição/rotação/escala/Z. */
-const OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES = 14;
-/** Só atualiza o freeze se o mid-ombro mover mais que isto (m). */
+/** Frames estáveis (legado freeze opcional via attr). */
+const OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES = 1;
+/** Só atualiza o freeze legado se o mid-ombro mover mais que isto (m). */
 const OMAFIT_NECKLACE_TORSO_UPDATE_POS_THRESH_M = 0.022;
+/** Head guard: movimento norm do mid-ombros para aceitar update (= corpo). */
+const OMAFIT_NECKLACE_HEAD_GUARD_BODY_NORM = 0.014;
+/** Head guard: movimento norm do nariz Pose sem ombros (= só cabeça). */
+const OMAFIT_NECKLACE_HEAD_GUARD_FACE_NORM = 0.009;
+/** Head guard: variação relativa do span ombro–ombro. */
+const OMAFIT_NECKLACE_HEAD_GUARD_SPAN_REL = 0.02;
 /** Só atualiza rotação se o ângulo entre bases for maior (rad). */
 const OMAFIT_NECKLACE_TORSO_UPDATE_ROT_THRESH_RAD = 0.14;
 /** Jitter máximo entre frames para contar como «estável» (m). */
@@ -2915,10 +2921,24 @@ function omafitComputeNecklaceDisplayScale(THREE, st, anchorGroup, cheekNative, 
     OMAFIT_NECKLACE_ANCHOR_SCALE_CLAMP_MAX,
   );
   const neckSpanM = Number.isFinite(st.necklaceNeckSpanM) ? st.necklaceNeckSpanM : 0.48;
+  let scaleTrackK = cheekTrackK;
+  if (
+    st.necklaceWorldAnchorMode === true &&
+    Number.isFinite(st.necklaceRefShoulderSpan3d) &&
+    st.necklaceRefShoulderSpan3d > 0.04 &&
+    Number.isFinite(st.necklaceShoulderSpan3d) &&
+    st.necklaceShoulderSpan3d > 0.04
+  ) {
+    scaleTrackK = THREE.MathUtils.clamp(
+      st.necklaceShoulderSpan3d / st.necklaceRefShoulderSpan3d,
+      0.9,
+      1.12,
+    );
+  }
   const scalePack = computeNecklaceArDisplayScale({
     neckSpanM,
     merchantMul,
-    cheekTrackK,
+    cheekTrackK: st.necklaceTorsoFreezeCheekTrack === true ? 1 : scaleTrackK,
     freezeCheekTrack: st.necklaceTorsoFreezeCheekTrack === true,
   });
   const nativeMul = omafitNecklaceMeterToNativeMul(metersMul);
@@ -3161,6 +3181,78 @@ function omafitNecklaceShoulderMidWorld(
   return torsoScratch.midSh.clone().applyMatrix4(camera.matrixWorld);
 }
 
+function omafitNecklaceSetTrapeziusWearVisible(wearGrp, glbRoot, visible) {
+  if (wearGrp) wearGrp.visible = visible;
+  if (!glbRoot) return;
+  glbRoot.visible = visible;
+  if (!visible) return;
+  glbRoot.traverse((o) => {
+    if (o) o.visible = true;
+  });
+}
+
+/** Métricas dos ombros em coords normalizadas (mesmo espaço que Pose). */
+function omafitNecklaceShoulderNormMetrics(poseLm, aspect, mirrorX) {
+  const lSh = poseLm?.[OMAFIT_POSE_L_SHOULDER];
+  const rSh = poseLm?.[OMAFIT_POSE_R_SHOULDER];
+  if (!lSh || !rSh) return null;
+  let lx = lSh.x;
+  let rx = rSh.x;
+  if (mirrorX === true) {
+    lx = 1 - lx;
+    rx = 1 - rx;
+  }
+  const midX = (lx + rx) * 0.5;
+  const midY = (lSh.y + rSh.y) * 0.5;
+  const dx = (rx - lx) * Math.max(0.05, aspect || 1);
+  const dy = rSh.y - lSh.y;
+  const spanNorm = Math.hypot(dx, dy);
+  if (spanNorm < 0.03) return null;
+  const pn = poseLm[0];
+  const faceX = pn && mirrorX === true ? 1 - pn.x : pn?.x;
+  const faceY = pn?.y;
+  return { midX, midY, spanNorm, faceX, faceY };
+}
+
+/** Bloqueia update quando só a cabeça mexeu (nariz) sem deslocamento de ombros. */
+function omafitNecklaceHeadGuardAllowBodyUpdate(st, metrics) {
+  if (st?.necklaceHeadGuard !== true || !metrics) return true;
+  const ref = st.necklaceTorsoRef;
+  if (!ref || !Number.isFinite(ref.shMidX)) return true;
+  const dSh = Math.hypot(metrics.midX - ref.shMidX, metrics.midY - ref.shMidY);
+  const dSpan =
+    Math.abs(metrics.spanNorm - ref.spanNorm) / Math.max(ref.spanNorm, 0.04);
+  const dFace =
+    Number.isFinite(ref.faceX) && Number.isFinite(metrics.faceX)
+      ? Math.hypot(metrics.faceX - ref.faceX, metrics.faceY - ref.faceY)
+      : 0;
+  if (
+    dSh >= OMAFIT_NECKLACE_HEAD_GUARD_BODY_NORM ||
+    dSpan >= OMAFIT_NECKLACE_HEAD_GUARD_SPAN_REL
+  ) {
+    return true;
+  }
+  if (
+    dFace >= OMAFIT_NECKLACE_HEAD_GUARD_FACE_NORM &&
+    dSh < OMAFIT_NECKLACE_HEAD_GUARD_BODY_NORM
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function omafitNecklaceUpdateTorsoRef(st, metrics, zDist) {
+  if (!metrics || !st) return;
+  if (!st.necklaceTorsoRef) st.necklaceTorsoRef = {};
+  const r = st.necklaceTorsoRef;
+  r.shMidX = metrics.midX;
+  r.shMidY = metrics.midY;
+  r.spanNorm = metrics.spanNorm;
+  if (Number.isFinite(metrics.faceX)) r.faceX = metrics.faceX;
+  if (Number.isFinite(metrics.faceY)) r.faceY = metrics.faceY;
+  if (Number.isFinite(zDist) && zDist > 0) r.zDist = zDist;
+}
+
 function omafitNecklaceRigidWearStep(THREE, st, wearGroup, target, dtSec) {
   if (!THREE || !st || !wearGroup || !target) return;
   /** Rigid slot: segue o pescoço no mesmo frame (sem lag que parece «estático»). */
@@ -3330,7 +3422,6 @@ function omafitNecklaceWearAndOrientStep(
   const nativeSpace = metersMul < 1;
   const strictPose = st.necklacePoseStrict === true;
   const torsoMode = st.necklaceTorsoAnchorMode === true && worldSpace === true;
-  const torsoFreezeMode = st.necklaceTorsoFreezeMode === true && torsoMode === true;
   const orientGrp = st.necklaceOrientGroup;
   const rigid =
     rigidWearNative || OMAFIT_NECKLACE_RIGID_WEAR_DEFAULT_NATIVE;
@@ -3382,39 +3473,45 @@ function omafitNecklaceWearAndOrientStep(
     }
   };
 
-  const commitTorsoFreezeValidated = (chestWorld, quatWorld, shoulderMidWorld, zDist) => {
-    if (!st.necklaceTorsoFrozenPos) st.necklaceTorsoFrozenPos = new THREE.Vector3();
-    if (!st.necklaceTorsoFrozenQuat) st.necklaceTorsoFrozenQuat = new THREE.Quaternion();
-    st.necklaceTorsoFrozenPos.copy(chestWorld);
-    if (quatWorld) st.necklaceTorsoFrozenQuat.copy(quatWorld);
-    if (shoulderMidWorld && st.necklaceTorsoFrozenShoulderMidWorld) {
-      st.necklaceTorsoFrozenShoulderMidWorld.copy(shoulderMidWorld);
-    }
-    st.necklaceTorsoFrozenZDist = Number(zDist);
-    st.necklaceTorsoFrozen = true;
-    st.necklaceTorsoEverLocked = true;
-    st.necklaceTorsoStableFrames = 0;
-    st.necklaceTorsoFreezeCheekTrack = true;
-    if (st.necklaceSwing) st.necklaceSwing.refNeckW = null;
-    st.necklaceLastNeckSource = "torso-pose-first-freeze";
-    try {
-      console.log("[omafit-ar] colar: pose-first freeze validado", {
-        build: OMAFIT_AR_WIDGET_BUILD,
-        zDist: Number.isFinite(zDist) ? zDist.toFixed(3) : null,
-      });
-    } catch {
-      /* ignore */
-    }
-  };
-
   /**
-   * Opção C: torsoMode posiciona só via Pose → camera.localToWorld (sem chin/anchor MindAR).
+   * v143 — trapézio contínuo: Pose nos ombros desde o 1.º frame válido; sem wear facial.
+   * Head guard: ignora jitter da cabeça; segue deslocamento real dos ombros.
    */
-  if (torsoMode && camera && st.lastPoseLandmarksNorm && st.poseShoulderOk) {
+  if (torsoMode) {
+    const poseReady =
+      Boolean(camera && st.lastPoseLandmarksNorm && st.poseShoulderOk === true);
+    const holdPose =
+      !poseReady &&
+      st.necklaceTorsoPosPrimed &&
+      st.necklaceStrictPoseLastWorld &&
+      Number.isFinite(st.necklaceStrictPoseLastMs) &&
+      nowMs - st.necklaceStrictPoseLastMs <= OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS;
+
+    if (!poseReady && !holdPose) {
+      omafitNecklaceSetTrapeziusWearVisible(wearGrp, null, false);
+      st.necklaceTrapeziusVisible = false;
+      st.necklaceLastNeckSource = "torso-hidden-no-shoulders";
+      return;
+    }
+
+    if (holdPose && !poseReady) {
+      applyTorsoWorldTarget(
+        st.necklaceStrictPoseLastWorld,
+        st.necklaceStrictPoseLastQuat,
+        true,
+      );
+      omafitNecklaceSetTrapeziusWearVisible(wearGrp, null, true);
+      st.necklaceTrapeziusVisible = true;
+      st.necklaceLastNeckSource = "torso-hold-pose-lost";
+      return;
+    }
+
     const torsoScratch = st.necklaceTorsoScratch;
     const lockedZ =
-      st.necklaceTorsoFrozen && Number.isFinite(st.necklaceTorsoFrozenZDist)
-        ? st.necklaceTorsoFrozenZDist
+      st.necklaceTorsoZLocked === true &&
+      st.necklaceTorsoRef &&
+      Number.isFinite(st.necklaceTorsoRef.zDist)
+        ? st.necklaceTorsoRef.zDist
         : undefined;
     if (!st.necklacePoseChestWorld) st.necklacePoseChestWorld = new THREE.Vector3();
     if (!st.necklacePoseQuatWorld) st.necklacePoseQuatWorld = new THREE.Quaternion();
@@ -3427,7 +3524,8 @@ function omafitNecklaceWearAndOrientStep(
     const chestWorld = st.necklacePoseChestWorld;
     const quatWorld = st.necklacePoseQuatWorld;
     let zDistProbe = Number(st.necklaceTorsoZDistSmooth?.value);
-    const poseTorsoOk = torsoScratch &&
+    const poseTorsoOk =
+      torsoScratch &&
       omafitNecklacePoseTorsoToWorld(
         THREE,
         st.lastPoseLandmarksNorm,
@@ -3444,6 +3542,7 @@ function omafitNecklaceWearAndOrientStep(
           wearOffsetCam: st.necklacePoseWearOffCam,
         },
       );
+
     if (poseTorsoOk) {
       zDistProbe = Number(torsoScratch.lockedZDistUsed);
       const scaleProbe = Number.isFinite(st.necklaceLastFitScale)
@@ -3457,131 +3556,70 @@ function omafitNecklaceWearAndOrientStep(
         zDistProbe,
         scaleProbe,
       );
-      const shoulderMidWorld = omafitNecklaceShoulderMidWorld(
-        THREE,
+      const metrics = omafitNecklaceShoulderNormMetrics(
         st.lastPoseLandmarksNorm,
-        camera,
-        torsoScratch,
         videoAspect,
-        mirrorUnprojectX,
-        lockedZ,
+        mirrorUnprojectX === true,
       );
 
-      if (!frameValid) {
-        if (st.necklaceTorsoFrozen) {
-          applyTorsoWorldTarget(
-            st.necklaceTorsoFrozenPos,
-            st.necklaceTorsoFrozenQuat,
-            true,
-          );
-          return;
-        }
-        if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
+      if (frameValid && metrics) {
+        const allowBody = omafitNecklaceHeadGuardAllowBodyUpdate(st, metrics);
+        if (allowBody) {
+          applyTorsoWorldTarget(chestWorld, quatWorld, false);
+          omafitNecklaceUpdateTorsoRef(st, metrics, zDistProbe);
+          if (
+            Number.isFinite(torsoScratch.shoulderSpan3d) &&
+            torsoScratch.shoulderSpan3d > 0.04
+          ) {
+            st.necklaceShoulderSpan3d = torsoScratch.shoulderSpan3d;
+            if (!Number.isFinite(st.necklaceRefShoulderSpan3d)) {
+              st.necklaceRefShoulderSpan3d = torsoScratch.shoulderSpan3d;
+            }
+          }
+          if (!st.necklaceTorsoZLocked) {
+            st.necklaceTorsoZLocked = true;
+            st.necklaceTorsoFreezeCheekTrack = true;
+          }
+          st.necklaceLastNeckSource = "torso-shoulder-continuous";
+          if (!st.necklaceTrapeziusActiveLogged) {
+            st.necklaceTrapeziusActiveLogged = true;
+            try {
+              console.log("[omafit-ar] colar: trapézio contínuo (ombros)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                zDist: Number.isFinite(zDistProbe) ? zDistProbe.toFixed(3) : null,
+                headGuard: st.necklaceHeadGuard === true,
+              });
+            } catch {
+              /* ignore */
+            }
+          }
+        } else if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
           applyTorsoWorldTarget(
             st.necklaceStrictPoseLastWorld,
             st.necklaceStrictPoseLastQuat,
             true,
           );
-          return;
+          st.necklaceLastNeckSource = "torso-head-guard-hold";
         }
-        /* Pré-freeze inválido: bootstrap facial abaixo (sem return). */
-      } else {
-        st.necklaceLastNeckSource = "torso-pose-first";
-
-        if (torsoFreezeMode) {
-          if (!st.necklaceTorsoFrozen) {
-            if (!st.necklaceTorsoCalibMid) st.necklaceTorsoCalibMid = new THREE.Vector3();
-            const jitter = chestWorld.distanceTo(st.necklaceTorsoCalibMid);
-            if (jitter <= OMAFIT_NECKLACE_TORSO_STABLE_JITTER_M) {
-              st.necklaceTorsoStableFrames = (st.necklaceTorsoStableFrames || 0) + 1;
-            } else {
-              st.necklaceTorsoStableFrames = 0;
-            }
-            st.necklaceTorsoCalibMid.copy(chestWorld);
-            applyTorsoWorldTarget(chestWorld, quatWorld, false);
-            if (st.necklaceTorsoStableFrames >= OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES) {
-              commitTorsoFreezeValidated(
-                chestWorld,
-                orientGrp?.quaternion || quatWorld,
-                shoulderMidWorld,
-                zDistProbe,
-              );
-            }
-            return;
-          }
-
-          if (shoulderMidWorld && st.necklaceTorsoFrozenShoulderMidWorld) {
-            const delta = new THREE.Vector3().subVectors(
-              shoulderMidWorld,
-              st.necklaceTorsoFrozenShoulderMidWorld,
-            );
-            if (delta.length() > OMAFIT_NECKLACE_TORSO_UPDATE_POS_THRESH_M) {
-              st.necklaceTorsoFrozenPos.add(delta);
-              st.necklaceTorsoFrozenShoulderMidWorld.copy(shoulderMidWorld);
-              if (quatWorld && st.necklaceTorsoFrozenQuat) {
-                st.necklaceTorsoFrozenQuat.slerp(quatWorld, 0.18);
-              }
-            }
-          }
-          applyTorsoWorldTarget(
-            st.necklaceTorsoFrozenPos,
-            st.necklaceTorsoFrozenQuat,
-            true,
-          );
-          st.necklaceStrictPoseLastWorld.copy(st.necklaceWearTargetWorld);
-          st.necklaceStrictPoseLastMs = nowMs;
-          return;
-        }
-
-        applyTorsoWorldTarget(chestWorld, quatWorld, false);
-        return;
+      } else if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
+        applyTorsoWorldTarget(
+          st.necklaceStrictPoseLastWorld,
+          st.necklaceStrictPoseLastQuat,
+          true,
+        );
+        st.necklaceLastNeckSource = "torso-hold-invalid-frame";
       }
-    }
-
-    if (st.necklaceTorsoFrozen) {
-      applyTorsoWorldTarget(
-        st.necklaceTorsoFrozenPos,
-        st.necklaceTorsoFrozenQuat,
-        true,
-      );
-      return;
-    }
-    if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
+    } else if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
       applyTorsoWorldTarget(
         st.necklaceStrictPoseLastWorld,
         st.necklaceStrictPoseLastQuat,
         true,
       );
-      return;
+      st.necklaceLastNeckSource = "torso-hold-no-pose";
     }
-  } else if (torsoMode && camera) {
-    if (st.necklaceTorsoFrozen) {
-      applyTorsoWorldTarget(
-        st.necklaceTorsoFrozenPos,
-        st.necklaceTorsoFrozenQuat,
-        true,
-      );
-      return;
-    }
-    if (
-      st.necklaceTorsoPosPrimed &&
-      st.necklaceStrictPoseLastWorld &&
-      Number.isFinite(st.necklaceStrictPoseLastMs) &&
-      nowMs - st.necklaceStrictPoseLastMs <= OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS
-    ) {
-      applyTorsoWorldTarget(
-        st.necklaceStrictPoseLastWorld,
-        st.necklaceStrictPoseLastQuat,
-        true,
-      );
-      return;
-    }
-  }
 
-  /**
-   * Face+anchor: bootstrap até freeze torácico; depois só Pose (colar não some no arranque).
-   */
-  if (torsoMode && st.necklaceTorsoFrozen) {
+    omafitNecklaceSetTrapeziusWearVisible(wearGrp, null, true);
+    st.necklaceTrapeziusVisible = true;
     return;
   }
 
@@ -9185,7 +9223,7 @@ async function runArSession({
      * Dispatcher de stack de tracking com base no tipo de acessório emitido
      * pelo Liquid em `data-ar-accessory-type` / `data-ar-tracking-stack`:
      *   - glasses → MindAR Face (abaixo, stack legado)
-     *   - necklace → MindAR Face (oclusão/escala) + Pose ombros (posição trapézio, v141 pose-first)
+     *   - necklace → MindAR (oclusão) + Pose ombros contínuo (trapézio, v143 head-guard)
      *   - watch, bracelet  → MediaPipe Hand Landmarker (`runHandArSession`)
      *
      * Fallback: se o atributo vier vazio (temas antigos) assumimos `glasses`
@@ -12351,8 +12389,24 @@ async function runArSession({
           : false,
       necklaceTorsoFreezeMode:
         accessoryType === "necklace"
-          ? !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklaceTorsoFreeze", "1")).trim())
+          ? !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklaceTorsoFreeze", "0")).trim())
           : false,
+      necklaceTrapeziusImmediate:
+        accessoryType === "necklace"
+          ? !/^(0|false|off|no)$/i.test(
+              String(cfgAttr("arNecklaceTrapeziusImmediate", "1")).trim(),
+            )
+          : false,
+      necklaceHeadGuard:
+        accessoryType === "necklace"
+          ? !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklaceHeadGuard", "1")).trim())
+          : false,
+      necklaceTorsoRef: accessoryType === "necklace" ? {} : null,
+      necklaceTorsoZLocked: false,
+      necklaceRefShoulderSpan3d: accessoryType === "necklace" ? NaN : NaN,
+      necklaceShoulderSpan3d: accessoryType === "necklace" ? NaN : NaN,
+      necklaceTrapeziusVisible: false,
+      necklaceTrapeziusActiveLogged: false,
       necklaceTorsoFrozen: false,
       necklaceTorsoFrozenPos:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
@@ -12604,7 +12658,20 @@ async function runArSession({
             st.necklaceTorsoStableFrames = 0;
             st.necklaceTorsoPosPrimed = false;
             st.necklaceTorsoFreezeCheekTrack = false;
+            st.necklaceTorsoZLocked = false;
             st.necklaceTorsoFrozenZDist = NaN;
+            st.necklaceRefShoulderSpan3d = NaN;
+            st.necklaceShoulderSpan3d = NaN;
+            st.necklaceTrapeziusVisible = false;
+            st.necklaceTrapeziusActiveLogged = false;
+            if (st.necklaceTorsoRef) {
+              st.necklaceTorsoRef.shMidX = NaN;
+              st.necklaceTorsoRef.shMidY = NaN;
+              st.necklaceTorsoRef.spanNorm = NaN;
+              st.necklaceTorsoRef.faceX = NaN;
+              st.necklaceTorsoRef.faceY = NaN;
+              st.necklaceTorsoRef.zDist = NaN;
+            }
             if (st.necklaceTorsoZDistSmooth) st.necklaceTorsoZDistSmooth.value = NaN;
             st.necklaceStrictPoseLastMs = 0;
             if (st.necklaceClavicleScratch) {
@@ -13324,8 +13391,12 @@ async function runArSession({
         }
         if (accessoryType === "necklace" && st.necklaceSwing) {
           const wearGrp = st.necklaceWearGroup || wearPosition;
-          if (wearGrp) wearGrp.visible = true;
-          if (glasses) glasses.visible = true;
+          const showTrapezius =
+            !st.necklaceTorsoAnchorMode ||
+            st.poseShoulderOk === true ||
+            st.necklaceTrapeziusVisible === true;
+          if (wearGrp) wearGrp.visible = showTrapezius;
+          if (glasses) glasses.visible = showTrapezius;
           try {
             const skip = new Set([glasses, wearGrp, faceOccluderMesh, neckOccluderMesh].filter(Boolean));
             if (wearGrp?.traverse) {
