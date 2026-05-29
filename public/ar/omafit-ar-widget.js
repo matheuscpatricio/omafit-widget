@@ -574,7 +574,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v146-necklace-torso-cm-world-fix";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v147-necklace-torso-orient-ry180";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3115,7 +3115,20 @@ function omafitNecklacePoseTorsoToWorld(
     .multiplyScalar(nativeCmMul)
     .applyMatrix4(camera.matrixWorld);
   if (outQuatWorld && torsoScratch.qTorso) {
-    outQuatWorld.copy(camera.quaternion).multiply(torsoScratch.qTorso);
+    /**
+     * GLB canónico: frente em −Z; base ombros alinha +Z para a câmara — Ry(180)
+     * (paridade óculos / `applyNecklaceAutoBind` ry-180-z-dominant).
+     */
+    if (!torsoScratch.qTorsoCanonicalFix) {
+      torsoScratch.qTorsoCanonicalFix = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        Math.PI,
+      );
+    }
+    outQuatWorld
+      .copy(camera.quaternion)
+      .multiply(torsoScratch.qTorso)
+      .multiply(torsoScratch.qTorsoCanonicalFix);
   }
   const wearOffCam = opts.wearOffsetCam;
   if (wearOffCam && Number.isFinite(wearOffCam.x)) {
