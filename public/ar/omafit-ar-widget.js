@@ -574,7 +574,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v148-necklace-torso-orient-stable";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v149-necklace-torso-bind-orient";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1063,8 +1063,6 @@ const OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS = 1800;
 const OMAFIT_NECKLACE_TORSO_POS_TAU_MS = 95;
 /** Slerp da orientação do torso (ombros/ancas). */
 const OMAFIT_NECKLACE_TORSO_ORIENT_SLERP = 0.28;
-/** Rejeita salto de orientação > ~103° (flip 180° da base ombros). */
-const OMAFIT_NECKLACE_TORSO_ORIENT_FLIP_GUARD_RAD = 1.8;
 /** Frames estáveis (legado freeze opcional via attr). */
 const OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES = 1;
 /** Só atualiza o freeze legado se o mid-ombro mover mais que isto (m). */
@@ -3507,43 +3505,20 @@ function omafitNecklaceWearAndOrientStep(
         if (!st.necklaceTorsoOrientTarget) {
           st.necklaceTorsoOrientTarget = new THREE.Quaternion();
         }
-        st.necklaceTorsoOrientTarget.copy(quatWorld);
-        if (st.necklaceTorsoWorldLockedQuat && st.necklaceTorsoOrientPrimed) {
-          omafitQuatShortestPathToward(
-            st.necklaceTorsoWorldLockedQuat,
-            st.necklaceTorsoOrientTarget,
-          );
-          const flipRad = st.necklaceTorsoWorldLockedQuat.angleTo(
-            st.necklaceTorsoOrientTarget,
-          );
-          if (flipRad > OMAFIT_NECKLACE_TORSO_ORIENT_FLIP_GUARD_RAD) {
-            st.necklaceTorsoOrientTarget.copy(st.necklaceTorsoWorldLockedQuat);
-          }
+        if (!st.necklaceTorsoOrientWear) {
+          st.necklaceTorsoOrientWear = new THREE.Quaternion();
+        }
+        st.necklaceTorsoOrientWear.copy(quatWorld);
+        if (st.necklaceMeshBindQuatInv) {
+          st.necklaceTorsoOrientWear.multiply(st.necklaceMeshBindQuatInv);
         }
         if (!st.necklaceTorsoOrientPrimed) {
-          if (!st.necklaceTorsoOrientRy180) {
-            st.necklaceTorsoOrientRy180 = new THREE.Quaternion().setFromAxisAngle(
-              new THREE.Vector3(0, 1, 0),
-              Math.PI,
-            );
-          }
-          const qSnap = st.necklaceTorsoOrientSnap || new THREE.Quaternion();
-          st.necklaceTorsoOrientSnap = qSnap;
-          qSnap.copy(st.necklaceTorsoOrientTarget);
-          const qAlt = st.necklaceTorsoOrientSnapAlt || new THREE.Quaternion();
-          st.necklaceTorsoOrientSnapAlt = qAlt;
-          qAlt.copy(qSnap).multiply(st.necklaceTorsoOrientRy180);
-          if (orientGrp.quaternion.angleTo(qAlt) < orientGrp.quaternion.angleTo(qSnap)) {
-            qSnap.copy(qAlt);
-          }
-          omafitQuatShortestPathToward(orientGrp.quaternion, qSnap);
-          orientGrp.quaternion.copy(qSnap);
-          st.necklaceTorsoOrientTarget.copy(qSnap);
+          orientGrp.quaternion.copy(st.necklaceTorsoOrientWear);
           st.necklaceTorsoOrientPrimed = true;
         } else if (!isHold) {
-          omafitQuatShortestPathToward(orientGrp.quaternion, st.necklaceTorsoOrientTarget);
+          omafitQuatShortestPathToward(orientGrp.quaternion, st.necklaceTorsoOrientWear);
           const oa = Math.min(1, Math.max(0, OMAFIT_NECKLACE_TORSO_ORIENT_SLERP));
-          orientGrp.quaternion.slerp(st.necklaceTorsoOrientTarget, oa);
+          orientGrp.quaternion.slerp(st.necklaceTorsoOrientWear, oa);
         }
         orientGrp.updateMatrix();
       }
@@ -12546,13 +12521,11 @@ async function runArSession({
       necklaceTorsoEverLocked: false,
       necklaceTorsoPosPrimed: false,
       necklaceTorsoOrientPrimed: false,
-      necklaceTorsoOrientTarget:
+      necklaceTorsoOrientWear:
         accessoryType === "necklace" ? new THREE.Quaternion() : null,
-      necklaceTorsoOrientSnap:
+      necklaceMeshBindQuat:
         accessoryType === "necklace" ? new THREE.Quaternion() : null,
-      necklaceTorsoOrientSnapAlt:
-        accessoryType === "necklace" ? new THREE.Quaternion() : null,
-      necklaceTorsoOrientRy180:
+      necklaceMeshBindQuatInv:
         accessoryType === "necklace" ? new THREE.Quaternion() : null,
       necklaceTorsoPosSmooth:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
@@ -12665,6 +12638,16 @@ async function runArSession({
 
     if (accessoryType === "necklace" && faceArEnhancementState) {
       omafitRefreshNecklaceMerchantCalFromCfg(THREE, faceArEnhancementState, cfgAttr);
+      if (glasses) {
+        glasses.updateMatrixWorld(true);
+        if (!faceArEnhancementState.necklaceMeshBindQuat) {
+          faceArEnhancementState.necklaceMeshBindQuat = glasses.quaternion.clone();
+        }
+        if (!faceArEnhancementState.necklaceMeshBindQuatInv) {
+          faceArEnhancementState.necklaceMeshBindQuatInv =
+            faceArEnhancementState.necklaceMeshBindQuat.clone().invert();
+        }
+      }
     }
 
     if (

@@ -655,6 +655,10 @@ export const OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M = 0.38;
 export const OMAFIT_NECKLACE_TORSO_CHEST_FRAC = 0.14;
 /** Trapézio só com ombros: deslocamento fixo abaixo do mid-ombro (m). */
 export const OMAFIT_NECKLACE_TRAPEZIUS_SHOULDER_DOWN_M = 0.048;
+/**
+ * Base ombros aponta +Z à câmara; export canónico tem frente em −Z — Ry(180) local.
+ */
+export const OMAFIT_NECKLACE_TORSO_FRONT_RY180_RAD = Math.PI;
 export const OMAFIT_NECKLACE_TORSO_POSE_MIN_VIS = 0.55;
 export const OMAFIT_NECKLACE_TORSO_SHOULDER_MIN_VIS = 0.5;
 export const OMAFIT_NECKLACE_TORSO_ZDIST_MIN = 0.28;
@@ -903,6 +907,13 @@ export function omafitComputeNecklaceTorsoAnchorShouldersOnly(
 
   basisM.makeBasis(xAxis, yAxis, zAxis);
   quat.setFromRotationMatrix(basisM);
+  if (!scratch.qTorsoFrontRy180) {
+    scratch.qTorsoFrontRy180 = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      OMAFIT_NECKLACE_TORSO_FRONT_RY180_RAD,
+    );
+  }
+  quat.multiply(scratch.qTorsoFrontRy180);
 
   scratch.lockedZDistUsed = zDist;
   scratch.shoulderSpan3d = shL.distanceTo(shR);
