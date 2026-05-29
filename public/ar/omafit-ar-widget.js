@@ -574,7 +574,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v141-necklace-pose-first-torso";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v142-necklace-pose-visible-bootstrap";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -1077,6 +1077,10 @@ const OMAFIT_NECKLACE_TORSO_ZDIST_VALID_MAX = 1.12;
 /** Distância world peito vs âncora facial (m). */
 const OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MIN = 0.05;
 const OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MAX = 0.48;
+/** Bootstrap (antes do freeze): limites mais largos para não rejeitar o 1.º lock. */
+const OMAFIT_NECKLACE_TORSO_BOOTSTRAP_ANCHOR_DIST_MAX = 0.62;
+const OMAFIT_NECKLACE_TORSO_BOOTSTRAP_SCALE_MIN_MUL = 0.5;
+const OMAFIT_NECKLACE_TORSO_BOOTSTRAP_SCALE_MAX_MUL = 1.55;
 /** Escala aplicada vs boot (evita colar gigante no freeze). */
 const OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MIN_MUL = 0.62;
 const OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MAX_MUL = 1.38;
@@ -3009,26 +3013,34 @@ function omafitNecklaceValidateTorsoFrame(
   chestWorld,
   zDist,
   appliedScale,
+  opts = {},
 ) {
   if (!chestWorld || !Number.isFinite(zDist)) return false;
   if (zDist < OMAFIT_NECKLACE_TORSO_ZDIST_VALID_MIN || zDist > OMAFIT_NECKLACE_TORSO_ZDIST_VALID_MAX) {
     return false;
   }
+  const bootstrap = opts.bootstrap === true || st?.necklaceTorsoFrozen !== true;
   if (anchorGroup) {
     anchorGroup.updateMatrixWorld(true);
     const anchorW = new THREE.Vector3().setFromMatrixPosition(anchorGroup.matrixWorld);
     const d = chestWorld.distanceTo(anchorW);
-    if (d < OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MIN || d > OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MAX) {
+    const anchorMax = bootstrap
+      ? OMAFIT_NECKLACE_TORSO_BOOTSTRAP_ANCHOR_DIST_MAX
+      : OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MAX;
+    if (d < OMAFIT_NECKLACE_TORSO_ANCHOR_DIST_MIN || d > anchorMax) {
       return false;
     }
   }
   const boot = Number(st.necklaceBootAppliedScale);
   if (Number.isFinite(boot) && boot > 0 && Number.isFinite(appliedScale) && appliedScale > 0) {
     const ratio = appliedScale / boot;
-    if (
-      ratio < OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MIN_MUL ||
-      ratio > OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MAX_MUL
-    ) {
+    const minMul = bootstrap
+      ? OMAFIT_NECKLACE_TORSO_BOOTSTRAP_SCALE_MIN_MUL
+      : OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MIN_MUL;
+    const maxMul = bootstrap
+      ? OMAFIT_NECKLACE_TORSO_BOOTSTRAP_SCALE_MAX_MUL
+      : OMAFIT_NECKLACE_TORSO_SCALE_BOOT_MAX_MUL;
+    if (ratio < minMul || ratio > maxMul) {
       return false;
     }
   }
@@ -3196,9 +3208,14 @@ function omafitNecklaceSamplePoseShoulders(st, video, nowMs) {
     /** Visibilidade ≥ 0.55 para evitar saltos quando ombros saem do enquadramento. */
     const lv = lSh.visibility ?? 1;
     const rv = rSh.visibility ?? 1;
-    if (lv < 0.55 || rv < 0.55) {
+    if (lv < 0.42 || rv < 0.42) {
       st.poseShoulderOk = false;
-      st.lastPoseLandmarksNorm = null;
+      if (
+        !Number.isFinite(st.poseShoulderLastMs) ||
+        nowMs - st.poseShoulderLastMs > OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS
+      ) {
+        st.lastPoseLandmarksNorm = null;
+      }
       return false;
     }
     if (!st.poseShoulders) {
@@ -3362,7 +3379,6 @@ function omafitNecklaceWearAndOrientStep(
       if (orientGrp && st.necklaceStrictPoseLastQuat) {
         st.necklaceStrictPoseLastQuat.copy(orientGrp.quaternion);
       }
-      st.necklaceTorsoEverLocked = true;
     }
   };
 
@@ -3458,59 +3474,68 @@ function omafitNecklaceWearAndOrientStep(
             st.necklaceTorsoFrozenQuat,
             true,
           );
+          return;
         }
-        return;
-      }
+        if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
+          applyTorsoWorldTarget(
+            st.necklaceStrictPoseLastWorld,
+            st.necklaceStrictPoseLastQuat,
+            true,
+          );
+          return;
+        }
+        /* Pré-freeze inválido: bootstrap facial abaixo (sem return). */
+      } else {
+        st.necklaceLastNeckSource = "torso-pose-first";
 
-      st.necklaceLastNeckSource = "torso-pose-first";
-
-      if (torsoFreezeMode) {
-        if (!st.necklaceTorsoFrozen) {
-          if (!st.necklaceTorsoCalibMid) st.necklaceTorsoCalibMid = new THREE.Vector3();
-          const jitter = chestWorld.distanceTo(st.necklaceTorsoCalibMid);
-          if (jitter <= OMAFIT_NECKLACE_TORSO_STABLE_JITTER_M) {
-            st.necklaceTorsoStableFrames = (st.necklaceTorsoStableFrames || 0) + 1;
-          } else {
-            st.necklaceTorsoStableFrames = 0;
+        if (torsoFreezeMode) {
+          if (!st.necklaceTorsoFrozen) {
+            if (!st.necklaceTorsoCalibMid) st.necklaceTorsoCalibMid = new THREE.Vector3();
+            const jitter = chestWorld.distanceTo(st.necklaceTorsoCalibMid);
+            if (jitter <= OMAFIT_NECKLACE_TORSO_STABLE_JITTER_M) {
+              st.necklaceTorsoStableFrames = (st.necklaceTorsoStableFrames || 0) + 1;
+            } else {
+              st.necklaceTorsoStableFrames = 0;
+            }
+            st.necklaceTorsoCalibMid.copy(chestWorld);
+            applyTorsoWorldTarget(chestWorld, quatWorld, false);
+            if (st.necklaceTorsoStableFrames >= OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES) {
+              commitTorsoFreezeValidated(
+                chestWorld,
+                orientGrp?.quaternion || quatWorld,
+                shoulderMidWorld,
+                zDistProbe,
+              );
+            }
+            return;
           }
-          st.necklaceTorsoCalibMid.copy(chestWorld);
-          applyTorsoWorldTarget(chestWorld, quatWorld, false);
-          if (st.necklaceTorsoStableFrames >= OMAFIT_NECKLACE_TORSO_FREEZE_STABLE_FRAMES) {
-            commitTorsoFreezeValidated(
-              chestWorld,
-              orientGrp?.quaternion || quatWorld,
+
+          if (shoulderMidWorld && st.necklaceTorsoFrozenShoulderMidWorld) {
+            const delta = new THREE.Vector3().subVectors(
               shoulderMidWorld,
-              zDistProbe,
+              st.necklaceTorsoFrozenShoulderMidWorld,
             );
+            if (delta.length() > OMAFIT_NECKLACE_TORSO_UPDATE_POS_THRESH_M) {
+              st.necklaceTorsoFrozenPos.add(delta);
+              st.necklaceTorsoFrozenShoulderMidWorld.copy(shoulderMidWorld);
+              if (quatWorld && st.necklaceTorsoFrozenQuat) {
+                st.necklaceTorsoFrozenQuat.slerp(quatWorld, 0.18);
+              }
+            }
           }
+          applyTorsoWorldTarget(
+            st.necklaceTorsoFrozenPos,
+            st.necklaceTorsoFrozenQuat,
+            true,
+          );
+          st.necklaceStrictPoseLastWorld.copy(st.necklaceWearTargetWorld);
+          st.necklaceStrictPoseLastMs = nowMs;
           return;
         }
 
-        if (shoulderMidWorld && st.necklaceTorsoFrozenShoulderMidWorld) {
-          const delta = new THREE.Vector3().subVectors(
-            shoulderMidWorld,
-            st.necklaceTorsoFrozenShoulderMidWorld,
-          );
-          if (delta.length() > OMAFIT_NECKLACE_TORSO_UPDATE_POS_THRESH_M) {
-            st.necklaceTorsoFrozenPos.add(delta);
-            st.necklaceTorsoFrozenShoulderMidWorld.copy(shoulderMidWorld);
-            if (quatWorld && st.necklaceTorsoFrozenQuat) {
-              st.necklaceTorsoFrozenQuat.slerp(quatWorld, 0.18);
-            }
-          }
-        }
-        applyTorsoWorldTarget(
-          st.necklaceTorsoFrozenPos,
-          st.necklaceTorsoFrozenQuat,
-          true,
-        );
-        st.necklaceStrictPoseLastWorld.copy(st.necklaceWearTargetWorld);
-        st.necklaceStrictPoseLastMs = nowMs;
+        applyTorsoWorldTarget(chestWorld, quatWorld, false);
         return;
       }
-
-      applyTorsoWorldTarget(chestWorld, quatWorld, false);
-      return;
     }
 
     if (st.necklaceTorsoFrozen) {
@@ -3521,9 +3546,15 @@ function omafitNecklaceWearAndOrientStep(
       );
       return;
     }
-  }
-
-  if (torsoMode && camera && st.lastPoseLandmarksNorm) {
+    if (st.necklaceTorsoPosPrimed && st.necklaceStrictPoseLastWorld) {
+      applyTorsoWorldTarget(
+        st.necklaceStrictPoseLastWorld,
+        st.necklaceStrictPoseLastQuat,
+        true,
+      );
+      return;
+    }
+  } else if (torsoMode && camera) {
     if (st.necklaceTorsoFrozen) {
       applyTorsoWorldTarget(
         st.necklaceTorsoFrozenPos,
@@ -3533,8 +3564,7 @@ function omafitNecklaceWearAndOrientStep(
       return;
     }
     if (
-      st.necklaceTorsoEverLocked &&
-      strictPose &&
+      st.necklaceTorsoPosPrimed &&
       st.necklaceStrictPoseLastWorld &&
       Number.isFinite(st.necklaceStrictPoseLastMs) &&
       nowMs - st.necklaceStrictPoseLastMs <= OMAFIT_NECKLACE_POSE_STRICT_HOLD_MS
@@ -3546,17 +3576,12 @@ function omafitNecklaceWearAndOrientStep(
       );
       return;
     }
-    if (strictPose && torsoFreezeMode) {
-      return;
-    }
   }
 
-  if (torsoFreezeMode && strictPose) {
-    return;
-  }
-
-  /** Legado face+anchor: só quando torsoMode desligado ou bootstrap antes do 1º lock. */
-  if (torsoMode && st.necklaceTorsoEverLocked) {
+  /**
+   * Face+anchor: bootstrap até freeze torácico; depois só Pose (colar não some no arranque).
+   */
+  if (torsoMode && st.necklaceTorsoFrozen) {
     return;
   }
 
@@ -3627,7 +3652,7 @@ function omafitNecklaceWearAndOrientStep(
   if (!st.necklaceWearTarget) st.necklaceWearTarget = new THREE.Vector3();
 
   if (strictPose && !strictPoseOk) {
-    if (torsoMode && st.necklaceTorsoEverLocked) {
+    if (torsoMode && st.necklaceTorsoFrozen) {
       return;
     }
     if (
