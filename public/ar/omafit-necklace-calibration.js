@@ -883,10 +883,16 @@ export function omafitComputeNecklaceTorsoAnchorShouldersOnly(
   omafitUnprojectNormLmToCameraSpace(shR, rSh, zDist, aspect, mirrorX, fovDeg);
   midSh.copy(shL).add(shR).multiplyScalar(0.5);
 
-  yAxis.set(0, -1, 0);
   xAxis.subVectors(shR, shL);
   if (xAxis.lengthSq() < 1e-10) return false;
   xAxis.normalize();
+  if (scratch.prevXAxis && Number.isFinite(scratch.prevXAxis.x)) {
+    if (scratch.prevXAxis.dot(xAxis) < 0) xAxis.negate();
+  }
+  if (!scratch.prevXAxis) scratch.prevXAxis = new THREE.Vector3();
+  scratch.prevXAxis.copy(xAxis);
+
+  yAxis.set(0, -1, 0);
   zAxis.crossVectors(xAxis, yAxis);
   if (zAxis.lengthSq() < 1e-10) return false;
   zAxis.normalize();
