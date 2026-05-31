@@ -159,20 +159,6 @@ export function omafitApplyNecklaceMerchantCalibToBindGroup(THREE, bindGroup, ca
 }
 
 /**
- * Trapézio (pose ombros + orient face): `rz` da loja (default −90°) era para o modo
- * face-only com `orientGroup` em identity — em world/torso duplica rotação e deixa o
- * colar «de lado» ou invertido. Mantém rx/ry/scale do lojista.
- *
- * @param {object} cal
- * @param {boolean} [keepRz] `data-ar-necklace-torso-merchant-rz="1"`
- */
-export function omafitNecklaceMerchantCalibForTorsoWear(cal, keepRz = false) {
-  const norm = normalizeNecklaceMerchantCalibration(cal);
-  if (keepRz) return norm;
-  return { ...norm, rz: 0 };
-}
-
-/**
  * Rotação de calibração do lojista (rx/ry/rz) — ordem Y → X → Z (paridade óculos / admin).
  *
  * @param {typeof import("three")} THREE

@@ -44,7 +44,6 @@ import {
   applyNecklaceMerchantCalibRotation,
   clampNecklaceMerchantScaleMul,
   omafitApplyNecklaceMerchantCalibToBindGroup,
-  omafitNecklaceMerchantCalibForTorsoWear,
   computeNecklaceArDisplayScale,
   normalizeNecklaceMerchantCalibration,
   omafitApplyNecklaceNeckBasisOrientation,
@@ -575,7 +574,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v153-necklace-torso-no-rz-bind";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v154-necklace-torso-static-orient";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -3433,40 +3432,21 @@ function omafitRefreshNecklaceMerchantCalFromCfg(THREE, st, cfgAttr) {
   st.necklaceScaleMul = st.readNecklaceMerchantScaleMul
     ? st.readNecklaceMerchantScaleMul()
     : resolveNecklaceMerchantScaleMul(cal, cfgAttr("arNecklaceScaleMul", ""));
-  const torsoWear =
-    st.necklaceTorsoAnchorMode === true &&
-    st.necklaceWorldAnchorMode === true;
-  const keepTorsoRz =
-    typeof cfgAttr === "function" &&
-    /^(1|true|yes|on)$/i.test(
-      String(cfgAttr("arNecklaceTorsoMerchantRz", "0")).trim(),
-    );
-  const calBind =
-    torsoWear && !keepTorsoRz
-      ? omafitNecklaceMerchantCalibForTorsoWear(cal, false)
-      : cal;
   st.necklaceMerchantCalApplied = cal;
-  st.necklaceMerchantCalBindApplied = calBind;
   if (st.necklaceBindGroup) {
-    omafitApplyNecklaceMerchantCalibToBindGroup(THREE, st.necklaceBindGroup, calBind);
+    omafitApplyNecklaceMerchantCalibToBindGroup(THREE, st.necklaceBindGroup, cal);
   }
   return cal;
 }
 
 /**
- * Trapézio Pose: orientação = rotação world do ramo facial MindAR (âncora + wear),
- * não quat dos ombros (evita flip 180° / «de lado» com auto-bind Tripo).
+ * Trapézio: só posição nos ombros; `orientGroup` identity (paridade preview admin /
+ * `applyNecklacePreviewStaticOrient`). Rotação visual = auto-bind + calib `bind`.
  */
-function omafitNecklaceApplyTorsoOrientFromAnchor(THREE, st, anchorGroup) {
+function omafitNecklaceApplyTorsoOrientStatic(st) {
   const orientGrp = st?.necklaceOrientGroup;
-  if (!THREE || !orientGrp || !anchorGroup) return;
-  if (!st.necklaceTorsoAnchorQuatScratch) {
-    st.necklaceTorsoAnchorQuatScratch = new THREE.Quaternion();
-  }
-  const trackNode = st.necklaceFaceTrackNode || anchorGroup;
-  trackNode.updateMatrixWorld(true);
-  trackNode.getWorldQuaternion(st.necklaceTorsoAnchorQuatScratch);
-  orientGrp.quaternion.copy(st.necklaceTorsoAnchorQuatScratch);
+  if (!orientGrp) return;
+  orientGrp.quaternion.identity();
   orientGrp.updateMatrix();
   st.necklaceTorsoOrientPrimed = true;
 }
@@ -3534,11 +3514,8 @@ function omafitNecklaceWearAndOrientStep(
       if (freezeOrient && lockedQuat) {
         orientGrp.quaternion.copy(lockedQuat);
         orientGrp.updateMatrix();
-      } else if (!isHold || !st.necklaceTorsoOrientPrimed) {
-        omafitNecklaceApplyTorsoOrientFromAnchor(THREE, st, anchorGroup);
-      } else if (lockedQuat) {
-        orientGrp.quaternion.copy(lockedQuat);
-        orientGrp.updateMatrix();
+      } else if (!st.necklaceTorsoOrientPrimed) {
+        omafitNecklaceApplyTorsoOrientStatic(st);
       }
     }
     omafitNecklaceRigidWearStep(
@@ -3692,20 +3669,13 @@ function omafitNecklaceWearAndOrientStep(
         if (!st.necklaceTrapeziusActiveLogged) {
           st.necklaceTrapeziusActiveLogged = true;
           try {
-            const calStore = st.necklaceMerchantCalApplied;
-            const calBind = st.necklaceMerchantCalBindApplied || calStore;
             console.log("[omafit-ar] colar: trapézio activo", {
               build: OMAFIT_AR_WIDGET_BUILD,
               zDist: Number.isFinite(zDistProbe) ? zDistProbe.toFixed(3) : null,
               frameValid,
               headGuard: st.necklaceHeadGuard === true,
-              orientSource: "face-track-world-quat",
-              merchantCalStore: calStore,
-              merchantCalBind: calBind,
-              torsoRzSuppressed:
-                calStore &&
-                calBind &&
-                Number(calStore.rz) !== Number(calBind.rz),
+              orientSource: "static-identity+bind-cal",
+              merchantCal: st.necklaceMerchantCalApplied,
             });
           } catch {
             /* ignore */
@@ -11926,18 +11896,13 @@ async function runArSession({
       necklaceWearGroup.add(necklaceOrientGroup);
       necklaceOrientGroup.add(necklaceBindGroup);
       necklaceBindGroup.add(glasses);
-      const initNeckSt = {
-        readNecklaceMerchantCal,
-        readNecklaceMerchantScaleMul,
-        necklaceBindGroup,
-        necklaceTorsoAnchorMode: !/^(0|false|off|no)$/i.test(
-          String(cfgAttr("arNecklaceTorsoAnchor", "1")).trim(),
-        ),
-        necklaceWorldAnchorMode: true,
-      };
       const initNeckCal = omafitRefreshNecklaceMerchantCalFromCfg(
         THREE,
-        initNeckSt,
+        {
+          readNecklaceMerchantCal,
+          readNecklaceMerchantScaleMul,
+          necklaceBindGroup,
+        },
         cfgAttr,
       );
       try {
@@ -11945,11 +11910,6 @@ async function runArSession({
           build: OMAFIT_AR_WIDGET_BUILD,
           canonicalBlenderExport: necklaceCanonicalBlenderExport,
           merchantCal: initNeckCal,
-          merchantCalBind: initNeckSt.necklaceMerchantCalBindApplied || initNeckCal,
-          torsoRzSuppressed:
-            initNeckCal &&
-            initNeckSt.necklaceMerchantCalBindApplied &&
-            Number(initNeckCal.rz) !== Number(initNeckSt.necklaceMerchantCalBindApplied.rz),
           mirrorSelfieX:
             /^(1|true|yes|on)$/i.test(
               String(cfgAttr("arNecklaceMirrorLandmarksX", "0")).trim(),
@@ -12294,8 +12254,6 @@ async function runArSession({
           ? String(cfgAttr("arNecklaceForceDepthFront", "1")).trim()
           : null,
       necklaceWearGroup: accessoryType === "necklace" ? necklaceWearGroup : null,
-      necklaceFaceTrackNode:
-        accessoryType === "necklace" ? wearPosition : null,
       necklaceWorldAnchorMode: accessoryType === "necklace" ? true : false,
       necklaceOrientGroup: accessoryType === "necklace" ? necklaceOrientGroup : null,
       necklaceBindGroup: accessoryType === "necklace" ? necklaceBindGroup : null,
@@ -12310,7 +12268,6 @@ async function runArSession({
         accessoryType === "necklace" && readNecklaceMerchantCal
           ? readNecklaceMerchantCal()
           : null,
-      necklaceMerchantCalBindApplied: null,
       necklaceCanonicalBlenderExport: accessoryType === "necklace" ? !!necklaceCanonicalBlenderExport : false,
       readNecklaceMerchantCal: accessoryType === "necklace" ? readNecklaceMerchantCal : null,
       readNecklaceMerchantScaleMul:
@@ -12561,8 +12518,6 @@ async function runArSession({
       necklaceTorsoEverLocked: false,
       necklaceTorsoPosPrimed: false,
       necklaceTorsoOrientPrimed: false,
-      necklaceTorsoAnchorQuatScratch:
-        accessoryType === "necklace" ? new THREE.Quaternion() : null,
       necklaceTorsoPosSmooth:
         accessoryType === "necklace" ? new THREE.Vector3() : null,
       necklaceTorsoZDistSmooth:
@@ -13675,11 +13630,6 @@ async function runArSession({
                 clavicleTracking: clavOk,
                 directAnchorSlot: !!st.necklaceWearGroup,
                 merchantRot: neckCalFrame || st.necklaceMerchantCalApplied || null,
-                merchantRotBind:
-                  st.necklaceMerchantCalBindApplied ||
-                  neckCalFrame ||
-                  st.necklaceMerchantCalApplied ||
-                  null,
                 necklaceScaleMulApplied: st.necklaceScaleMul,
                 metersMul,
                 nativeSpace,
