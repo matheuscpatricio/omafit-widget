@@ -459,6 +459,10 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
 /** Clip hemisférico (clippingPlanes): metade oposta à câmara (vista de cima/baixo). */
 const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = true;
+/** Desloca o plano ligeiramente para a câmara — evita cortar o anel inteiro no punho. */
+const OMAFIT_BRACELET_CLIP_PLANE_BIAS_M = 0.0025;
+/** Suavização da normal do plano (ms) — menos piscar com landmarks instáveis. */
+const OMAFIT_BRACELET_CLIP_NORMAL_TAU_MS = 140;
 /** Plano depth auxiliar entre pele e anel: desligado — escrevia depth à frente do GLB. */
 const OMAFIT_BRACELET_OCC_PLANE_ENABLED = false;
 /** Plano depth auxiliar: guarda relaxada em rigid (quando `OCC_PLANE` voltar). */
@@ -581,7 +585,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v159-bracelet-camera-hemisphere-clip";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v160-bracelet-clip-stable";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5799,9 +5803,37 @@ function createBraceletHemisphereClipState(THREE) {
   return {
     plane: new THREE.Plane(0, 1, 0, 1e6),
     normalScratch: new THREE.Vector3(0, 1, 0),
+    smoothedNormal: new THREE.Vector3(0, 0, 1),
+    normalSmoothInit: false,
     toCamScratch: new THREE.Vector3(),
+    planeCenterScratch: new THREE.Vector3(),
+    bboxScratch: new THREE.Box3(),
+    bboxCornerScratch: new THREE.Vector3(),
     enabled: false,
   };
+}
+
+/**
+ * @returns {boolean} true se algum vértice do AABB do mesh ficaria visível com o plano actual.
+ */
+function omafitBraceletClipPlaneKeepsMeshVisible(THREE, plane, meshRoot, clipState) {
+  if (!THREE || !plane || !meshRoot || !clipState?.bboxScratch) return true;
+  const box = clipState.bboxScratch;
+  const corner = clipState.bboxCornerScratch;
+  box.setFromObject(meshRoot);
+  if (box.isEmpty()) return true;
+  const xs = [box.min.x, box.max.x];
+  const ys = [box.min.y, box.max.y];
+  const zs = [box.min.z, box.max.z];
+  for (let xi = 0; xi < 2; xi++) {
+    for (let yi = 0; yi < 2; yi++) {
+      for (let zi = 0; zi < 2; zi++) {
+        corner.set(xs[xi], ys[yi], zs[zi]);
+        if (plane.distanceToPoint(corner) >= -5e-5) return true;
+      }
+    }
+  }
+  return false;
 }
 
 /** @param {import("three").Material[]} materials */
@@ -5821,6 +5853,7 @@ function installBraceletHemisphereClipOnMaterials(materials, clipState) {
     m.clippingPlanes = [clipState.plane];
     m.clipIntersection = false;
     m.clipShadows = false;
+    if ("clip" in m) m.clip = true;
     n += 1;
   }
   return n;
@@ -5832,11 +5865,20 @@ function installBraceletHemisphereClipOnMaterials(materials, clipState) {
  *
  * @param {boolean} enabled
  */
-function updateBraceletHemisphereClipPlane(THREE, clipState, wristCenter, camera, enabled) {
+function updateBraceletHemisphereClipPlane(
+  THREE,
+  clipState,
+  wristCenter,
+  camera,
+  enabled,
+  meshRoot,
+  dtMs,
+) {
   if (!THREE || !clipState?.plane || !wristCenter || !camera) return;
   clipState.enabled = enabled === true;
   if (!clipState.enabled) {
     clipState.plane.setComponents(0, 1, 0, 1e6);
+    clipState.normalSmoothInit = false;
     return;
   }
   clipState.toCamScratch.subVectors(camera.position, wristCenter);
@@ -5845,7 +5887,36 @@ function updateBraceletHemisphereClipPlane(THREE, clipState, wristCenter, camera
   } else {
     clipState.normalScratch.copy(clipState.toCamScratch).normalize();
   }
-  clipState.plane.setFromNormalAndCoplanarPoint(clipState.normalScratch, wristCenter);
+  const clampDt = Math.max(8, Math.min(80, Number.isFinite(dtMs) ? dtMs : 16));
+  const aNorm = 1 - Math.exp(-clampDt / OMAFIT_BRACELET_CLIP_NORMAL_TAU_MS);
+  if (!clipState.normalSmoothInit) {
+    clipState.smoothedNormal.copy(clipState.normalScratch);
+    clipState.normalSmoothInit = true;
+  } else {
+    clipState.smoothedNormal.lerp(clipState.normalScratch, aNorm);
+    if (clipState.smoothedNormal.lengthSq() > 1e-10) {
+      clipState.smoothedNormal.normalize();
+    } else {
+      clipState.smoothedNormal.copy(clipState.normalScratch);
+    }
+  }
+  clipState.planeCenterScratch
+    .copy(wristCenter)
+    .addScaledVector(clipState.smoothedNormal, OMAFIT_BRACELET_CLIP_PLANE_BIAS_M);
+  clipState.plane.setFromNormalAndCoplanarPoint(
+    clipState.smoothedNormal,
+    clipState.planeCenterScratch,
+  );
+  if (meshRoot && !omafitBraceletClipPlaneKeepsMeshVisible(THREE, clipState.plane, meshRoot, clipState)) {
+    clipState.smoothedNormal.negate();
+    clipState.planeCenterScratch
+      .copy(wristCenter)
+      .addScaledVector(clipState.smoothedNormal, OMAFIT_BRACELET_CLIP_PLANE_BIAS_M);
+    clipState.plane.setFromNormalAndCoplanarPoint(
+      clipState.smoothedNormal,
+      clipState.planeCenterScratch,
+    );
+  }
 }
 
 /**
@@ -17167,12 +17238,13 @@ async function runHandArSession({
         if (!handMicroUxDisabled) {
           try {
             handMicroUx.introStartMs = performance.now();
-            handMicroUx.introComplete = false;
             handMicroUx.preparedOpacity = false;
             handMicroUxWrap.scale.setScalar(0.9);
             if (accessoryType === "bracelet") {
               omafitRestoreModelOpacityBaseline(glbScene);
+              handMicroUx.introComplete = true;
             } else {
+              handMicroUx.introComplete = false;
               omafitStoreMaterialOpacityBaseline(glbScene);
               omafitApplyModelOpacityFactor(glbScene, 0);
               handMicroUx.preparedOpacity = true;
@@ -18139,12 +18211,16 @@ async function runHandArSession({
       accessoryType === "bracelet" &&
       OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED
     ) {
+      const clipMeshRoot = handMicroOpacityRoot || glbRoot;
+      if (clipMeshRoot) clipMeshRoot.updateMatrixWorld(true);
       updateBraceletHemisphereClipPlane(
         THREE,
         braceletHemiClipState,
         smPos,
         camera,
         anchor.visible === true,
+        clipMeshRoot,
+        clampDt,
       );
     }
 
@@ -18157,6 +18233,7 @@ async function runHandArSession({
      */
     if (
       OMAFIT_BRACELET_MATERIAL_OCCLUSION_ENABLED &&
+      !OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED &&
       accessoryType === "bracelet" &&
       braceletOcclusionMaterials.length > 0
     ) {
