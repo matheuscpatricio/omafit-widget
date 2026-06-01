@@ -457,8 +457,8 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
  */
 /** v158: desligado até validar — cilindro BackSide + depth custom podiam zerar a pulseira. */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
-/** Clip hemisférico (clippingPlanes): desligado em v158 — reactivar após pulseira estável. */
-const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = false;
+/** Clip hemisférico (clippingPlanes): metade oposta à câmara (vista de cima/baixo). */
+const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = true;
 /** Plano depth auxiliar entre pele e anel: desligado — escrevia depth à frente do GLB. */
 const OMAFIT_BRACELET_OCC_PLANE_ENABLED = false;
 /** Plano depth auxiliar: guarda relaxada em rigid (quando `OCC_PLANE` voltar). */
@@ -581,7 +581,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v158-bracelet-visible-restore";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v159-bracelet-camera-hemisphere-clip";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5827,29 +5827,23 @@ function installBraceletHemisphereClipOnMaterials(materials, clipState) {
 }
 
 /**
- * Plano pelo punso: mantém o hemisfério virado para a câmara (eixo palmar–dorsal).
+ * Plano pelo punso com normal punho→câmara: mantém só o hemisfério virado ao utilizador
+ * (de cima oclui a metade de baixo do anel, e vice-versa).
  *
  * @param {boolean} enabled
  */
-function updateBraceletHemisphereClipPlane(THREE, clipState, wristCenter, palmarDorsal, camera, enabled) {
-  if (!THREE || !clipState?.plane || !wristCenter || !palmarDorsal || !camera) return;
+function updateBraceletHemisphereClipPlane(THREE, clipState, wristCenter, camera, enabled) {
+  if (!THREE || !clipState?.plane || !wristCenter || !camera) return;
   clipState.enabled = enabled === true;
   if (!clipState.enabled) {
     clipState.plane.setComponents(0, 1, 0, 1e6);
     return;
   }
-  clipState.normalScratch.copy(palmarDorsal);
-  if (clipState.normalScratch.lengthSq() < 1e-10) {
-    clipState.normalScratch.set(0, 1, 0);
-  } else {
-    clipState.normalScratch.normalize();
-  }
   clipState.toCamScratch.subVectors(camera.position, wristCenter);
-  if (clipState.toCamScratch.lengthSq() > 1e-10) {
-    clipState.toCamScratch.normalize();
-    if (clipState.normalScratch.dot(clipState.toCamScratch) < 0) {
-      clipState.normalScratch.negate();
-    }
+  if (clipState.toCamScratch.lengthSq() < 1e-10) {
+    clipState.normalScratch.set(0, 0, 1);
+  } else {
+    clipState.normalScratch.copy(clipState.toCamScratch).normalize();
   }
   clipState.plane.setFromNormalAndCoplanarPoint(clipState.normalScratch, wristCenter);
 }
@@ -17189,7 +17183,7 @@ async function runHandArSession({
         }
         if (braceletHemiClipState && debug) {
           try {
-            console.log("[omafit-ar] bracelet hemisphere clip (clippingPlanes)", {
+            console.log("[omafit-ar] bracelet hemisphere clip (camera-facing plane)", {
               build: OMAFIT_AR_WIDGET_BUILD,
               materials: braceletOcclusionMaterials.length,
               rigidSlot: braceletIsRigidSlot,
@@ -18149,7 +18143,6 @@ async function runHandArSession({
         THREE,
         braceletHemiClipState,
         smPos,
-        smY,
         camera,
         anchor.visible === true,
       );
