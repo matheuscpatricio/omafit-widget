@@ -458,8 +458,8 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
 /** Clip por hemisfério (plano palmar–dorsal): esconde metade oposta em vista de cima/baixo. */
 const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = true;
-/** Plano depth auxiliar: activo em rigid slot sem guarda `dotOcc` restritiva. */
-const OMAFIT_BRACELET_OCC_PLANE_RIGID_ALWAYS = true;
+/** Plano depth auxiliar: guarda relaxada em rigid (nunca sempre-on — bloqueava o GLB). */
+const OMAFIT_BRACELET_OCC_PLANE_RIGID_RELAXED = true;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -578,7 +578,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v155-bracelet-hemisphere-occlusion";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v156-bracelet-occlusion-visible-fix";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5797,8 +5797,64 @@ function createBraceletHemisphereClipUniforms(THREE) {
   return {
     uOmafitBraceletWristCenter: { value: new THREE.Vector3() },
     uOmafitBraceletPalmarDorsal: { value: new THREE.Vector3(0, 1, 0) },
-    uOmafitBraceletHemiClip: { value: 1 },
+    /** 0 até tracking válido — evita discard total com centro (0,0,0). */
+    uOmafitBraceletHemiClip: { value: 0 },
   };
+}
+
+/**
+ * Injeta clip hemisférico no shader PBR (Three 0.18x). Devolve false se o layout for desconhecido.
+ *
+ * @returns {boolean}
+ */
+function omafitInjectBraceletHemisphereClipShader(shader) {
+  const fragSnippet = [
+    "if (uOmafitBraceletHemiClip > 0.5) {",
+    "  vec3 __obp = vOmafitBraceletWorldPos - uOmafitBraceletWristCenter;",
+    "  vec3 __obc = cameraPosition - uOmafitBraceletWristCenter;",
+    "  if (length(__obc) > 1e-6) {",
+    "    float __obs = dot(__obp, uOmafitBraceletPalmarDorsal) * dot(normalize(__obc), uOmafitBraceletPalmarDorsal);",
+    "    if (__obs < 0.0) discard;",
+    "  }",
+    "}",
+  ].join("\n");
+  if (shader.fragmentShader.includes("uOmafitBraceletHemiClip")) {
+    return true;
+  }
+  if (!shader.vertexShader.includes("vOmafitBraceletWorldPos")) {
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <common>",
+      ["varying vec3 vOmafitBraceletWorldPos;", "#include <common>"].join("\n"),
+    );
+    if (shader.vertexShader.includes("#include <begin_vertex>")) {
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        [
+          "#include <begin_vertex>",
+          "vOmafitBraceletWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;",
+        ].join("\n"),
+      );
+    } else {
+      return false;
+    }
+  }
+  const fragAnchors = [
+    "#include <clipping_planes_fragment>",
+    "#include <output_fragment>",
+    "#include <dithering_fragment>",
+    "#include <opaque_fragment>",
+  ];
+  for (let i = 0; i < fragAnchors.length; i++) {
+    const anchor = fragAnchors[i];
+    if (shader.fragmentShader.includes(anchor)) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        anchor,
+        `${fragSnippet}\n${anchor}`,
+      );
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -5810,36 +5866,17 @@ function installBraceletHemisphereClipOnMaterial(material, hemiUniforms) {
     return;
   }
   material.userData = material.userData || {};
-  material.userData.omafitBraceletHemiClipInstalled = true;
   const prev = material.onBeforeCompile;
   material.onBeforeCompile = function onBeforeCompileBraceletHemi(shader, renderer) {
     if (typeof prev === "function") prev.call(this, shader, renderer);
     shader.uniforms.uOmafitBraceletWristCenter = hemiUniforms.uOmafitBraceletWristCenter;
     shader.uniforms.uOmafitBraceletPalmarDorsal = hemiUniforms.uOmafitBraceletPalmarDorsal;
     shader.uniforms.uOmafitBraceletHemiClip = hemiUniforms.uOmafitBraceletHemiClip;
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <common>",
-      ["varying vec3 vOmafitBraceletWorldPos;", "#include <common>"].join("\n"),
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <project_vertex>",
-      [
-        "#include <project_vertex>",
-        "vOmafitBraceletWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;",
-      ].join("\n"),
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <clipping_planes_fragment>",
-      [
-        "#include <clipping_planes_fragment>",
-        "if (uOmafitBraceletHemiClip > 0.5) {",
-        "  vec3 __obp = vOmafitBraceletWorldPos - uOmafitBraceletWristCenter;",
-        "  vec3 __obc = cameraPosition - uOmafitBraceletWristCenter;",
-        "  float __obs = dot(__obp, uOmafitBraceletPalmarDorsal) * dot(__obc, uOmafitBraceletPalmarDorsal);",
-        "  if (__obs < 0.0) discard;",
-        "}",
-      ].join("\n"),
-    );
+    if (!omafitInjectBraceletHemisphereClipShader(shader)) {
+      material.userData.omafitBraceletHemiClipInstalled = false;
+      return;
+    }
+    material.userData.omafitBraceletHemiClipInstalled = true;
   };
   material.needsUpdate = true;
 }
@@ -18106,19 +18143,13 @@ async function runHandArSession({
       if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
       else tmpCamToWrist.set(0, 0, 1);
       const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
+      occPlane.scale.set(0.12, 0.08, 1);
       if (
-        OMAFIT_BRACELET_OCC_PLANE_RIGID_ALWAYS &&
+        OMAFIT_BRACELET_OCC_PLANE_RIGID_RELAXED &&
         braceletIsRigidSlot
       ) {
-        occPlane.visible = true;
-        const wristWidthOcc = w5.distanceTo(w17);
-        occPlane.scale.set(
-          THREE.MathUtils.clamp(wristWidthOcc * 2.4, 0.14, 0.26),
-          THREE.MathUtils.clamp(wristWidthOcc * 1.75, 0.1, 0.2),
-          1,
-        );
+        occPlane.visible = isInFront && dotOcc < 0.12;
       } else {
-        occPlane.scale.set(0.12, 0.08, 1);
         occPlane.visible = isInFront && dotOcc < -0.2;
       }
       basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
@@ -18157,7 +18188,8 @@ async function runHandArSession({
       if (braceletHemiClipUniforms.uOmafitBraceletPalmarDorsal.value.lengthSq() > 1e-10) {
         braceletHemiClipUniforms.uOmafitBraceletPalmarDorsal.value.normalize();
       }
-      braceletHemiClipUniforms.uOmafitBraceletHemiClip.value = 1;
+      braceletHemiClipUniforms.uOmafitBraceletHemiClip.value =
+        anchor.visible === true ? 1 : 0;
     }
 
     /**
