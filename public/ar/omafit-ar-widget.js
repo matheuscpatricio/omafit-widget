@@ -456,6 +456,10 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
  * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
  */
 const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
+/** Clip por hemisfério (plano palmar–dorsal): esconde metade oposta em vista de cima/baixo. */
+const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = true;
+/** Plano depth auxiliar: activo em rigid slot sem guarda `dotOcc` restritiva. */
+const OMAFIT_BRACELET_OCC_PLANE_RIGID_ALWAYS = true;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
  * factor ≈ `(span_m × k) / OMAFIT_BASE_KNUCKLE_SPAN_M` (equivalente ao teu
@@ -574,7 +578,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v154-necklace-torso-static-orient";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v155-bracelet-hemisphere-occlusion";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5778,6 +5782,78 @@ function installGlassesTempleHairMaskOnGlb(THREE, root, hairUniforms) {
     for (const m of mats) {
       if (!m) continue;
       installGlassesTempleHairMaskOnMaterial(THREE, m, hairUniforms);
+      n += 1;
+    }
+  });
+  return n;
+}
+
+/**
+ * Cria uniforms partilhados para clip hemisférico da pulseira (actualizados por frame).
+ *
+ * @param {typeof import("three")} THREE
+ */
+function createBraceletHemisphereClipUniforms(THREE) {
+  return {
+    uOmafitBraceletWristCenter: { value: new THREE.Vector3() },
+    uOmafitBraceletPalmarDorsal: { value: new THREE.Vector3(0, 1, 0) },
+    uOmafitBraceletHemiClip: { value: 1 },
+  };
+}
+
+/**
+ * Descarta fragmentos do lado oposto do plano equatorial do punso (eixo palmar–dorsal).
+ * Complementa o cilindro depth (eixo do antebraço), que só oclui a metade circunferencial.
+ */
+function installBraceletHemisphereClipOnMaterial(material, hemiUniforms) {
+  if (!material || !hemiUniforms || material.userData?.omafitBraceletHemiClipInstalled) {
+    return;
+  }
+  material.userData = material.userData || {};
+  material.userData.omafitBraceletHemiClipInstalled = true;
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = function onBeforeCompileBraceletHemi(shader, renderer) {
+    if (typeof prev === "function") prev.call(this, shader, renderer);
+    shader.uniforms.uOmafitBraceletWristCenter = hemiUniforms.uOmafitBraceletWristCenter;
+    shader.uniforms.uOmafitBraceletPalmarDorsal = hemiUniforms.uOmafitBraceletPalmarDorsal;
+    shader.uniforms.uOmafitBraceletHemiClip = hemiUniforms.uOmafitBraceletHemiClip;
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <common>",
+      ["varying vec3 vOmafitBraceletWorldPos;", "#include <common>"].join("\n"),
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <project_vertex>",
+      [
+        "#include <project_vertex>",
+        "vOmafitBraceletWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;",
+      ].join("\n"),
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <clipping_planes_fragment>",
+      [
+        "#include <clipping_planes_fragment>",
+        "if (uOmafitBraceletHemiClip > 0.5) {",
+        "  vec3 __obp = vOmafitBraceletWorldPos - uOmafitBraceletWristCenter;",
+        "  vec3 __obc = cameraPosition - uOmafitBraceletWristCenter;",
+        "  float __obs = dot(__obp, uOmafitBraceletPalmarDorsal) * dot(__obc, uOmafitBraceletPalmarDorsal);",
+        "  if (__obs < 0.0) discard;",
+        "}",
+      ].join("\n"),
+    );
+  };
+  material.needsUpdate = true;
+}
+
+/** @returns {number} materiais com clip instalado */
+function installBraceletHemisphereClipOnGlb(root, hemiUniforms) {
+  if (!root || !hemiUniforms || !OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED) return 0;
+  let n = 0;
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m) continue;
+      installBraceletHemisphereClipOnMaterial(m, hemiUniforms);
       n += 1;
     }
   });
@@ -16836,6 +16912,11 @@ async function runHandArSession({
   let braceletVertexDeform = null;
   let braceletOcclusionMaterials = [];
   let braceletOcclusionSmooth = 0;
+  const braceletHemiClipUniforms =
+    accessoryType === "bracelet" && OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED
+      ? createBraceletHemisphereClipUniforms(THREE)
+      : null;
+  let braceletHemiClipMeshCount = 0;
   const braceletCameraDir = new THREE.Vector3();
   const braceletOccWidth = new THREE.Vector3();
   const braceletOccForward = new THREE.Vector3();
@@ -17080,6 +17161,20 @@ async function runHandArSession({
         }
         smoothedStrapK = 1;
         upgradeHandArMetalMaterials(THREE, glbScene);
+        if (braceletHemiClipUniforms) {
+          braceletHemiClipMeshCount = installBraceletHemisphereClipOnGlb(
+            glbScene,
+            braceletHemiClipUniforms,
+          );
+          braceletOcclusionMaterials = omafitCollectUniqueMaterials(glbScene);
+          for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
+            const bm = braceletOcclusionMaterials[mi];
+            if (!bm || typeof bm !== "object") continue;
+            bm.depthWrite = true;
+            bm.depthTest = true;
+            bm.side = THREE.DoubleSide;
+          }
+        }
         omafitEnsureGlassesMeshesRenderable(THREE, glbScene);
         setHandArMeshRenderOrder(glbRoot, 1);
         handMicroOpacityRoot = glbScene;
@@ -17091,6 +17186,17 @@ async function runHandArSession({
             handMicroUx.introComplete = false;
             handMicroUx.preparedOpacity = true;
             handMicroUxWrap.scale.setScalar(0.9);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (braceletHemiClipUniforms && debug) {
+          try {
+            console.log("[omafit-ar] bracelet hemisphere clip installed", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              meshMaterials: braceletHemiClipMeshCount,
+              rigidSlot: braceletIsRigidSlot,
+            });
           } catch {
             /* ignore */
           }
@@ -18000,14 +18106,28 @@ async function runHandArSession({
       if (tmpCamToWrist.lengthSq() > 1e-12) tmpCamToWrist.normalize();
       else tmpCamToWrist.set(0, 0, 1);
       const isInFront = braceletOccNormal.dot(tmpCamToWrist) < 0;
-      occPlane.visible = isInFront && dotOcc < -0.2;
+      if (
+        OMAFIT_BRACELET_OCC_PLANE_RIGID_ALWAYS &&
+        braceletIsRigidSlot
+      ) {
+        occPlane.visible = true;
+        const wristWidthOcc = w5.distanceTo(w17);
+        occPlane.scale.set(
+          THREE.MathUtils.clamp(wristWidthOcc * 2.4, 0.14, 0.26),
+          THREE.MathUtils.clamp(wristWidthOcc * 1.75, 0.1, 0.2),
+          1,
+        );
+      } else {
+        occPlane.scale.set(0.12, 0.08, 1);
+        occPlane.visible = isInFront && dotOcc < -0.2;
+      }
       basisMat.makeBasis(braceletOccWidth, braceletOccForward, braceletOccNormal);
       occPlane.quaternion.setFromRotationMatrix(basisMat);
       const wristWidthOcc = w5.distanceTo(w17);
       const dynamicOffset = THREE.MathUtils.clamp(
-        wristWidthOcc * 0.015,
-        0.0008,
-        0.0015,
+        wristWidthOcc * 0.022,
+        0.0012,
+        0.0032,
       );
       occPlane.position.copy(smPos).addScaledVector(braceletOccNormal, dynamicOffset);
       if (occPlane.visible) {
@@ -18025,6 +18145,19 @@ async function runHandArSession({
         );
         occPos.needsUpdate = true;
       }
+    }
+
+    if (
+      braceletHemiClipUniforms &&
+      accessoryType === "bracelet" &&
+      OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED
+    ) {
+      braceletHemiClipUniforms.uOmafitBraceletWristCenter.value.copy(smPos);
+      braceletHemiClipUniforms.uOmafitBraceletPalmarDorsal.value.copy(smY);
+      if (braceletHemiClipUniforms.uOmafitBraceletPalmarDorsal.value.lengthSq() > 1e-10) {
+        braceletHemiClipUniforms.uOmafitBraceletPalmarDorsal.value.normalize();
+      }
+      braceletHemiClipUniforms.uOmafitBraceletHemiClip.value = 1;
     }
 
     /**
@@ -19003,6 +19136,20 @@ async function runHandArSession({
                 watchDialUpLocal.multiplyScalar(-1);
               }
               upgradeHandArMetalMaterials(THREE, next);
+              if (braceletHemiClipUniforms) {
+                braceletHemiClipMeshCount = installBraceletHemisphereClipOnGlb(
+                  next,
+                  braceletHemiClipUniforms,
+                );
+                braceletOcclusionMaterials = omafitCollectUniqueMaterials(next);
+                for (let mi = 0; mi < braceletOcclusionMaterials.length; mi++) {
+                  const bm = braceletOcclusionMaterials[mi];
+                  if (!bm || typeof bm !== "object") continue;
+                  bm.depthWrite = true;
+                  bm.depthTest = true;
+                  bm.side = THREE.DoubleSide;
+                }
+              }
               omafitEnsureGlassesMeshesRenderable(THREE, next);
               setHandArMeshRenderOrder(glbRoot, 1);
               handMicroOpacityRoot = next;
