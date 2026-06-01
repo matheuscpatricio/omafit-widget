@@ -455,10 +455,13 @@ const OMAFIT_WATCH_USE_HANDEDNESS_LABEL = false;
  * Ativo para rigid slot (bangle sólido): escreve depth no cilindro do braço
  * e esconde a metade posterior do anel — dá volume de "envolver o pulso".
  */
-const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = true;
-/** Clip por hemisfério (plano palmar–dorsal): esconde metade oposta em vista de cima/baixo. */
-const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = true;
-/** Plano depth auxiliar: guarda relaxada em rigid (nunca sempre-on — bloqueava o GLB). */
+/** v158: desligado até validar — cilindro BackSide + depth custom podiam zerar a pulseira. */
+const OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED = false;
+/** Clip hemisférico (clippingPlanes): desligado em v158 — reactivar após pulseira estável. */
+const OMAFIT_BRACELET_HEMISPHERE_CLIP_ENABLED = false;
+/** Plano depth auxiliar entre pele e anel: desligado — escrevia depth à frente do GLB. */
+const OMAFIT_BRACELET_OCC_PLANE_ENABLED = false;
+/** Plano depth auxiliar: guarda relaxada em rigid (quando `OCC_PLANE` voltar). */
 const OMAFIT_BRACELET_OCC_PLANE_RIGID_RELAXED = true;
 /**
  * Amarra a escala ao *wrist width* 3D `distance(LM5, LM17)` (já unprojected):
@@ -578,7 +581,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v157-bracelet-clip-plane";
+const OMAFIT_AR_WIDGET_BUILD = "2026-05-28-ar-widget-v158-bracelet-visible-restore";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -17074,25 +17077,27 @@ async function runHandArSession({
             if (!obj?.isMesh) return;
             if (obj.renderOrder < 2) obj.renderOrder = 2;
           });
-          scene.traverse((obj) => {
-            if (!obj?.isMesh) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            let writesDepth = false;
-            for (let i = 0; i < mats.length; i++) {
-              const mat = mats[i];
-              if (!mat) continue;
-              if (mat.depthWrite) {
-                writesDepth = true;
-                if (obj !== occPlane) mat.depthWrite = false;
+          if (OMAFIT_BRACELET_OCC_PLANE_ENABLED) {
+            scene.traverse((obj) => {
+              if (!obj?.isMesh) return;
+              const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+              let writesDepth = false;
+              for (let i = 0; i < mats.length; i++) {
+                const mat = mats[i];
+                if (!mat) continue;
+                if (mat.depthWrite) {
+                  writesDepth = true;
+                  if (obj !== occPlane) mat.depthWrite = false;
+                }
               }
-            }
-            if (writesDepth && debug) {
-              console.log(
-                obj === occPlane ? "DEPTH WRITER: occPlane" : "DEPTH WRITER: disabled",
-                obj.name || obj.type || "mesh",
-              );
-            }
-          });
+              if (writesDepth && debug) {
+                console.log(
+                  obj === occPlane ? "DEPTH WRITER: occPlane" : "DEPTH WRITER: disabled",
+                  obj.name || obj.type || "mesh",
+                );
+              }
+            });
+          }
           braceletOcclusionSmooth = 0;
           omafitRefreshBraceletRingHoleAxisInCalibLocal(
             THREE,
@@ -17167,12 +17172,17 @@ async function runHandArSession({
         handMicroOpacityRoot = glbScene;
         if (!handMicroUxDisabled) {
           try {
-            omafitStoreMaterialOpacityBaseline(glbScene);
-            omafitApplyModelOpacityFactor(glbScene, 0);
             handMicroUx.introStartMs = performance.now();
             handMicroUx.introComplete = false;
-            handMicroUx.preparedOpacity = true;
+            handMicroUx.preparedOpacity = false;
             handMicroUxWrap.scale.setScalar(0.9);
+            if (accessoryType === "bracelet") {
+              omafitRestoreModelOpacityBaseline(glbScene);
+            } else {
+              omafitStoreMaterialOpacityBaseline(glbScene);
+              omafitApplyModelOpacityFactor(glbScene, 0);
+              handMicroUx.preparedOpacity = true;
+            }
           } catch {
             /* ignore */
           }
@@ -18075,7 +18085,8 @@ async function runHandArSession({
      * O plano depth-only entre pele e parte posterior do anel faz a pulseira
      * parecer envolver o punho — sem ele a metade traseira aparece à frente da pele.
      */
-    occPlane.visible = accessoryType === "bracelet";
+    occPlane.visible =
+      OMAFIT_BRACELET_OCC_PLANE_ENABLED && accessoryType === "bracelet";
     if (occPlane.visible) {
       // T/B/N: normal do plano deve apontar para DENTRO do braço.
       braceletOccWidth.copy(smX).normalize();   // T
@@ -18721,7 +18732,10 @@ async function runHandArSession({
         accessoryType === "bracelet"
           ? OMAFIT_BRACELET_DEPTH_OCCLUDER_ENABLED && armOccluder.visible
           : true;
-      occPlane.visible = accessoryType === "bracelet" && occPlane.visible;
+      occPlane.visible =
+        OMAFIT_BRACELET_OCC_PLANE_ENABLED &&
+        accessoryType === "bracelet" &&
+        occPlane.visible;
       if (braceletAxisDebugLine) braceletAxisDebugLine.visible = accessoryType === "bracelet";
       if (braceletOccNormalDebugLine) braceletOccNormalDebugLine.visible = accessoryType === "bracelet";
       contactShadow.visible = true;
