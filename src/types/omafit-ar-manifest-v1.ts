@@ -85,5 +85,15 @@ export interface OmafitArManifestV1 {
     ringCenterLocal?: [number, number, number];
     holeCenterLocal?: [number, number, number];
   };
+  materialProfile?: {
+    lensType?: 'clear_fake' | 'tinted' | 'mirror' | 'clear_physical';
+    renderMode?: 'lite' | 'pmrem' | 'auto';
+  };
+  ingest?: {
+    provider?: string;
+    wearableClass?: string;
+    shopDomain?: string;
+    assetId?: string;
+  };
   [key: string]: unknown;
 }

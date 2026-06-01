@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "description": "Cópia de referência — fonte de verdade: omafit/workers/ar-mesh-generate/presets/wearable-classes.json",
+  "classes": [
+    "glasses_clear",
+    "glasses_sun",
+    "glasses_premium",
+    "bracelet_bangle",
+    "bracelet_chain",
+    "bracelet_cuff_open",
+    "watch_round",
+    "necklace_chain"
+  ]
+}

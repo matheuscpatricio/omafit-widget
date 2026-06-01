@@ -98,7 +98,9 @@ export function omafitDefaultArManifestForAccessory(category) {
         occlusionMaxHz: 24,
       },
       medium: {},
-      high: {},
+      high: {
+        enablePmremForGlasses: cat === "glasses",
+      },
     },
     memoryBudgetHint: {
       maxEstimatedVramMb: cat === "glasses" ? 96 : 64,
@@ -135,4 +137,70 @@ export async function omafitLoadArManifestFromCfg(cfgAttr, category) {
     partial = await res.json();
   }
   return deepMerge(base, partial);
+}
+
+/**
+ * Resolve PMREM e strip de transmission para óculos a partir do manifest + attrs.
+ * @param {Record<string, unknown> | null} manifest
+ * @param {(k: string, fb?: string) => string} cfgAttr
+ * @param {"low"|"medium"|"high"|string} [deviceTier]
+ */
+export function omafitResolveGlassesRenderFlags(manifest, cfgAttr, deviceTier = "medium") {
+  const mp = manifest?.materialProfile && typeof manifest.materialProfile === "object"
+    ? manifest.materialProfile
+    : {};
+  const renderMode = String(
+    mp.renderMode || cfgAttr("arGlassesRenderMode", "auto") || "auto",
+  )
+    .trim()
+    .toLowerCase();
+  const attrPmrem = /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim());
+  let pmremOn = attrPmrem;
+  let stripTransmission = true;
+
+  if (renderMode === "pmrem") {
+    pmremOn = true;
+    stripTransmission = false;
+  } else if (renderMode === "lite") {
+    pmremOn = false;
+    stripTransmission = true;
+  } else if (renderMode === "auto") {
+    const tier = String(deviceTier || "medium").toLowerCase();
+    const policy = manifest?.deviceTierPolicy;
+    if (tier === "high" && policy?.high?.enablePmremForGlasses) {
+      pmremOn = true;
+      stripTransmission = false;
+    } else if (tier === "high" && mp.lensType === "clear_physical") {
+      pmremOn = true;
+      stripTransmission = false;
+    }
+    if (tier === "low" && policy?.low?.disableTransmission !== false) {
+      stripTransmission = true;
+      pmremOn = false;
+    }
+  }
+
+  if (mp.lensType === "clear_physical" && renderMode !== "lite") {
+    pmremOn = true;
+    stripTransmission = false;
+  }
+
+  return { pmremOn, stripTransmission, lensType: mp.lensType || null, renderMode };
+}
+
+/**
+ * Attrs data-ar-* derivados do manifest (propagação iframe / preview).
+ * @param {Record<string, unknown> | null} manifest
+ */
+export function omafitArManifestToDataAttrs(manifest) {
+  if (!manifest || typeof manifest !== "object") return {};
+  const out = {};
+  const mp = manifest.materialProfile;
+  if (mp && typeof mp === "object") {
+    if (mp.renderMode === "pmrem") out["data-ar-glasses-pmrem"] = "1";
+    if (mp.renderMode === "lite") out["data-ar-glasses-pmrem"] = "0";
+    if (mp.lensType) out["data-ar-glasses-lens-type"] = String(mp.lensType);
+  }
+  if (manifest.wearableClass) out["data-ar-wearable-class"] = String(manifest.wearableClass);
+  return out;
 }

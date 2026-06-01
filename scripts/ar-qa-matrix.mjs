@@ -23,7 +23,9 @@ function main() {
   assert(sample.schemaVersion === 1, "sample.schemaVersion");
   assert(typeof sample.runtimeProfile?.version === "string", "runtimeProfile.version");
   assert(typeof sample.attachmentSpace === "string", "attachmentSpace");
-  console.log("[ar-qa-matrix] OK — schema + sample válidos");
+  const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+  assert(schema.properties?.materialProfile, "schema.materialProfile");
+  console.log("[ar-qa-matrix] OK — schema + sample + materialProfile");
 }
 
 main();

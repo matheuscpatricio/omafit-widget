@@ -78,6 +78,29 @@
       "type": "string",
       "description": "Classe decidida no ingest (ex. bracelet_bangle). Usado com template_certified."
     },
+    "materialProfile": {
+      "type": "object",
+      "description": "Perfil de materiais (óculos: lentes). Definido no ingest Rodin/Blender.",
+      "properties": {
+        "lensType": {
+          "type": "string",
+          "enum": ["clear_fake", "tinted", "mirror", "clear_physical"]
+        },
+        "renderMode": {
+          "type": "string",
+          "enum": ["lite", "pmrem", "auto"]
+        }
+      }
+    },
+    "ingest": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string" },
+        "wearableClass": { "type": "string" },
+        "shopDomain": { "type": "string" },
+        "assetId": { "type": "string" }
+      }
+    },
     "certifiedTemplate": {
       "type": "object",
       "properties": {

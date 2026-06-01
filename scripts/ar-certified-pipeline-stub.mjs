@@ -16,6 +16,9 @@ const KNOWN = {
   bracelet_bangle_round_v1: "bracelet_bangle",
   bracelet_chain_soft_v1: "bracelet_chain",
   bracelet_cuff_open_v1: "bracelet_cuff_open",
+  glasses_clear_v1: "glasses_clear",
+  glasses_sun_v1: "glasses_sun",
+  glasses_premium_v1: "glasses_premium",
 };
 
 function parseArgs(argv) {
@@ -46,41 +49,62 @@ function buildManifest(opts) {
       `id desconhecido: ${opts.id}. Use um de: ${Object.keys(KNOWN).join(", ")}`,
     );
   }
-  const fitProxy = {
-    ringHoleAxisLocal: [0, 0, 1],
-    ringCenterLocal: [0, 0, 0],
-  };
-  if (Number.isFinite(opts.innerDiameterMm) && opts.innerDiameterMm > 0) {
-    fitProxy.innerDiameterMm = opts.innerDiameterMm;
-  } else if (Number.isFinite(opts.innerRadiusMm) && opts.innerRadiusMm > 0) {
-    fitProxy.innerRadiusMm = opts.innerRadiusMm;
-  } else {
-    fitProxy.innerDiameterMm = 62;
+  const isGlasses = wc.startsWith("glasses_");
+  const fitProxy = isGlasses
+    ? undefined
+    : {
+        ringHoleAxisLocal: [0, 0, 1],
+        ringCenterLocal: [0, 0, 0],
+      };
+  if (fitProxy) {
+    if (Number.isFinite(opts.innerDiameterMm) && opts.innerDiameterMm > 0) {
+      fitProxy.innerDiameterMm = opts.innerDiameterMm;
+    } else if (Number.isFinite(opts.innerRadiusMm) && opts.innerRadiusMm > 0) {
+      fitProxy.innerRadiusMm = opts.innerRadiusMm;
+    } else {
+      fitProxy.innerDiameterMm = 62;
+    }
   }
+  const materialProfile = isGlasses
+    ? {
+        lensType:
+          wc === "glasses_sun"
+            ? "tinted"
+            : wc === "glasses_premium"
+              ? "clear_physical"
+              : "clear_fake",
+        renderMode: wc === "glasses_premium" ? "pmrem" : "lite",
+      }
+    : undefined;
   const manifest = {
     schemaVersion: 1,
-    category: "bracelet",
-    attachmentSpace: "wrist_local",
+    category: isGlasses ? "glasses" : "bracelet",
+    attachmentSpace: isGlasses ? "face_bridge" : "wrist_local",
     wearableClass: wc,
     certifiedTemplate: {
       id: opts.id,
       version: 1,
       ...(opts.glbUrl ? { geometryGlbUrl: opts.glbUrl } : {}),
     },
-    meshPolicy: {
-      skinnedMesh: "warn_v1",
-      deformationPolicy: "rigid",
-      braceletTopology: "auto",
-      fittingMode: "strict",
-      runtimeMode: "template_certified",
-    },
-    wearAnchor: {
-      space: "wrist_local",
-      position: [0, 0, 0.02],
-      forward: [0, 0, -1],
-      up: [0, 1, 0],
-    },
-    fitProxy,
+    meshPolicy: isGlasses
+      ? { skinnedMesh: "warn_v1", fittingMode: "strict" }
+      : {
+          skinnedMesh: "warn_v1",
+          deformationPolicy: "rigid",
+          braceletTopology: "auto",
+          fittingMode: "strict",
+          runtimeMode: "template_certified",
+        },
+    ...(materialProfile ? { materialProfile } : {}),
+    wearAnchor: isGlasses
+      ? undefined
+      : {
+          space: "wrist_local",
+          position: [0, 0, 0.02],
+          forward: [0, 0, -1],
+          up: [0, 1, 0],
+        },
+    ...(fitProxy ? { fitProxy } : {}),
   };
   return manifest;
 }

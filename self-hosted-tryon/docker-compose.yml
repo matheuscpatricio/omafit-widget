@@ -56,7 +56,7 @@ services:
   # Fila AR óculos (Shopify app Omafit): GLB via stub (CPU) ou TripoSR (troque Dockerfile + GPU).
   ar-eyewear-tripo:
     build:
-      context: ${OMAFIT_AR_WORKER_CONTEXT:-../../omafit/workers/ar-eyewear-tripo}
+      context: ${OMAFIT_AR_WORKER_CONTEXT:-../../omafit/workers/ar-mesh-generate}
       dockerfile: ${OMAFIT_AR_WORKER_DOCKERFILE:-Dockerfile.stub}
     restart: unless-stopped
     env_file:

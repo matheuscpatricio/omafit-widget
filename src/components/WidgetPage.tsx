@@ -1275,6 +1275,19 @@ export function WidgetPage() {
     }
     if (eyewearBootstrap.arManifestJson) {
       arExtraAttrs['data-ar-manifest-json'] = eyewearBootstrap.arManifestJson;
+      try {
+        const m = JSON.parse(eyewearBootstrap.arManifestJson) as {
+          materialProfile?: { renderMode?: string; lensType?: string };
+          wearableClass?: string;
+        };
+        const mp = m?.materialProfile;
+        if (mp?.renderMode === 'pmrem') arExtraAttrs['data-ar-glasses-pmrem'] = '1';
+        if (mp?.renderMode === 'lite') arExtraAttrs['data-ar-glasses-pmrem'] = '0';
+        if (mp?.lensType) arExtraAttrs['data-ar-glasses-lens-type'] = mp.lensType;
+        if (m?.wearableClass) arExtraAttrs['data-ar-wearable-class'] = m.wearableClass;
+      } catch {
+        /* manifest JSON inválido — attrs base mantêm-se */
+      }
     }
     if (eyewearBootstrap.arManifestUrl) {
       arExtraAttrs['data-ar-manifest-url'] = eyewearBootstrap.arManifestUrl;

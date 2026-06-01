@@ -57,6 +57,10 @@ import {
   resolveNecklaceMerchantScaleMul,
 } from "./omafit-necklace-calibration.js";
 import {
+  omafitLoadArManifestFromCfg,
+  omafitResolveGlassesRenderFlags,
+} from "./omafit-ar-manifest.js";
+import {
   omafitApplyMetaRendererPixelRatio,
   omafitApplyMetaRendererPresentationHints,
   omafitCreateMetaFrameBudgetGovernor,
@@ -9520,6 +9524,8 @@ async function runArSession({
 
     let accessoryType;
     let accessoryTypeSource;
+    let arManifestV1 = null;
+    let glassesRenderFlags = { pmremOn: false, stripTransmission: true, lensType: null, renderMode: "lite" };
     if (clientHasStrongSignal && clientDetected !== liquidAccessoryType) {
       accessoryType = clientDetected;
       accessoryTypeSource = `client-override (liquid=${liquidAccessoryType || "∅"} ≠ client=${clientDetected})`;
@@ -10071,6 +10077,20 @@ async function runArSession({
 
     const perfModeResolved = String(cfgAttr("arPerformanceProfile", "auto")).trim().toLowerCase();
     const arDeviceProfile = omafitResolveArDeviceRuntimeProfile({ perfMode: perfModeResolved });
+    if (accessoryType === "glasses" || accessoryType === "necklace") {
+      try {
+        arManifestV1 = await omafitLoadArManifestFromCfg(cfgAttr, accessoryType);
+        if (accessoryType === "glasses") {
+          glassesRenderFlags = omafitResolveGlassesRenderFlags(
+            arManifestV1,
+            cfgAttr,
+            arDeviceProfile.perfTier,
+          );
+        }
+      } catch (manifestErr) {
+        console.warn("[omafit-ar] ar manifest:", manifestErr?.message || manifestErr);
+      }
+    }
     /** Micro-interacções (entrada, anel de tracking, snap). `data-ar-micro-ux="0"` desliga. */
     const microUxDisabled = /^(0|false|off|no)$/i.test(String(cfgAttr("arMicroUx", "1")).trim());
 
@@ -10633,7 +10653,12 @@ async function runArSession({
          * KHR_materials_transmission: sem PMREM / pipeline de transmissão do renderer,
          * o modelo pode renderizar como totalmente transparente no AR “lite”.
          */
-        if ("transmission" in mat && Number(mat.transmission) > 0.02) {
+        if (
+          accessoryType === "glasses" &&
+          glassesRenderFlags.stripTransmission &&
+          "transmission" in mat &&
+          Number(mat.transmission) > 0.02
+        ) {
           mat.transmission = 0;
           if ("thickness" in mat) mat.thickness = 0;
         }
@@ -13967,8 +13992,7 @@ async function runArSession({
     (async () => {
       try {
         const pmremOn =
-          (accessoryType === "glasses" &&
-            /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim())) ||
+          (accessoryType === "glasses" && glassesRenderFlags.pmremOn) ||
           (accessoryType === "necklace" &&
             !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklacePmrem", "1")).trim()));
         if (!pmremOn) {

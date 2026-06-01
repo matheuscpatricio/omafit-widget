@@ -32,5 +32,9 @@
     "innerDiameterMm": 62,
     "ringHoleAxisLocal": [0, 0, 1],
     "ringCenterLocal": [0, 0, 0]
+  },
+  "materialProfile": {
+    "lensType": "clear_fake",
+    "renderMode": "lite"
   }
 }

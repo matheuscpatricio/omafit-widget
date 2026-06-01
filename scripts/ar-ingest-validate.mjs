@@ -2,7 +2,7 @@
 /**
  * Validação de ingest AR: GLB (chunk JSON), skins, meshes; opcional Khronos gltf-validator.
  *
- * Uso: node scripts/ar-ingest-validate.mjs <ficheiro.glb>
+ * Uso: node scripts/ar-ingest-validate.mjs <ficheiro.glb> [manifest.json]
  *
  * Certified templates (Fase 1.5): pipeline desejado Tripo GLB → Blender (escala m,
  * pivô, medir diâmetro interno, eixo, ringCenterLocal) → export GLB certificado →
@@ -49,14 +49,77 @@ async function runValidator(buf) {
   }
 }
 
+function validateLensMaterials(doc, manifest) {
+  const warnings = [];
+  const errors = [];
+  const lensType = manifest?.materialProfile?.lensType;
+  const mats = doc.materials || [];
+  const lensMats = mats.filter((m) =>
+    /lens|glass|lente|cristal/i.test(String(m?.name || "")),
+  );
+  if (lensType && lensMats.length === 0) {
+    warnings.push("materialProfile.lensType definido mas sem material lens_* no GLB");
+  }
+  for (const m of lensMats) {
+    const op =
+      m.pbrMetallicRoughness?.baseColorFactor?.[3] ??
+      m.alpha ??
+      (m.extensions?.KHR_materials_transmission ? 1 : null);
+    if (op != null && Number(op) < 0.05) {
+      errors.push(`material ${m.name}: opacity demasiado baixa (${op})`);
+    }
+  }
+  if (lensType === "clear_physical") {
+    const hasTx = lensMats.some(
+      (m) => Number(m.extensions?.KHR_materials_transmission?.transmissionFactor ?? 0) > 0.02,
+    );
+    if (!hasTx) warnings.push("clear_physical: transmission ausente nas lentes");
+  }
+  if (lensType === "clear_fake") {
+    const bad = lensMats.some(
+      (m) => Number(m.extensions?.KHR_materials_transmission?.transmissionFactor ?? 0) > 0.02,
+    );
+    if (bad) warnings.push("clear_fake: transmission presente — usar opacity fake no ingest");
+  }
+  return { warnings, errors };
+}
+
+function validateGlassesWidth(doc) {
+  const warnings = [];
+  const accessors = doc.accessors || [];
+  const meshes = doc.meshes || [];
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const mesh of meshes) {
+    for (const prim of mesh.primitives || []) {
+      const pos = accessors[prim.attributes?.POSITION];
+      if (!pos?.min || !pos?.max) continue;
+      minX = Math.min(minX, pos.min[0]);
+      maxX = Math.max(maxX, pos.max[0]);
+    }
+  }
+  if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+    const w = maxX - minX;
+    if (w < 0.1 || w > 0.2) {
+      warnings.push(`largura bbox X≈${w.toFixed(3)}m (esperado ~0.12–0.16 para óculos)`);
+    }
+  }
+  return warnings;
+}
+
 async function main() {
   const path = process.argv[2];
+  const manifestPath = process.argv[3];
   if (!path) {
-    console.error("Uso: node scripts/ar-ingest-validate.mjs <asset.glb>");
+    console.error("Uso: node scripts/ar-ingest-validate.mjs <asset.glb> [manifest.json]");
     process.exit(1);
   }
   const buf = readFileSync(path);
   const doc = readGltfJsonFromGlb(buf);
+  let manifest = null;
+  if (manifestPath) {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  }
   const skins = doc.skins?.length ?? 0;
   const meshes = doc.meshes?.length ?? 0;
   const materials = doc.materials?.length ?? 0;
@@ -82,6 +145,13 @@ async function main() {
     if (!v.ok) process.exit(2);
   } else {
     console.warn("[ar-ingest] gltf-validator omitido:", v.reason);
+  }
+  if (manifest) {
+    const lens = validateLensMaterials(doc, manifest);
+    const widthWarn = manifest.category === "glasses" ? validateGlassesWidth(doc) : [];
+    for (const w of [...lens.warnings, ...widthWarn]) console.warn(`[ar-ingest] AVISO: ${w}`);
+    for (const e of lens.errors) console.error(`[ar-ingest] ERRO: ${e}`);
+    if (lens.errors.length) process.exit(3);
   }
 }
 
