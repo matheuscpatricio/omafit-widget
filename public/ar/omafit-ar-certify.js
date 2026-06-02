@@ -138,6 +138,9 @@ export function omafitArCertifyConsoleLog(
     meshPolicy: manifest?.meshPolicy,
     fitProxy: manifest?.fitProxy,
     occlusionProxy: manifest?.occlusionProxy,
+    occlusionPolicy: manifest?.occlusionPolicy,
+    materialProfile: manifest?.materialProfile,
+    deviceTierPolicy: manifest?.deviceTierPolicy,
   });
 }
 

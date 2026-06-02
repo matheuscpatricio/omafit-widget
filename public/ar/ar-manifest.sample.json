@@ -36,5 +36,15 @@
   "materialProfile": {
     "lensType": "clear_fake",
     "renderMode": "lite"
+  },
+  "occlusionProxy": {
+    "type": "wrist_cylinder",
+    "radiusScale": 0.93,
+    "radiusFromFitProxy": true
+  },
+  "occlusionPolicy": {
+    "mode": "depth",
+    "updateMode": "tracked",
+    "maxHz": 45
   }
 }

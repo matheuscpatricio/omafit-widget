@@ -25,7 +25,38 @@ function main() {
   assert(typeof sample.attachmentSpace === "string", "attachmentSpace");
   const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
   assert(schema.properties?.materialProfile, "schema.materialProfile");
-  console.log("[ar-qa-matrix] OK — schema + sample + materialProfile");
+  assert(schema.properties?.occlusionProxy, "schema.occlusionProxy");
+  assert(sample.occlusionProxy?.type === "wrist_cylinder", "sample.occlusionProxy.type");
+  assert(sample.occlusionPolicy?.mode === "depth", "sample.occlusionPolicy.mode");
+
+  const manifestJs = join(root, "public", "ar", "omafit-ar-manifest.js");
+  assert(existsSync(manifestJs), `omafit-ar-manifest.js em falta: ${manifestJs}`);
+  const manifestSrc = readFileSync(manifestJs, "utf8");
+  assert(
+    manifestSrc.includes("omafitResolveOcclusionFlags"),
+    "omafitResolveOcclusionFlags export",
+  );
+
+  const widgetJs = join(root, "public", "ar", "omafit-ar-widget.js");
+  const widgetSrc = readFileSync(widgetJs, "utf8");
+  const buildMatch = widgetSrc.match(
+    /OMAFIT_AR_WIDGET_BUILD\s*=\s*"([^"]+)"/,
+  );
+  assert(buildMatch, "OMAFIT_AR_WIDGET_BUILD no widget");
+  const widgetPage = readFileSync(
+    join(root, "src", "components", "WidgetPage.tsx"),
+    "utf8",
+  );
+  assert(
+    widgetPage.includes(buildMatch[1]),
+    "WidgetPage cache bust alinhado ao widget build",
+  );
+  assert(
+    widgetSrc.includes("omafitResolveOcclusionFlags"),
+    "widget importa resolve oclusão",
+  );
+
+  console.log("[ar-qa-matrix] OK — schema, sample, manifest resolver, build", buildMatch[1]);
 }
 
 main();

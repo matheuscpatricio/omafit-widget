@@ -46,9 +46,21 @@ export interface OmafitArManifestV1 {
   };
   physicalConstraints?: { maxRotationDeg?: number; maxOffset_m?: number };
   occlusionPolicy?: {
+    mode?: 'depth' | 'material' | 'off';
     updateMode?: string;
     maxHz?: number;
     decoupleFromRender?: boolean;
+    suppressFaceDepthOcclusion?: boolean;
+  };
+  occlusionProxy?: {
+    type?: 'wrist_cylinder' | 'neck_cylinder' | 'none' | string;
+    radiusScale?: number;
+    radiusFromFitProxy?: boolean;
+    arcSpanM?: number;
+    radiusTopMul?: number;
+    radiusBottomMul?: number;
+    radiusTopMinM?: number;
+    radiusBottomMinM?: number;
   };
   cameraDepthHints?: { nearMinM?: number; farMaxM?: number };
   degradationUX?: { onTrackingLost?: string; fadeMs?: number };

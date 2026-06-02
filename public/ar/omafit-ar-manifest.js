@@ -155,6 +155,7 @@ export function omafitResolveGlassesRenderFlags(manifest, cfgAttr, deviceTier = 
     .trim()
     .toLowerCase();
   const attrPmrem = /^(1|on|true|yes)$/i.test(String(cfgAttr("arGlassesPmrem", "0")).trim());
+  const tier = String(deviceTier || "medium").toLowerCase();
   let pmremOn = attrPmrem;
   let stripTransmission = true;
 
@@ -165,7 +166,6 @@ export function omafitResolveGlassesRenderFlags(manifest, cfgAttr, deviceTier = 
     pmremOn = false;
     stripTransmission = true;
   } else if (renderMode === "auto") {
-    const tier = String(deviceTier || "medium").toLowerCase();
     const policy = manifest?.deviceTierPolicy;
     if (tier === "high" && policy?.high?.enablePmremForGlasses) {
       pmremOn = true;
@@ -180,12 +180,101 @@ export function omafitResolveGlassesRenderFlags(manifest, cfgAttr, deviceTier = 
     }
   }
 
-  if (mp.lensType === "clear_physical" && renderMode !== "lite") {
+  if (mp.lensType === "clear_physical" && renderMode !== "lite" && tier !== "low") {
     pmremOn = true;
     stripTransmission = false;
   }
 
-  return { pmremOn, stripTransmission, lensType: mp.lensType || null, renderMode };
+  const lensType = mp.lensType ? String(mp.lensType).trim().toLowerCase() : null;
+  if (lensType === "clear_fake" || lensType === "tinted") {
+    stripTransmission = renderMode !== "pmrem";
+    if (tier === "low") {
+      stripTransmission = true;
+      pmremOn = false;
+    }
+  }
+
+  return { pmremOn, stripTransmission, lensType, renderMode };
+}
+
+/**
+ * Resolve oclusão AR a partir do manifest publicado + attrs de rollback.
+ * @param {Record<string, unknown> | null} manifest
+ * @param {"bracelet"|"watch"|"glasses"|"necklace"|string} accessoryType
+ * @param {(k: string, fb?: string) => string} [cfgAttr]
+ */
+export function omafitResolveOcclusionFlags(manifest, accessoryType, cfgAttr = () => "") {
+  const cat = String(accessoryType || "").toLowerCase();
+  const occ = manifest?.occlusionProxy && typeof manifest.occlusionProxy === "object"
+    ? manifest.occlusionProxy
+    : {};
+  const policy =
+    manifest?.occlusionPolicy && typeof manifest.occlusionPolicy === "object"
+      ? manifest.occlusionPolicy
+      : {};
+  const occType = String(occ.type || "").trim().toLowerCase();
+  const modeAttr = String(cfgAttr("arOcclusionMode", "") || policy.mode || "")
+    .trim()
+    .toLowerCase();
+  let mode = modeAttr;
+  if (!mode) {
+    if (occType === "none" || occType === "off") mode = "off";
+    else if (occType === "wrist_cylinder" || occType === "neck_cylinder") mode = "depth";
+    else if (cat === "bracelet" || cat === "watch") mode = "depth";
+    else if (cat === "necklace") mode = "depth";
+    else mode = "material";
+  }
+  if (mode === "off") {
+    return {
+      mode: "off",
+      depthOccluderEnabled: false,
+      materialOcclusionEnabled: false,
+      materialOcclusionStrength: 0,
+      suppressFaceDepthOcclusion: Boolean(policy.suppressFaceDepthOcclusion),
+      neckCylinderFromManifest: false,
+      wristRadiusScale: 0.93,
+      neckRadiusTopMul: 0.36,
+      neckRadiusBottomMul: 0.44,
+      neckRadiusTopMinM: 0.026,
+      neckRadiusBottomMinM: 0.032,
+      arcSpanM: Number(occ.arcSpanM) || 0.18,
+    };
+  }
+  const depthOccluderEnabled =
+    mode === "depth" &&
+    (occType === "wrist_cylinder" ||
+      occType === "neck_cylinder" ||
+      (cat === "bracelet" && occType !== "none") ||
+      (cat === "watch" && occType !== "none") ||
+      (cat === "necklace" && occType !== "none"));
+  const materialOcclusionEnabled =
+    mode === "material" ||
+    (mode === "depth" && cat === "bracelet" && occType === "none") ||
+    (cat === "bracelet" && occType !== "wrist_cylinder" && !depthOccluderEnabled);
+  const materialOcclusionStrength =
+    mode === "depth" && (occType === "wrist_cylinder" || cat === "watch")
+      ? 0.2
+      : materialOcclusionEnabled
+        ? 0.38
+        : 0;
+  return {
+    mode,
+    depthOccluderEnabled,
+    materialOcclusionEnabled,
+    materialOcclusionStrength,
+    suppressFaceDepthOcclusion: Boolean(
+      policy.suppressFaceDepthOcclusion ?? (cat === "necklace"),
+    ),
+    neckCylinderFromManifest: occType === "neck_cylinder" || cat === "necklace",
+    wristRadiusScale: Number(occ.radiusScale) > 0 ? Number(occ.radiusScale) : 0.93,
+    neckRadiusTopMul: Number(occ.radiusTopMul) > 0 ? Number(occ.radiusTopMul) : 0.36,
+    neckRadiusBottomMul:
+      Number(occ.radiusBottomMul) > 0 ? Number(occ.radiusBottomMul) : 0.44,
+    neckRadiusTopMinM: Number(occ.radiusTopMinM) > 0 ? Number(occ.radiusTopMinM) : 0.026,
+    neckRadiusBottomMinM:
+      Number(occ.radiusBottomMinM) > 0 ? Number(occ.radiusBottomMinM) : 0.032,
+    arcSpanM: Number(occ.arcSpanM) > 0 ? Number(occ.arcSpanM) : 0.18,
+  };
 }
 
 /**
@@ -202,5 +291,13 @@ export function omafitArManifestToDataAttrs(manifest) {
     if (mp.lensType) out["data-ar-glasses-lens-type"] = String(mp.lensType);
   }
   if (manifest.wearableClass) out["data-ar-wearable-class"] = String(manifest.wearableClass);
+  const occ = manifest.occlusionPolicy;
+  if (occ && typeof occ === "object" && occ.mode) {
+    out["data-ar-occlusion-mode"] = String(occ.mode);
+  }
+  const proxy = manifest.occlusionProxy;
+  if (proxy && typeof proxy === "object" && proxy.type) {
+    out["data-ar-occlusion-proxy-type"] = String(proxy.type);
+  }
   return out;
 }
