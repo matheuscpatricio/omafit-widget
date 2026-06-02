@@ -38,9 +38,9 @@ export function applyGlassesMerchantCalibRotation(THREE, group, cal) {
   const ry = toRad(cal?.ry);
   const rz = toRad(cal?.rz);
   group.quaternion.identity();
-  if (ry) group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), ry);
-  if (rx) group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rx);
-  if (rz) group.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz);
+  group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), ry);
+  group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rx);
+  group.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz);
 }
 export const OMAFIT_GLASSES_REFERENCE_IPD_M = 0.063;
 

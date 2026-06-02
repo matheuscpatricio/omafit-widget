@@ -9784,17 +9784,19 @@ async function runArSession({
     function applyOmafitCalibration(cal, el) {
       const target = el || arCfg;
       if (!target || !cal || typeof cal !== "object") return false;
+      const prev = parseOmafitCalibrationRaw(target.dataset.arOmafitCalibration || "") || {};
+      const merged = { ...prev, ...cal };
       const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : null);
-      const bridgeY = num(cal.bridgeY);
-      const wearX = num(cal.wearX), wearY = num(cal.wearY), wearZ = num(cal.wearZ);
-      const lfx = num(cal.localFineX);
-      const lfy = num(cal.localFineY);
-      const lfz = num(cal.localFineZ);
-      const mox = num(cal.manualOffsetX);
-      const moy = num(cal.manualOffsetY);
-      const moz = num(cal.manualOffsetZ);
-      const msm = num(cal.manualScaleMul);
-      const scale = num(cal.scale);
+      const bridgeY = num(merged.bridgeY);
+      const wearX = num(merged.wearX), wearY = num(merged.wearY), wearZ = num(merged.wearZ);
+      const lfx = num(merged.localFineX);
+      const lfy = num(merged.localFineY);
+      const lfz = num(merged.localFineZ);
+      const mox = num(merged.manualOffsetX);
+      const moy = num(merged.manualOffsetY);
+      const moz = num(merged.manualOffsetZ);
+      const msm = num(merged.manualScaleMul);
+      const scale = num(merged.scale);
       if (wearX !== null && wearY !== null && wearZ !== null) {
         target.dataset.arMindarWearPosition = `${wearX} ${wearY} ${wearZ}`;
       }
@@ -9814,6 +9816,23 @@ async function runArSession({
       if (accessoryType === "necklace" && scale !== null && scale > 0) {
         target.dataset.arNecklaceScaleMul = String(clampNecklaceMerchantScaleMul(scale));
       }
+      if (accessoryType === "glasses") {
+        try {
+          target.dataset.arOmafitCalibration = JSON.stringify(
+            normalizeGlassesMerchantCalibration(merged),
+          );
+        } catch {
+          /* ignore */
+        }
+      } else if (accessoryType === "necklace") {
+        try {
+          target.dataset.arOmafitCalibration = JSON.stringify(
+            normalizeNecklaceMerchantCalibration(merged),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
       if (accessoryType === "necklace" && faceArEnhancementState) {
         omafitRefreshNecklaceMerchantCalFromCfg(THREE, faceArEnhancementState, cfgAttr);
         if (faceArEnhancementState.necklaceOrientGroup) {
@@ -9827,6 +9846,14 @@ async function runArSession({
       const rawCal = arCfg?.dataset?.arOmafitCalibration || "";
       const parsed = parseOmafitCalibrationRaw(rawCal);
       if (parsed) applyOmafitCalibration(parsed, arCfg);
+      const ivInit = arVariants.find((vv) => String(vv.id) === String(currentVariantId));
+      if (ivInit) {
+        const base = parseOmafitCalibrationRaw(arCfg?.dataset?.arOmafitCalibration || "") || parsed || {};
+        const vc = variantCalPayload(ivInit);
+        if (vc && typeof vc === "object" && Object.keys(vc).length > 0) {
+          applyOmafitCalibration({ ...base, ...vc }, arCfg);
+        }
+      }
     } catch (e) {
       console.warn("[omafit-ar] applyOmafitCalibration failed", e?.message || e);
     }
@@ -11868,10 +11895,15 @@ async function runArSession({
         glassesStaticBindWrap.scale.set(1, 1, 1);
         if (glassesCanonicalBlenderExport && glassesSimpleFaceOnly) {
           /**
-           * AR canónico: sem Ry 180° (preview admin mantém-o na cena estática).
-           * A âncora MindAR já alinha o export Blender; o bind extra inverte hastes.
+           * Paridade preview admin (`OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD`): GLB
+           * trimesh/Rodin tem frente em −Z; MindAR usa +Z para a câmara.
+           * Merchant rx/ry/rz ficam em `calibRot` (pai); bind fixo aqui (filho).
            */
           glassesStaticBindWrap.quaternion.identity();
+          glassesStaticBindWrap.rotateOnWorldAxis(
+            new THREE.Vector3(0, 1, 0),
+            Math.PI,
+          );
         } else if (glassesStaticBindQuatPostBind) {
           glassesStaticBindWrap.quaternion.copy(glassesStaticBindQuatPostBind);
         } else {
@@ -13274,7 +13306,7 @@ async function runArSession({
                 if (glassesTrackingWrap && st.glassesSimpleFaceOnly) {
                   /**
                    * Canónico + calibração loja: paridade com o preview admin (modelo estático).
-                   *   - Orientação = âncora MindAR (168) + `calibRot` (rx/ry/rz); sem bind Ry 180°.
+                   *   - Orientação = âncora MindAR (168) + bind Ry180 + `calibRot` (rx/ry/rz).
                    *   - Não copiar a rotação da malha 468 no wrap (duplicava yaw e desviava o ry do lojista).
                    * Outros GLBs simples (não canónicos): mantém rotação da face no wrap.
                    * Translação: ponte 168 / wear em metros nos eixos de `fa.localMat`.
@@ -13382,7 +13414,7 @@ async function runArSession({
                             ? "identity (paridade preview)"
                             : "faceBasis",
                         canonicalBindRy: st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
-                          ? "none (MindAR anchor)"
+                          ? "Ry180 staticBindWrap (paridade preview)"
                           : "legacy",
                         formula: st.glassesCanonicalBlenderExport && st.glassesSimpleFaceOnly
                           ? "meshScale = merchantScale; rot = anchor×calibRot(rx/ry/rz)"
@@ -14594,14 +14626,26 @@ async function runArSession({
     window.__omafitArSwitchGlb = async (nextUrl, cal) => {
       try {
         if (cal && typeof cal === "object") {
-          applyOmafitCalibration(cal, arCfg);
+          const base =
+            parseOmafitCalibrationRaw(arCfg?.dataset?.arOmafitCalibration || "") ||
+            initialFaceCal ||
+            {};
+          applyOmafitCalibration({ ...base, ...cal }, arCfg);
           if (accessoryType === "necklace" && faceArEnhancementState) {
             omafitRefreshNecklaceMerchantCalFromCfg(THREE, faceArEnhancementState, cfgAttr);
             if (faceArEnhancementState.necklaceOrientGroup) {
               faceArEnhancementState.necklaceOrientGroup.userData.omafitNeckOrientPrimed = false;
             }
           } else if (accessoryType === "glasses") {
-            applyThreeGroupCalibRot(calibRot, cal);
+            applyThreeGroupCalibRot(
+              calibRot,
+              normalizeGlassesMerchantCalibration({
+                ...(parseOmafitCalibrationRaw(arCfg?.dataset?.arOmafitCalibration || "") ||
+                  initialFaceCal ||
+                  {}),
+                ...cal,
+              }),
+            );
             calibRot.updateMatrix();
             calibRot.updateMatrixWorld(true);
             try {
