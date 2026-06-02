@@ -36,6 +36,14 @@ function main() {
     manifestSrc.includes("omafitResolveOcclusionFlags"),
     "omafitResolveOcclusionFlags export",
   );
+  assert(
+    manifestSrc.includes("omafitGlassesAllowsPhysicalLenses"),
+    "omafitGlassesAllowsPhysicalLenses export",
+  );
+  assert(
+    manifestSrc.includes("omafitIsGlassesLensMaterial"),
+    "omafitIsGlassesLensMaterial export",
+  );
 
   const widgetJs = join(root, "public", "ar", "omafit-ar-widget.js");
   const widgetSrc = readFileSync(widgetJs, "utf8");
