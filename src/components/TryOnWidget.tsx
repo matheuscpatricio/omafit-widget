@@ -5285,37 +5285,72 @@ const handleSubmit = async (
         }
 
         let suggestedProductsBlock: ChatMessage['suggestedProducts'];
-        const showSuggestedCards =
-          stylistEnabled &&
-          Array.isArray(suggested_products) &&
-          suggested_products.length > 0 &&
-          Boolean(candidate_products?.length);
-        if (showSuggestedCards) {
+        if (stylistEnabled && candidate_products?.length) {
           const cmap = new Map(candidate_products.map((c) => [c.handle.toLowerCase(), c]));
-          const mapped = suggested_products
-            .map((s: { handle?: string; rationale?: string }) => {
-              const hh = String(s?.handle || '').trim();
-              const c = cmap.get(hh.toLowerCase());
-              if (!c) {
-                return null;
+          const resolveCardCandidate = (token: string) => {
+            const raw = String(token || '').trim();
+            if (!raw) return null;
+            const slug = raw
+              .replace(/^https?:\/\/[^/]+\/products\//i, '')
+              .split('?')[0]
+              .trim()
+              .toLowerCase();
+            for (const key of [raw.toLowerCase(), slug]) {
+              if (key && cmap.has(key)) return cmap.get(key)!;
+            }
+            const norm = raw.toLowerCase();
+            for (const c of candidate_products) {
+              const title = String(c.title || '').trim().toLowerCase();
+              if (title && (title === norm || title.includes(norm) || norm.includes(title))) {
+                return c;
               }
-              const price_label = formatCatalogPrice(
-                c.price_amount,
-                c.currency_code,
-                langForDisplay
-              );
-              return {
-                handle: c.handle,
-                title: c.title,
-                image_url: c.image_url,
-                rationale: String(s?.rationale || '').trim() || undefined,
-                price_amount: c.price_amount,
-                currency_code: c.currency_code,
-                ...(price_label ? { price_label } : {}),
-              };
-            })
+            }
+            return null;
+          };
+          const mapTokenToCard = (token: string, rationale?: string) => {
+            const c = resolveCardCandidate(token);
+            if (!c) return null;
+            const price_label = formatCatalogPrice(
+              c.price_amount,
+              c.currency_code,
+              langForDisplay
+            );
+            return {
+              handle: c.handle,
+              title: c.title,
+              image_url: c.image_url,
+              rationale: String(rationale || '').trim() || undefined,
+              price_amount: c.price_amount,
+              currency_code: c.currency_code,
+              ...(price_label ? { price_label } : {}),
+            };
+          };
+
+          const mappedFromGpt = (Array.isArray(suggested_products) ? suggested_products : [])
+            .map((s: { handle?: string; rationale?: string; title?: string }) =>
+              mapTokenToCard(
+                String(s?.handle || s?.title || '').trim(),
+                String(s?.rationale || '').trim()
+              )
+            )
             .filter(Boolean) as NonNullable<ChatMessage['suggestedProducts']>;
-          suggestedProductsBlock = mapped.length ? mapped : undefined;
+
+          const deduped: NonNullable<ChatMessage['suggestedProducts']> = [];
+          const seen = new Set<string>();
+          for (const card of mappedFromGpt) {
+            const hk = card.handle.toLowerCase();
+            if (seen.has(hk)) continue;
+            seen.add(hk);
+            deduped.push(card);
+            if (deduped.length >= 3) break;
+          }
+
+          suggestedProductsBlock =
+            deduped.length > 0
+              ? deduped
+              : (candidate_products.slice(0, 3).map((c) =>
+                  mapTokenToCard(c.handle)
+                ).filter(Boolean) as NonNullable<ChatMessage['suggestedProducts']>);
         }
 
         let stylistImpressionId: string | undefined;

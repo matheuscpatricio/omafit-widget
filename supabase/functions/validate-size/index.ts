@@ -270,14 +270,18 @@ function shapeGPTResponse(parsed: unknown, defaultTamanho: string): GPTResponse 
   }
   const should_end_conversation =
     typeof o.should_end_conversation === "boolean" ? o.should_end_conversation : undefined;
-  const rawSuggested = o.suggested_products;
+  const rawSuggested =
+    o.suggested_products ??
+    o.produtos_sugeridos ??
+    (o as { suggestedProducts?: unknown }).suggestedProducts;
   let suggested_products: GPTResponse["suggested_products"];
   if (Array.isArray(rawSuggested)) {
     suggested_products = rawSuggested
       .filter((x) => x && typeof x === "object")
       .map((x) => {
-        const h = String((x as { handle?: string }).handle || "").trim();
-        const rationale = String((x as { rationale?: string }).rationale || "").trim();
+        const row = x as { handle?: string; rationale?: string; title?: string; name?: string };
+        const h = String(row.handle || row.title || row.name || "").trim();
+        const rationale = String(row.rationale || "").trim();
         return h ? { handle: h, ...(rationale ? { rationale } : {}) } : null;
       })
       .filter(Boolean) as GPTResponse["suggested_products"];
@@ -308,26 +312,74 @@ function defaultSuggestedFromCandidates(
     .filter((x) => x.handle);
 }
 
+function resolveCandidateHandleFromGptToken(
+  token: string,
+  candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
+): string | null {
+  const raw = String(token || "").trim();
+  if (!raw) return null;
+  const slug = raw
+    .replace(/^https?:\/\/[^/]+\/products\//i, "")
+    .split("?")[0]
+    .trim()
+    .toLowerCase();
+  const keys = [raw.toLowerCase(), slug].filter(Boolean);
+  for (const k of keys) {
+    const row = (candidates || []).find(
+      (c) => String(c?.handle || "").trim().toLowerCase() === k
+    );
+    if (row?.handle) return String(row.handle).trim();
+  }
+  const norm = raw.toLowerCase();
+  const byTitle = (candidates || []).find((c) => {
+    const title = String(c?.title || "").trim().toLowerCase();
+    return title && (title === norm || title.includes(norm) || norm.includes(title));
+  });
+  return byTitle?.handle ? String(byTitle.handle).trim() : null;
+}
+
+function inferSuggestedFromExplicacao(
+  explicacao: string,
+  candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
+): Array<{ handle: string; rationale?: string }> {
+  const text = String(explicacao || "");
+  if (!text.trim()) return [];
+  const out: Array<{ handle: string; rationale?: string }> = [];
+  const used = new Set<string>();
+  for (const c of candidates || []) {
+    const title = String(c?.title || "").trim();
+    const handle = String(c?.handle || "").trim();
+    if (!title || title.length < 4 || !handle) continue;
+    if (!text.toLowerCase().includes(title.toLowerCase())) continue;
+    const hk = handle.toLowerCase();
+    if (used.has(hk)) continue;
+    used.add(hk);
+    out.push({ handle });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
 function sanitizeSuggestedProducts(
   raw: unknown,
   candidates: NonNullable<ValidateSizeRequest["candidate_products"]>
 ): Array<{ handle: string; rationale?: string }> {
-  const allowed = new Set(
-    (candidates || []).map((c) => String(c?.handle || "").trim().toLowerCase()).filter(Boolean)
-  );
   if (!Array.isArray(raw)) return [];
   const out: Array<{ handle: string; rationale?: string }> = [];
+  const used = new Set<string>();
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const h = String((item as { handle?: string }).handle || "").trim();
-    const hk = h.toLowerCase();
-    if (!h || !allowed.has(hk)) continue;
-    const row = (candidates || []).find((c) => String(c?.handle || "").trim().toLowerCase() === hk);
-    if (!row) continue;
-    const rationale = String((item as { rationale?: string }).rationale || "").trim();
+    const row = item as { handle?: string; rationale?: string; title?: string; name?: string };
+    const token = String(row.handle || row.title || row.name || "").trim();
+    const resolved = resolveCandidateHandleFromGptToken(token, candidates);
+    if (!resolved) continue;
+    const hk = resolved.toLowerCase();
+    if (used.has(hk)) continue;
+    used.add(hk);
+    const rationale = String(row.rationale || "").trim();
     out.push({
-      handle: h,
-        ...(rationale ? { rationale: rationale.slice(0, 140) } : {}),
+      handle: resolved,
+      ...(rationale ? { rationale: rationale.slice(0, 140) } : {}),
     });
     if (out.length >= 3) break;
   }
@@ -1619,7 +1671,7 @@ function getStylistSystemExtra(language: string): string {
 - GÉNERO: siga CONTEXTO DE GÉNERO e regras de combinação (perfil masculino: sem saias/vestidos).
 - Escolha 1–3 handles que melhor respondem ao pedido atual; rationale em suggested_products: até ~130 caracteres por item, uma frase clara com o porquê da escolha.
 - Se o cliente mudar de ideia, reavalie CANDIDATOS; se nada servir, diga em uma frase — sem inventar.
-- JSON com "suggested_products": 1–3 itens {"handle":"...","rationale":"..."} da lista quando houver fit (nunca vazio se existirem candidatos coerentes).`,
+- JSON OBRIGATÓRIO inclui "suggested_products": array com 1–3 itens {"handle":"handle-exato-da-lista","rationale":"..."} — use só handles de CANDIDATOS; nunca omita este campo quando a lista não estiver vazia.`,
     es: `MODO ESTILISTA (catálogo limitado — tú eres la inteligencia principal):
 - Tú decides qué piezas recomendar: analiza el mensaje, el historial, el CONTEXTO ESTRUCTURADO y cada línea de CANDIDATOS (título, precio, tags match). El orden de la lista NO es ranking final — los tags match son pistas.
 - Tono cálido y personal ("para ti", "en tu caso"): claro y estructurado — ni telegráfico ni prolijo.
@@ -1632,7 +1684,7 @@ function getStylistSystemExtra(language: string): string {
 - GÉNERO: respeta CONTEXTO DE GÉNERO (perfil masculino: sin faldas/vestidos).
 - Elige 1–3 handles que mejor respondan al pedido; rationale por ítem: hasta ~130 caracteres, una frase clara con el porqué.
 - Si no encaja nada, dilo en una frase.
-- JSON "suggested_products": 1–3 {"handle":"...","rationale":"..."} de la lista cuando haya fit coherente.`,
+- JSON OBLIGATORIO incluye "suggested_products": array de 1–3 {"handle":"handle-exacto","rationale":"..."} — solo handles de CANDIDATOS; no omitas el campo si la lista no está vacía.`,
     en: `STYLIST MODE (limited catalog — you are the primary intelligence):
 - You decide which pieces to recommend: analyze the shopper message, chat history, STRUCTURED CONTEXT, and each CANDIDATES line (title, price, match tags). List order is NOT the final ranking — match tags are hints only.
 - Warm personal tone ("for you", "in your case"): clear and structured — not telegraphic, not rambling.
@@ -1645,7 +1697,7 @@ function getStylistSystemExtra(language: string): string {
 - GENDER: follow GENDER CONTEXT (male profile: no skirts/dresses).
 - Pick 1–3 handles that best match the current request; per-item rationale up to ~130 characters with clear why.
 - If nothing fits, say so in one sentence.
-- JSON "suggested_products": 1–3 {"handle":"...","rationale":"..."} from the list when coherent fits exist.`,
+- JSON MUST include "suggested_products": array of 1–3 {"handle":"exact-handle-from-list","rationale":"..."} — never omit when CANDIDATES is non-empty.`,
   };
   return blocks[language] || blocks.en;
 }
@@ -2649,7 +2701,7 @@ Deno.serve(async (req: Request) => {
     try {
       gptResponse = await callOpenAI(userPrompt, language, {
         systemExtra: combinedSystemExtra || undefined,
-        maxTokens: isSecondaryCaption ? 340 : stylistOutfitLead ? 680 : 480,
+        maxTokens: isSecondaryCaption ? 340 : stylistOutfitLead ? 1024 : 480,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
         temperature:
           stylistOutfitLead && hasCandidateProducts && !isSecondaryCaption ? 0.58 : undefined,
@@ -2685,7 +2737,13 @@ Deno.serve(async (req: Request) => {
         gptResponse.suggested_products,
         data.candidate_products
       );
-      if (suggested.length === 0 && assistantSource === "fallback_openai") {
+      if (suggested.length === 0) {
+        suggested = inferSuggestedFromExplicacao(
+          gptResponse.explicacao,
+          data.candidate_products
+        );
+      }
+      if (suggested.length === 0) {
         suggested = defaultSuggestedFromCandidates(data.candidate_products, language);
       }
       gptResponse = {
