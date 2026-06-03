@@ -3,6 +3,7 @@ import {
   computeGlassesCanonicalOffsetQuat,
   omafitApplyGlassesTripoOffsetContainer,
   omafitGlassesGlbIsWidgetCanonicalFrame,
+  omafitEnsureGlassesBridgePointsUp,
   omafitRemapRodinGlbToWidgetFrame,
 } from "./omafit-glasses-orient.js";
 import {
@@ -598,7 +599,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-03-ar-glasses-lens-mesh-v180";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-03-ar-glasses-deterministic-v181";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2621,7 +2622,36 @@ function omafitApplyGlassesLensAppearanceWithFallback(THREE, root, opts = {}) {
     omafitRemoveMonolithicGlassesLensOverlays(root);
     return primary;
   }
-  /** Sem heurísticas/placas/cutouts — exige mesh `omafit_lens` + material `lens_glass` do worker. */
+  const fbCount = omafitApplyGlassesLensAppearanceFallback(THREE, root, opts);
+  if (fbCount > 0) {
+    console.warn("[omafit-ar] glasses lens fallback heurístico", {
+      build: OMAFIT_AR_WIDGET_BUILD,
+      lensMeshes: fbCount,
+    });
+    return { lensMeshes: fbCount };
+  }
+  const areaGuess = omafitGuessGlassesLensMeshesByArea(THREE, root);
+  let areaN = 0;
+  for (const mesh of areaGuess) {
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const next = mats.map((m) => {
+      if (!m || m.userData?.omafitArLensMaterial) return m;
+      areaN += 1;
+      const out = omafitCreateGlassesLiteLensMaterial(THREE, opts.lensType || "clear_fake");
+      out.userData = { ...(out.userData || {}), omafitArLensMaterial: true, omafitArLensAreaGuess: true };
+      out.needsUpdate = true;
+      return out;
+    });
+    mesh.material = Array.isArray(mesh.material) ? next : next[0];
+    mesh.renderOrder = Math.max(Number(mesh.renderOrder) || 0, 8);
+  }
+  if (areaN > 0) {
+    console.warn("[omafit-ar] glasses lens fallback área AABB (monolítico)", {
+      build: OMAFIT_AR_WIDGET_BUILD,
+      lensMeshes: areaN,
+    });
+    return { lensMeshes: areaN };
+  }
   return primary;
 }
 
@@ -11315,6 +11345,17 @@ async function runArSession({
             "[omafit-ar] glasses worker/Rodin frame remap Rx(-90°) → +Y topo, −Z frente",
             { build: OMAFIT_AR_WIDGET_BUILD },
           );
+        }
+        if (
+          glassesWorkerFrameRemapped ||
+          hasOmafitCanonicalNode ||
+          omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses)
+        ) {
+          if (omafitEnsureGlassesBridgePointsUp(THREE, glasses)) {
+            console.log("[omafit-ar] glasses bridge-up fix Rx(180°) aplicado", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+            });
+          }
         }
       } catch (remapErr) {
         console.warn(
