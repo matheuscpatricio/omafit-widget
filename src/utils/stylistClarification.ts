@@ -19,7 +19,8 @@ export function evaluateStylistClarification(
   const m = String(message || '').trim();
   if (!m || m.length > 120) return { needsClarification: false };
   if (SPECIFIC.test(m)) return { needsClarification: false };
-  if (!VAGUE.test(m) && m.split(/\s+/).length >= 4) return { needsClarification: false };
+  /** Só pergunta formal/casual/presente quando o cliente foi explicitamente vago — não em pedidos curtos mas claros ("quero um look", chips, etc.). */
+  if (!VAGUE.test(m)) return { needsClarification: false };
 
   if (language === 'es') {
     return {
