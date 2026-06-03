@@ -5126,6 +5126,9 @@ const handleSubmit = async (
           collectionHandlesEnviados: shopifyCollectionHandles,
           colecoesInferidasApi: lastCatalogSearch?.debug?.resolved_collection_handles,
           targetGender: lastCatalogSearch?.debug?.target_gender,
+          effectiveSearchGender: lastCatalogSearch?.debug?.effective_search_gender,
+          counts: lastCatalogSearch?.debug?.counts,
+          hint: lastCatalogSearch?.debug?.hint,
           resposta: lastCatalogSearch,
           checklist:
             '1) Produto em pelo menos uma coleção Shopify com outras peças. 2) Redeploy app Omafit (Railway). 3) Tema com data-collection-handles ou product-by-handle com coleções. 4) Imagem destacada nos candidatos. 5) target_gender no debug — tabela só masculina/feminina pode filtrar tudo.',
