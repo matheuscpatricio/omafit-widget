@@ -1,11 +1,23 @@
+/** Normaliza path Shopify (mesma foto em tamanhos/ sufixos diferentes). */
+function normalizeShopifyImagePath(pathname: string): string {
+  return pathname
+    .toLowerCase()
+    .replace(/_(\d+x\d+|\d+x)(?=\.[a-z0-9]+$)/i, '')
+    .replace(
+      /_((?:grande|large|medium|small|thumb|compact|master|original|crop(?:_center)?))(?=\.[a-z0-9]+$)/i,
+      ''
+    );
+}
+
 function galleryDedupeKey(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
   try {
-    const parsed = new URL(trimmed);
-    return `${parsed.origin}${parsed.pathname}`.toLowerCase();
+    const parsed = new URL(trimmed, 'https://placeholder.local');
+    const path = normalizeShopifyImagePath(parsed.pathname);
+    return `${parsed.hostname}${path}`;
   } catch {
-    return trimmed.toLowerCase();
+    return normalizeShopifyImagePath(trimmed);
   }
 }
 

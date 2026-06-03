@@ -2319,9 +2319,10 @@ export function TryOnWidget({
         requestProductImagesFromParent();
         return;
       }
-      const imgs = (product.images?.length ? product.images : [product.image_url])
-        .map((u) => String(u || '').trim())
-        .filter(Boolean);
+      const imgs = mergeProductImageGallery(
+        String(product.image_url || '').trim(),
+        product.images?.length ? product.images : []
+      );
       if (imgs.length > 1) {
         console.log('📸 Galeria via product-by-handle:', imgs.length);
         setApiProductImages(imgs);
@@ -5799,6 +5800,13 @@ const handleSubmit = async (
           color: ${localPrimaryColor} !important;
           opacity: 0.88;
         }
+        .omafit-tryon-hero button.omafit-product-gallery-arrow {
+          color: ${effectivePrimaryColor} !important;
+        }
+        .omafit-tryon-hero button.omafit-product-gallery-arrow svg {
+          color: ${effectivePrimaryColor} !important;
+          stroke: ${effectivePrimaryColor} !important;
+        }
         .omafit-tryon-hero .bg-gray-100 { background-color: rgb(243 244 246) !important; }
         .omafit-tryon-hero .bg-gray-100.text-gray-700,
         .omafit-tryon-hero .hover\\:bg-gray-200:hover { color: #374151 !important; }
@@ -6745,27 +6753,37 @@ const handleSubmit = async (
                   {availableImages.length > 1 && (
                     <>
                       <button
+                        type="button"
                         onClick={prevImage}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
+                        className="omafit-product-gallery-arrow absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
+                        style={{ color: effectivePrimaryColor }}
                       >
-                        <ArrowLeft className="h-5 w-5" style={{ color: primaryColor }} />
+                        <ArrowLeft className="h-5 w-5" />
                       </button>
 
                       <button
+                        type="button"
                         onClick={nextImage}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
+                        className="omafit-product-gallery-arrow absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition hover:bg-white"
+                        style={{ color: effectivePrimaryColor }}
                       >
-                        <ArrowRight className="h-5 w-5" style={{ color: primaryColor }} />
+                        <ArrowRight className="h-5 w-5" />
                       </button>
 
                       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
                         {availableImages.map((_, index) => (
                           <button
                             key={index}
+                            type="button"
                             onClick={() => setCurrentImageIndex(index)}
                             className={`h-2 w-2 rounded-full transition-all ${
-                              index === currentImageIndex ? 'bg-primary w-6' : 'bg-white/70 hover:bg-white'
+                              index === currentImageIndex ? 'w-6' : 'bg-white/70 hover:bg-white'
                             }`}
+                            style={
+                              index === currentImageIndex
+                                ? { backgroundColor: effectivePrimaryColor }
+                                : undefined
+                            }
                           />
                         ))}
                       </div>
@@ -6875,29 +6893,37 @@ const handleSubmit = async (
                     </div>
 
                     <button
+                      type="button"
                       onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                      className="omafit-product-gallery-arrow absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                      style={{ color: effectivePrimaryColor }}
                     >
-                      <ArrowLeft className="w-5 h-5" style={{ color: primaryColor }} />
+                      <ArrowLeft className="w-5 h-5" />
                     </button>
 
                     <button
+                      type="button"
                       onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                      className="omafit-product-gallery-arrow absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                      style={{ color: effectivePrimaryColor }}
                     >
-                      <ArrowRight className="w-5 h-5" style={{ color: primaryColor }} />
+                      <ArrowRight className="w-5 h-5" />
                     </button>
 
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                       {availableImages.map((_, index) => (
                         <button
                           key={index}
+                          type="button"
                           onClick={() => setCurrentImageIndex(index)}
                           className={`w-2 h-2 rounded-full transition-all ${
-                            index === currentImageIndex
-                              ? 'bg-primary w-6'
-                              : 'bg-white/70 hover:bg-white'
+                            index === currentImageIndex ? 'w-6' : 'bg-white/70 hover:bg-white'
                           }`}
+                          style={
+                            index === currentImageIndex
+                              ? { backgroundColor: effectivePrimaryColor }
+                              : undefined
+                          }
                         />
                       ))}
                     </div>
@@ -7010,16 +7036,18 @@ const handleSubmit = async (
                         <button
                           type="button"
                           onClick={prevImage}
-                          className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
+                          className="omafit-product-gallery-arrow absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
+                          style={{ color: effectivePrimaryColor }}
                         >
-                          <ArrowLeft className="h-4 w-4" style={{ color: primaryColor }} />
+                          <ArrowLeft className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
                           onClick={nextImage}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
+                          className="omafit-product-gallery-arrow absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow-md transition hover:bg-white"
+                          style={{ color: effectivePrimaryColor }}
                         >
-                          <ArrowRight className="h-4 w-4" style={{ color: primaryColor }} />
+                          <ArrowRight className="h-4 w-4" />
                         </button>
                         <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
                           {availableImages.map((_, index) => (
@@ -7028,8 +7056,13 @@ const handleSubmit = async (
                               type="button"
                               onClick={() => setCurrentImageIndex(index)}
                               className={`h-1.5 rounded-full transition-all ${
-                                index === currentImageIndex ? 'bg-primary w-5' : 'w-1.5 bg-white/80 hover:bg-white'
+                                index === currentImageIndex ? 'w-5' : 'w-1.5 bg-white/80 hover:bg-white'
                               }`}
+                              style={
+                                index === currentImageIndex
+                                  ? { backgroundColor: effectivePrimaryColor }
+                                  : undefined
+                              }
                             />
                           ))}
                         </div>
