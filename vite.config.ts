@@ -76,5 +76,8 @@ export default defineConfig(({ mode }) => {
         'Content-Security-Policy': 'frame-ancestors *',
       },
     },
+    test: {
+      include: ['src/**/*.test.ts'],
+    },
   };
 });

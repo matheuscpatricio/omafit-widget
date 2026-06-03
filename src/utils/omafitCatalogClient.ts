@@ -1,12 +1,21 @@
+import { parseStoreProfileFromApi } from './storeProfile';
+
 export type OmafitCatalogCandidate = {
   handle: string;
   title: string;
   url: string;
   image_url: string;
+  product_type?: string;
+  tags?: string[];
+  price_amount?: number | null;
+  currency_code?: string | null;
+  in_stock?: boolean;
+  score_reason_tags?: string[];
 };
 
 export type OmafitCatalogSearchResult = {
   candidates: OmafitCatalogCandidate[];
+  store_profile?: import('./storeProfile').StoreProfile | null;
   error: string | null;
   /** HTTP status da última resposta (útil em diagnóstico). */
   httpStatus: number;
@@ -28,7 +37,32 @@ function normalizeCandidateRow(row: unknown): OmafitCatalogCandidate | null {
   const url = pickString(o.url ?? o.product_url ?? o.link);
   const image_url = pickString(o.image_url ?? o.image ?? o.featured_image ?? o.thumbnail);
   if (!handle) return null;
-  return { handle, title, url: url || '#', image_url: image_url || '' };
+  const priceRaw = o.price_amount ?? o.priceAmount;
+  const price_amount =
+    priceRaw != null && Number.isFinite(Number(priceRaw)) ? Number(priceRaw) : null;
+  const tags = Array.isArray(o.tags) ? o.tags.map((t) => String(t)) : [];
+  const inStockRaw = o.in_stock ?? o.inStock;
+  const in_stock =
+    inStockRaw === true || inStockRaw === 'true'
+      ? true
+      : inStockRaw === false || inStockRaw === 'false'
+        ? false
+        : undefined;
+  const reasonTags = Array.isArray(o.score_reason_tags)
+    ? o.score_reason_tags.map((t) => String(t)).filter(Boolean)
+    : [];
+  return {
+    handle,
+    title,
+    url: url || '#',
+    image_url: image_url || '',
+    product_type: pickString(o.product_type ?? o.productType) || undefined,
+    tags: tags.length ? tags : undefined,
+    price_amount,
+    currency_code: pickString(o.currency_code ?? o.currencyCode) || null,
+    ...(in_stock !== undefined ? { in_stock } : {}),
+    ...(reasonTags.length ? { score_reason_tags: reasonTags } : {}),
+  };
 }
 
 function extractCandidatesFromJson(json: unknown): OmafitCatalogCandidate[] {
@@ -99,8 +133,18 @@ export function buildCatalogSearchCanonical(params: {
   user_message: string;
   shopper_gender: string;
   chart_gender_scope: string;
+  country_code?: string;
+  occasion_ids?: string;
+  gift_recipient?: string;
+  store_audience?: string;
+  effective_search_gender?: string;
+  exclude_handles?: string;
+  sort_price_asc?: string;
+  search_terms_boost?: string;
+  price_band?: string;
+  store_profile_source?: string;
 }): string {
-  return [
+  const base = [
     `collection_handles=${params.collection_handles}`,
     `collection_type=${params.collection_type}`,
     `exclude_handle=${params.exclude_handle}`,
@@ -112,6 +156,19 @@ export function buildCatalogSearchCanonical(params: {
     `shopper_gender=${params.shopper_gender}`,
     `chart_gender_scope=${params.chart_gender_scope}`,
   ].join('|');
+  const stylist = [
+    `country_code=${params.country_code ?? ''}`,
+    `occasion_ids=${params.occasion_ids ?? ''}`,
+    `gift_recipient=${params.gift_recipient ?? ''}`,
+    `store_audience=${params.store_audience ?? ''}`,
+    `effective_search_gender=${params.effective_search_gender ?? ''}`,
+    `exclude_handles=${params.exclude_handles ?? ''}`,
+    `sort_price_asc=${params.sort_price_asc ?? '0'}`,
+    `search_terms_boost=${params.search_terms_boost ?? ''}`,
+    `price_band=${params.price_band ?? ''}`,
+    `store_profile_source=${params.store_profile_source ?? ''}`,
+  ].join('|');
+  return `${base}|${stylist}`;
 }
 
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
@@ -144,6 +201,7 @@ export async function fetchOmafitCatalogSearch(params: {
   chartGenderScope?: string;
   /** Handles Shopify das coleções do produto em try-on (inclui produtos da mesma coleção). */
   collectionHandles?: string[];
+  stylistBrief?: import('./stylistContext').StylistBrief;
 }): Promise<OmafitCatalogSearchResult> {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const collection_type = String(params.collectionType || 'upper');
@@ -162,6 +220,21 @@ export async function fetchOmafitCatalogSearch(params: {
     ),
   ].join(',');
 
+  const briefParams = params.stylistBrief
+    ? {
+        country_code: params.stylistBrief.country_code,
+        occasion_ids: params.stylistBrief.active_occasions.map((o) => o.id).join(','),
+        gift_recipient: params.stylistBrief.gift_recipient,
+        store_audience: params.stylistBrief.store_audience,
+        effective_search_gender: params.stylistBrief.effective_search_gender,
+        exclude_handles: params.stylistBrief.exclude_handles.join(','),
+        sort_price_asc: params.stylistBrief.sort_price_asc ? '1' : '0',
+        search_terms_boost: params.stylistBrief.search_terms_boost.join(','),
+        price_band: params.stylistBrief.price_band,
+        store_profile_source: params.stylistBrief.store_profile_source,
+      }
+    : {};
+
   const canonical = buildCatalogSearchCanonical({
     collection_handles,
     collection_type,
@@ -173,6 +246,7 @@ export async function fetchOmafitCatalogSearch(params: {
     user_message,
     shopper_gender,
     chart_gender_scope,
+    ...briefParams,
   });
 
   const signature = await hmacSha256Hex(params.secret, canonical);
@@ -188,6 +262,16 @@ export async function fetchOmafitCatalogSearch(params: {
     user_message,
     shopper_gender,
     chart_gender_scope,
+    country_code: briefParams.country_code ?? '',
+    occasion_ids: briefParams.occasion_ids ?? '',
+    gift_recipient: briefParams.gift_recipient ?? '',
+    store_audience: briefParams.store_audience ?? '',
+    effective_search_gender: briefParams.effective_search_gender ?? '',
+    exclude_handles: briefParams.exclude_handles ?? '',
+    sort_price_asc: briefParams.sort_price_asc ?? '0',
+    search_terms_boost: briefParams.search_terms_boost ?? '',
+    price_band: briefParams.price_band ?? '',
+    store_profile_source: briefParams.store_profile_source ?? '',
     signature,
   });
 
@@ -228,7 +312,10 @@ export async function fetchOmafitCatalogSearch(params: {
   if (!res.ok) {
     const err = serverError || `http_${res.status}`;
     let hint = '';
-    if (err === 'bad_signature') {
+    if (err === 'plan_required') {
+      hint =
+        ' | dica=consultor stylist exige plano Growth ou superior na loja (shopify_shops no Supabase)';
+    } else if (err === 'bad_signature') {
       hint =
         ' | dica=confirme VITE_OMAFIT_WIDGET_HMAC_SECRET igual a WIDGET_CATALOG_HMAC_SECRET no Railway e redeploy da app Omafit';
     } else if (err === 'no_session') {
@@ -248,6 +335,7 @@ export async function fetchOmafitCatalogSearch(params: {
 
   return {
     candidates,
+    store_profile: parseStoreProfileFromApi(json),
     error: serverError,
     httpStatus: res.status,
     diagnostic: diagnostic + debugSuffix,

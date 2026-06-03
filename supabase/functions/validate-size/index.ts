@@ -168,7 +168,30 @@ interface ValidateSizeRequest {
     title: string;
     url?: string;
     image_url?: string;
+    price_amount?: number | null;
+    currency_code?: string | null;
+    score_reason_tags?: string[];
   }>;
+  /** Brief estruturado (calendário, loja, feedback) — busca/score já aplicados no catalog-search. */
+  stylist_brief?: {
+    country_code?: string;
+    season?: string;
+    season_label_pt?: string;
+    active_occasions?: Array<{ id: string; label: string; tone?: string }>;
+    store_audience?: string;
+    gift_recipient?: string;
+    effective_search_gender?: string;
+    feedback?: {
+      type?: string;
+      sortPriceAsc?: boolean;
+      excludePreviousSuggestions?: boolean;
+      styleKeywords?: string[];
+    };
+    garment_constraints_tags?: string[];
+    search_terms_boost?: string[];
+    price_band?: string;
+    store_profile_source?: string;
+  };
   /** Perfil de género do cliente no provador (male | female | unisex). */
   genero?: string;
   /**
@@ -1149,7 +1172,7 @@ IMPORTANT: Return valid JSON with this structure:
 async function callOpenAISingle(
   userPrompt: string,
   language: string,
-  opts: { systemExtra?: string; maxTokens: number; defaultTamanho: string }
+  opts: { systemExtra?: string; maxTokens: number; defaultTamanho: string; temperature?: number }
 ): Promise<GPTResponse> {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY not configured");
@@ -1169,7 +1192,7 @@ async function callOpenAISingle(
         { role: "user", content: userPrompt },
       ],
       max_tokens: opts.maxTokens,
-      temperature: 0.55,
+      temperature: opts.temperature ?? 0.55,
       response_format: { type: "json_object" },
     }),
   });
@@ -1201,7 +1224,7 @@ async function callOpenAISingle(
 async function callOpenAI(
   userPrompt: string,
   language: string = "pt",
-  opts?: { systemExtra?: string; maxTokens?: number; defaultTamanho?: string }
+  opts?: { systemExtra?: string; maxTokens?: number; defaultTamanho?: string; temperature?: number }
 ): Promise<GPTResponse> {
   const defaultTamanho = normalizeSizeLabel(opts?.defaultTamanho || "M") || "M";
   const requested = opts?.maxTokens ?? 1200;
@@ -1214,6 +1237,7 @@ async function callOpenAI(
         systemExtra: opts?.systemExtra,
         maxTokens: attempts[i],
         defaultTamanho,
+        temperature: opts?.temperature,
       });
     } catch (err) {
       lastError = err;
@@ -1588,6 +1612,7 @@ function getStylistSystemExtra(language: string): string {
 - TAMANHO (obrigatório): primeira frase exatamente: "Para o/a NOME_DA_PEÇA, seu tamanho ideal é TAMANHO_FINAL." (use "o" ou "a" conforme o nome — ex.: "o Suéter …", "a Calça …".) Depois, mais 3–5 frases objetivas (silhueta, proporções, cor, ocasião, por que o complemento funciona) — não repita o tamanho; limite prático ~900 caracteres no total em explicacao.
 - PEÇA JÁ ESCOLHIDA: na 2.ª frase, diga explicitamente que o cliente já está com essa peça (nome igual ao produto em contexto) e que as sugestões são complementos do look — não inverta: não comece só pela peça candidata.
 - Só mencione produtos cujo "handle" está em CANDIDATOS. Nunca invente URLs ou peças fora da lista.
+- Se houver CONTEXTO ESTRUTURADO (stylist_brief), use-o para tom e ocasião; preços na lista são referência — não invente valores.
 - Critérios (cite só o essencial): cor/silhueta/ocasião vs categoria upper/lower/full.
 - Pode sugerir calçados e acessórios (óculos, relógio, bolsa, cinto, joias, boné, etc.) se estiverem em CANDIDATOS; na explicacao, convide a adicionar ao carrinho para esses itens (o cliente não os experimenta no provador de roupa).
 - GÉNERO: siga CONTEXTO DE GÉNERO e regras de combinação (perfil masculino: sem saias/vestidos).
@@ -1810,11 +1835,58 @@ function stylistUserUtterancePlaceholder(language: string): string {
   return "(Sem mensagem de texto: o cliente acabou de ver o resultado do provador; sugira uma combinação entre os candidatos (vestuário, calçado ou acessórios da lista).)";
 }
 
+function formatCandidatePriceLine(
+  c: NonNullable<ValidateSizeRequest["candidate_products"]>[number]
+): string {
+  const amount = c?.price_amount;
+  if (amount == null || !Number.isFinite(Number(amount))) return "";
+  const cur = String(c.currency_code || "").trim();
+  return ` | price: ${Number(amount)}${cur ? ` ${cur}` : ""}`;
+}
+
+function buildStylistBriefContextForPrompt(
+  data: ValidateSizeRequest,
+  language: string
+): string {
+  const b = data.stylist_brief;
+  if (!b || typeof b !== "object") return "";
+
+  const occasions = Array.isArray(b.active_occasions)
+    ? b.active_occasions.map((o) => String(o?.label || o?.id || "").trim()).filter(Boolean)
+    : [];
+  const tags = Array.isArray(b.garment_constraints_tags)
+    ? b.garment_constraints_tags.map((t) => String(t).trim()).filter(Boolean)
+    : [];
+  const boost = Array.isArray(b.search_terms_boost)
+    ? b.search_terms_boost.map((t) => String(t).trim()).filter(Boolean)
+    : [];
+  const fb = b.feedback && typeof b.feedback === "object" ? b.feedback : undefined;
+  const fbType = String(fb?.type || "none");
+  const styleKw = Array.isArray(fb?.styleKeywords)
+    ? fb.styleKeywords.map((k) => String(k).trim()).filter(Boolean)
+    : [];
+
+  if (language === "es") {
+    return `\nCONTEXTO ESTRUCTURADO (ya filtrado en búsqueda — no inventes handles):\n- Temporada: ${String(b.season || "")} (${String(b.season_label_pt || b.season || "")}).\n- Ocasiones activas: ${occasions.join(", ") || "(ninguna)"}.\n- Perfil tienda: ${String(b.store_audience || "")}; destinatario regalo: ${String(b.gift_recipient || "self")}.\n- Feedback cliente: ${fbType}${fb?.sortPriceAsc ? " (priorizar precio más bajo entre candidatos)" : ""}${fb?.excludePreviousSuggestions ? " (evitar repetir sugerencias anteriores)" : ""}${styleKw.length ? `; estilo: ${styleKw.join(", ")}` : ""}.\n- Restricciones: ${tags.join("; ") || "(ninguna)"}.\n- La lista CANDIDATOS ya está ordenada/filtrada; solo narra y elige handles de esa lista.\n`;
+  }
+  if (language === "en") {
+    return `\nSTRUCTURED CONTEXT (search already filtered — do not invent handles):\n- Season: ${String(b.season || "")} (${String(b.season_label_pt || b.season || "")}).\n- Active occasions: ${occasions.join(", ") || "(none)"}.\n- Store profile: ${String(b.store_audience || "")}; gift recipient: ${String(b.gift_recipient || "self")}.\n- Shopper feedback: ${fbType}${fb?.sortPriceAsc ? " (prefer lower price among candidates)" : ""}${fb?.excludePreviousSuggestions ? " (avoid repeating prior suggestions)" : ""}${styleKw.length ? `; style: ${styleKw.join(", ")}` : ""}.\n- Constraints: ${tags.join("; ") || "(none)"}.\n- CANDIDATES list is pre-scored; only narrate and pick handles from it.\n`;
+  }
+  return `\nCONTEXTO ESTRUTURADO (busca já filtrada — não invente handles):\n- Estação: ${String(b.season || "")} (${String(b.season_label_pt || b.season || "")}).\n- Ocasiões ativas: ${occasions.join(", ") || "(nenhuma)"}.\n- Perfil da loja: ${String(b.store_audience || "")} (faixa ${String(b.price_band || "unknown")}); destinatário presente: ${String(b.gift_recipient || "self")}.\n- Feedback do cliente: ${fbType}${fb?.sortPriceAsc ? " (priorizar preço mais baixo entre candidatos)" : ""}${fb?.excludePreviousSuggestions ? " (evitar repetir sugestões anteriores)" : ""}${styleKw.length ? `; estilo: ${styleKw.join(", ")}` : ""}.\n- Restrições: ${tags.join("; ") || "(nenhuma)"}${boost.length ? `; termos de busca: ${boost.join(", ")}` : ""}.\n- A lista CANDIDATOS já foi filtrada/ordenada; só narre e escolha handles dessa lista.\n`;
+}
+
 function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: string): string {
   const candidates = Array.isArray(data.candidate_products) ? data.candidate_products : [];
   const lines = candidates
-    .map((c) => `- handle: ${String(c.handle || "").trim()} | title: ${String(c.title || "").trim()}`)
+    .map((c) => {
+      const base = `- handle: ${String(c.handle || "").trim()} | title: ${String(c.title || "").trim()}${formatCandidatePriceLine(c)}`;
+      const tags = Array.isArray(c.score_reason_tags)
+        ? c.score_reason_tags.map((t) => String(t).trim()).filter(Boolean)
+        : [];
+      return tags.length ? `${base} | match: ${tags.join(", ")}` : base;
+    })
     .join("\n");
+  const briefCtx = buildStylistBriefContextForPrompt(data, language);
 
   const productCatalogContext = buildProductCatalogContext(data, language);
   const genderCtx = buildGenderContextForStylist(data, language);
@@ -1849,12 +1921,12 @@ function buildStylistConsultantPrompt(data: ValidateSizeRequest, language: strin
         : "(upper = tops; think bottoms (jeans, trousers…) for silhouette and color.)";
 
   if (language === "es") {
-    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando: ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponda como estilista ("tú", "para ti", "en tu caso"); explicacion clara — unas 5 a 7 frases cortas en total (incluida la primera obligatoria); evite superar ~850 caracteres.\nOBLIGATORIO — primera frase de explicacao: debe ser exactamente del tipo: "Para el/la NOMBRE_DEL_PRODUCTO, tu talla ideal es TALLA" (elige "el" o "la" según el nombre) usando el nombre del producto del contexto y exactamente el valor tamanho_final (debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO — texto tras esa primera frase: la siguiente frase debe dejar claro que el cliente ya lleva esa prenda (nombre del producto en contexto) y solo entonces sugerir 1–3 complementos de los CANDIDATOS (ropa, calzado o accesorios de la lista); para calzado/accesorios invita a añadir al carrito.\nRespeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
+    return `El cliente escribió:\n"${msg}"\n\nPrenda que está probando: ${data.product_name || "producto actual"}\nCategoría (colección / silueta): ${data.categoria} ${catHintEs}\nTalla recomendada (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}${briefCtx}\nCANDIDATOS (solo puedes recomendar estos handles):\n${lines || "(vacío)"}\n\nResponda como estilista ("tú", "para ti", "en tu caso"); explicacion clara — unas 5 a 7 frases cortas en total (incluida la primera obligatoria); evite superar ~850 caracteres.\nOBLIGATORIO — primera frase de explicacao: debe ser exactamente del tipo: "Para el/la NOMBRE_DEL_PRODUCTO, tu talla ideal es TALLA" (elige "el" o "la" según el nombre) usando el nombre del producto del contexto y exactamente el valor tamanho_final (debe coincidir con la talla recomendada del contexto).\nOBLIGATORIO — texto tras esa primera frase: la siguiente frase debe dejar claro que el cliente ya lleva esa prenda (nombre del producto en contexto) y solo entonces sugerir 1–3 complementos de los CANDIDATOS (ropa, calzado o accesorios de la lista); para calzado/accesorios invita a añadir al carrito.\nRespeta el perfil de género (ej.: perfil masculino — nunca menciones faldas/vestidos; sugiere vaqueros, pantalón de vestir, bermuda).\nOBLIGATORIO en el JSON: "suggested_products" debe ser un array con 1 a 3 objetos {"handle":"...","rationale":"..."} usando SOLO handles exactos de CANDIDATOS (nunca vacío si la lista tiene ítems).\nDevuelve JSON con tamanho_final, explicacao, coerencia, confianca y suggested_products.`;
   }
   if (language === "en") {
-    return `The shopper wrote:\n"${msg}"\n\nProduct: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist ("you", "for you", "in your case"); keep explicacao clear — about 5–7 short sentences total (including the mandatory opening); stay under ~850 characters.\nMANDATORY — first sentence of explicacao: must follow exactly: "For PRODUCT_NAME, your ideal size is SIZE" using the product name from context and exactly tamanho_final (must match recommended size in context).\nMANDATORY — text after that first sentence: the next sentence must state clearly the shopper is already wearing that product (same name), then suggest 1–3 complements from CANDIDATES (apparel, footwear, or accessories on the list); for footwear/accessories nudge add to cart.\nRespect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
+    return `The shopper wrote:\n"${msg}"\n\nProduct: ${data.product_name || "current product"}\nCollection category (silhouette context): ${data.categoria} ${catHintEn}\nRecommended size (context): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}${briefCtx}\nCANDIDATES (you may ONLY recommend these handles):\n${lines || "(empty)"}\n\nReply as a stylist ("you", "for you", "in your case"); keep explicacao clear — about 5–7 short sentences total (including the mandatory opening); stay under ~850 characters.\nMANDATORY — first sentence of explicacao: must follow exactly: "For PRODUCT_NAME, your ideal size is SIZE" using the product name from context and exactly tamanho_final (must match recommended size in context).\nMANDATORY — text after that first sentence: the next sentence must state clearly the shopper is already wearing that product (same name), then suggest 1–3 complements from CANDIDATES (apparel, footwear, or accessories on the list); for footwear/accessories nudge add to cart.\nRespect the gender profile (e.g. male profile — never mention skirts/dresses; suggest jeans, dress pants, bermuda shorts).\nMANDATORY in JSON: "suggested_products" must be an array of 1–3 items {"handle":"...","rationale":"..."} using ONLY exact handles from CANDIDATES (never empty if the list has items).\nReturn JSON with tamanho_final, explicacao, coerencia, confianca, suggested_products.`;
   }
-  return `O cliente escreveu:\n"${msg}"\n\nProduto: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); explicacao clara — cerca de 5 a 7 frases curtas no total (incluindo a primeira obrigatória); evite ultrapassar ~850 caracteres.\nOBRIGATÓRIO — primeira frase da explicacao: deve seguir exatamente o formato: "Para o/a NOME_DO_PRODUTO, seu tamanho ideal é TAMANHO" (use "o" ou "a" antes do nome, conforme for natural — ex.: "o Suéter …", "a Calça …") usando o nome do produto do contexto e exatamente tamanho_final (deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO — texto após essa primeira frase: a seguinte frase deve deixar claro que o cliente já está com essa peça (nome do produto) e só então sugerir 1–3 complementos dos CANDIDATOS (vestuário, calçado ou acessórios da lista); para calçado/acessório convide a adicionar ao carrinho.\nRespeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
+  return `O cliente escreveu:\n"${msg}"\n\nProduto: ${data.product_name || "produto atual"}\nCategoria (coleção / silhueta): ${data.categoria} ${catHintPt}\nTamanho recomendado (contexto): ${data.tamanho_calculado_algoritmo}${storeContext}\n${genderCtx}${productCatalogContext}\n${chatHistoryText}${briefCtx}\nCANDIDATOS (só pode recomendar estes handles):\n${lines || "(vazio)"}\n\nResponda como estilista com tom pessoal ("você", "para você", "no seu caso"); explicacao clara — cerca de 5 a 7 frases curtas no total (incluindo a primeira obrigatória); evite ultrapassar ~850 caracteres.\nOBRIGATÓRIO — primeira frase da explicacao: deve seguir exatamente o formato: "Para o/a NOME_DO_PRODUTO, seu tamanho ideal é TAMANHO" (use "o" ou "a" antes do nome, conforme for natural — ex.: "o Suéter …", "a Calça …") usando o nome do produto do contexto e exatamente tamanho_final (deve coincidir com o tamanho recomendado no contexto).\nOBRIGATÓRIO — texto após essa primeira frase: a seguinte frase deve deixar claro que o cliente já está com essa peça (nome do produto) e só então sugerir 1–3 complementos dos CANDIDATOS (vestuário, calçado ou acessórios da lista); para calçado/acessório convide a adicionar ao carrinho.\nRespeite o perfil de género (ex.: perfil masculino — nunca mencione saias/vestidos; sugira calça jeans, alfaitarada, bermuda).\nOBRIGATÓRIO no JSON: "suggested_products" tem de ser um array com 1 a 3 objetos {"handle":"...","rationale":"..."} usando APENAS handles exatos dos CANDIDATOS (nunca vazio se a lista tiver itens).\nDevolva JSON com tamanho_final, explicacao, coerencia, confianca e suggested_products.`;
 }
 
 async function validateUserMessage(message: string, language: string): Promise<{ is_appropriate: boolean; response_message: string }> {
@@ -2574,6 +2646,8 @@ Deno.serve(async (req: Request) => {
         systemExtra: combinedSystemExtra || undefined,
         maxTokens: isSecondaryCaption ? 340 : stylistOutfitLead ? 680 : 480,
         defaultTamanho: data.tamanho_calculado_algoritmo || "M",
+        temperature:
+          stylistOutfitLead && hasCandidateProducts && !isSecondaryCaption ? 0.32 : undefined,
       });
     } catch (aiErr) {
       console.error("OpenAI unavailable:", aiErr);

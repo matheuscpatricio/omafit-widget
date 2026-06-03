@@ -44,6 +44,12 @@ import {
   parseCollectionHandlesFromMessage,
 } from '../utils/mergeShopifyCollectionHandles';
 import { buildWidgetFontStyleBlock } from '../utils/widgetFont';
+import { buildStylistBrief, formatCatalogPrice } from '../utils/stylistContext';
+import { evaluateStylistClarification } from '../utils/stylistClarification';
+import {
+  fallbackStoreProfile,
+  type StoreProfile,
+} from '../utils/storeProfile';
 import {
   inferProductHandleFromReferrer,
   mergeProductImageGallery,
@@ -150,7 +156,7 @@ interface PreparedPoseAnalysis {
   validationMessage: string | null;
 }
 
-const GPT_INTERACTION_LIMIT = 5;
+const GPT_INTERACTION_LIMIT = 8;
 const TRYON_IMAGE_MAX_DIMENSION = 1024;
 const TRYON_IMAGE_QUALITY = 0.76;
 const TRYON_REMOTE_IMAGE_MAX_DIMENSION = 1024;
@@ -832,6 +838,9 @@ export function TryOnWidget({
       title: string;
       image_url?: string;
       rationale?: string;
+      price_amount?: number | null;
+      currency_code?: string | null;
+      price_label?: string;
     }>;
   }
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -863,6 +872,7 @@ export function TryOnWidget({
   const stylistOpeningExtrasConsumedRef = useRef(false);
   /** Pesquisa Omafit disparada em paralelo ao /tryon para o primeiro GPT após resultado não esperar tanto. */
   const stylistCatalogPrefetchPromiseRef = useRef<Promise<OmafitCatalogCandidate[]> | null>(null);
+  const stylistStoreProfileRef = useRef<StoreProfile | null>(null);
   const [pendingSuggestedHandle, setPendingSuggestedHandle] = useState<string | null>(null);
   /** Últimas sugestões do consultor (para "quero experimentar" / try-on automático). */
   const lastStylistSuggestionsRef = useRef<
@@ -3636,6 +3646,17 @@ const validatePhotoForCollection = (
 
     stylistCatalogPrefetchPromiseRef.current = (async () => {
       const handles = await ensureCatalogCollectionHandles();
+      const brief = buildStylistBrief({
+        shopDomain: effectiveShopDomain,
+        userMessage: autoQuery,
+        shopperGender: sizeData?.gender || 'unisex',
+        chartGenderScope,
+        storeProfile:
+          stylistStoreProfileRef.current ?? fallbackStoreProfile(chartGenderScope),
+        excludeHandles: [(localProductHandle || productHandle || '').trim().toLowerCase()].filter(
+          Boolean
+        ),
+      });
       const res = await fetchOmafitCatalogSearch({
         baseUrl: omafitBase,
         secret: omafitSecret,
@@ -3648,6 +3669,7 @@ const validatePhotoForCollection = (
         shopperGender: sizeData?.gender || 'unisex',
         chartGenderScope,
         collectionHandles: handles,
+        stylistBrief: brief,
       });
       return res.candidates;
     })().catch(() => []);
@@ -4861,6 +4883,21 @@ const handleSubmit = async (
     setGptLoading(true);
 
     try {
+      if (intention === 'custom' && customMessage && stylistEnabled) {
+        const langClar: 'pt' | 'es' | 'en' =
+          currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
+        const clar = evaluateStylistClarification(customMessage, langClar);
+        if (clar.needsClarification) {
+          if (requestSeq !== gptAssistSeqRef.current) return;
+          setChatMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: clar.assistantMessage, timestamp: Date.now() },
+          ]);
+          setInteractionCount((c) => Math.min(c + 1, GPT_INTERACTION_LIMIT));
+          return;
+        }
+      }
+
       if (intention === 'custom' && customMessage && userWantsTryOnGeneration(customMessage)) {
         const sug = lastStylistSuggestionsRef.current;
         if (sug.length > 0) {
@@ -4938,8 +4975,26 @@ const handleSubmit = async (
         debug?: Record<string, unknown>;
       } | null = null;
 
+      const buildStylistBriefForSearch = (userMessageForSearch: string) => {
+        const anchor = (localProductHandle || productHandle || '').trim().toLowerCase();
+        const previous = lastStylistSuggestionsRef.current
+          .map((s) => String(s.handle || '').trim().toLowerCase())
+          .filter(Boolean);
+        const excludeHandles = [...new Set([anchor, ...previous].filter(Boolean))];
+        return buildStylistBrief({
+          shopDomain: effectiveShopDomain,
+          userMessage: userMessageForSearch,
+          shopperGender: sizeData?.gender || 'unisex',
+          chartGenderScope,
+          storeProfile:
+            stylistStoreProfileRef.current ?? fallbackStoreProfile(chartGenderScope),
+          excludeHandles,
+        });
+      };
+
       const runOmafitCatalogSearch = async (userMessageForSearch: string) => {
         if (!canOmafitSearch) return;
+        const brief = stylistEnabled ? buildStylistBriefForSearch(userMessageForSearch) : undefined;
         let searchRes: Awaited<ReturnType<typeof fetchOmafitCatalogSearch>>;
         try {
           searchRes = await fetchOmafitCatalogSearch({
@@ -4954,6 +5009,7 @@ const handleSubmit = async (
           shopperGender: sizeData?.gender || 'unisex',
           chartGenderScope,
           collectionHandles: shopifyCollectionHandles,
+          stylistBrief: brief,
         });
         } catch (catalogErr) {
           console.warn('[Omafit catalog-search] fetch falhou (rede/CORS):', catalogErr);
@@ -4970,6 +5026,9 @@ const handleSubmit = async (
             '[Omafit catalog-search] no_session — a app Omafit no Railway não tem sessão Shopify para esta loja. Abra o app no admin Shopify da loja (produção).',
             searchRes.debug || ''
           );
+        }
+        if (searchRes.store_profile) {
+          stylistStoreProfileRef.current = searchRes.store_profile;
         }
         if (searchRes.candidates.length) {
           candidate_products = searchRes.candidates;
@@ -5126,6 +5185,14 @@ const handleSubmit = async (
           return base;
         })(),
         ...(candidate_products ? { candidate_products } : {}),
+        ...(stylistEnabled && canOmafitSearch
+          ? {
+              stylist_brief: buildStylistBriefForSearch(
+                String(customMessageForPayload || customMessage || '').trim() ||
+                  `Combinar outfit com ${effectiveProductName || localProductName || 'esta peça'}`
+              ),
+            }
+          : {}),
       };
 
       console.log('🤖 [GPT PAYLOAD] Catálogo enviado para validate-size:');
@@ -5218,13 +5285,12 @@ const handleSubmit = async (
         }
 
         let suggestedProductsBlock: ChatMessage['suggestedProducts'];
-        if (
+        const showSuggestedCards =
           stylistEnabled &&
-          allowOpeningExtras &&
           Array.isArray(suggested_products) &&
           suggested_products.length > 0 &&
-          candidate_products?.length
-        ) {
+          Boolean(candidate_products?.length);
+        if (showSuggestedCards) {
           const cmap = new Map(candidate_products.map((c) => [c.handle.toLowerCase(), c]));
           const mapped = suggested_products
             .map((s: { handle?: string; rationale?: string }) => {
@@ -5233,11 +5299,19 @@ const handleSubmit = async (
               if (!c) {
                 return null;
               }
+              const price_label = formatCatalogPrice(
+                c.price_amount,
+                c.currency_code,
+                langForDisplay
+              );
               return {
                 handle: c.handle,
                 title: c.title,
                 image_url: c.image_url,
                 rationale: String(s?.rationale || '').trim() || undefined,
+                price_amount: c.price_amount,
+                currency_code: c.currency_code,
+                ...(price_label ? { price_label } : {}),
               };
             })
             .filter(Boolean) as NonNullable<ChatMessage['suggestedProducts']>;
@@ -5268,10 +5342,10 @@ const handleSubmit = async (
             role: 'assistant',
             content: explicacao,
             timestamp: Date.now(),
-            ...(stylistEnabled && allowOpeningExtras && suggestedProductsBlock?.length
+            ...(stylistEnabled && suggestedProductsBlock?.length
               ? { suggestedProducts: suggestedProductsBlock }
               : {}),
-            ...(stylistEnabled && allowOpeningExtras && stylistImpressionId && anchorForStylistMsg
+            ...(stylistEnabled && suggestedProductsBlock?.length && stylistImpressionId && anchorForStylistMsg
               ? { stylistImpressionId, stylistAnchorHandle: anchorForStylistMsg }
               : {}),
           },
@@ -5279,7 +5353,7 @@ const handleSubmit = async (
 
         stylistOpeningExtrasConsumedRef.current = true;
 
-        if (stylistEnabled && allowOpeningExtras && suggestedProductsBlock?.length) {
+        if (stylistEnabled && suggestedProductsBlock?.length) {
           lastStylistSuggestionsRef.current = suggestedProductsBlock;
           if (stylistImpressionId && anchorForStylistMsg) {
             lastStylistImpressionMetaRef.current = {
@@ -5946,6 +6020,9 @@ const handleSubmit = async (
                           </div>
                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
                             <p className="text-sm font-semibold text-gray-900 line-clamp-2">{sp.title}</p>
+                            {sp.price_label ? (
+                              <p className="text-xs font-semibold text-gray-800">{sp.price_label}</p>
+                            ) : null}
                             {sp.rationale ? (
                               <p className="text-xs text-gray-600 line-clamp-2">{sp.rationale}</p>
                             ) : null}
@@ -6107,6 +6184,81 @@ const handleSubmit = async (
               <p className="text-sm text-gray-600 text-center mb-3">
                 {t('chatStylingHint')}
               </p>
+
+              <div className="mb-3 flex flex-wrap justify-center gap-2">
+                {(() => {
+                  const brief = buildStylistBrief({
+                    shopDomain: effectiveShopDomain,
+                    shopperGender: sizeData?.gender || 'unisex',
+                    chartGenderScope,
+                    storeProfile:
+                      stylistStoreProfileRef.current ?? fallbackStoreProfile(chartGenderScope),
+                  });
+                  const occ = brief.active_occasions[0];
+                  const chips =
+                    currentLanguage === 'es'
+                      ? [
+                          { label: 'Más barato', message: 'Quiero opciones más baratas' },
+                          {
+                            label: 'Otra opción',
+                            message:
+                              'No me gustaron las sugerencias, quiero otra opción diferente',
+                          },
+                          {
+                            label: occ ? `Look ${occ.label}` : 'Look de temporada',
+                            message: occ
+                              ? `Sugiere un look para ${occ.label}`
+                              : 'Sugiere un look para la ocasión o temporada actual',
+                          },
+                        ]
+                      : currentLanguage === 'en'
+                        ? [
+                            { label: 'Cheaper', message: 'I want more affordable options' },
+                            {
+                              label: 'Something else',
+                              message:
+                                "I didn't like those suggestions, show me something else",
+                            },
+                            {
+                              label: occ ? `${occ.label} look` : 'Seasonal look',
+                              message: occ
+                                ? `Suggest a look for ${occ.label}`
+                                : 'Suggest a look for the current season or occasion',
+                            },
+                          ]
+                        : [
+                            { label: 'Mais barato', message: 'Quero opções mais baratas' },
+                            {
+                              label: 'Outra opção',
+                              message:
+                                'Não gostei das sugestões, quero outra opção diferente',
+                            },
+                            {
+                              label: occ ? `Look ${occ.label}` : 'Look de festa',
+                              message: occ
+                                ? `Sugira um look para ${occ.label}`
+                                : 'Sugira um look para a ocasião ou estação atual',
+                            },
+                          ];
+                  return chips;
+                })().map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    disabled={gptLoading || interactionCount >= GPT_INTERACTION_LIMIT}
+                    onClick={() => {
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: 'user', content: chip.message, timestamp: Date.now() },
+                      ]);
+                      void callGPTAssistant('custom', undefined, chip.message);
+                    }}
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
 
               <input
                 ref={chatPhotoInputRef}
