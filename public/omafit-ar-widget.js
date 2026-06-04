@@ -3,6 +3,7 @@ import {
   computeGlassesCanonicalOffsetQuat,
   omafitApplyGlassesTripoOffsetContainer,
   omafitGlassesGlbIsWidgetCanonicalFrame,
+  omafitEnsureGlassesBridgePointsUp,
   omafitRemapRodinGlbToWidgetFrame,
 } from "./omafit-glasses-orient.js";
 import {
@@ -63,6 +64,7 @@ import {
   omafitResolveGlassesRenderFlags,
   omafitGlassesAllowsPhysicalLenses,
   omafitIsGlassesLensMaterial,
+  omafitResolveOcclusionFlags,
 } from "./omafit-ar-manifest.js";
 import {
   omafitApplyMetaRendererPixelRatio,
@@ -598,7 +600,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-03-ar-glasses-lens-mesh-v180";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-03-ar-glasses-orient-lens-v183";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2618,10 +2620,90 @@ function omafitApplyGlassesLensAppearance(THREE, root, opts = {}) {
   return { lensMeshes };
 }
 
+/**
+ * GLB com contrato ingest (`omafit_lens` / `lens_glass`) — sem heurísticas no runtime.
+ * @param {import("three").Object3D} root
+ * @returns {boolean}
+ */
+function omafitHasGlassesLensContract(root) {
+  if (!root?.traverse) return false;
+  let found = false;
+  root.traverse((obj) => {
+    if (!obj.isMesh || found) return;
+    const mat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+    if (omafitIsGlassesLensMaterial(String(obj.name || ""), String(mat?.name || ""))) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * Re-aplica material lite só em meshes de lente (p.ex. após PMREM clonar armação).
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {{ lensType?: string, stripTransmission?: boolean }} opts
+ * @returns {{ lensMeshes: number }}
+ */
+function omafitEnsureGlassesLensMaterials(THREE, root, opts = {}) {
+  return omafitApplyGlassesLensAppearance(THREE, root, opts);
+}
+
+/**
+ * Load óculos — passo 1: lentes antes do traverse (translúcido imediato, sem strip PBR).
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {{ lensType?: string, physicalLenses?: boolean, stripTransmission?: boolean }} opts
+ * @returns {{ lensMeshes: number, hasContract: boolean, lensType: string }}
+ */
+function omafitApplyGlassesLensOnLoadEarly(THREE, root, opts = {}) {
+  const lensType = String(opts.lensType || "clear_fake").trim().toLowerCase() || "clear_fake";
+  const stripTransmission = opts.stripTransmission !== false;
+  const hasContract = omafitHasGlassesLensContract(root);
+
+  const lensAppear = omafitApplyGlassesLensAppearanceWithFallback(THREE, root, {
+    lensType,
+    physicalLenses: Boolean(opts.physicalLenses),
+    stripTransmission,
+    contractOnly: hasContract,
+  });
+
+  return {
+    lensMeshes: lensAppear.lensMeshes,
+    hasContract,
+    lensType,
+  };
+}
+
+/**
+ * Load óculos — passo 2: PBR da armação (após traverse; lentes já marcadas).
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {{ cavityAoIntensity?: number }} [opts]
+ */
+function omafitPrepareGlassesFrameOnLoadLate(THREE, root, opts = {}) {
+  const cavityAoIntensity = Number(opts.cavityAoIntensity) || 0;
+  omafitPrepareGlassesFrameMaterialsForAr(THREE, root);
+  omafitEnhanceFaceGlbPbrResponse(THREE, root);
+  if (cavityAoIntensity > 0) {
+    omafitPatchGlassesMaterialsLocalCavityAo(THREE, root, cavityAoIntensity);
+  }
+}
+
+/**
+ * @deprecated Preferir `omafitApplyGlassesLensOnLoadEarly` + `omafitPrepareGlassesFrameOnLoadLate`.
+ */
+function omafitPrepareGlassesMaterialsOnGltfLoad(THREE, root, opts = {}) {
+  const early = omafitApplyGlassesLensOnLoadEarly(THREE, root, opts);
+  omafitPrepareGlassesFrameOnLoadLate(THREE, root, opts);
+  return early;
+}
+
 /** @param {typeof import("three")} THREE @param {import("three").Object3D} root @param {object} opts @returns {{ lensMeshes: number }} */
 function omafitApplyGlassesLensAppearanceWithFallback(THREE, root, opts = {}) {
   const primary = omafitApplyGlassesLensAppearance(THREE, root, opts);
   if (primary.lensMeshes > 0) return primary;
+  if (opts.contractOnly) return primary;
   const fb = omafitApplyGlassesLensAppearanceFallback(THREE, root, opts);
   if (fb > 0) {
     console.warn("[omafit-ar] glasses lens fallback heurístico", {
@@ -9881,6 +9963,8 @@ async function runArSession({
     let accessoryTypeSource;
     let arManifestV1 = null;
     let glassesRenderFlags = { pmremOn: false, stripTransmission: true, lensType: null, renderMode: "lite" };
+    /** Estado de lentes após load — re-aplicação mínima pós-PMREM. */
+    let glassesLensLoadState = null;
     if (clientHasStrongSignal && clientDetected !== liquidAccessoryType) {
       accessoryType = clientDetected;
       accessoryTypeSource = `client-override (liquid=${liquidAccessoryType || "∅"} ≠ client=${clientDetected})`;
@@ -11024,6 +11108,54 @@ async function runArSession({
       );
     }
     glasses.frustumCulled = false;
+    if (accessoryType === "glasses") {
+      const resolvedLensTypePre =
+        String(
+          glassesRenderFlags.lensType ||
+            cfgAttr("arGlassesLensType", "clear_fake") ||
+            "clear_fake",
+        ).trim() || "clear_fake";
+      try {
+        glassesLensLoadState = omafitApplyGlassesLensOnLoadEarly(THREE, glasses, {
+          lensType: resolvedLensTypePre,
+          physicalLenses: glassesPhysicalLenses,
+          stripTransmission: glassesRenderFlags.stripTransmission !== false,
+        });
+        if (glassesLensLoadState.lensMeshes > 0) {
+          console.log("[omafit-ar] glasses lens appearance (load-once)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            lensType: resolvedLensTypePre,
+            lensMeshes: glassesLensLoadState.lensMeshes,
+            hasContract: glassesLensLoadState.hasContract,
+            physicalLenses: glassesPhysicalLenses,
+            stripTransmission: glassesRenderFlags.stripTransmission !== false,
+          });
+        } else if (
+          resolvedLensTypePre !== "opaque" &&
+          resolvedLensTypePre !== "none" &&
+          resolvedLensTypePre !== "off"
+        ) {
+          omafitWarnMonolithicGlassesLensRegen(
+            faceArEnhancementState,
+            glasses,
+            resolvedLensTypePre,
+          );
+          console.warn(
+            "[omafit-ar] glasses: nenhuma mesh lens_glass no GLB — Reenfileirar no admin AR (worker split omafit_lens)",
+            {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              lensType: resolvedLensTypePre,
+              hasContract: glassesLensLoadState.hasContract,
+            },
+          );
+        }
+      } catch (lensErr) {
+        console.warn(
+          "[omafit-ar] glasses lens appearance (load-once):",
+          lensErr?.message || lensErr,
+        );
+      }
+    }
     glasses.traverse((child) => {
       if (!child.isMesh) return;
       child.frustumCulled = false;
@@ -11037,6 +11169,15 @@ async function runArSession({
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       for (const mat of mats) {
         if (!mat) continue;
+        if (accessoryType === "glasses" && mat.userData?.omafitArLensMaterial) {
+          if ("polygonOffset" in mat) {
+            mat.polygonOffset = true;
+            mat.polygonOffsetFactor = -2;
+            mat.polygonOffsetUnits = -2;
+          }
+          mat.needsUpdate = true;
+          continue;
+        }
         if (mat.map) {
           if (THREE.SRGBColorSpace !== undefined && "colorSpace" in mat.map) {
             mat.map.colorSpace = THREE.SRGBColorSpace;
@@ -11094,56 +11235,17 @@ async function runArSession({
       }
     });
     if (accessoryType === "glasses") {
-      const resolvedLensType =
-        String(
-          glassesRenderFlags.lensType ||
-            cfgAttr("arGlassesLensType", "clear_fake") ||
-            "clear_fake",
-        ).trim() || "clear_fake";
       try {
-        const lensAppear = omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
-          lensType: resolvedLensType,
-          physicalLenses: glassesPhysicalLenses,
-          stripTransmission: glassesRenderFlags.stripTransmission !== false,
+        omafitPrepareGlassesFrameOnLoadLate(THREE, glasses, {
+          cavityAoIntensity: glassesCavityAoIntensity,
         });
-        if (lensAppear.lensMeshes > 0) {
-          console.log("[omafit-ar] glasses lens appearance", {
-            build: OMAFIT_AR_WIDGET_BUILD,
-            lensType: resolvedLensType,
-            lensMeshes: lensAppear.lensMeshes,
-            physicalLenses: glassesPhysicalLenses,
-            stripTransmission: glassesRenderFlags.stripTransmission !== false,
-          });
-        } else if (
-          resolvedLensType !== "opaque" &&
-          resolvedLensType !== "none" &&
-          resolvedLensType !== "off"
-        ) {
-          omafitWarnMonolithicGlassesLensRegen(
-            faceArEnhancementState,
-            glasses,
-            resolvedLensType,
-          );
-          console.warn(
-            "[omafit-ar] glasses: nenhuma mesh lens_glass no GLB — Reenfileirar no admin AR (worker split omafit_lens)",
-            { build: OMAFIT_AR_WIDGET_BUILD, lensType: resolvedLensType },
-          );
-        }
-      } catch (lensErr) {
-        console.warn(
-          "[omafit-ar] glasses lens appearance:",
-          lensErr?.message || lensErr,
-        );
-      }
-      try {
-        omafitPrepareGlassesFrameMaterialsForAr(THREE, glasses);
-        omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
-        console.log("[omafit-ar] glasses frame PBR (paridade preview admin)", {
+        console.log("[omafit-ar] glasses frame PBR (load-once)", {
           build: OMAFIT_AR_WIDGET_BUILD,
+          lensMeshes: glassesLensLoadState?.lensMeshes ?? 0,
         });
       } catch (framePbrErr) {
         console.warn(
-          "[omafit-ar] glasses frame PBR prep:",
+          "[omafit-ar] glasses frame PBR (load-once):",
           framePbrErr?.message || framePbrErr,
         );
       }
@@ -11169,50 +11271,11 @@ async function runArSession({
         console.warn("[omafit-ar] mesh depth priorities:", e?.message || e);
       }
     }
-    if (accessoryType === "glasses" && glassesCavityAoIntensity > 0) {
-      try {
-        omafitPatchGlassesMaterialsLocalCavityAo(THREE, glasses, glassesCavityAoIntensity);
-      } catch (e) {
-        console.warn("[omafit-ar] cavity AO patch:", e?.message || e);
-      }
-      try {
-        const resolvedLensType =
-          String(
-            glassesRenderFlags.lensType ||
-              cfgAttr("arGlassesLensType", "clear_fake") ||
-              "clear_fake",
-          ).trim() || "clear_fake";
-        omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
-          lensType: resolvedLensType,
-          physicalLenses: glassesPhysicalLenses,
-          stripTransmission: glassesRenderFlags.stripTransmission !== false,
-        });
-      } catch {
-        /* ignore */
-      }
-    }
-    if (accessoryType === "glasses" || accessoryType === "necklace") {
+    if (accessoryType === "necklace") {
       try {
         omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
       } catch (e) {
         console.warn("[omafit-ar] PBR response tune:", e?.message || e);
-      }
-    }
-    if (accessoryType === "glasses") {
-      try {
-        const resolvedLensType =
-          String(
-            glassesRenderFlags.lensType ||
-              cfgAttr("arGlassesLensType", "clear_fake") ||
-              "clear_fake",
-          ).trim() || "clear_fake";
-        omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
-          lensType: resolvedLensType,
-          physicalLenses: glassesPhysicalLenses,
-          stripTransmission: glassesRenderFlags.stripTransmission !== false,
-        });
-      } catch {
-        /* ignore */
       }
     }
 
@@ -11335,7 +11398,7 @@ async function runArSession({
       !glassesManualMindarRig
     ) {
       try {
-        if (hasOmafitCanonicalNode || omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses)) {
+        if (omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses)) {
           glassesWorkerFrameRemapped = true;
           console.log(
             "[omafit-ar] glasses GLB já em frame widget (+Y topo, −Z frente)",
@@ -11347,6 +11410,17 @@ async function runArSession({
             "[omafit-ar] glasses worker/Rodin frame remap Rx(-90°) → +Y topo, −Z frente",
             { build: OMAFIT_AR_WIDGET_BUILD },
           );
+        }
+        if (
+          glassesWorkerFrameRemapped ||
+          hasOmafitCanonicalNode ||
+          omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses)
+        ) {
+          if (omafitEnsureGlassesBridgePointsUp(THREE, glasses)) {
+            console.log("[omafit-ar] glasses bridge-up fix Rx(180°) aplicado", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+            });
+          }
         }
       } catch (remapErr) {
         console.warn(
@@ -12865,6 +12939,7 @@ async function runArSession({
       positionLogged: false,
       glassesCalibRuntimeLogged: false,
       monolithicLensRegenWarned: false,
+      glassesLensLoadState,
       glassesNdcScreenLock,
       glassesNdcBlendFromMp,
       glassesLensDistortK,
@@ -14595,35 +14670,28 @@ async function runArSession({
             physicalLenses: glassesPhysicalLenses,
           });
           try {
-            omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
-              lensType:
-                glassesRenderFlags.lensType ||
-                cfgAttr("arGlassesLensType", "clear_fake"),
-              physicalLenses: glassesPhysicalLenses,
-              stripTransmission: glassesRenderFlags.stripTransmission !== false,
-              envTexture: pmremRT.texture,
-              camera: mindarThree.camera,
-              monolithicLensOverlayState: faceArEnhancementState,
-            });
+            const lensSt = faceArEnhancementState?.glassesLensLoadState;
+            const lensTypePmrem =
+              lensSt?.lensType ||
+              glassesRenderFlags.lensType ||
+              cfgAttr("arGlassesLensType", "clear_fake");
+            if (lensSt?.lensMeshes > 0) {
+              omafitEnsureGlassesLensMaterials(THREE, glasses, {
+                lensType: lensTypePmrem,
+                stripTransmission: glassesRenderFlags.stripTransmission !== false,
+              });
+            } else if (!lensSt?.hasContract) {
+              omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
+                lensType: lensTypePmrem,
+                physicalLenses: glassesPhysicalLenses,
+                stripTransmission: glassesRenderFlags.stripTransmission !== false,
+              });
+            }
           } catch {
             /* ignore */
           }
           try {
             omafitEnhanceFaceGlbPbrResponse(THREE, glasses);
-          } catch {
-            /* ignore */
-          }
-          try {
-            omafitApplyGlassesLensAppearanceWithFallback(THREE, glasses, {
-              lensType:
-                glassesRenderFlags.lensType ||
-                cfgAttr("arGlassesLensType", "clear_fake"),
-              physicalLenses: glassesPhysicalLenses,
-              stripTransmission: glassesRenderFlags.stripTransmission !== false,
-              envTexture: pmremRT.texture,
-              camera: mindarThree.camera,
-              monolithicLensOverlayState: faceArEnhancementState,
-            });
           } catch {
             /* ignore */
           }
