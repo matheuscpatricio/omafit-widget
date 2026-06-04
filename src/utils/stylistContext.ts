@@ -36,6 +36,23 @@ export type StylistBrief = {
   sort_price_asc: boolean;
 };
 
+const STYLE_SEARCH_BOOST: Record<string, string[]> = {
+  formal: ['formal', 'alfaiataria', 'blazer', 'social', 'camisa social', 'terno'],
+  casual: ['casual', 'jeans', 'moletom', 'dia a dia', 'basico'],
+};
+
+function expandStyleKeywordsForSearch(styleKeywords: string[]): string[] {
+  const out: string[] = [];
+  for (const kw of styleKeywords) {
+    const key = String(kw || '').trim().toLowerCase();
+    if (!key) continue;
+    const mapped = STYLE_SEARCH_BOOST[key];
+    if (mapped?.length) out.push(...mapped);
+    else out.push(key);
+  }
+  return out;
+}
+
 export function buildStylistBrief(options: {
   shopDomain?: string;
   countryCode?: string;
@@ -64,6 +81,7 @@ export function buildStylistBrief(options: {
     occasions
   );
   const feedback = parseStylistFeedback(options.userMessage || '');
+  const styleSearchBoost = expandStyleKeywordsForSearch(feedback.styleKeywords);
   const constraints: GarmentConstraints = buildGarmentConstraints({
     storeAudience,
     shopperGender: options.shopperGender,
@@ -95,7 +113,7 @@ export function buildStylistBrief(options: {
     effective_search_gender: constraints.effectiveSearchGender,
     feedback,
     garment_constraints_tags: constraints.rationaleTags,
-    search_terms_boost: constraints.searchTermsBoost,
+    search_terms_boost: [...new Set([...constraints.searchTermsBoost, ...styleSearchBoost])],
     exclude_handles,
     sort_price_asc: feedback.sortPriceAsc,
   };
