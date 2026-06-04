@@ -52,6 +52,7 @@ import {
 } from '../utils/storeProfile';
 import {
   inferProductHandleFromReferrer,
+  galleryUrlsEqual,
   mergeProductImageGallery,
   parseProductImagesMessage,
   safeDecodeGarmentImage,
@@ -2396,8 +2397,7 @@ export function TryOnWidget({
 
     setAvailableImages(gallery);
     setSelectedProductImage((prev) => {
-      const prevKey = prev.trim();
-      const keepIndex = gallery.findIndex((url) => url === prevKey || decodeURIComponent(url) === prevKey);
+      const keepIndex = gallery.findIndex((url) => galleryUrlsEqual(url, prev));
       return keepIndex >= 0 ? gallery[keepIndex] : gallery[0];
     });
     setCurrentImageIndex((prev) => {
@@ -4614,7 +4614,10 @@ const handleSubmit = async (
       });
       setLocalCollectionType(inferredCollectionType);
 
-      const imgs = product.images?.length ? product.images : [product.image_url].filter(Boolean);
+      const imgs = mergeProductImageGallery(
+        String(product.image_url || '').trim(),
+        product.images?.length ? product.images : []
+      );
       const mainImg = imgs[0] || product.image_url || '';
       setAvailableImages(imgs);
       setCurrentImageIndex(0);
@@ -6232,62 +6235,55 @@ const handleSubmit = async (
               </p>
 
               <div className="mb-3 flex flex-wrap justify-center gap-2">
-                {(() => {
-                  const brief = buildStylistBrief({
-                    shopDomain: effectiveShopDomain,
-                    shopperGender: sizeData?.gender || 'unisex',
-                    chartGenderScope,
-                    storeProfile:
-                      stylistStoreProfileRef.current ?? fallbackStoreProfile(chartGenderScope),
-                  });
-                  const occ = brief.active_occasions[0];
-                  const chips =
-                    currentLanguage === 'es'
+                {(
+                  currentLanguage === 'es'
+                    ? [
+                        {
+                          label: 'Más formal',
+                          message: 'Busco un look más formal para ocasión especial',
+                        },
+                        {
+                          label: 'Otra opción',
+                          message:
+                            'No me gustaron las sugerencias, quiero otra opción diferente',
+                        },
+                        {
+                          label: 'Más casual',
+                          message: 'Quiero algo casual para el día a día',
+                        },
+                      ]
+                    : currentLanguage === 'en'
                       ? [
-                          { label: 'Más barato', message: 'Quiero opciones más baratas' },
                           {
-                            label: 'Otra opción',
-                            message:
-                              'No me gustaron las sugerencias, quiero otra opción diferente',
+                            label: 'More formal',
+                            message: 'I want a more formal look for a special occasion',
                           },
                           {
-                            label: occ ? `Look ${occ.label}` : 'Look de temporada',
-                            message: occ
-                              ? `Sugiere un look para ${occ.label}`
-                              : 'Sugiere un look para la ocasión o temporada actual',
+                            label: 'Something else',
+                            message:
+                              "I didn't like those suggestions, show me something else",
+                          },
+                          {
+                            label: 'More casual',
+                            message: 'Something casual for everyday wear',
                           },
                         ]
-                      : currentLanguage === 'en'
-                        ? [
-                            { label: 'Cheaper', message: 'I want more affordable options' },
-                            {
-                              label: 'Something else',
-                              message:
-                                "I didn't like those suggestions, show me something else",
-                            },
-                            {
-                              label: occ ? `${occ.label} look` : 'Seasonal look',
-                              message: occ
-                                ? `Suggest a look for ${occ.label}`
-                                : 'Suggest a look for the current season or occasion',
-                            },
-                          ]
-                        : [
-                            { label: 'Mais barato', message: 'Quero opções mais baratas' },
-                            {
-                              label: 'Outra opção',
-                              message:
-                                'Não gostei das sugestões, quero outra opção diferente',
-                            },
-                            {
-                              label: occ ? `Look ${occ.label}` : 'Look de festa',
-                              message: occ
-                                ? `Sugira um look para ${occ.label}`
-                                : 'Sugira um look para a ocasião ou estação atual',
-                            },
-                          ];
-                  return chips;
-                })().map((chip) => (
+                      : [
+                          {
+                            label: 'Mais formal',
+                            message: 'Quero um look mais formal para ocasião especial',
+                          },
+                          {
+                            label: 'Outra opção',
+                            message:
+                              'Não gostei das sugestões, quero outra opção diferente',
+                          },
+                          {
+                            label: 'Mais casual',
+                            message: 'Quero algo casual para o dia a dia',
+                          },
+                        ]
+                ).map((chip) => (
                   <button
                     key={chip.label}
                     type="button"
