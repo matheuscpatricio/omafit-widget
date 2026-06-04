@@ -389,6 +389,23 @@ export function omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses) {
 }
 
 /**
+ * GLB com tag de ingest (`extras.omafit_widget_frame` no nó canónico).
+ * @param {any} root
+ * @returns {boolean}
+ */
+export function omafitGlassesGlbHasIngestWidgetFrameTag(root) {
+  if (!root?.traverse) return false;
+  let tagged = false;
+  root.traverse((obj) => {
+    if (tagged || String(obj?.name || "") !== "omafit_ar_canonical") return;
+    const ud = obj.userData || {};
+    const ex = ud.omafit_widget_frame ?? ud.extras?.omafit_widget_frame;
+    if (ex === 1 || ex === true) tagged = true;
+  });
+  return tagged;
+}
+
+/**
  * Correcção determinística pós-worker: ponte estreita em +Y.
  * Se o topo for mais largo que a base → Rx(180°).
  *
