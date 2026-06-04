@@ -9,26 +9,68 @@ function normalizeShopifyImagePath(pathname: string): string {
     );
 }
 
-function galleryDedupeKey(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = new URL(trimmed, 'https://placeholder.local');
-    const path = normalizeShopifyImagePath(parsed.pathname);
-    return `${parsed.hostname}${path}`;
-  } catch {
-    return normalizeShopifyImagePath(trimmed);
-  }
+function shopifyFileStemFromPath(pathname: string): string {
+  const file = pathname.split('/').filter(Boolean).pop() || '';
+  if (!file || !/\.(jpe?g|png|webp|gif|avif|heic)$/i.test(file)) return '';
+  return normalizeShopifyImagePath(`/${file}`).replace(/^\//, '').replace(/\.[a-z0-9]+$/i, '');
+}
+
+function isShopifyCdnHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return /\.shopify\.com$/i.test(h) || h.includes('shopifycdn');
 }
 
 function decodeImageUrl(url: string): string {
-  const trimmed = url.trim();
+  const trimmed = String(url || '').trim();
   if (!trimmed) return '';
   try {
     return decodeURIComponent(trimmed);
   } catch {
     return trimmed;
   }
+}
+
+/** Normaliza protocolo/codificação antes de comparar ou exibir. */
+export function normalizeGalleryUrl(raw: string): string {
+  let decoded = decodeImageUrl(raw);
+  if (!decoded) return '';
+  if (decoded.startsWith('//')) decoded = `https:${decoded}`;
+  try {
+    if (/^http:\/\/cdn\.shopify\.com\//i.test(decoded)) {
+      decoded = `https://${decoded.slice('http://'.length)}`;
+    }
+    const parsed = new URL(decoded);
+    if (parsed.protocol === 'http:' && isShopifyCdnHost(parsed.hostname)) {
+      parsed.protocol = 'https:';
+      decoded = parsed.toString();
+    }
+  } catch {
+    /* keep decoded */
+  }
+  return decoded;
+}
+
+export function galleryDedupeKey(url: string): string {
+  const normalized = normalizeGalleryUrl(url);
+  if (!normalized) return '';
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+    const path = normalizeShopifyImagePath(parsed.pathname);
+    if (isShopifyCdnHost(host)) {
+      const stem = shopifyFileStemFromPath(parsed.pathname);
+      if (stem) return `${host}::file::${stem}`;
+    }
+    return `${host}${path}`;
+  } catch {
+    return normalizeShopifyImagePath(normalized);
+  }
+}
+
+export function galleryUrlsEqual(a: string, b: string): boolean {
+  const ka = galleryDedupeKey(a);
+  const kb = galleryDedupeKey(b);
+  return Boolean(ka && kb && ka === kb);
 }
 
 /** Une garment + listas do parent/postMessage, sem duplicar a mesma foto do CDN. */
@@ -40,12 +82,12 @@ export function mergeProductImageGallery(
   const result: string[] = [];
 
   const add = (raw: string) => {
-    const decoded = decodeImageUrl(raw);
-    if (!decoded) return;
-    const key = galleryDedupeKey(decoded);
+    const normalized = normalizeGalleryUrl(raw);
+    if (!normalized) return;
+    const key = galleryDedupeKey(normalized);
     if (!key || seen.has(key)) return;
     seen.add(key);
-    result.push(decoded);
+    result.push(normalized);
   };
 
   add(primaryImage);
@@ -61,9 +103,10 @@ export function mergeProductImageGallery(
 
 export function parseProductImagesMessage(payload: unknown): string[] {
   if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item) => (typeof item === 'string' ? decodeImageUrl(item) : ''))
+  const raw = payload
+    .map((item) => (typeof item === 'string' ? item : ''))
     .filter(Boolean);
+  return mergeProductImageGallery('', raw);
 }
 
 /** Handle Shopify a partir do referrer (página do produto que embute o iframe). */
@@ -80,11 +123,5 @@ export function inferProductHandleFromReferrer(): string {
 }
 
 export function safeDecodeGarmentImage(url: string): string {
-  const trimmed = String(url || '').trim();
-  if (!trimmed) return '';
-  try {
-    return decodeURIComponent(trimmed);
-  } catch {
-    return trimmed;
-  }
+  return normalizeGalleryUrl(url);
 }
