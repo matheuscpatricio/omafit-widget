@@ -5,8 +5,8 @@ import { cn } from '../../lib/utils';
 const VIDEO_URL =
   'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/VideoOmafit.mp4';
 
-/** Frame de pré-visualização antes do play; a reprodução começa sempre em 0s. */
-const POSTER_TIME_SEC = 2;
+/** Frame de pré-visualização antes do play (~1,76s); a reprodução começa em 0s só no primeiro play. */
+const POSTER_TIME_SEC = 1.76;
 
 function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
   return new Promise((resolve) => {
@@ -31,6 +31,8 @@ function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
 export function PainSolutionVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const posterReadyRef = useRef(false);
+  /** true após o primeiro play — só aí saltamos do poster (~1,76s) para 0s. */
+  const hasStartedPlaybackRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
@@ -93,7 +95,10 @@ export function PainSolutionVideo() {
 
     try {
       if (video.paused) {
-        await seekVideo(video, 0);
+        if (!hasStartedPlaybackRef.current) {
+          await seekVideo(video, 0);
+          hasStartedPlaybackRef.current = true;
+        }
         await video.play();
       } else {
         video.pause();
