@@ -5,31 +5,95 @@ import { cn } from '../../lib/utils';
 const VIDEO_URL =
   'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/VideoOmafit.mp4';
 
+/** Frame de pré-visualização antes do play; a reprodução começa sempre em 0s. */
+const POSTER_TIME_SEC = 2;
+
+function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (Math.abs(video.currentTime - timeSec) < 0.05) {
+      resolve();
+      return;
+    }
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    };
+    video.addEventListener('seeked', onSeeked);
+    try {
+      video.currentTime = timeSec;
+    } catch {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    }
+  });
+}
+
 export function PainSolutionVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const posterReadyRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
-  const [canPlay, setCanPlay] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
 
-  /** Garante que o pedido de rede começa logo após montar (MP4 pesado). */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    let cancelled = false;
+
+    const preparePosterFrame = async () => {
+      if (posterReadyRef.current || cancelled) return;
+
+      const duration = video.duration;
+      const posterTime =
+        Number.isFinite(duration) && duration > 0
+          ? Math.min(POSTER_TIME_SEC, Math.max(0, duration - 0.05))
+          : POSTER_TIME_SEC;
+
+      try {
+        await seekVideo(video, posterTime);
+        if (cancelled) return;
+        video.pause();
+        posterReadyRef.current = true;
+        setHasFrame(true);
+        setReady(true);
+      } catch {
+        if (cancelled) return;
+        posterReadyRef.current = true;
+        setHasFrame(true);
+        setReady(true);
+      }
+    };
+
+    const onLoadedMetadata = () => {
+      void preparePosterFrame();
+    };
+
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
     try {
       video.load();
     } catch {
       /* noop */
     }
+    if (video.readyState >= 1) {
+      void preparePosterFrame();
+    }
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
+    };
   }, []);
 
   const togglePlay = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || !canPlay || error) return;
+    if (!video || !ready || error) return;
 
     try {
       if (video.paused) {
+        await seekVideo(video, 0);
         await video.play();
       } else {
         video.pause();
@@ -37,9 +101,9 @@ export function PainSolutionVideo() {
     } catch {
       setError(true);
     }
-  }, [canPlay, error]);
+  }, [ready, error]);
 
-  const showPreparing = !canPlay && !error;
+  const showPreparing = !ready && !error;
 
   return (
     <section
@@ -59,11 +123,6 @@ export function PainSolutionVideo() {
             playsInline
             controls={false}
             muted={false}
-            onLoadedData={() => setHasFrame(true)}
-            onCanPlay={() => {
-              setCanPlay(true);
-              setBuffering(false);
-            }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onWaiting={() => setBuffering(true)}
@@ -94,10 +153,10 @@ export function PainSolutionVideo() {
             <button
               type="button"
               onClick={togglePlay}
-              disabled={!canPlay || error}
+              disabled={!ready || error}
               className={cn(
                 'flex h-10 w-10 items-center justify-center rounded-full border border-oma-cream/20 bg-oma-elevated/85 text-oma-cream shadow-elegant backdrop-blur-sm transition hover:bg-oma-elevated hover:border-oma-accent/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oma-accent sm:h-11 sm:w-11',
-                (!canPlay || error) && 'cursor-not-allowed opacity-50',
+                (!ready || error) && 'cursor-not-allowed opacity-50',
               )}
               aria-label={playing ? 'Pausar vídeo' : 'Reproduzir vídeo'}
             >
