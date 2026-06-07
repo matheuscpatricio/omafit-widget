@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-04-ar-glasses-ingest-v198';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-04-ar-glasses-ingest-v199';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -1298,7 +1298,7 @@ export function WidgetPage() {
     if (eyewearBootstrap.arVariantsGlb) {
       arExtraAttrs['data-ar-variants-glb'] = eyewearBootstrap.arVariantsGlb;
     }
-    /** Óculos canónico ingest: export Blender / nó omafit_ar_canonical (sem Ry180 no AR). */
+    /** Óculos canónico ingest: export Blender / nó omafit_ar_canonical (Ry180 no staticBindWrap). */
     if (arAccessory === 'glasses' || arAccessory === 'eyewear') {
       arExtraAttrs['data-ar-glasses-canonical-blender-export'] = '1';
     }
