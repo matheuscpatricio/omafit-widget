@@ -286,11 +286,13 @@ export const OMAFIT_GLASSES_SIMPLE_FACE_IPD_MUL = 1.5;
 
 /**
  * Escala uniforme do mesh no modo simples: IPD em `metricLandmarks` / faceScale.
- * Preview admin usa metros estáticos; MindAR exige esta fórmula (não bbox×merchant só).
+ * O denominador é a **largura bbox bruta** do GLB (m), não fitW — o mesh ainda
+ * está em escala local raw; fitW só normaliza via auto-fit em fallback.
  *
  * @param {{
  *   ipdLandmark: number,
  *   faceScale: number,
+ *   frameWidthRawLocal?: number,
  *   frameWidthLocal?: number,
  *   ipdMul?: number,
  *   merchantScaleMul?: number,
@@ -301,14 +303,16 @@ export function computeGlassesSimpleFaceIpdMeshScale(p) {
   const ipdL = Math.max(Number(p.ipdLandmark) || 0, 1e-6);
   const faceS = Math.max(Number(p.faceScale) || 1, 1e-6);
   const ipdMetric = ipdL / faceS;
-  const frameW = Math.max(
-    Number(p.frameWidthLocal) || OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M,
+  const rawW = Math.max(
+    Number(p.frameWidthRawLocal) ||
+      Number(p.frameWidthLocal) ||
+      OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M,
     1e-4,
   );
   const ipdMul =
     Number(p.ipdMul) > 0 ? Number(p.ipdMul) : OMAFIT_GLASSES_SIMPLE_FACE_IPD_MUL;
   const merchant = Number(p.merchantScaleMul) > 0 ? Number(p.merchantScaleMul) : 1;
-  return (ipdMetric * ipdMul / frameW) * merchant;
+  return (ipdMetric * ipdMul / rawW) * merchant;
 }
 
 /**
