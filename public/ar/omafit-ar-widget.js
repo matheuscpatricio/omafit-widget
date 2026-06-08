@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v212";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v213";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5199,6 +5199,10 @@ function omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnitScale
   const cheekMul = omafitMindarMetricToMetersScale(lm);
   const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
   if (!Number.isFinite(rawDist) || rawDist < 1e-6) return 1;
+  /** MindAR entrega tradução em cm (~||rawP||≈63–360): calibrar sempre para ~0,62 m. */
+  if (rawDist > 1.5) {
+    return OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M / rawDist;
+  }
   if (stripUnitScale) {
     const afterCheek = rawDist * (cheekMul < 1 ? cheekMul : 1);
     if (afterCheek > 1.2) {
@@ -5215,26 +5219,27 @@ function omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnitScale
  * 2) Opcional `stripUnitScale`: escala=1 **sem** `p÷u`.
  */
 function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts) {
-  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return null;
-  matrix.decompose(dec.p, dec.q, dec.s);
+  if (!matrix?.elements || !matrix?.decompose || !dec?.p || !dec?.q || !dec?.s) return null;
+  const e = matrix.elements;
   const cheekMul = omafitMindarMetricToMetersScale(lm);
-  const rawP = { x: dec.p.x, y: dec.p.y, z: dec.p.z };
+  const rawP = { x: e[12], y: e[13], z: e[14] };
   const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
   const stripUnit = opts?.stripUnitScale === true;
   const transMul = omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnit);
   if (transMul !== 1) {
-    dec.p.x *= transMul;
-    dec.p.y *= transMul;
-    dec.p.z *= transMul;
+    e[12] *= transMul;
+    e[13] *= transMul;
+    e[14] *= transMul;
   }
+  matrix.decompose(dec.p, dec.q, dec.s);
   const u = Math.max(
     1e-6,
     (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
   );
   if (stripUnit) {
     dec.s.set(1, 1, 1);
+    matrix.compose(dec.p, dec.q, dec.s);
   }
-  matrix.compose(dec.p, dec.q, dec.s);
   const fixedDist = Math.hypot(dec.p.x, dec.p.y, dec.p.z);
   return {
     u,
@@ -11906,11 +11911,10 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * Paridade preview admin: cm→m na tradução + escala=1 na âncora (sem p÷u).
-     * wear/mesh em metros directos; meshScale = adminMeshScale.
+     * v213: manter escala MindAR na âncora; meshScale = adminMeshScale ÷ u.
+     * `stripUnitScale=true` deslocava o GLB ~3,5 m (off-screen) com escala correcta.
      */
-    const glassesForceAnchorUnitScale =
-      accessoryType === "glasses" && glassesSimpleFaceOnly && !glassesManualMindarRig;
+    const glassesForceAnchorUnitScale = false;
 
     const readGlassesMerchantCal = () => {
       const parsed = parseOmafitCalibrationRaw(
@@ -12483,17 +12487,10 @@ async function runArSession({
       accessoryType === "glasses" ? glasses.quaternion.clone() : null;
 
     /**
-     * Paridade exacta preview admin: MindAR anchor → wearPosition (m) → calibRot → GLB.
-     * v210: tradução cm→m aplicada **antes** do smooth (v209 corrigia depois → lerp cm↔m).
+     * v213: desactivado — hierarquia plana (wear→calibRot→GLB) posicionava fora do ecrã
+     * (~3,5 m) apesar da escala correcta. Restaurar tracking-wrap + pivot (pré-v203).
      */
-    const glassesAdminParityFlat =
-      accessoryType === "glasses" &&
-      glassesSimpleFaceOnly &&
-      !glassesManualMindarRig &&
-      !glassesGlbStandardize &&
-      (glassesCanonicalBlenderExport ||
-        glassesIngestWidgetFrameTag ||
-        glassesWorkerFrameRemapped);
+    const glassesAdminParityFlat = false;
 
     /** 4) Hierarquia (óculos):
      *   anchor.group → wearPosition → faceParent → calibRot → [tripOffsetGroup] →
@@ -14232,7 +14229,7 @@ async function runArSession({
             cameraDistanceM,
             glassesAdminParityFlat: st.glassesAdminParityFlat,
             strippedUnitScale: anchorNormInfo.strippedUnitScale,
-            note: "transMul calibra ||rawP||→~0,62 m; escala=1 sem p÷u.",
+            note: "transMul=0,62/||rawP|| quando MindAR cm; escala âncora preservada (÷u no mesh).",
           });
         }
 
