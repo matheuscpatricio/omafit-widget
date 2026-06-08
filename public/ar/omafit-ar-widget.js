@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v217";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v218";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11977,10 +11977,13 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * v213: manter escala MindAR na âncora; meshScale = adminMeshScale ÷ u.
-     * `stripUnitScale=true` deslocava o GLB ~3,5 m (off-screen) com escala correcta.
+     * v218: MindAR entrega âncora ~15 u/m + tradução ~100 u → world ~63 m se só
+     * normalizar T. `stripUnitScale` força u≈1; meshScale = admin (sem ÷u).
      */
-    const glassesForceAnchorUnitScale = false;
+    const glassesForceAnchorUnitScale =
+      accessoryType === "glasses" &&
+      glassesSimpleFaceOnly &&
+      !glassesManualMindarRig;
 
     const readGlassesMerchantCal = () => {
       const parsed = parseOmafitCalibrationRaw(
@@ -14262,7 +14265,7 @@ async function runArSession({
           }
         }
 
-        /** v217: tradução cm→m na âncora (||rawP||≈63→~0,62 m); escala MindAR preservada. */
+        /** v218: tradução cm→m + opcional stripUnitScale (u≈1) para óculos simples face-only. */
         let anchorNormInfo = null;
         const anchorRawMat =
           accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
@@ -14272,7 +14275,7 @@ async function runArSession({
                   st.anchorRawScratch,
                   st.anchorDec,
                   lm,
-                  { stripUnitScale: false },
+                  { stripUnitScale: !!st.glassesForceAnchorUnitScale },
                 );
                 return st.anchorRawScratch;
               })()
@@ -14286,7 +14289,11 @@ async function runArSession({
             rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
             fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
             anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
-            note: "só tradução; meshScale admin (sem ÷u).",
+            strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
+            glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
+            note: st.glassesForceAnchorUnitScale
+              ? "T→m + stripUnitScale; meshScale admin directo."
+              : "só tradução; meshScale admin÷u.",
           });
         }
 
@@ -14349,6 +14356,9 @@ async function runArSession({
               OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
               OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
             );
+            if (st.glassesForceAnchorUnitScale) {
+              st.anchorDec.s.set(1, 1, 1);
+            }
             st.smoothAnchorMat.compose(
               st.anchorDec.p.set(pF[0], pF[1], pF[2]),
               st.anchorEuroQuatState.qPrev,
@@ -14654,7 +14664,7 @@ async function runArSession({
                   anchor.group.updateMatrixWorld(true);
                   applyGlassesMerchantWearToAnchorPosition(
                     wearPosition.position,
-                    anchor.group.matrixWorld,
+                    st.glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
                     merchantWearCal,
                   );
                 } else if (wearPosMEffective) {
