@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v205";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v206";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2842,14 +2842,10 @@ function omafitPrepareGlassesFrameMaterialsForAr(THREE, root) {
 }
 
 /**
- * Malha 468 MindAR / oclusores só-depth bloqueiam GLB na mesma profundidade (nariz).
- * Colar já usava isto; óculos AR precisam do mesmo (paridade visibilidade).
+ * Colar no peito fica atrás da malha 468 / oclusores só-depth → invisível.
+ * Desliga depth nessas malhas; o colar desenha por cima.
  */
-function omafitSuppressMindarFaceMeshDepthOcclusion(mindarThree, exceptMeshes) {
-  return omafitNecklaceSuppressFaceDepthOcclusion(mindarThree, exceptMeshes);
-}
-
-/**
+function omafitNecklaceSuppressFaceDepthOcclusion(mindarThree, exceptMeshes) {
   const skip = exceptMeshes instanceof Set ? exceptMeshes : new Set();
   let n = 0;
   const patchMesh = (mesh) => {
@@ -2893,6 +2889,14 @@ function omafitSuppressMindarFaceMeshDepthOcclusion(mindarThree, exceptMeshes) {
   const scene = mindarThree?.scene;
   if (scene?.traverse) scene.traverse(patchMesh);
   return n;
+}
+
+/**
+ * Malha 468 MindAR / oclusores só-depth bloqueiam GLB na mesma profundidade (nariz).
+ * Colar já usava isto; óculos AR precisam do mesmo (paridade visibilidade).
+ */
+function omafitSuppressMindarFaceMeshDepthOcclusion(mindarThree, exceptMeshes) {
+  return omafitNecklaceSuppressFaceDepthOcclusion(mindarThree, exceptMeshes);
 }
 
 /** Materiais do colar: DoubleSide + desenhar à frente do depth facial (opt-out no attr). */
@@ -12550,7 +12554,11 @@ async function runArSession({
             adminMeshScale: adminMeshScaleInit,
             merchantCal: mcFlat,
             ingestSplit: glassesIngestWidgetFrameTag,
-            note: "meshScale local = adminMeshScale / u (MindAR) por frame",
+            glassesForceAnchorUnitScale,
+            bboxCentered: true,
+            note: glassesForceAnchorUnitScale
+              ? "meshScale = adminMeshScale; wear em m; âncora escala=1"
+              : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
           /* ignore */
@@ -12813,7 +12821,7 @@ async function runArSession({
     } else if (glassesAdminParityFlat) {
       applyGlassesMerchantWearToAnchorPosition(
         wearPosition.position,
-        anchor.group.matrixWorld,
+        glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
         readGlassesMerchantCal(),
       );
     } else if (wearPosMEffective) {
@@ -14216,7 +14224,7 @@ async function runArSession({
                 : { scale: 1, wearX: 0, wearY: 0, wearZ: 0 };
               applyGlassesMerchantWearToAnchorPosition(
                 wearPosition.position,
-                anchor.group.matrixWorld,
+                st.glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
                 merchantCal,
               );
               applyGlassesMerchantCalibRotation(THREE, calibRot, merchantCal);
@@ -14236,17 +14244,21 @@ async function runArSession({
                 autoFitBase,
               );
               const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
-              const displayScale = clampGlassesDisplayMeshScale(
-                resolveGlassesMindarLocalMeshScale(
-                  adminMeshScale,
-                  anchor.group.matrixWorld,
-                ),
-                autoFitBase / Math.max(anchorU, 1e-6),
-              );
+              const displayScale = st.glassesForceAnchorUnitScale
+                ? adminMeshScale
+                : clampGlassesDisplayMeshScale(
+                    resolveGlassesMindarLocalMeshScale(
+                      adminMeshScale,
+                      anchor.group.matrixWorld,
+                    ),
+                    autoFitBase / Math.max(anchorU, 1e-6),
+                  );
               st.glassesLastMeshScale = displayScale;
               st.glassesLastAdminMeshScale = adminMeshScale;
               st.glassesLastAnchorUnitsPerMeter = anchorU;
-              st.glassesLastScaleSource = "admin-parity-flat÷u";
+              st.glassesLastScaleSource = st.glassesForceAnchorUnitScale
+                ? "admin-parity-flat×merchant"
+                : "admin-parity-flat÷u";
               glasses.scale.setScalar(displayScale);
               if (!st.glassesCalibRuntimeLogged) {
                 st.glassesCalibRuntimeLogged = true;
@@ -14285,10 +14297,19 @@ async function runArSession({
                         wNdc.z < 1,
                     }
                   : null;
+                const expectedWidthM = Number(
+                  (st.glassesFrameWidthRawLocal * displayScale).toFixed(5),
+                );
                 if (ndcInfo && !ndcInfo.onScreen) {
                   console.warn(
                     "[omafit-ar] glasses FORA do ecrã (admin parity flat) — verificar escala MindAR / wear",
-                    { build: OMAFIT_AR_WIDGET_BUILD, ndc: ndcInfo, sizeM: wSize.toArray() },
+                    {
+                      build: OMAFIT_AR_WIDGET_BUILD,
+                      ndc: ndcInfo,
+                      sizeM: wSize.toArray(),
+                      expectedWidthM,
+                      glassesForceAnchorUnitScale: st.glassesForceAnchorUnitScale,
+                    },
                   );
                 }
                 console.log("[omafit-ar] glasses world bbox (admin parity flat)", {
@@ -14299,6 +14320,12 @@ async function runArSession({
                   centerM: wCenter.toArray().map((v) => Number(v.toFixed(4))),
                   ndc: ndcInfo,
                   meshScale: displayScale,
+                  adminMeshScale,
+                  anchorUnitsPerMeter: anchorU,
+                  expectedWidthM,
+                  glassesForceAnchorUnitScale: st.glassesForceAnchorUnitScale,
+                  scaleSource: st.glassesLastScaleSource,
+                  inRenderTree: Boolean(glasses.parent),
                   visible: glasses.visible,
                 });
               }
