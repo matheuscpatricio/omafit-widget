@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v207";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v208";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5165,21 +5165,26 @@ function omafitNecklaceResolveWearAnchorScale(THREE, anchorGroup, smoothRef) {
 }
 
 /**
- * MindAR `faceMatrix` pode incluir escala não-uniforme; no colar isso esmaga o mesh
- * (aparece bem → «linha fina» quando o damp da âncora converge).
- * @returns {number} desvio máximo |s−1| antes de forçar unidade
+ * MindAR `faceMatrix` inclui escala ~u (unidades/ metro). Ao forçar escala=1 na
+ * âncora, a translação tem de ser dividida por u — senão o GLB fica a dezenas
+ * de metros da câmara (bbox centerM z ≈ −63 m).
+ * @returns {number} u médio antes de normalizar
  */
 function omafitAnchorMatrixForceUnitScale(matrix, dec) {
-  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return 0;
+  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return 1;
   matrix.decompose(dec.p, dec.q, dec.s);
-  const dev = Math.max(
-    Math.abs(dec.s.x - 1),
-    Math.abs(dec.s.y - 1),
-    Math.abs(dec.s.z - 1),
+  const u = Math.max(
+    1e-6,
+    (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
   );
+  if (u > 1.02) {
+    dec.p.x /= u;
+    dec.p.y /= u;
+    dec.p.z /= u;
+  }
   dec.s.set(1, 1, 1);
   matrix.compose(dec.p, dec.q, dec.s);
-  return dev;
+  return u;
 }
 
 /**
@@ -11840,15 +11845,10 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * Paridade preview admin: âncora só T+R (escala=1); escala física no mesh.
-     * Ingest / export canónico / frame widget remapeado no modo simples.
+     * Paridade preview admin: preferir escala MindAR na âncora + wear/mesh ÷ u.
+     * Forçar escala=1 na âncora desloca o GLB para dezenas de metros (bbox z≈−63).
      */
-    const glassesForceAnchorUnitScale =
-      accessoryType === "glasses" &&
-      glassesSimpleFaceOnly &&
-      (glassesIngestWidgetFrameTag ||
-        glassesCanonicalBlenderExport ||
-        glassesWorkerFrameRemapped);
+    const glassesForceAnchorUnitScale = false;
 
     const readGlassesMerchantCal = () => {
       const parsed = parseOmafitCalibrationRaw(
@@ -14368,9 +14368,36 @@ async function runArSession({
                         wNdc.z < 1,
                     }
                   : null;
+                let cameraDistanceM = null;
+                if (cam) {
+                  cameraDistanceM = Number(wCenter.distanceTo(cam.position).toFixed(4));
+                }
+                let anchorWorldPos = null;
+                if (anchor?.group) {
+                  anchor.group.updateMatrixWorld(true);
+                  anchorWorldPos = anchor.group.getWorldPosition(new THREE.Vector3());
+                  anchorWorldPos = {
+                    x: Number(anchorWorldPos.x.toFixed(4)),
+                    y: Number(anchorWorldPos.y.toFixed(4)),
+                    z: Number(anchorWorldPos.z.toFixed(4)),
+                  };
+                }
                 const expectedWidthM = Number(
                   (st.glassesFrameWidthRawLocal * displayScale).toFixed(5),
                 );
+                if (cameraDistanceM != null && cameraDistanceM > 2.5) {
+                  console.warn(
+                    "[omafit-ar] glasses LONGE da câmara (admin parity flat) — verificar conversão âncora MindAR",
+                    {
+                      build: OMAFIT_AR_WIDGET_BUILD,
+                      cameraDistanceM,
+                      centerM: wCenter.toArray(),
+                      anchorWorldPos,
+                      anchorUnitsPerMeter: anchorU,
+                      glassesForceAnchorUnitScale: st.glassesForceAnchorUnitScale,
+                    },
+                  );
+                }
                 if (ndcInfo && !ndcInfo.onScreen) {
                   console.warn(
                     "[omafit-ar] glasses FORA do ecrã (admin parity flat) — verificar escala MindAR / wear",
@@ -14396,6 +14423,8 @@ async function runArSession({
                   expectedWidthM,
                   glassesForceAnchorUnitScale: st.glassesForceAnchorUnitScale,
                   scaleSource: st.glassesLastScaleSource,
+                  cameraDistanceM,
+                  anchorWorldPos,
                   inRenderTree: Boolean(glasses.parent),
                   visible: glasses.visible,
                 });
