@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v214";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v215";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2303,6 +2303,32 @@ function omafitReadGlbUrlFromRootOrQuery() {
   } catch {
     return "";
   }
+}
+
+function omafitPatchGlassesFrameMaterialAfterTransmissionStrip(THREE, mat) {
+  if (!mat) return;
+  mat.transparent = false;
+  mat.opacity = 1;
+  if (mat.color?.getHex && mat.color.getHex() < 0x222222) mat.color.setHex(0x444444);
+  if (mat.emissive?.setHex) {
+    mat.emissive.setHex(0x1a1a1a);
+    mat.emissiveIntensity = Math.max(Number(mat.emissiveIntensity) || 0, 0.35);
+  }
+  if ("metalness" in mat) {
+    mat.metalness = THREE.MathUtils.clamp(Number(mat.metalness) || 0.32, 0.15, 0.55);
+  }
+  if ("roughness" in mat) {
+    mat.roughness = THREE.MathUtils.clamp(Number(mat.roughness) || 0.45, 0.18, 0.72);
+  }
+  mat.needsUpdate = true;
+}
+
+/** Visibilidade AR widget: paridade admin (sem depender de PMREM async). */
+function omafitFinalizeGlassesWidgetDrawable(THREE, root) {
+  if (!THREE || !root) return;
+  omafitEnsureGlassesMeshesRenderable(THREE, root);
+  omafitGlassesBoostAdminParityArVisibility(THREE, root);
+  omafitGlassesFlatModeForceDrawableOnFace(THREE, root);
 }
 
 function omafitGlassesFlatModeForceDrawableOnFace(THREE, root) {
@@ -11415,6 +11441,7 @@ async function runArSession({
         if (shouldStripTransmission && "transmission" in mat && Number(mat.transmission) > 0.02) {
           mat.transmission = 0;
           if ("thickness" in mat) mat.thickness = 0;
+          if (!isLensMesh) omafitPatchGlassesFrameMaterialAfterTransmissionStrip(THREE, mat);
         }
         /**
          * A malha facial MindAR (só depth, renderOrder baixo) pode ganhar o z-test
@@ -11463,9 +11490,27 @@ async function runArSession({
         console.warn("[omafit-ar] ensure meshes renderable:", e?.message || e);
       }
       try {
-        omafitApplyGlassesMeshDepthPriorities(THREE, glasses);
+        if (!(accessoryType === "glasses" && glassesSimpleFaceOnly)) {
+          omafitApplyGlassesMeshDepthPriorities(THREE, glasses);
+        }
       } catch (e) {
         console.warn("[omafit-ar] mesh depth priorities:", e?.message || e);
+      }
+      if (accessoryType === "glasses" && glassesSimpleFaceOnly) {
+        try {
+          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+          console.log("[omafit-ar] glasses AR drawable materiais (load-once sync)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            stripTransmission: glassesRenderFlags.stripTransmission !== false,
+            physicalLenses: glassesPhysicalLenses,
+            ingestSplit: omafitGlassesGlbHasIngestWidgetFrameTag(glasses),
+          });
+        } catch (drawErr) {
+          console.warn(
+            "[omafit-ar] glasses AR drawable (load-once):",
+            drawErr?.message || drawErr,
+          );
+        }
       }
     }
     if (accessoryType === "necklace") {
@@ -13789,7 +13834,12 @@ async function runArSession({
     }
 
     const applyFaceArPmremTask = async () => {
-      if (faceArEnhancementState?.facePmremRT) return;
+      if (faceArEnhancementState?.facePmremRT) {
+        if (accessoryType === "glasses") {
+          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+        }
+        return;
+      }
       const glassesPmremAttr = String(cfgAttr("arGlassesPmrem", "auto")).trim().toLowerCase();
       const glassesPmremDisabled = /^(0|false|off|no)$/i.test(glassesPmremAttr);
       const pmremOn =
@@ -13798,7 +13848,17 @@ async function runArSession({
           arDeviceProfile.perfTier !== "low") ||
         (accessoryType === "necklace" &&
           !/^(0|false|off|no)$/i.test(String(cfgAttr("arNecklacePmrem", "1")).trim()));
-      if (!pmremOn) return;
+      if (!pmremOn) {
+        if (accessoryType === "glasses") {
+          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+          console.log("[omafit-ar] glasses drawable (PMREM off / perf low)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            perfTier: arDeviceProfile.perfTier,
+            glassesPmremAttr,
+          });
+        }
+        return;
+      }
       const dep = `deps=three@${ESM_THREE_VER}`;
       const roomUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/environments/RoomEnvironment.js?${dep}`;
       const rgbeUrl = `${ESM_SH}/three@${ESM_THREE_VER}/examples/jsm/loaders/RGBELoader.js?${dep}`;
@@ -13851,7 +13911,7 @@ async function runArSession({
           upgradeFaceArEyewearRendering(THREE, glasses, pmremRT.texture, {
             physicalLenses: glassesPhysicalLenses,
           });
-          omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses);
+          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
         }
         try {
           const lensSt = faceArEnhancementState?.glassesLensLoadState;
@@ -14734,6 +14794,14 @@ async function runArSession({
                     st.glassesLastScaleSource = scaleSource;
                     if (st.glassesModelWrap) st.glassesModelWrap.scale.set(1, 1, 1);
                     glasses.scale.set(displayScale, displayScale, displayScale);
+                    if (!st.glassesDrawablePerFrameApplied) {
+                      st.glassesDrawablePerFrameApplied = true;
+                      try {
+                        omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+                      } catch {
+                        /* ignore */
+                      }
+                    }
                     if (st.calibRotGroup) {
                       applyGlassesMerchantCalibRotation(
                         THREE,
