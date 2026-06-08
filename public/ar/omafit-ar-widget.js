@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v215";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v216";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11489,14 +11489,20 @@ async function runArSession({
       } catch (e) {
         console.warn("[omafit-ar] ensure meshes renderable:", e?.message || e);
       }
+      const glassesSimpleDrawableLoad =
+        accessoryType === "glasses" &&
+        !glassesStructuralMindarRig &&
+        !glassesCheekOrthogonalBasis &&
+        !glassesGlbStandardize &&
+        !/^(1|true|yes|on)$/i.test(String(cfgAttr("arGlassesGeometryAnchor", "0")).trim());
       try {
-        if (!(accessoryType === "glasses" && glassesSimpleFaceOnly)) {
+        if (!glassesSimpleDrawableLoad) {
           omafitApplyGlassesMeshDepthPriorities(THREE, glasses);
         }
       } catch (e) {
         console.warn("[omafit-ar] mesh depth priorities:", e?.message || e);
       }
-      if (accessoryType === "glasses" && glassesSimpleFaceOnly) {
+      if (glassesSimpleDrawableLoad) {
         try {
           omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
           console.log("[omafit-ar] glasses AR drawable materiais (load-once sync)", {
