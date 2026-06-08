@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v216";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v217";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11645,6 +11645,21 @@ async function runArSession({
       if (faceArEnhancementState) {
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
       }
+      try {
+        glasses.updateMatrixWorld(true);
+        const ingestBbox = new THREE.Box3().setFromObject(glasses);
+        const ingestCenter = ingestBbox.getCenter(new THREE.Vector3());
+        if (ingestCenter.length() > 0.08) {
+          glasses.position.sub(ingestCenter);
+          glasses.updateMatrixWorld(true);
+          console.log("[omafit-ar] glasses ingest: origem deslocada → centrada na bbox", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            offsetM: ingestCenter.toArray().map((v) => Number(v.toFixed(5))),
+          });
+        }
+      } catch {
+        /* ignore */
+      }
     }
 
     if (
@@ -14247,8 +14262,33 @@ async function runArSession({
           }
         }
 
-        /** v214: âncora MindAR bruta (paridade v160) — normalização cm→m quebrava pose/escala. */
-        const anchorRawMat = anchor.group.matrix;
+        /** v217: tradução cm→m na âncora (||rawP||≈63→~0,62 m); escala MindAR preservada. */
+        let anchorNormInfo = null;
+        const anchorRawMat =
+          accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
+            ? (() => {
+                st.anchorRawScratch.copy(anchor.group.matrix);
+                anchorNormInfo = omafitGlassesNormalizeMindarAnchorMatrix(
+                  st.anchorRawScratch,
+                  st.anchorDec,
+                  lm,
+                  { stripUnitScale: false },
+                );
+                return st.anchorRawScratch;
+              })()
+            : anchor.group.matrix;
+
+        if (accessoryType === "glasses" && anchorNormInfo && !st.glassesAnchorMetersFixLogged) {
+          st.glassesAnchorMetersFixLogged = true;
+          console.log("[omafit-ar] glasses anchor translation meters fix", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
+            rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
+            fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
+            anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
+            note: "só tradução; meshScale admin (sem ÷u).",
+          });
+        }
 
         if (!st.smoothInitialized) {
           if (st.anchorEuroPosState) {
@@ -15011,29 +15051,61 @@ async function runArSession({
                         if (cam) {
                           cameraDistanceM = Number(wCenter.distanceTo(cam.position).toFixed(4));
                         }
+                        let anchorWorldPos = null;
+                        if (anchor?.group) {
+                          anchor.group.updateMatrixWorld(true);
+                          const ap = anchor.group.getWorldPosition(new THREE.Vector3());
+                          anchorWorldPos = {
+                            x: Number(ap.x.toFixed(4)),
+                            y: Number(ap.y.toFixed(4)),
+                            z: Number(ap.z.toFixed(4)),
+                          };
+                        }
+                        const ndcInfo = cam
+                          ? {
+                              x: Number(wNdc.x.toFixed(4)),
+                              y: Number(wNdc.y.toFixed(4)),
+                              z: Number(wNdc.z.toFixed(4)),
+                              onScreen:
+                                Math.abs(wNdc.x) <= 1.05 &&
+                                Math.abs(wNdc.y) <= 1.05 &&
+                                wNdc.z > -1 &&
+                                wNdc.z < 1,
+                            }
+                          : null;
+                        if (ndcInfo && !ndcInfo.onScreen) {
+                          console.warn("[omafit-ar] glasses FORA do ecrã (tracking-wrap)", {
+                            build: OMAFIT_AR_WIDGET_BUILD,
+                            ndc: ndcInfo,
+                            centerM: wCenter.toArray(),
+                            sizeM: wSize.toArray(),
+                            cameraDistanceM,
+                            anchorWorldPos,
+                            meshScale: st.glassesLastMeshScale,
+                          });
+                        } else if (cameraDistanceM != null && cameraDistanceM > 2.5) {
+                          console.warn("[omafit-ar] glasses LONGE da câmara (tracking-wrap)", {
+                            build: OMAFIT_AR_WIDGET_BUILD,
+                            cameraDistanceM,
+                            centerM: wCenter.toArray(),
+                            anchorWorldPos,
+                            meshScale: st.glassesLastMeshScale,
+                          });
+                        }
                         console.log("[omafit-ar] glasses world bbox (1º frame calibrado)", {
                           build: OMAFIT_AR_WIDGET_BUILD,
                           min: wb.min.toArray().map((v) => Number(v.toFixed(4))),
                           max: wb.max.toArray().map((v) => Number(v.toFixed(4))),
                           sizeM: wSize.toArray().map((v) => Number(v.toFixed(4))),
                           centerM: wCenter.toArray().map((v) => Number(v.toFixed(4))),
-                          ndc: cam
-                            ? {
-                                x: Number(wNdc.x.toFixed(4)),
-                                y: Number(wNdc.y.toFixed(4)),
-                                z: Number(wNdc.z.toFixed(4)),
-                                onScreen:
-                                  Math.abs(wNdc.x) <= 1.05 &&
-                                  Math.abs(wNdc.y) <= 1.05 &&
-                                  wNdc.z > -1 &&
-                                  wNdc.z < 1,
-                              }
-                            : null,
+                          ndc: ndcInfo,
                           meshScale: st.glassesLastMeshScale,
                           scaleSource: st.glassesLastScaleSource,
                           glassesForceAnchorUnitScale: st.glassesForceAnchorUnitScale,
                           glassesAdminParityFlat: st.glassesAdminParityFlat,
                           cameraDistanceM,
+                          anchorWorldPos,
+                          inRenderTree: Boolean(glasses.parent),
                           visible: glasses.visible,
                         });
                       }
