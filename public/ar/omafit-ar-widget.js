@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v208";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v209";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5185,6 +5185,35 @@ function omafitAnchorMatrixForceUnitScale(matrix, dec) {
   dec.s.set(1, 1, 1);
   matrix.compose(dec.p, dec.q, dec.s);
   return u;
+}
+
+/**
+ * MindAR `faceMatrix` translation often arrives in **cm** as Three.js world units
+ * (ex.: m[14]≈−63 → −63 cm). Multiplica por `metersMul` (0,01) → metros (~−0,63 m).
+ * Mantém escala MindAR nas colunas de rotação (mesh ÷ u continua válido).
+ * @returns {{ u: number, metersMul: number, rawP: { x: number, y: number, z: number }, fixedP: { x: number, y: number, z: number } } | null}
+ */
+function omafitAnchorMatrixTranslationToMeters(matrix, dec, metersMul) {
+  if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return null;
+  matrix.decompose(dec.p, dec.q, dec.s);
+  const mul = Number.isFinite(metersMul) && metersMul > 0 ? metersMul : 1;
+  const rawP = { x: dec.p.x, y: dec.p.y, z: dec.p.z };
+  const u = Math.max(
+    1e-6,
+    (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
+  );
+  if (mul < 1) {
+    dec.p.x *= mul;
+    dec.p.y *= mul;
+    dec.p.z *= mul;
+  }
+  matrix.compose(dec.p, dec.q, dec.s);
+  return {
+    u,
+    metersMul: mul,
+    rawP,
+    fixedP: { x: dec.p.x, y: dec.p.y, z: dec.p.z },
+  };
 }
 
 /**
@@ -12421,17 +12450,10 @@ async function runArSession({
       accessoryType === "glasses" ? glasses.quaternion.clone() : null;
 
     /**
-     * Paridade exacta preview admin: MindAR anchor → wearPosition (m) → calibRot → GLB (Ry180 + scale).
-     * Sem glassesPivot / trackingWrap / micro-ux — evita transform composto que invisibiliza o mesh.
+     * Paridade exacta preview admin (modo plano): desactivado v209 — colocava o GLB a
+     * dezenas de metros da câmara (translação MindAR em cm). Usar tracking-wrap.
      */
-    const glassesAdminParityFlat =
-      accessoryType === "glasses" &&
-      glassesSimpleFaceOnly &&
-      !glassesManualMindarRig &&
-      !glassesGlbStandardize &&
-      (glassesCanonicalBlenderExport ||
-        glassesIngestWidgetFrameTag ||
-        glassesWorkerFrameRemapped);
+    const glassesAdminParityFlat = false;
 
     /** 4) Hierarquia (óculos):
      *   anchor.group → wearPosition → faceParent → calibRot → [tripOffsetGroup] →
@@ -13217,6 +13239,7 @@ async function runArSession({
       projectionSyncLogged: false,
       positionLogged: false,
       glassesCalibRuntimeLogged: false,
+      glassesAnchorMetersFixLogged: false,
       glassesFaceMeshDepthOffLogged: false,
       glassesFaceOccMatsPatched: 0,
       monolithicLensRegenWarned: false,
@@ -14143,6 +14166,17 @@ async function runArSession({
             omafitAnchorMatrixForceUnitScale(anchor.group.matrix, st.anchorDec);
             st.smoothAnchorMat.copy(anchor.group.matrix);
           }
+          if (accessoryType === "glasses" && st.anchorDec && lm) {
+            const metersMulInit = omafitMindarMetricToMetersScale(lm);
+            if (metersMulInit < 1) {
+              omafitAnchorMatrixTranslationToMeters(
+                anchor.group.matrix,
+                st.anchorDec,
+                metersMulInit,
+              );
+              st.smoothAnchorMat.copy(anchor.group.matrix);
+            }
+          }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -14217,6 +14251,44 @@ async function runArSession({
             if (st.glassesForceAnchorUnitScale && st.anchorDec) {
               omafitAnchorMatrixForceUnitScale(anchor.group.matrix, st.anchorDec);
               st.smoothAnchorMat.copy(anchor.group.matrix);
+            }
+          }
+          if (accessoryType === "glasses" && st.anchorDec && lm) {
+            const metersMulFrame = omafitMindarMetricToMetersScale(lm);
+            if (metersMulFrame < 1) {
+              const anchorFix = omafitAnchorMatrixTranslationToMeters(
+                anchor.group.matrix,
+                st.anchorDec,
+                metersMulFrame,
+              );
+              st.smoothAnchorMat.copy(anchor.group.matrix);
+              if (!st.glassesAnchorMetersFixLogged && anchorFix) {
+                st.glassesAnchorMetersFixLogged = true;
+                const cam = mindarThree?.camera;
+                let cameraDistanceM = null;
+                if (cam && anchor?.group) {
+                  anchor.group.updateMatrixWorld(true);
+                  const wp = anchor.group.getWorldPosition(new THREE.Vector3());
+                  cameraDistanceM = Number(wp.distanceTo(cam.position).toFixed(4));
+                }
+                console.log("[omafit-ar] glasses anchor translation meters fix", {
+                  build: OMAFIT_AR_WIDGET_BUILD,
+                  metersMul: anchorFix.metersMul,
+                  anchorUnitsPerMeter: Number(anchorFix.u.toFixed(4)),
+                  rawTranslation: {
+                    x: Number(anchorFix.rawP.x.toFixed(4)),
+                    y: Number(anchorFix.rawP.y.toFixed(4)),
+                    z: Number(anchorFix.rawP.z.toFixed(4)),
+                  },
+                  fixedTranslation: {
+                    x: Number(anchorFix.fixedP.x.toFixed(4)),
+                    y: Number(anchorFix.fixedP.y.toFixed(4)),
+                    z: Number(anchorFix.fixedP.z.toFixed(4)),
+                  },
+                  cameraDistanceM,
+                  glassesAdminParityFlat: st.glassesAdminParityFlat,
+                });
+              }
             }
           }
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
