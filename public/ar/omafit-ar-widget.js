@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v211";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v212";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5187,34 +5187,61 @@ function omafitAnchorMatrixForceUnitScale(matrix, dec) {
   return u;
 }
 
+/** Profundidade alvo da âncora facial selfie (m) — calibra tradução MindAR bruta. */
+const OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M = 0.62;
+
+/**
+ * Converte tradução bruta MindAR → metros. Cheek heuristic (0,01) falha quando
+ * `||rawP||` ≫ 63 (ex.: ~359 → 3,6 m após ×0,01). Com `stripUnitScale`, reescala
+ * para ~0,62 m mantendo direcção.
+ */
+function omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnitScale) {
+  const cheekMul = omafitMindarMetricToMetersScale(lm);
+  const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
+  if (!Number.isFinite(rawDist) || rawDist < 1e-6) return 1;
+  if (stripUnitScale) {
+    const afterCheek = rawDist * (cheekMul < 1 ? cheekMul : 1);
+    if (afterCheek > 1.2) {
+      return OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M / rawDist;
+    }
+    return cheekMul < 1 ? cheekMul : 1;
+  }
+  return cheekMul < 1 ? cheekMul : 1;
+}
+
 /**
  * MindAR `faceMatrix`: tradução em **cm** como unidades Three.js (m[14]≈−63).
- * 1) `p × metersMul` (cm→m) **antes** do smooth.
- * 2) Opcional `stripUnitScale`: escala=1 **sem** `p÷u` (p já está em metros; `p÷u` ≈ −4,6 m).
- * @returns {{ u: number, metersMul: number, strippedUnitScale: boolean, rawP: object, fixedP: object } | null}
+ * 1) `p × transMul` (cm→m, com calibração de profundidade se necessário).
+ * 2) Opcional `stripUnitScale`: escala=1 **sem** `p÷u`.
  */
 function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts) {
   if (!matrix?.decompose || !dec?.p || !dec.q || !dec.s) return null;
   matrix.decompose(dec.p, dec.q, dec.s);
-  const metersMul = omafitMindarMetricToMetersScale(lm);
+  const cheekMul = omafitMindarMetricToMetersScale(lm);
   const rawP = { x: dec.p.x, y: dec.p.y, z: dec.p.z };
+  const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
+  const stripUnit = opts?.stripUnitScale === true;
+  const transMul = omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnit);
+  if (transMul !== 1) {
+    dec.p.x *= transMul;
+    dec.p.y *= transMul;
+    dec.p.z *= transMul;
+  }
   const u = Math.max(
     1e-6,
     (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
   );
-  if (metersMul < 1) {
-    dec.p.x *= metersMul;
-    dec.p.y *= metersMul;
-    dec.p.z *= metersMul;
-  }
-  const stripUnit = opts?.stripUnitScale === true;
   if (stripUnit) {
     dec.s.set(1, 1, 1);
   }
   matrix.compose(dec.p, dec.q, dec.s);
+  const fixedDist = Math.hypot(dec.p.x, dec.p.y, dec.p.z);
   return {
     u,
-    metersMul,
+    metersMul: cheekMul,
+    transMul,
+    rawDist,
+    fixedDist,
     strippedUnitScale: stripUnit,
     rawP,
     fixedP: { x: dec.p.x, y: dec.p.y, z: dec.p.z },
@@ -14183,15 +14210,14 @@ async function runArSession({
         if (accessoryType === "glasses" && anchorNormInfo && !st.glassesAnchorMetersFixLogged) {
           st.glassesAnchorMetersFixLogged = true;
           const cameraDistanceM = Number(
-            Math.hypot(
-              anchorNormInfo.fixedP.x,
-              anchorNormInfo.fixedP.y,
-              anchorNormInfo.fixedP.z,
-            ).toFixed(4),
+            (anchorNormInfo.fixedDist ?? 0).toFixed(4),
           );
           console.log("[omafit-ar] glasses anchor translation meters fix", {
             build: OMAFIT_AR_WIDGET_BUILD,
             metersMul: anchorNormInfo.metersMul,
+            transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
+            rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
+            fixedDist: cameraDistanceM,
             anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
             rawTranslation: {
               x: Number(anchorNormInfo.rawP.x.toFixed(4)),
@@ -14206,7 +14232,7 @@ async function runArSession({
             cameraDistanceM,
             glassesAdminParityFlat: st.glassesAdminParityFlat,
             strippedUnitScale: anchorNormInfo.strippedUnitScale,
-            note: "cm→m antes do smooth; escala=1 sem p÷u (paridade admin).",
+            note: "transMul calibra ||rawP||→~0,62 m; escala=1 sem p÷u.",
           });
         }
 
