@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v219";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v220";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11981,8 +11981,8 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * v219: tradução âncora → ~0,62 m (transMul); escala MindAR u preservada (sem stripUnitScale).
-     * meshScale = admin÷u. v218 stripUnitScale + Ry180 + bbox-recentro deslocavam ~3–4 m.
+     * v220: âncora MindAR bruta (paridade v160). transMul / stripUnitScale / meshScale÷u
+     * deslocavam o GLB ~4 m fora do NDC.
      */
     const glassesForceAnchorUnitScale = false;
 
@@ -14268,39 +14268,19 @@ async function runArSession({
           }
         }
 
-        /** v219: T→~0,62 m; escala u MindAR intacta (stripUnitScale off). */
-        let anchorNormInfo = null;
-        const anchorRawMat =
-          accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
-            ? (() => {
-                st.anchorRawScratch.copy(anchor.group.matrix);
-                anchorNormInfo = omafitGlassesNormalizeMindarAnchorMatrix(
-                  st.anchorRawScratch,
-                  st.anchorDec,
-                  lm,
-                  { stripUnitScale: false },
-                );
-                return st.anchorRawScratch;
-              })()
-            : anchor.group.matrix;
-
-        if (accessoryType === "glasses" && anchorNormInfo) {
-          st.glassesLastAnchorNormInfo = anchorNormInfo;
-          if (!st.glassesAnchorMetersFixLogged) {
-            st.glassesAnchorMetersFixLogged = true;
-            const effectiveU = omafitAnchorUnitsPerMeter(st.anchorRawScratch);
-            console.log("[omafit-ar] glasses anchor translation meters fix", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
-              rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
-              fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
-              anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
-              effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
-              strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
-              glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
-              note: "T→~0,62 m; u preservado; meshScale admin÷u.",
-            });
-          }
+        /** v220: âncora MindAR bruta — sem transMul/strip (paridade v160). */
+        const anchorRawMat = anchor.group.matrix;
+        if (accessoryType === "glasses" && !st.glassesAnchorMetersFixLogged) {
+          st.glassesAnchorMetersFixLogged = true;
+          const e = anchor.group.matrix.elements;
+          const rawDist = Math.hypot(e[12], e[13], e[14]);
+          const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrix);
+          console.log("[omafit-ar] glasses anchor (raw MindAR, v160 parity)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            rawDist: Number(rawDist.toFixed(4)),
+            anchorUnitsPerMeter: Number(anchorU.toFixed(4)),
+            note: "sem normalização T; meshScale admin directo.",
+          });
         }
 
         if (!st.smoothInitialized) {
@@ -14796,13 +14776,12 @@ async function runArSession({
                     };
                     let displayScale;
                     let scaleSource = "bbox-merchant";
-                    const useAdminParityScale =
+                    const useV160MerchantScale =
                       st.glassesSimpleFaceOnly &&
                       (st.glassesCanonicalBlenderExport ||
                         st.glassesWorkerFrameRemapped);
-                    if (useAdminParityScale) {
-                      anchor.group.updateMatrixWorld(true);
-                      const adminMeshScale = clampGlassesDisplayMeshScale(
+                    if (useV160MerchantScale) {
+                      displayScale = clampGlassesDisplayMeshScale(
                         resolveGlassesMerchantMeshScale({
                           bboxWidthLocal: st.glassesFrameWidthRawLocal,
                           merchantScaleMul: merchantCal?.scale,
@@ -14811,17 +14790,11 @@ async function runArSession({
                         }),
                         autoFitBase,
                       );
-                      const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
-                      displayScale = clampGlassesDisplayMeshScale(
-                        resolveGlassesMindarLocalMeshScale(
-                          adminMeshScale,
-                          anchor.group.matrixWorld,
-                        ),
-                        autoFitBase / Math.max(anchorU, 1e-6),
+                      st.glassesLastAdminMeshScale = displayScale;
+                      st.glassesLastAnchorUnitsPerMeter = omafitAnchorUnitsPerMeter(
+                        anchor.group.matrixWorld,
                       );
-                      st.glassesLastAdminMeshScale = adminMeshScale;
-                      st.glassesLastAnchorUnitsPerMeter = anchorU;
-                      scaleSource = "admin-parity-base×merchant÷u";
+                      scaleSource = "merchantScale (v160-parity)";
                     } else if (st.glassesSimpleFaceOnly && lmLoc) {
                       const er = fa.eyeR;
                       const el = fa.eyeL;
@@ -14917,7 +14890,7 @@ async function runArSession({
                           st.glassesSimpleFaceOnly &&
                           (st.glassesCanonicalBlenderExport ||
                             st.glassesWorkerFrameRemapped)
-                          ? "meshScale = (fitW/rawW) × merchantScale ÷ u (T→0,62 m; bind identidade)"
+                          ? "meshScale = merchantScale (v160; âncora bruta + u na hierarquia)"
                           : st.glassesSimpleFaceOnly
                           ? "meshScale = (ipdLandmark/faceScale × ipdMul / rawW) × merchant"
                           : "meshScale = (fitW/bboxX) × merchantScale",
@@ -14939,7 +14912,7 @@ async function runArSession({
                           z: glassesTrackingWrap.position.z.toFixed(4),
                         },
                         hint:
-                          "Canónico v219: T→0,62 m; wear m÷u; meshScale admin÷u; bind identidade.",
+                          "Canónico v220: âncora MindAR bruta; wear m÷u; meshScale admin; bind identidade.",
                       });
                     }
                   };
@@ -15099,19 +15072,18 @@ async function runArSession({
                                 wNdc.z < 1,
                             }
                           : null;
-                        const anchorNormDiag = st.glassesLastAnchorNormInfo
+                        const anchorNormDiag = anchor?.group
                           ? {
-                              transMul: Number(st.glassesLastAnchorNormInfo.transMul?.toFixed(6)),
-                              fixedDist: Number(st.glassesLastAnchorNormInfo.fixedDist?.toFixed(4)),
-                              strippedUnitScale: !!st.glassesLastAnchorNormInfo.strippedUnitScale,
-                              anchorUnitsPerMeterPreStrip: Number(
-                                st.glassesLastAnchorNormInfo.u?.toFixed(4),
+                              anchorUnitsPerMeter: Number(
+                                omafitAnchorUnitsPerMeter(anchor.group.matrixWorld).toFixed(4),
                               ),
-                              effectiveAnchorUAfterNorm: anchor?.group
-                                ? Number(
-                                    omafitAnchorUnitsPerMeter(anchor.group.matrixWorld).toFixed(4),
-                                  )
-                                : null,
+                              rawAnchorDist: Number(
+                                Math.hypot(
+                                  anchor.group.matrix.elements[12],
+                                  anchor.group.matrix.elements[13],
+                                  anchor.group.matrix.elements[14],
+                                ).toFixed(4),
+                              ),
                             }
                           : null;
                         if (ndcInfo && !ndcInfo.onScreen) {
