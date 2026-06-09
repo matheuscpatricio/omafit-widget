@@ -11,6 +11,8 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
+  omafitGlassesCorrectLocalBboxCenterIfNeeded,
+  omafitGlassesLocalBboxCenterM,
   omafitRecenterObject3OnGlassesLensFront,
 } from "./omafit-glb-bbox-center.js";
 import {
@@ -608,7 +610,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v222";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v223";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11762,6 +11764,20 @@ async function runArSession({
       if (frontCenter) glasses.position.sub(frontCenter);
       else glasses.position.sub(box.getCenter(new THREE.Vector3()));
       glasses.updateMatrixWorld(true);
+      try {
+        const driftFix = omafitGlassesCorrectLocalBboxCenterIfNeeded(THREE, glasses);
+        if (driftFix?.corrected) {
+          console.log("[omafit-ar] glasses lens anchor drift corrected (load)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            driftM: Number(driftFix.driftM.toFixed(5)),
+            offsetM: driftFix.center?.toArray?.().map((v) => Number(v.toFixed(5))),
+            ingestSplit: glassesIngestWidgetFrameTag,
+            canonicalBlenderExport: glassesCanonicalBlenderExport,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
     } else if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
@@ -12672,19 +12688,31 @@ async function runArSession({
         glasses.name = "omafit-ar-glasses-model";
         glasses.scale.set(1, 1, 1);
         glasses.updateMatrixWorld(true);
-        /** Paridade admin: bbox centrada; canónico/ingest já tem origem na ponte. */
-        if (!glassesCanonicalBlenderExport && !glassesIngestWidgetFrameTag) {
-          try {
+        /** v223: recentrar pivot funcional antes do meshScale (ingest pode deixar ~0,49 m de drift). */
+        try {
+          const recFlat = omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
+          let driftFlat = omafitGlassesCorrectLocalBboxCenterIfNeeded(THREE, glasses);
+          if (!driftFlat?.corrected && !recFlat?.ok) {
             const cenFlat = omafitCenterObject3OnBboxOrigin(THREE, glasses);
             if (!cenFlat?.ok) {
               console.warn("[omafit-ar] glasses admin parity flat: bbox center falhou", cenFlat);
+            } else {
+              driftFlat = { corrected: true, center: cenFlat.center, driftM: cenFlat.center?.length?.() ?? 0 };
             }
-          } catch (cenFlatErr) {
-            console.warn(
-              "[omafit-ar] glasses admin parity flat: bbox center:",
-              cenFlatErr?.message || cenFlatErr,
-            );
           }
+          if (recFlat?.ok || driftFlat?.corrected) {
+            console.log("[omafit-ar] glasses admin parity flat: pivot recenter (pre-scale)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              recenterMode: recFlat?.mode || "bbox-fallback",
+              driftM: Number((driftFlat?.driftM || 0).toFixed(5)),
+              ingestSplit: glassesIngestWidgetFrameTag,
+            });
+          }
+        } catch (cenFlatErr) {
+          console.warn(
+            "[omafit-ar] glasses admin parity flat: pivot recenter:",
+            cenFlatErr?.message || cenFlatErr,
+          );
         }
         glasses.rotation.order = "XYZ";
         glasses.rotation.set(0, 0, 0);
@@ -14550,14 +14578,38 @@ async function runArSession({
                   cameraDistanceM = Number(wCenter.distanceTo(cam.position).toFixed(4));
                 }
                 let anchorWorldPos = null;
+                let anchorWorldVec = null;
                 if (anchor?.group) {
                   anchor.group.updateMatrixWorld(true);
-                  anchorWorldPos = anchor.group.getWorldPosition(new THREE.Vector3());
+                  anchorWorldVec = anchor.group.getWorldPosition(new THREE.Vector3());
                   anchorWorldPos = {
-                    x: Number(anchorWorldPos.x.toFixed(4)),
-                    y: Number(anchorWorldPos.y.toFixed(4)),
-                    z: Number(anchorWorldPos.z.toFixed(4)),
+                    x: Number(anchorWorldVec.x.toFixed(4)),
+                    y: Number(anchorWorldVec.y.toFixed(4)),
+                    z: Number(anchorWorldVec.z.toFixed(4)),
                   };
+                }
+                let glassesWorldPos = null;
+                let posDeltaM = null;
+                let localBboxCenterM = null;
+                if (glasses) {
+                  const gwp = new THREE.Vector3();
+                  glasses.getWorldPosition(gwp);
+                  glassesWorldPos = {
+                    x: Number(gwp.x.toFixed(4)),
+                    y: Number(gwp.y.toFixed(4)),
+                    z: Number(gwp.z.toFixed(4)),
+                  };
+                  if (anchorWorldVec) {
+                    posDeltaM = [
+                      Number((wCenter.x - anchorWorldVec.x).toFixed(4)),
+                      Number((wCenter.y - anchorWorldVec.y).toFixed(4)),
+                      Number((wCenter.z - anchorWorldVec.z).toFixed(4)),
+                    ];
+                  }
+                  const lb = omafitGlassesLocalBboxCenterM(THREE, glasses);
+                  if (lb) {
+                    localBboxCenterM = lb.toArray().map((v) => Number(v.toFixed(5)));
+                  }
                 }
                 const expectedWidthM = Number(
                   (
@@ -14607,6 +14659,9 @@ async function runArSession({
                   scaleSource: st.glassesLastScaleSource,
                   cameraDistanceM,
                   anchorWorldPos,
+                  glassesWorldPos,
+                  posDeltaM,
+                  localBboxCenterM,
                   inRenderTree: Boolean(glasses.parent),
                   visible: glasses.visible,
                 });

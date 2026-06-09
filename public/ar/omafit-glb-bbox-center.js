@@ -335,3 +335,52 @@ export function omafitRecenterObject3OnGlassesLensFront(THREE, root, opts = {}) 
     mode: midPivot ? "lens-midpoint" : "lens-front",
   };
 }
+
+/** Drift máximo (m) entre origem do root e centro geométrico local antes de corrigir. */
+export const OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M = 0.015;
+
+/**
+ * Centro da bbox AABB no espaço **local do root** (ignora escala world de `setFromObject`).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @returns {import("three").Vector3 | null}
+ */
+export function omafitGlassesLocalBboxCenterM(THREE, root) {
+  if (!THREE || !root) return null;
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const box = new THREE.Box3();
+  root.traverse((child) => {
+    if (!child.isMesh || child.isInstancedMesh || !child.geometry) return;
+    const geo = child.geometry;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    const b = geo.boundingBox.clone();
+    b.applyMatrix4(child.matrixWorld);
+    box.union(b);
+  });
+  if (typeof box.isEmpty === "function" && box.isEmpty()) return null;
+  return box.getCenter(new THREE.Vector3()).applyMatrix4(inv);
+}
+
+/**
+ * Se o centro geométrico local estiver longe da origem, translada `root.position`.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {number} [maxDriftM]
+ */
+export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
+  THREE,
+  root,
+  maxDriftM = OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
+) {
+  const center = omafitGlassesLocalBboxCenterM(THREE, root);
+  if (!center) return { corrected: false, center: null, driftM: 0 };
+  const driftM = center.length();
+  if (driftM <= maxDriftM) return { corrected: false, center, driftM };
+  root.position.sub(center);
+  if (typeof root.updateMatrix === "function") root.updateMatrix();
+  if (typeof root.updateMatrixWorld === "function") root.updateMatrixWorld(true);
+  return { corrected: true, center, driftM };
+}
