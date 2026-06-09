@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v221";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v222";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12672,25 +12672,27 @@ async function runArSession({
         glasses.name = "omafit-ar-glasses-model";
         glasses.scale.set(1, 1, 1);
         glasses.updateMatrixWorld(true);
-        /** Paridade admin: bbox centrada (não heurística lentes) antes de bind/escala. */
-        try {
-          const cenFlat = omafitCenterObject3OnBboxOrigin(THREE, glasses);
-          if (!cenFlat?.ok) {
-            console.warn("[omafit-ar] glasses admin parity flat: bbox center falhou", cenFlat);
+        /** Paridade admin: bbox centrada; canónico/ingest já tem origem na ponte. */
+        if (!glassesCanonicalBlenderExport && !glassesIngestWidgetFrameTag) {
+          try {
+            const cenFlat = omafitCenterObject3OnBboxOrigin(THREE, glasses);
+            if (!cenFlat?.ok) {
+              console.warn("[omafit-ar] glasses admin parity flat: bbox center falhou", cenFlat);
+            }
+          } catch (cenFlatErr) {
+            console.warn(
+              "[omafit-ar] glasses admin parity flat: bbox center:",
+              cenFlatErr?.message || cenFlatErr,
+            );
           }
-        } catch (cenFlatErr) {
-          console.warn(
-            "[omafit-ar] glasses admin parity flat: bbox center:",
-            cenFlatErr?.message || cenFlatErr,
-          );
         }
         glasses.rotation.order = "XYZ";
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
-        glasses.rotateOnWorldAxis(
-          new THREE.Vector3(0, 1, 0),
-          OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
-        );
+        /**
+         * v222: AR canónico — bind identidade (v160). Ry180 é só preview admin estático;
+         * com âncora MindAR invertia frente e NDC off-screen (y≈−80).
+         */
         glasses.updateMatrix();
         glasses.updateMatrixWorld(true);
         calibRot.rotation.order = "YXZ";
@@ -12732,7 +12734,7 @@ async function runArSession({
             glassesForceAnchorUnitScale,
             bboxCentered: true,
             note: glassesForceAnchorUnitScale
-              ? "meshScale = adminMeshScale; wear em m; âncora escala=1"
+              ? "meshScale admin; wear em m; bind identidade AR (sem Ry180 admin)."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
