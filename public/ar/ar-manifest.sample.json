@@ -34,7 +34,6 @@
     "ringCenterLocal": [0, 0, 0]
   },
   "materialProfile": {
-    "lensType": "clear_fake",
     "renderMode": "lite"
   },
   "occlusionProxy": {

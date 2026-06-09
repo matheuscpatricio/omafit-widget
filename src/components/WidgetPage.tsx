@@ -22,7 +22,7 @@ import {
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-04-ar-glasses-ingest-v223';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-04-ar-glasses-rodin-lenses-v225';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -1283,7 +1283,6 @@ export function WidgetPage() {
         const mp = m?.materialProfile;
         if (mp?.renderMode === 'pmrem') arExtraAttrs['data-ar-glasses-pmrem'] = '1';
         if (mp?.renderMode === 'lite') arExtraAttrs['data-ar-glasses-pmrem'] = '0';
-        if (mp?.lensType) arExtraAttrs['data-ar-glasses-lens-type'] = mp.lensType;
         if (m?.wearableClass) arExtraAttrs['data-ar-wearable-class'] = m.wearableClass;
       } catch {
         /* manifest JSON inválido — attrs base mantêm-se */

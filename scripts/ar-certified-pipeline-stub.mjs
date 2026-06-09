@@ -67,12 +67,6 @@ function buildManifest(opts) {
   }
   const materialProfile = isGlasses
     ? {
-        lensType:
-          wc === "glasses_sun"
-            ? "tinted"
-            : wc === "glasses_premium"
-              ? "clear_physical"
-              : "clear_fake",
         renderMode: wc === "glasses_premium" ? "pmrem" : "lite",
       }
     : undefined;

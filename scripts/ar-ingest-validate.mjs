@@ -52,13 +52,13 @@ async function runValidator(buf) {
 function validateLensMaterials(doc, manifest) {
   const warnings = [];
   const errors = [];
-  const lensType = manifest?.materialProfile?.lensType;
+  void manifest;
   const mats = doc.materials || [];
   const lensMats = mats.filter((m) =>
     /lens|glass|lente|cristal/i.test(String(m?.name || "")),
   );
-  if (lensType && lensMats.length === 0) {
-    warnings.push("materialProfile.lensType definido mas sem material lens_* no GLB");
+  if (lensMats.length === 0) {
+    warnings.push("GLB óculos sem material lens_* — verificar split ingest Rodin");
   }
   for (const m of lensMats) {
     const op =
@@ -68,18 +68,6 @@ function validateLensMaterials(doc, manifest) {
     if (op != null && Number(op) < 0.05) {
       errors.push(`material ${m.name}: opacity demasiado baixa (${op})`);
     }
-  }
-  if (lensType === "clear_physical") {
-    const hasTx = lensMats.some(
-      (m) => Number(m.extensions?.KHR_materials_transmission?.transmissionFactor ?? 0) > 0.02,
-    );
-    if (!hasTx) warnings.push("clear_physical: transmission ausente nas lentes");
-  }
-  if (lensType === "clear_fake") {
-    const bad = lensMats.some(
-      (m) => Number(m.extensions?.KHR_materials_transmission?.transmissionFactor ?? 0) > 0.02,
-    );
-    if (bad) warnings.push("clear_fake: transmission presente — usar opacity fake no ingest");
   }
   return { warnings, errors };
 }

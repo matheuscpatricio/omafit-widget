@@ -11,8 +11,9 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
-  omafitGlassesCorrectLocalBboxCenterIfNeeded,
+  omafitGlassesBakeGeometricCenterToOrigin,
   omafitGlassesLocalBboxCenterM,
+  OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
 } from "./omafit-glb-bbox-center.js";
 import {
@@ -610,7 +611,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v223";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-rodin-lenses-v225";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2340,17 +2341,28 @@ function omafitGlassesFlatModeForceDrawableOnFace(THREE, root) {
     child.visible = true;
     child.frustumCulled = false;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
-    const isLens = mats.some((m) => m?.userData?.omafitArLensMaterial);
+    const isLens = mats.some(
+      (m) =>
+        m?.userData?.omafitArLensMaterial ||
+        omafitIsGlassesLensMeshMaterial(THREE, root, m, child.name, m?.name),
+    );
     child.renderOrder = isLens ? 102 : 100;
     for (const mat of mats) {
       if (!mat) continue;
-      if (mat.userData?.omafitArLensMaterial) {
+      const isRuntimeLens = Boolean(mat.userData?.omafitArLensMaterial);
+      const isRodinLens =
+        !isRuntimeLens &&
+        omafitIsGlassesLensMeshMaterial(THREE, root, mat, child.name, mat.name);
+      if (isRuntimeLens) {
         mat.depthTest = true;
         mat.depthWrite = false;
         if (Number(mat.opacity) < 0.35) {
           mat.opacity = 0.52;
           mat.transparent = true;
         }
+      } else if (isRodinLens) {
+        /** GLB Rodin/ingest: sem overlay de opacity — só depthWrite off para o rosto. */
+        if ("depthWrite" in mat) mat.depthWrite = false;
       } else {
         /** Paridade colar: armação por cima do depth facial MindAR / vídeo. */
         mat.depthTest = false;
@@ -2384,6 +2396,11 @@ function omafitGlassesBoostAdminParityArVisibility(THREE, root) {
       if (mat.userData?.omafitArLensMaterial) {
         if (mat.transparent && Number(mat.opacity) < 0.5) mat.opacity = 0.58;
         mat.needsUpdate = true;
+        continue;
+      }
+      if (
+        omafitIsGlassesLensMeshMaterial(THREE, root, mat, child.name, mat.name)
+      ) {
         continue;
       }
       if (mat.color && typeof mat.color.getHex === "function" && mat.color.getHex() < 0x151515) {
@@ -2749,6 +2766,26 @@ function omafitHasGlassesLensContract(root) {
   return found;
 }
 
+/** GLB pós-ingest Rodin / split omafit_lens — materiais do ficheiro, sem overlay lite. */
+function omafitShouldPreserveRodinGlbLenses(root, opts = {}) {
+  if (opts?.preserveRodinGlb === true) return true;
+  if (omafitGlassesGlbHasIngestWidgetFrameTag(root)) return true;
+  return omafitHasGlassesLensContract(root);
+}
+
+function omafitCountGlassesLensContractMeshes(root) {
+  if (!root?.traverse) return 0;
+  let n = 0;
+  root.traverse((obj) => {
+    if (!obj.isMesh) return;
+    const mat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+    if (omafitIsGlassesLensMaterial(String(obj.name || ""), String(mat?.name || ""))) {
+      n += 1;
+    }
+  });
+  return n;
+}
+
 /**
  * Re-aplica material lite só em meshes de lente (p.ex. após PMREM clonar armação).
  * @param {typeof import("three")} THREE
@@ -2768,9 +2805,19 @@ function omafitEnsureGlassesLensMaterials(THREE, root, opts = {}) {
  * @returns {{ lensMeshes: number, hasContract: boolean, lensType: string }}
  */
 function omafitApplyGlassesLensOnLoadEarly(THREE, root, opts = {}) {
+  const hasContract = omafitHasGlassesLensContract(root);
+  const preserveRodinGlb = omafitShouldPreserveRodinGlbLenses(root, opts);
+  if (preserveRodinGlb) {
+    const lensMeshes = omafitCountGlassesLensContractMeshes(root);
+    return {
+      lensMeshes,
+      hasContract,
+      lensType: "glb",
+      preserveRodinGlb: true,
+    };
+  }
   const lensType = String(opts.lensType || "clear_fake").trim().toLowerCase() || "clear_fake";
   const stripTransmission = opts.stripTransmission !== false;
-  const hasContract = omafitHasGlassesLensContract(root);
 
   const lensAppear = omafitApplyGlassesLensAppearanceWithFallback(THREE, root, {
     lensType,
@@ -2783,6 +2830,7 @@ function omafitApplyGlassesLensOnLoadEarly(THREE, root, opts = {}) {
     lensMeshes: lensAppear.lensMeshes,
     hasContract,
     lensType,
+    preserveRodinGlb: false,
   };
 }
 
@@ -10179,6 +10227,8 @@ async function runArSession({
     let glassesRenderFlags = { pmremOn: false, stripTransmission: true, lensType: null, renderMode: "lite" };
     /** Estado de lentes após load — re-aplicação mínima pós-PMREM. */
     let glassesLensLoadState = null;
+    /** GLB Rodin/ingest: lentes do ficheiro, sem overlay lite/tipo lojista. */
+    let glassesPreserveRodinGlbLenses = false;
     if (clientHasStrongSignal && clientDetected !== liquidAccessoryType) {
       accessoryType = clientDetected;
       accessoryTypeSource = `client-override (liquid=${liquidAccessoryType || "∅"} ≠ client=${clientDetected})`;
@@ -11347,16 +11397,21 @@ async function runArSession({
           physicalLenses: glassesPhysicalLenses,
           stripTransmission: glassesRenderFlags.stripTransmission !== false,
         });
+        glassesPreserveRodinGlbLenses = Boolean(glassesLensLoadState?.preserveRodinGlb);
         if (glassesLensLoadState.lensMeshes > 0) {
           console.log("[omafit-ar] glasses lens appearance (load-once)", {
             build: OMAFIT_AR_WIDGET_BUILD,
-            lensType: resolvedLensTypePre,
+            lensType: glassesPreserveRodinGlbLenses ? "glb" : resolvedLensTypePre,
             lensMeshes: glassesLensLoadState.lensMeshes,
             hasContract: glassesLensLoadState.hasContract,
+            preserveRodinGlb: glassesPreserveRodinGlbLenses,
             physicalLenses: glassesPhysicalLenses,
-            stripTransmission: glassesRenderFlags.stripTransmission !== false,
+            stripTransmission: glassesPreserveRodinGlbLenses
+              ? false
+              : glassesRenderFlags.stripTransmission !== false,
           });
         } else if (
+          !glassesPreserveRodinGlbLenses &&
           resolvedLensTypePre !== "opaque" &&
           resolvedLensTypePre !== "none" &&
           resolvedLensTypePre !== "off"
@@ -11439,6 +11494,7 @@ async function runArSession({
         const shouldStripTransmission =
           accessoryType !== "glasses" ||
           !isLensMesh ||
+          glassesPreserveRodinGlbLenses ||
           !glassesPhysicalLenses ||
           glassesRenderFlags.stripTransmission !== false;
         if (shouldStripTransmission && "transmission" in mat && Number(mat.transmission) > 0.02) {
@@ -11759,24 +11815,32 @@ async function runArSession({
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
-      /** Paridade preview admin: centrar na ponte/lentes (sempre, inclusive ingest/canónico). */
-      const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
-      if (frontCenter) glasses.position.sub(frontCenter);
-      else glasses.position.sub(box.getCenter(new THREE.Vector3()));
-      glasses.updateMatrixWorld(true);
-      try {
-        const driftFix = omafitGlassesCorrectLocalBboxCenterIfNeeded(THREE, glasses);
-        if (driftFix?.corrected) {
-          console.log("[omafit-ar] glasses lens anchor drift corrected (load)", {
-            build: OMAFIT_AR_WIDGET_BUILD,
-            driftM: Number(driftFix.driftM.toFixed(5)),
-            offsetM: driftFix.center?.toArray?.().map((v) => Number(v.toFixed(5))),
-            ingestSplit: glassesIngestWidgetFrameTag,
-            canonicalBlenderExport: glassesCanonicalBlenderExport,
-          });
+      /**
+       * v224: ingest/canónico — bake geométrico nos vértices (lens anchor heurístico
+       * devolve ~0,58 m de falso drift; position.sub acumula offset no parent).
+       * Outros GLBs: pivot funcional lentes via position.sub (uma vez).
+       */
+      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
+        try {
+          const baked = omafitGlassesBakeGeometricCenterToOrigin(THREE, glasses);
+          if (baked?.ok && baked.driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
+            console.log("[omafit-ar] glasses geometric center baked to origin (load)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              driftM: Number(baked.driftM.toFixed(5)),
+              offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
+              bakedMeshes: baked.bakedMeshes,
+              ingestSplit: glassesIngestWidgetFrameTag,
+              canonicalBlenderExport: glassesCanonicalBlenderExport,
+            });
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
+      } else {
+        const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+        if (frontCenter) glasses.position.sub(frontCenter);
+        else glasses.position.sub(box.getCenter(new THREE.Vector3()));
+        glasses.updateMatrixWorld(true);
       }
     } else if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
@@ -12686,34 +12750,9 @@ async function runArSession({
     if (accessoryType === "glasses") {
       if (glassesAdminParityFlat) {
         glasses.name = "omafit-ar-glasses-model";
+        glasses.position.set(0, 0, 0);
         glasses.scale.set(1, 1, 1);
         glasses.updateMatrixWorld(true);
-        /** v223: recentrar pivot funcional antes do meshScale (ingest pode deixar ~0,49 m de drift). */
-        try {
-          const recFlat = omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
-          let driftFlat = omafitGlassesCorrectLocalBboxCenterIfNeeded(THREE, glasses);
-          if (!driftFlat?.corrected && !recFlat?.ok) {
-            const cenFlat = omafitCenterObject3OnBboxOrigin(THREE, glasses);
-            if (!cenFlat?.ok) {
-              console.warn("[omafit-ar] glasses admin parity flat: bbox center falhou", cenFlat);
-            } else {
-              driftFlat = { corrected: true, center: cenFlat.center, driftM: cenFlat.center?.length?.() ?? 0 };
-            }
-          }
-          if (recFlat?.ok || driftFlat?.corrected) {
-            console.log("[omafit-ar] glasses admin parity flat: pivot recenter (pre-scale)", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              recenterMode: recFlat?.mode || "bbox-fallback",
-              driftM: Number((driftFlat?.driftM || 0).toFixed(5)),
-              ingestSplit: glassesIngestWidgetFrameTag,
-            });
-          }
-        } catch (cenFlatErr) {
-          console.warn(
-            "[omafit-ar] glasses admin parity flat: pivot recenter:",
-            cenFlatErr?.message || cenFlatErr,
-          );
-        }
         glasses.rotation.order = "XYZ";
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
@@ -13980,6 +14019,9 @@ async function runArSession({
         }
         try {
           const lensSt = faceArEnhancementState?.glassesLensLoadState;
+          if (lensSt?.preserveRodinGlb) {
+            /* GLB Rodin: materiais de lente intactos. */
+          } else {
           const lensTypePmrem =
             lensSt?.lensType ||
             glassesRenderFlags.lensType ||
@@ -13995,6 +14037,7 @@ async function runArSession({
               physicalLenses: glassesPhysicalLenses,
               stripTransmission: glassesRenderFlags.stripTransmission !== false,
             });
+          }
           }
         } catch {
           /* ignore */

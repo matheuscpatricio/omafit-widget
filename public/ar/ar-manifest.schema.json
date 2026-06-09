@@ -80,12 +80,8 @@
     },
     "materialProfile": {
       "type": "object",
-      "description": "Perfil de materiais (óculos: lentes). Definido no ingest Rodin/Blender.",
+      "description": "Perfil de materiais (óculos). Lentes vêm do GLB Rodin — sem tipo override.",
       "properties": {
-        "lensType": {
-          "type": "string",
-          "enum": ["clear_fake", "tinted", "mirror", "clear_physical"]
-        },
         "renderMode": {
           "type": "string",
           "enum": ["lite", "pmrem", "auto"]

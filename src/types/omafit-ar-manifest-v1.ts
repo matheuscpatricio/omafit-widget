@@ -98,6 +98,7 @@ export interface OmafitArManifestV1 {
     holeCenterLocal?: [number, number, number];
   };
   materialProfile?: {
+    /** @deprecated Lentes usam materiais do GLB Rodin; não configurar no admin. */
     lensType?: 'clear_fake' | 'tinted' | 'mirror' | 'clear_physical';
     renderMode?: 'lite' | 'pmrem' | 'auto';
   };
