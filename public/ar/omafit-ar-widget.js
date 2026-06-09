@@ -11980,8 +11980,8 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * v219: manter escala MindAR na âncora (paridade v160); meshScale admin directo.
-     * v218 stripUnitScale deixava residual ~4 m (63/15); normalização T quebrava pose.
+     * v219: tradução âncora → ~0,62 m (transMul); escala MindAR u preservada (sem stripUnitScale).
+     * meshScale = admin÷u. v218 stripUnitScale + Ry180 + bbox-recentro deslocavam ~3,3 m do centro.
      */
     const glassesForceAnchorUnitScale = false;
 
@@ -14267,8 +14267,40 @@ async function runArSession({
           }
         }
 
-        /** v219: âncora MindAR bruta (paridade v160) — normalização T/scale quebrava pose (~4 m off-screen). */
-        const anchorRawMat = anchor.group.matrix;
+        /** v219: T→~0,62 m; escala u MindAR intacta (stripUnitScale off). */
+        let anchorNormInfo = null;
+        const anchorRawMat =
+          accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
+            ? (() => {
+                st.anchorRawScratch.copy(anchor.group.matrix);
+                anchorNormInfo = omafitGlassesNormalizeMindarAnchorMatrix(
+                  st.anchorRawScratch,
+                  st.anchorDec,
+                  lm,
+                  { stripUnitScale: false },
+                );
+                return st.anchorRawScratch;
+              })()
+            : anchor.group.matrix;
+
+        if (accessoryType === "glasses" && anchorNormInfo) {
+          st.glassesLastAnchorNormInfo = anchorNormInfo;
+          if (!st.glassesAnchorMetersFixLogged) {
+            st.glassesAnchorMetersFixLogged = true;
+            const effectiveU = omafitAnchorUnitsPerMeter(st.anchorRawScratch);
+            console.log("[omafit-ar] glasses anchor translation meters fix", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
+              rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
+              fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
+              anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
+              effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
+              strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
+              glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
+              note: "T→~0,62 m; u preservado; meshScale admin÷u.",
+            });
+          }
+        }
 
         if (!st.smoothInitialized) {
           if (st.anchorEuroPosState) {
@@ -14768,7 +14800,8 @@ async function runArSession({
                       (st.glassesCanonicalBlenderExport ||
                         st.glassesWorkerFrameRemapped);
                     if (useAdminParityScale) {
-                      displayScale = clampGlassesDisplayMeshScale(
+                      anchor.group.updateMatrixWorld(true);
+                      const adminMeshScale = clampGlassesDisplayMeshScale(
                         resolveGlassesMerchantMeshScale({
                           bboxWidthLocal: st.glassesFrameWidthRawLocal,
                           merchantScaleMul: merchantCal?.scale,
@@ -14777,7 +14810,17 @@ async function runArSession({
                         }),
                         autoFitBase,
                       );
-                      scaleSource = "admin-parity-base×merchant";
+                      const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
+                      displayScale = clampGlassesDisplayMeshScale(
+                        resolveGlassesMindarLocalMeshScale(
+                          adminMeshScale,
+                          anchor.group.matrixWorld,
+                        ),
+                        autoFitBase / Math.max(anchorU, 1e-6),
+                      );
+                      st.glassesLastAdminMeshScale = adminMeshScale;
+                      st.glassesLastAnchorUnitsPerMeter = anchorU;
+                      scaleSource = "admin-parity-base×merchant÷u";
                     } else if (st.glassesSimpleFaceOnly && lmLoc) {
                       const er = fa.eyeR;
                       const el = fa.eyeL;
@@ -14873,7 +14916,7 @@ async function runArSession({
                           st.glassesSimpleFaceOnly &&
                           (st.glassesCanonicalBlenderExport ||
                             st.glassesWorkerFrameRemapped)
-                          ? "meshScale = (fitW/rawW) × merchantScale (paridade admin; âncora T+R)"
+                          ? "meshScale = (fitW/rawW) × merchantScale ÷ u (T→0,62 m; bind identidade)"
                           : st.glassesSimpleFaceOnly
                           ? "meshScale = (ipdLandmark/faceScale × ipdMul / rawW) × merchant"
                           : "meshScale = (fitW/bboxX) × merchantScale",
@@ -14895,7 +14938,7 @@ async function runArSession({
                           z: glassesTrackingWrap.position.z.toFixed(4),
                         },
                         hint:
-                          "Canónico v160: wear em m×u no wearPosition; meshScale admin; bind identidade.",
+                          "Canónico v219: T→0,62 m; wear m÷u; meshScale admin÷u; bind identidade.",
                       });
                     }
                   };
@@ -15055,6 +15098,16 @@ async function runArSession({
                                 wNdc.z < 1,
                             }
                           : null;
+                        const anchorNormDiag = st.glassesLastAnchorNormInfo
+                          ? {
+                              transMul: Number(st.glassesLastAnchorNormInfo.transMul?.toFixed(6)),
+                              fixedDist: Number(st.glassesLastAnchorNormInfo.fixedDist?.toFixed(4)),
+                              strippedUnitScale: !!st.glassesLastAnchorNormInfo.strippedUnitScale,
+                              effectiveAnchorUAfterNorm: Number(
+                                st.glassesLastAnchorNormInfo.u?.toFixed(4),
+                              ),
+                            }
+                          : null;
                         if (ndcInfo && !ndcInfo.onScreen) {
                           const posDeltaM =
                             anchorWorldPos && wCenter
@@ -15076,6 +15129,7 @@ async function runArSession({
                             anchorUnitsPerMeter: anchor?.group
                               ? omafitAnchorUnitsPerMeter(anchor.group.matrixWorld)
                               : null,
+                            anchorNorm: anchorNormDiag,
                           });
                         } else if (cameraDistanceM != null && cameraDistanceM > 2.5) {
                           console.warn("[omafit-ar] glasses LONGE da câmara (tracking-wrap)", {
@@ -15112,6 +15166,8 @@ async function runArSession({
                                   z: Number((wCenter.z - anchorWorldPos.z).toFixed(4)),
                                 }
                               : null,
+                          anchorNorm: anchorNormDiag,
+                          adminMeshScale: st.glassesLastAdminMeshScale,
                           inRenderTree: Boolean(glasses.parent),
                           visible: glasses.visible,
                         });
