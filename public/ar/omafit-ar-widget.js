@@ -608,7 +608,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v220";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-ingest-v221";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11981,10 +11981,13 @@ async function runArSession({
       !glassesGlbStandardize;
 
     /**
-     * v220: âncora MindAR bruta (paridade v160). transMul / stripUnitScale / meshScale÷u
-     * deslocavam o GLB ~4 m fora do NDC.
+     * v221: T→~0,62 m + stripUnitScale (s=1, sem p÷u pós-transMul) + meshScale admin;
+     * hierarquia flat admin para GLB canónico (paridade preview).
      */
-    const glassesForceAnchorUnitScale = false;
+    const glassesForceAnchorUnitScale =
+      accessoryType === "glasses" &&
+      glassesSimpleFaceOnly &&
+      !glassesManualMindarRig;
 
     const readGlassesMerchantCal = () => {
       const parsed = parseOmafitCalibrationRaw(
@@ -12549,10 +12552,15 @@ async function runArSession({
       accessoryType === "glasses" ? glasses.quaternion.clone() : null;
 
     /**
-     * v213: desactivado — hierarquia plana (wear→calibRot→GLB) posicionava fora do ecrã
-     * (~3,5 m) apesar da escala correcta. Restaurar tracking-wrap + pivot (pré-v203).
+     * v221: flat wear→calibRot→GLB com stripUnitScale na âncora (v218 corrigido).
      */
-    const glassesAdminParityFlat = false;
+    const glassesAdminParityFlat =
+      accessoryType === "glasses" &&
+      glassesSimpleFaceOnly &&
+      !glassesManualMindarRig &&
+      !glassesGlbStandardize &&
+      !!glassesCanonicalBlenderExport &&
+      glassesForceAnchorUnitScale;
 
     /** 4) Hierarquia (óculos):
      *   anchor.group → wearPosition → faceParent → calibRot → [tripOffsetGroup] →
@@ -14268,18 +14276,36 @@ async function runArSession({
           }
         }
 
-        /** v220: âncora MindAR bruta — sem transMul/strip (paridade v160). */
-        const anchorRawMat = anchor.group.matrix;
-        if (accessoryType === "glasses" && !st.glassesAnchorMetersFixLogged) {
+        /** v221: T→~0,62 m + stripUnitScale (u≈1 efectivo); flat admin quando canónico. */
+        let anchorNormInfo = null;
+        const anchorRawMat =
+          accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
+            ? (() => {
+                st.anchorRawScratch.copy(anchor.group.matrix);
+                anchorNormInfo = omafitGlassesNormalizeMindarAnchorMatrix(
+                  st.anchorRawScratch,
+                  st.anchorDec,
+                  lm,
+                  { stripUnitScale: !!st.glassesForceAnchorUnitScale },
+                );
+                return st.anchorRawScratch;
+              })()
+            : anchor.group.matrix;
+
+        if (accessoryType === "glasses" && anchorNormInfo && !st.glassesAnchorMetersFixLogged) {
           st.glassesAnchorMetersFixLogged = true;
-          const e = anchor.group.matrix.elements;
-          const rawDist = Math.hypot(e[12], e[13], e[14]);
-          const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrix);
-          console.log("[omafit-ar] glasses anchor (raw MindAR, v160 parity)", {
+          const effectiveU = omafitAnchorUnitsPerMeter(st.anchorRawScratch);
+          console.log("[omafit-ar] glasses anchor translation meters fix", {
             build: OMAFIT_AR_WIDGET_BUILD,
-            rawDist: Number(rawDist.toFixed(4)),
-            anchorUnitsPerMeter: Number(anchorU.toFixed(4)),
-            note: "sem normalização T; meshScale admin directo.",
+            transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
+            rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
+            fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
+            anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
+            effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
+            strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
+            glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
+            glassesAdminParityFlat: !!st.glassesAdminParityFlat,
+            note: "transMul + stripUnitScale; meshScale admin; wear em m.",
           });
         }
 
@@ -14342,6 +14368,9 @@ async function runArSession({
               OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
               OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
             );
+            if (st.glassesForceAnchorUnitScale) {
+              st.anchorDec.s.set(1, 1, 1);
+            }
             st.smoothAnchorMat.compose(
               st.anchorDec.p.set(pF[0], pF[1], pF[2]),
               st.anchorEuroQuatState.qPrev,
@@ -14597,7 +14626,9 @@ async function runArSession({
                     break;
                   }
                 }
-                if (!faceSrc) faceSrc = fms[0];
+                if (!faceSrc && fms[0] && fms[0] !== faceOccluderMesh) {
+                  faceSrc = fms[0];
+                }
               }
               /** Pai do alinhamento facial: sempre `glassesModelWrap` (tracking wrap é filho). */
               const faceAlignParent =
