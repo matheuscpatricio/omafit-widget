@@ -35,6 +35,7 @@ import {
   OMAFIT_GLASSES_REFERENCE_IPD_M,
   OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
   addGlassesMerchantWearToPositionM,
+  applyGlassesMerchantWearAdminParityFlat,
   applyGlassesMerchantWearToAnchorPosition,
   applyGlassesMerchantCalibRotation,
   omafitAnchorUnitsPerMeter,
@@ -612,7 +613,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-bridge-depth-v244";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-wearz-flat-v245";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12298,7 +12299,24 @@ async function runArSession({
       const parsed = parseOmafitCalibrationRaw(
         arCfg?.dataset?.arOmafitCalibration || "",
       );
-      return normalizeGlassesMerchantCalibration(parsed || initialFaceCal);
+      let base = normalizeGlassesMerchantCalibration(parsed || initialFaceCal);
+      const wearRaw = String(cfgAttr("arMindarWearPosition", "")).trim();
+      if (wearRaw) {
+        const wp = parseXyzMeters(wearRaw, NaN, NaN, NaN);
+        if (
+          Number.isFinite(wp.x) &&
+          Number.isFinite(wp.y) &&
+          Number.isFinite(wp.z)
+        ) {
+          base = normalizeGlassesMerchantCalibration({
+            ...base,
+            wearX: wp.x,
+            wearY: wp.y,
+            wearZ: wp.z,
+          });
+        }
+      }
+      return base;
     };
     const readNecklaceMerchantCal = () =>
       normalizeNecklaceMerchantCalibration(
@@ -13327,9 +13345,10 @@ async function runArSession({
     if (accessoryType === "glasses" && glassesManualMindarRig) {
       wearPosition.position.set(0, 0, 0);
     } else if (glassesAdminParityFlat) {
-      applyGlassesMerchantWearToAnchorPosition(
+      anchor.group.updateMatrixWorld(true);
+      applyGlassesMerchantWearAdminParityFlat(
         wearPosition.position,
-        glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
+        anchor.group.matrixWorld,
         readGlassesMerchantCal(),
         { parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M },
       );
@@ -14869,12 +14888,26 @@ async function runArSession({
               const merchantCal = st.readGlassesMerchantCal
                 ? st.readGlassesMerchantCal()
                 : { scale: 1, wearX: 0, wearY: 0, wearZ: 0 };
-              applyGlassesMerchantWearToAnchorPosition(
+              applyGlassesMerchantWearAdminParityFlat(
                 wearPosition.position,
-                st.glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
+                anchor.group.matrixWorld,
                 merchantCal,
                 { parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M },
               );
+              const wearZNow = Number(merchantCal?.wearZ) || 0;
+              if (st.glassesLastWearZ !== wearZNow) {
+                st.glassesLastWearZ = wearZNow;
+                console.log("[omafit-ar] glasses wearZ (admin parity flat)", {
+                  build: OMAFIT_AR_WIDGET_BUILD,
+                  wearZ: wearZNow,
+                  wearPositionLocal: {
+                    x: wearPosition.position.x.toFixed(4),
+                    y: wearPosition.position.y.toFixed(4),
+                    z: wearPosition.position.z.toFixed(4),
+                  },
+                  parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
+                });
+              }
               applyGlassesMerchantCalibRotation(THREE, calibRot, merchantCal);
               const autoFitBase =
                 Number(st.glassesCalibAutoScaleBase) > 0

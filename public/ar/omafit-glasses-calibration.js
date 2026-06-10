@@ -218,6 +218,41 @@ export function applyGlassesMerchantWearToAnchorPosition(position, anchorMatrixW
 }
 
 /**
+ * Flat admin parity: wearX/Y/Z em metros nos **eixos da cena** (igual preview
+ * `/calibrate` — `wearPosition` filho da Scene). Converte para local da âncora
+ * MindAR com R^T · wearWorld em cada frame.
+ *
+ * @param {import("three").Vector3} position
+ * @param {import("three").Matrix4 | null | undefined} anchorMatrixWorld
+ * @param {{ wearX?: number, wearY?: number, wearZ?: number }} cal
+ * @param {{ parityFlatZInsetM?: number }} [opts]
+ */
+export function applyGlassesMerchantWearAdminParityFlat(
+  position,
+  anchorMatrixWorld,
+  cal,
+  opts = {},
+) {
+  if (!position) return;
+  const wx = Number(cal?.wearX) || 0;
+  const wy = Number(cal?.wearY) || 0;
+  const wz = (Number(cal?.wearZ) || 0) + (Number(opts.parityFlatZInsetM) || 0);
+  if (!anchorMatrixWorld?.elements) {
+    position.set(wx, wy, wz);
+    return;
+  }
+  const e = anchorMatrixWorld.elements;
+  const sx = Math.hypot(e[0], e[1], e[2]) || 1;
+  const sy = Math.hypot(e[4], e[5], e[6]) || 1;
+  const sz = Math.hypot(e[8], e[9], e[10]) || 1;
+  position.set(
+    (e[0] / sx) * wx + (e[1] / sx) * wy + (e[2] / sx) * wz,
+    (e[4] / sy) * wx + (e[5] / sy) * wy + (e[6] / sy) * wz,
+    (e[8] / sz) * wx + (e[9] / sz) * wy + (e[10] / sz) * wz,
+  );
+}
+
+/**
  * Escala local do mesh `glasses` para paridade admin com âncora MindAR escala ~u.
  *
  * @param {number} adminMeshScale escala preview admin (m)
