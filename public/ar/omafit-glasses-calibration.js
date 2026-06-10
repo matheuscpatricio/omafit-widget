@@ -61,29 +61,31 @@ export const OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE = 1;
 export const OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE = 0.5;
 
 /**
- * AR flat MindAR (`glassesAdminParityFlat`): aproxima a armação ao rosto vs preview
- * estático (câmara z=0,45 m). Negativo = para a pele; soma ao `wearZ` do lojista.
+ * Paridade preview admin `/calibrate`: câmara em z=0,45 m, origem ≈ ponte.
+ * O inset técnico fica a 0 — `wearZ` do lojista aplica-se só em `wearPosition`
+ * (eixos da cena), como no admin.
  */
-export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = -0.025;
+export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = 0;
 
-/** Profundidade alvo da âncora MindAR selfie (m) — paridade `omafit-ar-widget.js`. */
+/** Distância câmara→origem no preview estático admin (PerspectiveCamera z). */
+export const OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M = 0.45;
+
+/** Profundidade MindAR legacy (modos não-flat); flat admin usa {@link OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M}. */
 export const OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_DEFAULT_M = 0.62;
 
 /**
- * Flat admin parity: `wearZ` + inset técnico deslocam a **distância da âncora**
- * (MindAR T→m), não só `wearPosition` local — o slider de profundidade fica
- * visível vs profundidade fixa ~0,62 m.
+ * Flat admin parity: distância alvo da tradução MindAR (m) = preview admin.
+ * `wearZ` **não** entra aqui — só em `wearPosition` (paridade `/calibrate`).
  *
- * @param {{ wearZ?: number }} cal
+ * @param {{ wearZ?: number }} [_cal]
  * @param {{ parityFlatZInsetM?: number, baseAnchorDepthM?: number }} [opts]
  * @returns {number}
  */
-export function resolveGlassesMerchantFlatAnchorDepthM(cal, opts = {}) {
+export function resolveGlassesMerchantFlatAnchorDepthM(_cal, opts = {}) {
   const base =
-    Number(opts.baseAnchorDepthM) || OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_DEFAULT_M;
-  const depthOff =
-    (Number(cal?.wearZ) || 0) + (Number(opts.parityFlatZInsetM) || 0);
-  return Math.max(0.35, Math.min(1.05, base + depthOff));
+    Number(opts.baseAnchorDepthM) || OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M;
+  const inset = Number(opts.parityFlatZInsetM) || 0;
+  return Math.max(0.28, Math.min(0.85, base + inset));
 }
 
 /** Profundidade técnica opcional (m) fora do modo simples; no simples usar só `wearZ`. */
@@ -256,24 +258,18 @@ export function applyGlassesMerchantWearAdminParityFlat(
   if (!position) return;
   const wx = Number(cal?.wearX) || 0;
   const wy = Number(cal?.wearY) || 0;
-  const wz = (Number(cal?.wearZ) || 0) + (Number(opts.parityFlatZInsetM) || 0);
-  const depthOnAnchor = opts.depthOnAnchor === true;
+  /** Admin `/calibrate`: `wearPosition.position.set(wearX, wearY, wearZ)` — sem inset. */
+  const wz =
+    (Number(cal?.wearZ) || 0) +
+    (opts.adminWearParity === false ? Number(opts.parityFlatZInsetM) || 0 : 0);
   if (!anchorMatrixWorld?.elements) {
-    position.set(wx, wy, depthOnAnchor ? 0 : wz);
+    position.set(wx, wy, wz);
     return;
   }
   const e = anchorMatrixWorld.elements;
   const sx = Math.hypot(e[0], e[1], e[2]) || 1;
   const sy = Math.hypot(e[4], e[5], e[6]) || 1;
   const sz = Math.hypot(e[8], e[9], e[10]) || 1;
-  if (depthOnAnchor) {
-    position.set(
-      (e[0] / sx) * wx + (e[1] / sx) * wy,
-      (e[4] / sy) * wx + (e[5] / sy) * wy,
-      (e[8] / sz) * wx + (e[9] / sz) * wy,
-    );
-    return;
-  }
   position.set(
     (e[0] / sx) * wx + (e[1] / sx) * wy + (e[2] / sx) * wz,
     (e[4] / sy) * wx + (e[5] / sy) * wy + (e[6] / sy) * wz,
