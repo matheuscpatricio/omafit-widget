@@ -616,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-mesh-parity-v259";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-visible-v260";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12081,9 +12081,6 @@ async function runArSession({
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
       }
     }
-    const glassesSkipBakeFlatten =
-      accessoryType === "glasses" &&
-      (glassesIngestWidgetFrameTag || hasOmafitCanonicalNode);
     const necklaceCanonicalBlenderExport =
       accessoryType === "necklace" &&
       (/^(1|true|yes|on)$/i.test(
@@ -12137,38 +12134,19 @@ async function runArSession({
     let skippedAnimatedMeshCount = 0;
     /** Colar Tripo: bake pode esvaziar hierarquia / deslocar pivots — manter transforms do GLB. */
     if (accessoryType !== "necklace") {
-      if (glassesSkipBakeFlatten) {
+      try {
+        bakeGLBTransforms(THREE, glasses, (info) => {
+          bakedMeshCount = info.baked;
+          skippedAnimatedMeshCount = info.skipped;
+        });
+      } catch (e) {
+        console.warn(
+          "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
+          e?.message || e,
+        );
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         glasses.scale.setScalar(1);
-        glasses.updateMatrixWorld(true);
-        try {
-          console.log(
-            "[omafit-ar] glasses ingest/canonical — bake flatten omitido (paridade preview)",
-            {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              hasOmafitCanonicalNode,
-              ingestTag: glassesIngestWidgetFrameTag,
-            },
-          );
-        } catch {
-          /* ignore */
-        }
-      } else {
-        try {
-          bakeGLBTransforms(THREE, glasses, (info) => {
-            bakedMeshCount = info.baked;
-            skippedAnimatedMeshCount = info.skipped;
-          });
-        } catch (e) {
-          console.warn(
-            "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
-            e?.message || e,
-          );
-          glasses.rotation.set(0, 0, 0);
-          glasses.quaternion.identity();
-          glasses.scale.setScalar(1);
-        }
       }
     } else {
       glasses.rotation.set(0, 0, 0);
@@ -13264,7 +13242,11 @@ async function runArSession({
          */
         const lbPreBind = omafitGlassesLocalBboxCenterM(THREE, glasses);
         let ry180Applied = false;
-        if (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
+        const ry180Eligible =
+          (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) ||
+          glassesIngestWidgetFrameTag ||
+          glassesWorkerFrameRemapped;
+        if (ry180Eligible) {
           glasses.rotateOnWorldAxis(
             new THREE.Vector3(0, 1, 0),
             OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
