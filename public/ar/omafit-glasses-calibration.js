@@ -112,7 +112,9 @@ export function resolveGlassesMerchantFlatAnchorDepthM(cal, opts = {}) {
   const tracked = Number(opts.trackedFaceDistM);
   const base =
     Number.isFinite(tracked) && tracked > 0.2 ? tracked : adminBase;
-  return Math.max(0.28, Math.min(0.85, base + inset + wearZ));
+  /** Tecto 1,4 m: webcam típica fica a 0,5–1,2 m; o antigo 0,85 m prendia a
+   * âncora no limite (face a ~0,86 m) e descolava do rosto ao afastar. */
+  return Math.max(0.28, Math.min(1.4, base + inset + wearZ));
 }
 
 /** Profundidade técnica opcional (m) fora do modo simples; no simples usar só `wearZ`. */

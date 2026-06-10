@@ -616,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v250";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v251";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -14737,6 +14737,16 @@ async function runArSession({
               { x: ae[12], y: ae[13], z: ae[14] },
               omafitMindarMetricToMetersScale,
             );
+            /** v251: EMA na distância estimada — sem isto a profundidade alvo (e a
+             * escala angular) pulsam com o ruído bruto do MindAR ("flutuar"). */
+            if (flatTrackedFaceDistM != null) {
+              const prevD = Number(st.glassesTrackedFaceDistSmoothM);
+              st.glassesTrackedFaceDistSmoothM =
+                Number.isFinite(prevD) && prevD > 0
+                  ? prevD + (flatTrackedFaceDistM - prevD) * 0.12
+                  : flatTrackedFaceDistM;
+              flatTrackedFaceDistM = st.glassesTrackedFaceDistSmoothM;
+            }
           }
           flatTargetAnchorDistM = resolveGlassesMerchantFlatAnchorDepthM(
             merchantCalFrame,
@@ -14997,8 +15007,13 @@ async function runArSession({
                 }),
                 autoFitBase,
               );
+              /**
+               * v251: escala angular usa a profundidade REAL da âncora (tracking+wearZ).
+               * Com d fixo=0,45 e âncora a ~0,83 m, o tamanho projectado caía para ~54%
+               * — óculos pequenos e "a flutuar" em relação aos olhos.
+               */
               const angularMul = omafitGlassesAdminParityAngularScaleMul(
-                OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
+                flatTargetAnchorDistM || OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
                 mindarThree?.camera?.fov,
               );
               const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
