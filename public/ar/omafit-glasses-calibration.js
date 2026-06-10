@@ -66,6 +66,26 @@ export const OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE = 0.5;
  */
 export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = -0.025;
 
+/** Profundidade alvo da âncora MindAR selfie (m) — paridade `omafit-ar-widget.js`. */
+export const OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_DEFAULT_M = 0.62;
+
+/**
+ * Flat admin parity: `wearZ` + inset técnico deslocam a **distância da âncora**
+ * (MindAR T→m), não só `wearPosition` local — o slider de profundidade fica
+ * visível vs profundidade fixa ~0,62 m.
+ *
+ * @param {{ wearZ?: number }} cal
+ * @param {{ parityFlatZInsetM?: number, baseAnchorDepthM?: number }} [opts]
+ * @returns {number}
+ */
+export function resolveGlassesMerchantFlatAnchorDepthM(cal, opts = {}) {
+  const base =
+    Number(opts.baseAnchorDepthM) || OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_DEFAULT_M;
+  const depthOff =
+    (Number(cal?.wearZ) || 0) + (Number(opts.parityFlatZInsetM) || 0);
+  return Math.max(0.35, Math.min(1.05, base + depthOff));
+}
+
 /** Profundidade técnica opcional (m) fora do modo simples; no simples usar só `wearZ`. */
 export const OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M = 0;
 
@@ -237,14 +257,23 @@ export function applyGlassesMerchantWearAdminParityFlat(
   const wx = Number(cal?.wearX) || 0;
   const wy = Number(cal?.wearY) || 0;
   const wz = (Number(cal?.wearZ) || 0) + (Number(opts.parityFlatZInsetM) || 0);
+  const depthOnAnchor = opts.depthOnAnchor === true;
   if (!anchorMatrixWorld?.elements) {
-    position.set(wx, wy, wz);
+    position.set(wx, wy, depthOnAnchor ? 0 : wz);
     return;
   }
   const e = anchorMatrixWorld.elements;
   const sx = Math.hypot(e[0], e[1], e[2]) || 1;
   const sy = Math.hypot(e[4], e[5], e[6]) || 1;
   const sz = Math.hypot(e[8], e[9], e[10]) || 1;
+  if (depthOnAnchor) {
+    position.set(
+      (e[0] / sx) * wx + (e[1] / sx) * wy,
+      (e[4] / sy) * wx + (e[5] / sy) * wy,
+      (e[8] / sz) * wx + (e[9] / sz) * wy,
+    );
+    return;
+  }
   position.set(
     (e[0] / sx) * wx + (e[1] / sx) * wy + (e[2] / sx) * wz,
     (e[4] / sy) * wx + (e[5] / sy) * wy + (e[6] / sy) * wz,
