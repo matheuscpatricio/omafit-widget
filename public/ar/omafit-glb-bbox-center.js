@@ -364,35 +364,6 @@ export function omafitGlassesLocalBboxCenterM(THREE, root) {
 }
 
 /**
- * Translada vértices para `center` (espaço local do root) ≈ origem.
- *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} root
- * @param {import("three").Vector3} center
- */
-function omafitGlassesBakeRootLocalCenterToOrigin(THREE, root, center) {
-  if (!THREE || !root || !center) return 0;
-  let bakedMeshes = 0;
-  root.traverse((child) => {
-    if (!child.isMesh || child.isInstancedMesh || !child.geometry) return;
-    child.updateMatrixWorld(true);
-    const toMeshLocal = new THREE.Matrix4().multiplyMatrices(
-      new THREE.Matrix4().copy(child.matrixWorld).invert(),
-      root.matrixWorld,
-    );
-    const meshLocal = center.clone().applyMatrix4(toMeshLocal);
-    child.geometry.translate(-meshLocal.x, -meshLocal.y, -meshLocal.z);
-    if (child.geometry.boundingBox) child.geometry.computeBoundingBox();
-    if (child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
-    bakedMeshes += 1;
-  });
-  root.position.set(0, 0, 0);
-  if (typeof root.updateMatrix === "function") root.updateMatrix();
-  if (typeof root.updateMatrixWorld === "function") root.updateMatrixWorld(true);
-  return bakedMeshes;
-}
-
-/**
  * Translada vértices (não só `root.position`) para o centróide geométrico ≈ origem.
  * `position.sub(center)` move o pivot no parent mas deixa o centróide local inalterado —
  * chamadas repetidas acumulam offset (ex. ingest flat +0,58 m).
@@ -419,26 +390,23 @@ export function omafitGlassesBakeGeometricCenterToOrigin(THREE, root) {
   if (driftM <= 1e-6) {
     return { ok: true, center, driftM: 0, bakedMeshes: 0 };
   }
-  const bakedMeshes = omafitGlassesBakeRootLocalCenterToOrigin(THREE, root, center);
-  return { ok: true, center, driftM, bakedMeshes };
-}
-
-/**
- * Centra a bbox AABB local (ponte/lentes) — mais estável que centróide de vértices
- * em GLBs Rodin split (falso drift ~0,58 m no heuristic de lentes).
- *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} root
- */
-export function omafitGlassesBakeBboxCenterToOrigin(THREE, root) {
-  if (!THREE || !root) return { ok: false, reason: "missing-three-or-root", driftM: 0, bakedMeshes: 0 };
-  const center = omafitGlassesLocalBboxCenterM(THREE, root);
-  if (!center) return { ok: false, reason: "empty-bbox", driftM: 0, bakedMeshes: 0 };
-  const driftM = center.length();
-  if (driftM <= 1e-6) {
-    return { ok: true, center, driftM: 0, bakedMeshes: 0 };
-  }
-  const bakedMeshes = omafitGlassesBakeRootLocalCenterToOrigin(THREE, root, center);
+  let bakedMeshes = 0;
+  root.traverse((child) => {
+    if (!child.isMesh || child.isInstancedMesh || !child.geometry) return;
+    child.updateMatrixWorld(true);
+    const toMeshLocal = new THREE.Matrix4().multiplyMatrices(
+      new THREE.Matrix4().copy(child.matrixWorld).invert(),
+      root.matrixWorld,
+    );
+    const meshLocal = center.clone().applyMatrix4(toMeshLocal);
+    child.geometry.translate(-meshLocal.x, -meshLocal.y, -meshLocal.z);
+    if (child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    if (child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
+    bakedMeshes += 1;
+  });
+  root.position.set(0, 0, 0);
+  if (typeof root.updateMatrix === "function") root.updateMatrix();
+  if (typeof root.updateMatrixWorld === "function") root.updateMatrixWorld(true);
   return { ok: true, center, driftM, bakedMeshes };
 }
 
@@ -458,7 +426,7 @@ export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
   if (!center) return { corrected: false, center: null, driftM: 0, bakedMeshes: 0 };
   const driftM = center.length();
   if (driftM <= maxDriftM) return { corrected: false, center, driftM, bakedMeshes: 0 };
-  const baked = omafitGlassesBakeBboxCenterToOrigin(THREE, root);
+  const baked = omafitGlassesBakeGeometricCenterToOrigin(THREE, root);
   return {
     corrected: Boolean(baked?.ok && baked.bakedMeshes > 0),
     center: baked?.center || center,

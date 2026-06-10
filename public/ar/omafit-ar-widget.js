@@ -11,8 +11,6 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
-  omafitGlassesBakeBboxCenterToOrigin,
-  omafitGlassesCorrectLocalBboxCenterIfNeeded,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -612,7 +610,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-rodin-lenses-v226";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-bind-v227";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2364,6 +2362,15 @@ function omafitGlassesFlatModeForceDrawableOnFace(THREE, root) {
       } else if (isRodinLens) {
         /** GLB Rodin/ingest: sem overlay de opacity — só depthWrite off para o rosto. */
         if ("depthWrite" in mat) mat.depthWrite = false;
+        if ("depthTest" in mat) mat.depthTest = true;
+        if (mat.envMap == null && root?.parent) {
+          let scene = root.parent;
+          while (scene && !scene.isScene) scene = scene.parent;
+          if (scene?.environment) mat.envMap = scene.environment;
+        }
+        if ("envMapIntensity" in mat && Number(mat.envMapIntensity) < 0.35) {
+          mat.envMapIntensity = 1;
+        }
       } else {
         /** Paridade colar: armação por cima do depth facial MindAR / vídeo. */
         mat.depthTest = false;
@@ -5291,38 +5298,31 @@ function omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnitScale
 }
 
 /**
- * MindAR `faceMatrix`: tradução em **cm** acoplada à escala ~u na matriz.
- * 1) `decompose` → `p × transMul` (cm→m / calibrar ~0,62 m).
- * 2) `stripUnitScale`: escala=1; se `||rawP||` já estava em metros (`≤1,5`), `p÷u`;
- *    se calibrámos de cm (`>1,5`), `p` fica em metros — **sem** `p÷u`.
+ * MindAR `faceMatrix`: tradução em **cm** como unidades Three.js (m[14]≈−63).
+ * 1) `p × transMul` (cm→m, com calibração de profundidade se necessário).
+ * 2) Opcional `stripUnitScale`: escala=1 — requer `p÷u` (ver `omafitAnchorMatrixForceUnitScale`);
+ *    sem `p÷u` o residual fica ~rawT/u (~4 m) com meshScale admin directo.
  */
 function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts) {
-  if (!matrix?.decompose || !dec?.p || !dec?.q || !dec?.s) return null;
-  matrix.decompose(dec.p, dec.q, dec.s);
+  if (!matrix?.elements || !matrix?.decompose || !dec?.p || !dec?.q || !dec?.s) return null;
+  const e = matrix.elements;
   const cheekMul = omafitMindarMetricToMetersScale(lm);
-  const rawP = { x: dec.p.x, y: dec.p.y, z: dec.p.z };
+  const rawP = { x: e[12], y: e[13], z: e[14] };
   const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
   const stripUnit = opts?.stripUnitScale === true;
+  const transMul = omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnit);
+  if (transMul !== 1) {
+    e[12] *= transMul;
+    e[13] *= transMul;
+    e[14] *= transMul;
+  }
+  matrix.decompose(dec.p, dec.q, dec.s);
   const u = Math.max(
     1e-6,
     (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
   );
-  const transMul = omafitGlassesResolveMindarTranslationMetersMul(lm, rawP, stripUnit);
-  if (transMul !== 1) {
-    dec.p.x *= transMul;
-    dec.p.y *= transMul;
-    dec.p.z *= transMul;
-  }
   if (stripUnit) {
-    /** Residual ~rawT/u (~4 m) quando cm já calibrado para m — só dividir p/u em raw curto. */
-    if (rawDist <= 1.5 && u > 1.02) {
-      dec.p.x /= u;
-      dec.p.y /= u;
-      dec.p.z /= u;
-    }
     dec.s.set(1, 1, 1);
-    matrix.compose(dec.p, dec.q, dec.s);
-  } else if (transMul !== 1) {
     matrix.compose(dec.p, dec.q, dec.s);
   }
   const fixedDist = Math.hypot(dec.p.x, dec.p.y, dec.p.z);
@@ -11824,27 +11824,34 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * v226: ingest — bake bbox local nos vértices (centróide/lentes heurístico
-       * devolvia ~0,58 m de falso drift). Canónico sem ingest: origem na ponte.
-       * Outros GLBs: pivot funcional lentes via position.sub (uma vez).
+       * v226: paridade admin — AABB `position.sub(center)` uma vez após bakeGLBTransforms.
+       * Bake geométrico nos vértices deixava residual ~0,58 m (× meshScale ≈ 4 m off-screen).
        */
-      if (glassesIngestWidgetFrameTag) {
+      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
         try {
-          const baked = omafitGlassesBakeBboxCenterToOrigin(THREE, glasses);
-          if (baked?.ok && baked.driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
-            console.log("[omafit-ar] glasses bbox center baked to origin (load)", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              driftM: Number(baked.driftM.toFixed(5)),
-              offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
-              bakedMeshes: baked.bakedMeshes,
-              ingestSplit: glassesIngestWidgetFrameTag,
-              canonicalBlenderExport: glassesCanonicalBlenderExport,
-            });
+          const centered = omafitCenterObject3OnBboxOrigin(THREE, glasses);
+          if (centered.ok && centered.center) {
+            const driftM = centered.center.length();
+            const lbAfter = omafitGlassesLocalBboxCenterM(THREE, glasses);
+            const driftAfterM = lbAfter ? lbAfter.length() : 0;
+            if (
+              driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M ||
+              driftAfterM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M
+            ) {
+              console.log("[omafit-ar] glasses AABB centered to origin (load)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                driftM: Number(driftM.toFixed(5)),
+                driftAfterM: Number(driftAfterM.toFixed(5)),
+                offsetM: centered.center.toArray().map((v) => Number(v.toFixed(5))),
+                ingestSplit: glassesIngestWidgetFrameTag,
+                canonicalBlenderExport: glassesCanonicalBlenderExport,
+              });
+            }
           }
         } catch {
           /* ignore */
         }
-      } else if (!glassesCanonicalBlenderExport) {
+      } else {
         const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
         if (frontCenter) glasses.position.sub(frontCenter);
         else glasses.position.sub(box.getCenter(new THREE.Vector3()));
@@ -12765,9 +12772,14 @@ async function runArSession({
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         /**
-         * v222: AR canónico — bind identidade (v160). Ry180 é só preview admin estático;
-         * com âncora MindAR invertia frente e NDC off-screen (y≈−80).
+         * v227: paridade admin — Ry180 após AABB center (v226). Export canónico −Z frente;
+         * MindAR +Z = para câmara; identidade apontava lentes para dentro do rosto.
+         * v222 y≈−80 era drift ~0,58 m × escala, não o Ry180 em si.
          */
+        glasses.rotateOnWorldAxis(
+          new THREE.Vector3(0, 1, 0),
+          OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
+        );
         glasses.updateMatrix();
         glasses.updateMatrixWorld(true);
         calibRot.rotation.order = "YXZ";
@@ -12809,7 +12821,7 @@ async function runArSession({
             glassesForceAnchorUnitScale,
             bboxCentered: true,
             note: glassesForceAnchorUnitScale
-              ? "meshScale admin; wear em m; bind identidade AR (sem Ry180 admin)."
+              ? "meshScale admin; wear em m; bind Ry180 canónico (paridade admin)."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
@@ -14403,7 +14415,6 @@ async function runArSession({
           }
           st.smoothAnchorMat.copy(anchorRawMat);
           anchor.group.matrix.copy(st.smoothAnchorMat);
-          anchor.group.matrixWorldNeedsUpdate = true;
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -14476,7 +14487,6 @@ async function runArSession({
             }
           }
           anchor.group.matrix.copy(st.smoothAnchorMat);
-          anchor.group.matrixWorldNeedsUpdate = true;
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
             if (!st.smoothFaceMats[fi]) st.smoothFaceMats[fi] = new THREE.Matrix4();
@@ -14589,23 +14599,6 @@ async function runArSession({
                 : "admin-parity-flat÷u";
               glasses.scale.setScalar(displayScale);
               omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses);
-              if (!st.glassesFlatBboxCenterCorrected) {
-                try {
-                  const corrected = omafitGlassesCorrectLocalBboxCenterIfNeeded(THREE, glasses);
-                  if (corrected?.corrected) {
-                    st.glassesFlatBboxCenterCorrected = true;
-                    console.log("[omafit-ar] glasses bbox center runtime correction (admin parity flat)", {
-                      build: OMAFIT_AR_WIDGET_BUILD,
-                      driftM: Number(corrected.driftM?.toFixed(5)),
-                      bakedMeshes: corrected.bakedMeshes,
-                    });
-                  } else if (corrected?.driftM != null) {
-                    st.glassesFlatBboxCenterCorrected = true;
-                  }
-                } catch {
-                  st.glassesFlatBboxCenterCorrected = true;
-                }
-              }
               if (!st.glassesCalibRuntimeLogged) {
                 st.glassesCalibRuntimeLogged = true;
                 console.log("[omafit-ar] glasses admin parity flat (runtime)", {
@@ -14641,6 +14634,8 @@ async function runArSession({
                         Math.abs(wNdc.y) <= 1.05 &&
                         wNdc.z > -1 &&
                         wNdc.z < 1,
+                      onScreenXY:
+                        Math.abs(wNdc.x) <= 1.05 && Math.abs(wNdc.y) <= 1.05,
                     }
                   : null;
                 let cameraDistanceM = null;
@@ -14702,7 +14697,7 @@ async function runArSession({
                     },
                   );
                 }
-                if (ndcInfo && !ndcInfo.onScreen) {
+                if (ndcInfo && !ndcInfo.onScreen && !ndcInfo.onScreenXY) {
                   console.warn(
                     "[omafit-ar] glasses FORA do ecrã (admin parity flat) — verificar escala MindAR / wear",
                     {
