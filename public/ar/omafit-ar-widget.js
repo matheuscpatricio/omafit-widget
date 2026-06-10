@@ -616,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v251";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-rodin-color-v252";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11810,10 +11810,26 @@ async function runArSession({
       }
       if (glassesSimpleDrawableLoad) {
         try {
-          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+          if (glassesPreserveRodinGlbLenses) {
+            /**
+             * v252: GLB Rodin preservado — NÃO aplicar boosts de visibilidade
+             * (emissive cinza, clamps metal/roughness, floor de cor). Eles
+             * alteravam a coloração vs preview admin e nada os repunha depois.
+             */
+            omafitEnsureGlassesMeshesRenderable(THREE, glasses);
+            omafitGlassesApplyRodinAdminParityLighting(THREE, glasses, mindarThree?.renderer);
+            omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses, {
+              preserveRodinGlb: true,
+            });
+          } else {
+            omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+          }
           console.log("[omafit-ar] glasses AR drawable materiais (load-once sync)", {
             build: OMAFIT_AR_WIDGET_BUILD,
-            stripTransmission: glassesRenderFlags.stripTransmission !== false,
+            preserveRodinGlb: glassesPreserveRodinGlbLenses,
+            stripTransmission: glassesPreserveRodinGlbLenses
+              ? false
+              : glassesRenderFlags.stripTransmission !== false,
             physicalLenses: glassesPhysicalLenses,
             ingestSplit: omafitGlassesGlbHasIngestWidgetFrameTag(glasses),
           });
