@@ -512,7 +512,7 @@ const OMAFIT_HAND_KNUCKLE_SPAN_SCALE_MAX = 1.32;
 const OMAFIT_WATCH_SCALE_REL_MIN = 0.66;
 const OMAFIT_WATCH_SCALE_REL_MAX = 1.16;
 /** Relógio: suavização + limitador de variação por segundo (up/down). */
-const OMAFIT_WATCH_SCALE_TAU_MS = 260;
+const OMAFIT_WATCH_SCALE_TAU_MS = 110;
 const OMAFIT_WATCH_SCALE_MAX_GROW_PER_SEC = 0.5;
 const OMAFIT_WATCH_SCALE_MAX_SHRINK_PER_SEC = 0.62;
 /**
@@ -527,13 +527,13 @@ const OMAFIT_WATCH_DIAL_UP_ALIGN_MIN_DOT = 0.12;
  * que filtrar só posição/rotação depois. Aplica-se a punho + MCPs chave.
  */
 const OMAFIT_HAND_LANDMARK_ONE_EURO_INDICES = [0, 1, 5, 9, 17];
-const OMAFIT_HAND_ONE_EURO_MIN_CUTOFF = 1.05;
-const OMAFIT_HAND_ONE_EURO_BETA = 0.022;
-const OMAFIT_HAND_ONE_EURO_D_CUTOFF = 1.15;
+const OMAFIT_HAND_ONE_EURO_MIN_CUTOFF = 1.4;
+const OMAFIT_HAND_ONE_EURO_BETA = 0.048;
+const OMAFIT_HAND_ONE_EURO_D_CUTOFF = 1.25;
 /** Tau da profundidade estimada (punho→MCP) — evita pulsar em Z. */
-const OMAFIT_HAND_ZDIST_TAU_MS = 95;
-/** Relógio: rotação SLERP um pouco mais suave que o adaptativo máximo. */
-const OMAFIT_WATCH_ROT_ALPHA_CAP = 0.13;
+const OMAFIT_HAND_ZDIST_TAU_MS = 58;
+/** Relógio: tecto SLERP — v256: 0,13 causava ~300 ms+ de lag em viragens rápidas. */
+const OMAFIT_WATCH_ROT_ALPHA_CAP = 0.34;
 /** Suavização da escala radial da correia (ms) — evita saltos quando zDist muda. */
 const OMAFIT_WATCH_STRAP_BIOMETRIC_TAU_MS = 220;
 /** PBR metais Tripo: roughness base e intensidade IBL (look “luxo”). */
@@ -568,22 +568,22 @@ const OMAFIT_BRACELET_Z_SCALE_EXP = 0.38;
  */
 const OMAFIT_HAND_POS_TAU_MS = 120;
 /** EMA rápida (pré-filtro) na posição da âncora — reduz jitter do landmark antes do tau principal. */
-const OMAFIT_HAND_POS_PRETAU_MS = 52;
+const OMAFIT_HAND_POS_PRETAU_MS = 34;
 const OMAFIT_HAND_AXIS_TAU_MS = 90;
 
 /**
  * v12.0: EMA fixa na âncora da mão (pedido produto — “peso” físico).
  * Posição α=0.15, rotação SLERP t=0.10 (substitui tau exponencial neste path).
  */
-const OMAFIT_HAND_EMA_POS_ALPHA = 0.17;
-const OMAFIT_HAND_EMA_ROT_ALPHA = 0.115;
+const OMAFIT_HAND_EMA_POS_ALPHA = 0.22;
+const OMAFIT_HAND_EMA_ROT_ALPHA = 0.2;
 /** Filtro adaptativo (inspirado em One-Euro): menos jitter parado, menos lag em movimento. */
-const OMAFIT_HAND_POS_ALPHA_MIN = 0.06;
-const OMAFIT_HAND_POS_ALPHA_MAX = 0.28;
-const OMAFIT_HAND_POS_ALPHA_SPEED_GAIN = 0.12;
-const OMAFIT_HAND_ROT_ALPHA_MIN = 0.05;
-const OMAFIT_HAND_ROT_ALPHA_MAX = 0.22;
-const OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN = 0.016;
+const OMAFIT_HAND_POS_ALPHA_MIN = 0.1;
+const OMAFIT_HAND_POS_ALPHA_MAX = 0.42;
+const OMAFIT_HAND_POS_ALPHA_SPEED_GAIN = 0.14;
+const OMAFIT_HAND_ROT_ALPHA_MIN = 0.12;
+const OMAFIT_HAND_ROT_ALPHA_MAX = 0.38;
+const OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN = 0.032;
 /** Quanto da rotação axial (normal 0–5–17 vs base) entra no quaternion final. */
 const OMAFIT_HAND_WRIST_ROLL_GAIN = 0.5;
 /**
@@ -617,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-bridge-pivot-v255";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-hand-watch-tracking-v256";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -20176,10 +20176,10 @@ async function runHandArSession({
       posAlpha = THREE.MathUtils.clamp(posAlpha, OMAFIT_HAND_POS_ALPHA_MIN, OMAFIT_HAND_POS_ALPHA_MAX);
       if (!closeEnoughHand) posAlpha *= 0.62;
       posAlpha = THREE.MathUtils.clamp(posAlpha, 0.035, OMAFIT_HAND_POS_ALPHA_MAX);
-      posAlpha = THREE.MathUtils.lerp(posAlpha, OMAFIT_HAND_EMA_POS_ALPHA, 0.18);
+      posAlpha = THREE.MathUtils.lerp(posAlpha, OMAFIT_HAND_EMA_POS_ALPHA, accessoryType === "watch" ? 0.08 : 0.18);
       if (accessoryType === "bracelet") posAlpha = 0.2;
       if (accessoryType === "watch") {
-        posAlpha = THREE.MathUtils.clamp(posAlpha * 0.88, 0.05, OMAFIT_HAND_POS_ALPHA_MAX);
+        posAlpha = THREE.MathUtils.clamp(posAlpha, 0.12, OMAFIT_HAND_POS_ALPHA_MAX);
       }
       smPos.lerp(posTarget, posAlpha);
       /**
@@ -20206,11 +20206,19 @@ async function runHandArSession({
       } else {
         const dtSec = Math.max(1e-3, clampDt / 1000);
         const rotSpeed = angleBetween / dtSec;
-        let rotAlpha = OMAFIT_HAND_ROT_ALPHA_MIN + OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN * rotSpeed;
+        const rotSpeedGain =
+          accessoryType === "watch"
+            ? OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN * 1.6
+            : OMAFIT_HAND_ROT_ALPHA_SPEED_GAIN;
+        let rotAlpha = OMAFIT_HAND_ROT_ALPHA_MIN + rotSpeedGain * rotSpeed;
         rotAlpha = THREE.MathUtils.clamp(rotAlpha, OMAFIT_HAND_ROT_ALPHA_MIN, OMAFIT_HAND_ROT_ALPHA_MAX);
-        if (!closeEnoughHand) rotAlpha *= 0.7;
-        rotAlpha = THREE.MathUtils.clamp(rotAlpha, 0.03, OMAFIT_HAND_ROT_ALPHA_MAX);
-        rotAlpha = THREE.MathUtils.lerp(rotAlpha, OMAFIT_HAND_EMA_ROT_ALPHA, 0.2);
+        if (!closeEnoughHand) rotAlpha *= accessoryType === "watch" ? 0.88 : 0.7;
+        rotAlpha = THREE.MathUtils.clamp(rotAlpha, 0.06, OMAFIT_HAND_ROT_ALPHA_MAX);
+        rotAlpha = THREE.MathUtils.lerp(
+          rotAlpha,
+          OMAFIT_HAND_EMA_ROT_ALPHA,
+          accessoryType === "watch" ? 0.06 : 0.2,
+        );
         if (accessoryType === "bracelet") rotAlpha = 0.2;
         if (accessoryType === "watch") {
           rotAlpha = Math.min(rotAlpha, OMAFIT_WATCH_ROT_ALPHA_CAP);
