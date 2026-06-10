@@ -655,10 +655,6 @@ export const OMAFIT_NECKLACE_SHOULDER_WIDTH_REF_M = 0.38;
 export const OMAFIT_NECKLACE_TORSO_CHEST_FRAC = 0.14;
 /** Trapézio só com ombros: deslocamento fixo abaixo do mid-ombro (m). */
 export const OMAFIT_NECKLACE_TRAPEZIUS_SHOULDER_DOWN_M = 0.048;
-/**
- * Base ombros aponta +Z à câmara; export canónico tem frente em −Z — alinhado via `towardCam`.
- */
-export const OMAFIT_NECKLACE_TORSO_FRONT_RY180_RAD = Math.PI;
 export const OMAFIT_NECKLACE_TORSO_POSE_MIN_VIS = 0.55;
 export const OMAFIT_NECKLACE_TORSO_SHOULDER_MIN_VIS = 0.5;
 export const OMAFIT_NECKLACE_TORSO_ZDIST_MIN = 0.28;
@@ -887,16 +883,10 @@ export function omafitComputeNecklaceTorsoAnchorShouldersOnly(
   omafitUnprojectNormLmToCameraSpace(shR, rSh, zDist, aspect, mirrorX, fovDeg);
   midSh.copy(shL).add(shR).multiplyScalar(0.5);
 
+  yAxis.set(0, -1, 0);
   xAxis.subVectors(shR, shL);
   if (xAxis.lengthSq() < 1e-10) return false;
   xAxis.normalize();
-  if (scratch.prevXAxis && Number.isFinite(scratch.prevXAxis.x)) {
-    if (scratch.prevXAxis.dot(xAxis) < 0) xAxis.negate();
-  }
-  if (!scratch.prevXAxis) scratch.prevXAxis = new THREE.Vector3();
-  scratch.prevXAxis.copy(xAxis);
-
-  yAxis.set(0, -1, 0);
   zAxis.crossVectors(xAxis, yAxis);
   if (zAxis.lengthSq() < 1e-10) return false;
   zAxis.normalize();
@@ -911,100 +901,6 @@ export function omafitComputeNecklaceTorsoAnchorShouldersOnly(
   scratch.lockedZDistUsed = zDist;
   scratch.shoulderSpan3d = shL.distanceTo(shR);
   scratch.neckSource = "torso-shoulders-frozen";
-  return true;
-}
-
-/**
- * Orientação world a partir dos ombros (espaço world, não camera×qTorso).
- * Garante −Z canónico (frente) para a câmara via teste `towardCam`.
- *
- * @returns {boolean}
- */
-export function omafitNecklaceTorsoWorldQuatFromShoulders(
-  THREE,
-  torsoScratch,
-  camera,
-  nativeCmMul,
-  outQuatWorld,
-) {
-  if (!THREE || !torsoScratch || !camera || !outQuatWorld) return false;
-  if (!torsoScratch.shL || !torsoScratch.shR || !torsoScratch.midSh || !torsoScratch.chest) {
-    return false;
-  }
-  const cm = Number.isFinite(nativeCmMul) && nativeCmMul > 0 ? nativeCmMul : 1;
-  camera.updateMatrixWorld(true);
-
-  if (!torsoScratch._shLw) torsoScratch._shLw = new THREE.Vector3();
-  if (!torsoScratch._shRw) torsoScratch._shRw = new THREE.Vector3();
-  if (!torsoScratch._midW) torsoScratch._midW = new THREE.Vector3();
-  if (!torsoScratch._chestW) torsoScratch._chestW = new THREE.Vector3();
-  if (!torsoScratch._xW) torsoScratch._xW = new THREE.Vector3();
-  if (!torsoScratch._yW) torsoScratch._yW = new THREE.Vector3();
-  if (!torsoScratch._zW) torsoScratch._zW = new THREE.Vector3();
-  if (!torsoScratch._mW) torsoScratch._mW = new THREE.Matrix4();
-  if (!torsoScratch._camPos) torsoScratch._camPos = new THREE.Vector3();
-  if (!torsoScratch._towardCam) torsoScratch._towardCam = new THREE.Vector3();
-
-  const shLw = torsoScratch._shLw;
-  const shRw = torsoScratch._shRw;
-  const midW = torsoScratch._midW;
-  const chestW = torsoScratch._chestW;
-  const xW = torsoScratch._xW;
-  const yW = torsoScratch._yW;
-  const zW = torsoScratch._zW;
-  const mW = torsoScratch._mW;
-  const camPos = torsoScratch._camPos;
-  const towardCam = torsoScratch._towardCam;
-
-  shLw.copy(torsoScratch.shL).multiplyScalar(cm).applyMatrix4(camera.matrixWorld);
-  shRw.copy(torsoScratch.shR).multiplyScalar(cm).applyMatrix4(camera.matrixWorld);
-  midW.copy(torsoScratch.midSh).multiplyScalar(cm).applyMatrix4(camera.matrixWorld);
-  chestW.copy(torsoScratch.chest).multiplyScalar(cm).applyMatrix4(camera.matrixWorld);
-
-  xW.subVectors(shRw, shLw);
-  if (xW.lengthSq() < 1e-10) return false;
-  xW.normalize();
-  if (!torsoScratch.prevXAxisW) torsoScratch.prevXAxisW = new THREE.Vector3();
-  if (Number.isFinite(torsoScratch.prevXAxisW.x) && torsoScratch.prevXAxisW.dot(xW) < 0) {
-    xW.negate();
-  }
-  torsoScratch.prevXAxisW.copy(xW);
-
-  yW.subVectors(chestW, midW);
-  if (yW.lengthSq() < 1e-10) {
-    yW.set(0, -1, 0).applyQuaternion(camera.quaternion);
-  } else {
-    yW.normalize();
-  }
-
-  zW.crossVectors(xW, yW);
-  if (zW.lengthSq() < 1e-10) return false;
-  zW.normalize();
-
-  camera.getWorldPosition(camPos);
-  towardCam.subVectors(camPos, chestW);
-  if (towardCam.lengthSq() > 1e-10) {
-    towardCam.normalize();
-    /** −Z local (frente canónica) = −colZ; queremos −colZ alinhado com towardCam. */
-    if (zW.dot(towardCam) > 0) zW.negate();
-  }
-
-  yW.crossVectors(zW, xW).normalize();
-  xW.crossVectors(yW, zW).normalize();
-  mW.makeBasis(xW, yW, zW);
-  outQuatWorld.setFromRotationMatrix(mW);
-
-  if (!torsoScratch.prevTorsoWorldQuat) {
-    torsoScratch.prevTorsoWorldQuat = new THREE.Quaternion();
-  } else if (torsoScratch.prevTorsoWorldQuat.dot(outQuatWorld) < 0) {
-    outQuatWorld.set(
-      -outQuatWorld.x,
-      -outQuatWorld.y,
-      -outQuatWorld.z,
-      -outQuatWorld.w,
-    );
-  }
-  torsoScratch.prevTorsoWorldQuat.copy(outQuatWorld);
   return true;
 }
 

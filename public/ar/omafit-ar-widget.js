@@ -617,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-hand-watch-tracking-v256";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-bind-v258";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -7636,6 +7636,52 @@ function pickLocale(raw) {
   return "pt";
 }
 
+/** Idioma da loja — mesma prioridade que TryOnWidget (dataset → Shopify → HTML → URL → browser). */
+function resolveArLocale(root) {
+  const fromRoot = root?.dataset?.locale || root?.getAttribute?.("data-locale") || "";
+  if (fromRoot) return pickLocale(fromRoot);
+  try {
+    const widgetRoot = document.getElementById("omafit-widget-root");
+    const fromAdmin =
+      widgetRoot?.dataset?.omafitAdminLocale ||
+      widgetRoot?.getAttribute?.("data-omafit-admin-locale") ||
+      "";
+    if (fromAdmin) return pickLocale(fromAdmin);
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof window !== "undefined" && window.Shopify?.locale) {
+      return pickLocale(window.Shopify.locale);
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const htmlLang = document.documentElement?.lang;
+    if (htmlLang) return pickLocale(htmlLang);
+  } catch {
+    /* ignore */
+  }
+  try {
+    const q = new URLSearchParams(location.search);
+    const fromUrl =
+      q.get("locale") ||
+      q.get("language") ||
+      q.get("lang") ||
+      q.get("adminLocale") ||
+      q.get("admin_locale") ||
+      q.get("storeLanguage");
+    if (fromUrl) return pickLocale(fromUrl);
+  } catch {
+    /* ignore */
+  }
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return pickLocale(navigator.language);
+  }
+  return "pt";
+}
+
 /**
  * Bundle de textos por idioma. O bloco `byType` sobrescreve chaves específicas
  * por tipo de acessório (glasses | necklace | watch | bracelet), permitindo
@@ -7645,59 +7691,79 @@ function pickLocale(raw) {
 const COPY = {
   pt: {
     title: "Olá, sou o assistente inteligente da {storeName}!",
-    desc: "Veja como estes óculos ficam no seu rosto em tempo real, usando a câmera do seu dispositivo. Posicione o rosto de frente para a tela — o modelo 3D dos óculos acompanha o seu movimento. Os dados não são gravados nos nossos servidores.",
+    desc: "Veja como estes óculos ficam no rosto em tempo real, com a câmara do dispositivo. Posicione o rosto de frente ao ecrã; o modelo 3D acompanha os seus movimentos. Os dados não são gravados nos nossos servidores.",
     howTitle: "Como funciona",
     howBody:
-      "Na próxima etapa, toque em «Começar experiência» e autorize a câmera quando o navegador pedir.",
+      "Na etapa seguinte, toque em «Começar experiência» e autorize a câmara quando o navegador pedir.",
     cta: "Começar experiência",
-    privacy: "Ao continuar, você concorda em usar a câmera apenas localmente no seu navegador para visualização.",
+    privacy:
+      "Ao continuar, concorda em usar a câmara apenas localmente no navegador para visualização.",
     close: "Fechar",
     linkTextFallback: "Experimentar óculos (AR)",
-    arLoading: "A iniciar câmera e modelo 3D…",
-    errCamera: "Permita o uso da câmera para o provador AR.",
+    loadingCamera: "A carregar câmara…",
+    arLoading: "A iniciar câmara e modelo 3D…",
+    loadingModel: "A carregar modelo…",
+    loadingModel3d: "A carregar modelo 3D…",
+    errUnavailable: "AR indisponível neste dispositivo.",
+    errCamera: "Permita o acesso à câmara para o provador AR.",
     errCameraEmbed:
-      "A câmara está bloqueada neste iframe (política do browser, preview do tema Shopify ou extensão). Teste na loja publicada (não no editor), actualize o tema Omafit ou use o telemóvel.",
+      "A câmara está bloqueada neste iframe (política do browser, pré-visualização do tema Shopify ou extensão). Teste na loja publicada — não no editor —, actualize o tema Omafit ou use o telemóvel.",
     errFace: "Não foi possível carregar a detecção facial.",
-    errGlb: "Não foi possível carregar o modelo 3D (GLB). Verifique se o ficheiro está público e acessível.",
+    errGlb:
+      "Não foi possível carregar o modelo 3D (GLB). Verifique se o ficheiro está público e acessível.",
     errGeneric: "AR indisponível neste dispositivo.",
-    errHttps: "Abre a loja em HTTPS (ou localhost). Sem contexto seguro o browser não pede a câmera.",
-    errMediaDevices: "Este browser não expõe a câmera aqui. Experimenta Chrome/Edge actualizado ou outro perfil.",
+    errHttps:
+      "Abra a loja em HTTPS (ou localhost). Sem contexto seguro, o browser não pede a câmara.",
+    errMediaDevices:
+      "Este browser não expõe a câmara aqui. Experimente Chrome ou Edge actualizado, ou outro perfil.",
     arOpenNewWindowCta: "Abrir AR numa nova janela (recomendado no desktop)",
     arPopupBlocked:
       "O navegador bloqueou a janela nova. Permita pop-ups para o domínio do widget (ex.: omafit.netlify.app) e tente de novo.",
     arWindowModeBanner:
       "Janela dedicada ao AR: use «Começar experiência» e autorize a câmara quando o browser pedir.",
+    sidebarProgress: "Progresso",
+    sidebarStep1: "Boas-vindas",
+    sidebarStep2: "Provador AR",
     addToCart: "Adicionar ao carrinho",
     addedToCart: "Adicionado!",
     addToCartError: "Erro ao adicionar",
-    loadingModel: "Carregando modelo…",
     byType: {
       glasses: {},
       necklace: {
-        desc: "Veja como este colar fica no seu pescoço em tempo real, usando a câmera do seu dispositivo. Deixe o rosto e a parte superior do peito visíveis na tela — o colar 3D acompanha o seu pescoço. Os dados não são gravados nos nossos servidores.",
+        desc: "Veja como este colar fica no pescoço em tempo real, com a câmara do dispositivo. Mantenha o rosto e a parte superior do peito visíveis no ecrã; o modelo 3D acompanha o pescoço. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera quando o navegador pedir.",
+          "Na etapa seguinte, toque em «Começar experiência» e autorize a câmara quando o navegador pedir.",
         linkTextFallback: "Experimentar colar (AR)",
-        arLoading: "A iniciar câmera e modelo 3D do colar…",
-        errFace: "Não foi possível carregar a detecção do rosto/pescoço.",
+        arLoading: "A iniciar câmara e modelo 3D do colar…",
+        errFace: "Não foi possível carregar a detecção do rosto e do pescoço.",
       },
       watch: {
-        desc: "Veja como este relógio fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — o relógio 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
+        desc: "Veja como este relógio fica no pulso em tempo real, com a câmara traseira do telemóvel. Mantenha a mão aberta ao centro do ecrã, com o pulso bem visível; o modelo 3D encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera traseira quando o navegador pedir.",
+          "Na etapa seguinte, toque em «Começar experiência» e autorize a câmara traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar relógio (AR)",
-        arLoading: "A iniciar câmera e modelo 3D do relógio…",
-        errCamera: "Permita o uso da câmera traseira para experimentar o relógio.",
+        arLoading: "A iniciar câmara e modelo 3D do relógio…",
+        errCamera: "Permita o acesso à câmara traseira para experimentar o relógio.",
         errFace: "Não foi possível carregar a detecção da mão.",
+        preparingHandTracking: "A preparar detecção do pulso…",
+        loadingHandTrackingGpu: "A carregar detecção do pulso (GPU)…",
+        loadingHandTrackingCpu: "A carregar detecção do pulso (CPU)…",
+        switchingHandTrackingCpu: "A mudar para detecção do pulso (CPU)…",
+        handWristHint: "Coloque o pulso direito em frente à câmara.",
       },
       bracelet: {
-        desc: "Veja como esta pulseira fica no seu pulso em tempo real, usando a câmera traseira do seu celular. Mantenha a mão aberta ao centro da tela, com o pulso bem visível — a pulseira 3D se encaixa no pulso. Os dados não são gravados nos nossos servidores.",
+        desc: "Veja como esta pulseira fica no pulso em tempo real, com a câmara traseira do telemóvel. Mantenha a mão aberta ao centro do ecrã, com o pulso bem visível; o modelo 3D encaixa no pulso. Os dados não são gravados nos nossos servidores.",
         howBody:
-          "Na próxima etapa, toque em «Começar experiência» e autorize a câmera traseira quando o navegador pedir.",
+          "Na etapa seguinte, toque em «Começar experiência» e autorize a câmara traseira quando o navegador pedir.",
         linkTextFallback: "Experimentar pulseira (AR)",
-        arLoading: "A iniciar câmera e modelo 3D da pulseira…",
-        errCamera: "Permita o uso da câmera traseira para experimentar a pulseira.",
+        arLoading: "A iniciar câmara e modelo 3D da pulseira…",
+        errCamera: "Permita o acesso à câmara traseira para experimentar a pulseira.",
         errFace: "Não foi possível carregar a detecção da mão.",
+        preparingHandTracking: "A preparar detecção da pulseira…",
+        loadingHandTrackingGpu: "A carregar detecção da pulseira (GPU)…",
+        loadingHandTrackingCpu: "A carregar detecção da pulseira (CPU)…",
+        switchingHandTrackingCpu: "A mudar para detecção da pulseira (CPU)…",
+        handWristHint: "Coloque o pulso esquerdo em frente à câmara.",
       },
     },
   },
@@ -7711,7 +7777,11 @@ const COPY = {
     privacy: "By continuing, you agree to use the camera locally in your browser for preview only.",
     close: "Close",
     linkTextFallback: "Try glasses on (AR)",
+    loadingCamera: "Loading camera…",
     arLoading: "Starting camera and 3D model…",
+    loadingModel: "Loading model…",
+    loadingModel3d: "Loading 3D model…",
+    errUnavailable: "AR unavailable on this device.",
     errCamera: "Allow camera access for AR try-on.",
     errCameraEmbed:
       "Camera is blocked in this iframe (browser policy, Shopify theme preview, or an extension). Try the live storefront (not the editor), update the Omafit theme, or use a phone.",
@@ -7725,10 +7795,12 @@ const COPY = {
       "The browser blocked the new window. Allow pop-ups for the widget domain (e.g. omafit.netlify.app) and try again.",
     arWindowModeBanner:
       "Dedicated AR window: tap “Start experience” and allow the camera when the browser asks.",
+    sidebarProgress: "Progress",
+    sidebarStep1: "Welcome",
+    sidebarStep2: "AR try-on",
     addToCart: "Add to cart",
     addedToCart: "Added!",
     addToCartError: "Error adding",
-    loadingModel: "Loading model…",
     byType: {
       glasses: {},
       necklace: {
@@ -7747,6 +7819,11 @@ const COPY = {
         arLoading: "Starting rear camera and 3D watch…",
         errCamera: "Allow rear-camera access to try the watch on.",
         errFace: "Could not load hand detection.",
+        preparingHandTracking: "Preparing wrist tracking…",
+        loadingHandTrackingGpu: "Loading wrist tracking (GPU)…",
+        loadingHandTrackingCpu: "Loading wrist tracking (CPU)…",
+        switchingHandTrackingCpu: "Switching to wrist tracking (CPU)…",
+        handWristHint: "Place your right wrist in front of the camera.",
       },
       bracelet: {
         desc: "See how this bracelet looks on your wrist in real time using your phone's rear camera. Keep your open hand centered on screen with your wrist clearly visible — the 3D bracelet fits on your wrist. Your data is not stored on our servers.",
@@ -7756,6 +7833,11 @@ const COPY = {
         arLoading: "Starting rear camera and 3D bracelet…",
         errCamera: "Allow rear-camera access to try the bracelet on.",
         errFace: "Could not load hand detection.",
+        preparingHandTracking: "Preparing bracelet tracking…",
+        loadingHandTrackingGpu: "Loading bracelet tracking (GPU)…",
+        loadingHandTrackingCpu: "Loading bracelet tracking (CPU)…",
+        switchingHandTrackingCpu: "Switching to bracelet tracking (CPU)…",
+        handWristHint: "Place your left wrist in front of the camera.",
       },
     },
   },
@@ -7769,7 +7851,11 @@ const COPY = {
     privacy: "Al continuar, aceptas usar la cámara solo en tu navegador para la vista previa.",
     close: "Cerrar",
     linkTextFallback: "Probar gafas (AR)",
+    loadingCamera: "Cargando cámara…",
     arLoading: "Iniciando cámara y modelo 3D…",
+    loadingModel: "Cargando modelo…",
+    loadingModel3d: "Cargando modelo 3D…",
+    errUnavailable: "AR no disponible en este dispositivo.",
     errCamera: "Permite el acceso a la cámara para el probador AR.",
     errCameraEmbed:
       "La cámara está bloqueada en este iframe (política del navegador, vista previa del tema Shopify o extensión). Prueba en la tienda publicada (no en el editor), actualiza el tema Omafit o usa el móvil.",
@@ -7783,10 +7869,12 @@ const COPY = {
       "El navegador bloqueó la ventana emergente. Permita ventanas emergentes para el dominio del widget (p. ej. omafit.netlify.app) e inténtelo de nuevo.",
     arWindowModeBanner:
       "Ventana dedicada al AR: pulse «Empezar experiencia» y permita la cámara cuando el navegador lo pida.",
+    sidebarProgress: "Progreso",
+    sidebarStep1: "Bienvenida",
+    sidebarStep2: "Probador AR",
     addToCart: "Añadir al carrito",
     addedToCart: "¡Añadido!",
     addToCartError: "Error al añadir",
-    loadingModel: "Cargando modelo…",
     byType: {
       glasses: {},
       necklace: {
@@ -7805,6 +7893,11 @@ const COPY = {
         arLoading: "Iniciando cámara trasera y reloj 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar el reloj.",
         errFace: "No se pudo cargar la detección de la mano.",
+        preparingHandTracking: "Preparando detección de la muñeca…",
+        loadingHandTrackingGpu: "Cargando detección de la muñeca (GPU)…",
+        loadingHandTrackingCpu: "Cargando detección de la muñeca (CPU)…",
+        switchingHandTrackingCpu: "Cambiando a detección de la muñeca (CPU)…",
+        handWristHint: "Coloque la muñeca derecha delante de la cámara.",
       },
       bracelet: {
         desc: "Mira cómo queda esta pulsera en tu muñeca en tiempo real con la cámara trasera del móvil. Mantén la mano abierta en el centro de la pantalla, con la muñeca bien visible: la pulsera 3D encaja en la muñeca. Los datos no se guardan en nuestros servidores.",
@@ -7814,6 +7907,11 @@ const COPY = {
         arLoading: "Iniciando cámara trasera y pulsera 3D…",
         errCamera: "Permite el acceso a la cámara trasera para probar la pulsera.",
         errFace: "No se pudo cargar la detección de la mano.",
+        preparingHandTracking: "Preparando detección de la pulsera…",
+        loadingHandTrackingGpu: "Cargando detección de la pulsera (GPU)…",
+        loadingHandTrackingCpu: "Cargando detección de la pulsera (CPU)…",
+        switchingHandTrackingCpu: "Cambiando a detección de la pulsera (CPU)…",
+        handWristHint: "Coloque la muñeca izquierda delante de la cámara.",
       },
     },
   },
@@ -8106,10 +8204,12 @@ function omafitContrastOnPrimary(hex) {
 }
 
 function omafitArSidebarStepLabels(lang) {
-  const base = String(lang || "pt").toLowerCase().split("-")[0];
-  if (base === "es") return { progress: "Progreso", step1: "Bienvenida", step2: "Probador AR" };
-  if (base === "en") return { progress: "Progress", step1: "Welcome", step2: "AR try-on" };
-  return { progress: "Progresso", step1: "Boas-vindas", step2: "Provador AR" };
+  const t = COPY[pickLocale(lang)] || COPY.pt;
+  return {
+    progress: t.sidebarProgress || "Progresso",
+    step1: t.sidebarStep1 || "Boas-vindas",
+    step2: t.sidebarStep2 || "Provador AR",
+  };
 }
 
 function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
@@ -9469,7 +9569,7 @@ function omafitArAppendNewWindowFallbackButton(loadingEl, t, onCloseModal) {
   if (!loadingEl || !t) return;
   const btn = el("button", {
     type: "button",
-    textContent: t.arOpenNewWindowCta || "Abrir AR numa nova janela",
+    textContent: t.arOpenNewWindowCta || "",
     style: {
       marginTop: "4px",
       padding: "12px 18px",
@@ -12716,6 +12816,26 @@ async function runArSession({
         } catch {
           /* ignore */
         }
+      } else if (glassesIngestWidgetFrameTag || glassesWorkerFrameRemapped) {
+        /**
+         * GLB pós-Rodin/ingest (`omafit_ar_canonical`) ou remap runtime já em frame
+         * widget (+Y topo, −Z frente). Auto-bind / Ry(180°) no mesh distorce a forma
+         * face ao preview — o bind MindAR estático (Ry π) fica só no wrap mais abaixo.
+         */
+        glasses.updateMatrixWorld(true);
+        const szIng = new THREE.Vector3();
+        new THREE.Box3().setFromObject(glasses).getSize(szIng);
+        glassesFaceWideAxisX = szIng.x >= szIng.z;
+        try {
+          console.log("[omafit-ar] glasses ingest/widget frame — bind automático omitido", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            ingestTag: glassesIngestWidgetFrameTag,
+            workerRemapped: glassesWorkerFrameRemapped,
+            bbox: { x: szIng.x, y: szIng.y, z: szIng.z },
+          });
+        } catch {
+          /* ignore */
+        }
       } else {
         const rawBind = String(cfgAttr("arGlassesMindarBindFix", "") || "").trim();
         const rb = rawBind.toLowerCase();
@@ -12868,7 +12988,13 @@ async function runArSession({
      * deixa de estar centrada na origem — o óculos roda em torno do nariz mas
      * o mesh fica deslocado lateralmente. Re-centrar antes da escala base.
      */
-    if (accessoryType === "glasses" && glassesBboxRecenterPostBind && !glassesStructuralMindarRig) {
+    if (
+      accessoryType === "glasses" &&
+      glassesBboxRecenterPostBind &&
+      !glassesStructuralMindarRig &&
+      !glassesIngestWidgetFrameTag &&
+      !glassesWorkerFrameRemapped
+    ) {
       omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
       glasses.updateMatrixWorld(true);
       const szPivot = new THREE.Vector3();
@@ -17256,7 +17382,7 @@ async function runHandArSession({
 
   const debug = /[?&]omafit_ar_debug=1\b/.test(String(location?.search || ""));
 
-  loading.textContent = t.loadingCamera || t.loading || "A carregar câmara...";
+  loading.textContent = t.loadingCamera || t.arLoading || "";
 
   /**
    * Relógio / pulseira: câmara traseira no telemóvel (filmar a mão).
@@ -17362,10 +17488,7 @@ async function runHandArSession({
     arDeviceProfile: handArProfile,
   });
 
-  loading.textContent =
-    accessoryType === "bracelet"
-      ? "A preparar tracking da pulseira…"
-      : "A preparar tracking do pulso…";
+  loading.textContent = t.preparingHandTracking || t.arLoading || "";
 
   braceletHandLog("mediapipe:before_vision_exports", {
     visionKeys:
@@ -17397,7 +17520,7 @@ async function runHandArSession({
     braceletHandLog("mediapipe:vision_exports_invalid", {
       visionType: typeof vision,
     });
-    loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
+    loading.textContent = t.errGeneric || t.errFace || t.errUnavailable || "";
     throw new Error(
       "omafit-ar: MediaPipe tasks-vision sem FilesetResolver/HandLandmarker — verifique import/CDN.",
     );
@@ -17440,7 +17563,7 @@ async function runHandArSession({
     braceletHandLog("mediapipe:fileset_resolver_fail", {
       message: eFs?.message || String(eFs),
     });
-    loading.textContent = t.errGeneric || t.errFace || "AR indisponível.";
+    loading.textContent = t.errGeneric || t.errFace || t.errUnavailable || "";
     throw eFs instanceof Error ? eFs : new Error(String(eFs));
   }
 
@@ -17534,7 +17657,7 @@ async function runHandArSession({
   }
 
   if (braceletGpuFirstEnabled) {
-    loading.textContent = "A carregar tracking da pulseira (GPU)…";
+    loading.textContent = t.loadingHandTrackingGpu || t.preparingHandTracking || "";
     await new Promise((res) =>
       requestAnimationFrame(() => requestAnimationFrame(res)),
     );
@@ -17566,10 +17689,7 @@ async function runHandArSession({
 
   if (!handLandmarker) {
     if (cpuFirst) {
-      loading.textContent =
-        accessoryType === "bracelet"
-          ? "A carregar tracking da pulseira (CPU)…"
-          : "A carregar tracking do pulso (CPU)…";
+      loading.textContent = t.loadingHandTrackingCpu || t.preparingHandTracking || "";
       await new Promise((res) =>
         requestAnimationFrame(() => requestAnimationFrame(res)),
       );
@@ -17584,10 +17704,7 @@ async function runHandArSession({
       braceletHandLog("mediapipe:hand_landmarker_ok", { delegate: "CPU" });
     } else {
       try {
-        loading.textContent =
-          accessoryType === "bracelet"
-            ? "A carregar tracking da pulseira (GPU)…"
-            : "A carregar tracking do pulso (GPU)…";
+        loading.textContent = t.loadingHandTrackingGpu || t.preparingHandTracking || "";
         handLandmarker = await Promise.race([
           createHandLandmarker("GPU"),
           new Promise((_, rej) => {
@@ -17603,10 +17720,7 @@ async function runHandArSession({
         braceletHandLog("mediapipe:hand_landmarker_gpu_fail", {
           message: eGpu?.message || String(eGpu),
         });
-        loading.textContent =
-          accessoryType === "bracelet"
-            ? "A trocar para tracking da pulseira (CPU)…"
-            : "A trocar para tracking do pulso (CPU)…";
+        loading.textContent = t.switchingHandTrackingCpu || t.loadingHandTrackingCpu || "";
         handLandmarker = await createHandLandmarkerWithTimeout(
           "CPU",
           "HandLandmarker CPU fallback",
@@ -17624,7 +17738,7 @@ async function runHandArSession({
     hasLandmarker: Boolean(handLandmarker),
   });
 
-  loading.textContent = t.arLoading || t.loading || "A carregar modelo 3D…";
+  loading.textContent = t.arLoading || t.loadingModel3d || t.loadingModel || "";
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, {
@@ -17663,10 +17777,7 @@ async function runHandArSession({
     transition: "opacity 0.4s ease",
     boxShadow: "0 2px 14px rgba(0,0,0,0.28)",
   });
-  const handWristInstruction =
-    accessoryType === "bracelet"
-      ? "Coloque seu pulso esquerdo em frente a camera"
-      : "Coloque seu pulso direito em frente a camera";
+  const handWristInstruction = t.handWristHint || "";
   proximityHint.textContent = handWristInstruction;
   mindarHost.appendChild(proximityHint);
 
@@ -21754,7 +21865,7 @@ async function main() {
   let logoUrl = (rootLogo || adminBrand?.storeLogo || "").trim();
   logoUrl = omafitUpgradeShopifyMediaToHttps(logoUrl);
   const shopName = (root.dataset.shopName || root.getAttribute("data-shop-name") || "").trim();
-  const lang = pickLocale(root.dataset.locale);
+  const lang = resolveArLocale(root);
 
   /**
    * Tipo de acessório do produto actual. Prioridade: (1) valor calculado pelo

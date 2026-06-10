@@ -1,0 +1,26 @@
+# Exemplo de configuração Shopify CLI — copie para shopify.app.toml e ajuste.
+# Depois rode: shopify app deploy
+
+name = "omafit"
+client_id = "SEU_CLIENT_ID"
+application_url = "https://omafit-app.fly.dev"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = [
+  "https://omafit-app.fly.dev/auth/callback",
+]
+
+[webhooks]
+api_version = "2024-10"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "https://lhkgnirolvbmomeduoaj.supabase.co/functions/v1/shopify-app-uninstalled-webhook"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://omafit-app.fly.dev/webhooks"

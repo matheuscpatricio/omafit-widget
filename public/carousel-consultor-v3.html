@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Omafit — Carrossel consultor v3 (tipografia)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gloock:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=DM+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --canvas: #16100a;
+      --elevated: #241a10;
+      --cream: #f6f0e2;
+      --muted: #7a6a58;
+      --accent: #d96845;
+      --accent-dark: #b8522e;
+      --tech: #5baf8a;
+      --line: #3a2e22;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+      background: #0a0806;
+      color: var(--cream);
+      padding: 24px;
+    }
+    h1.page-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .slides {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+    .slide {
+      width: 360px;
+      aspect-ratio: 4 / 5;
+      background: linear-gradient(165deg, var(--elevated) 0%, var(--canvas) 55%);
+      position: relative;
+      overflow: hidden;
+      padding: 28px 26px;
+      display: flex;
+      flex-direction: column;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 90% 50% at 80% -5%, rgba(217, 104, 69, 0.22), transparent 55%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .pill {
+      align-self: flex-start;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cream);
+      border: 1px solid var(--line);
+      background: rgba(217, 104, 69, 0.12);
+      padding: 5px 10px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
+    .fx {
+      font-family: Gloock, Georgia, serif;
+      font-weight: 400;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      color: var(--cream);
+    }
+    .fx-accent { color: var(--accent); font-style: italic; }
+    .fx-orange { color: var(--accent); }
+    .line {
+      font-size: 11px;
+      line-height: 1.45;
+      color: rgba(246, 240, 226, 0.88);
+      margin-top: 10px;
+    }
+    .line-muted { color: var(--muted); }
+    .line-italic { font-style: italic; color: var(--muted); margin-top: auto; padding-top: 12px; font-size: 10px; }
+    .footer {
+      margin-top: auto;
+      padding-top: 14px;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .mono {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--tech);
+      letter-spacing: 0.04em;
+    }
+    .bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 10px;
+      background: var(--accent);
+    }
+    .slide--bar { padding-left: 32px; }
+    .slide--cta .cta-band {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 38%;
+      background: var(--accent);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 22px 26px;
+      z-index: 2;
+    }
+    .slide--cta .fx-on-orange {
+      font-family: Gloock, Georgia, serif;
+      font-size: 22px;
+      line-height: 1.1;
+      color: var(--cream);
+    }
+    .slide--cta .upper { padding-bottom: 42%; }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .step {
+      font-size: 10px;
+      color: rgba(246, 240, 226, 0.9);
+    }
+    .step span { color: var(--tech); font-family: 'DM Mono', monospace; margin-right: 6px; }
+    .stagger .line:nth-child(odd) { margin-left: 18px; }
+    .slide-1 .fx { font-size: 26px; }
+    .slide-2 .fx { font-size: 24px; }
+    .slide-3 .fx-quote { font-size: 18px; }
+    .slide-3 .fx-answer { font-size: 22px; margin-top: 16px; }
+    .slide-4 .fx { font-size: 21px; }
+    .slide-5 .fx { font-size: 20px; text-align: center; }
+    .slide-5 .closing {
+      margin-top: 14px;
+      text-align: center;
+      font-family: Gloock, Georgia, serif;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--accent);
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .page-title { display: none; }
+      .slide { width: 1080px; height: 1350px; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <p class="page-title">Omafit carrossel v3 — 1080×1350 (preview 360px) · sem imagens · exportar via Canva ou print</p>
+  <div class="slides">
+    <article class="slide slide-1">
+      <span class="pill">Consultor de moda · IA</span>
+      <p class="fx">Catálogo não vende.<br /><span class="fx-accent">Quem vende é quem entende.</span></p>
+      <p class="line line-muted">Omafit para Shopify</p>
+      <p class="footer">omafit.co →</p>
+    </article>
+
+    <article class="slide slide-2">
+      <span class="pill">O problema</span>
+      <p class="fx">A loja está aberta.<br />Ninguém atende.</p>
+      <div class="stagger">
+        <p class="line">SKU infinito. Orientação zero.</p>
+        <p class="line">Verão, festa, trabalho — o site não percebe.</p>
+        <p class="line">Cada hesitação vira devolução ou carrinho morto.</p>
+      </div>
+      <p class="line-italic">Comprar sozinho online é falar com paredes.</p>
+    </article>
+
+    <article class="slide slide-3">
+      <span class="pill">Na loja física</span>
+      <p class="fx fx-quote fx-orange">“Preciso de algo leve pro calor.”</p>
+      <p class="fx fx-answer">Então não é uma peça.<br />É um look.</p>
+      <p class="line line-muted">O vendedor bom ouve estação, ocasião e tom — antes de abrir o estoque.</p>
+    </article>
+
+    <article class="slide slide-4 slide--bar">
+      <div class="bar" aria-hidden="true"></div>
+      <span class="pill">Omafit</span>
+      <p class="fx">O provador virou<br />sala de consultoria.</p>
+      <p class="line">Try-on e AR mostram o corpo. O consultor lê o catálogo e devolve o próximo passo — na voz da sua marca.</p>
+      <p class="mono">24/7 · white-label</p>
+    </article>
+
+    <article class="slide slide-5">
+      <span class="pill">Na prática</span>
+      <p class="fx">Da dúvida ao look<br />em uma conversa.</p>
+      <div class="steps">
+        <p class="step"><span>01</span>Vê no corpo</p>
+        <p class="step"><span>02</span>Conta o momento</p>
+        <p class="step"><span>03</span>Recebe do catálogo</p>
+        <p class="step"><span>04</span>Sobe o ticket</p>
+      </div>
+      <p class="closing">Menos devolução. Mais confiança. Mais AOV.</p>
+    </article>
+
+    <article class="slide slide-6 slide--cta">
+      <div class="upper">
+        <span class="pill">Shopify · moda</span>
+        <p class="line" style="margin-top:0;font-size:12px;">Widget · try-on · MediaPipe · consultor Growth+</p>
+      </div>
+      <div class="cta-band">
+        <p class="fx-on-orange">Traga o vendedor<br />para o digital.</p>
+        <p class="footer" style="color:var(--cream);margin-top:10px;opacity:0.95">Conheça o Omafit — omafit.co</p>
+      </div>
+    </article>
+  </div>
+</body>
+</html>
