@@ -612,7 +612,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-flat-depth-v243";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-bridge-depth-v244";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12982,6 +12982,18 @@ async function runArSession({
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         /**
+         * Bake ingest centra na AABB (não na ponte). Alinhar midpoint interpupilar /
+         * frente das lentes à origem antes do Ry180 — paridade com `position.sub(frontCenter)` no load.
+         */
+        let flatBridgeAnchorM = null;
+        const flatBridgePt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+        if (flatBridgePt && flatBridgePt.length() > 0.001) {
+          glasses.position.sub(flatBridgePt);
+          flatBridgeAnchorM = flatBridgePt.length();
+          glasses.updateMatrix();
+          glasses.updateMatrixWorld(true);
+        }
+        /**
          * v228: Ry180 só após bake local bbox ≈ 0 (vértices). Com drift ~0,58 m residual,
          * Ry180 × meshScale empurrava centerM.y ≈ 4 m (v227).
          */
@@ -13043,6 +13055,8 @@ async function runArSession({
             merchantCal: mcFlat,
             ingestSplit: glassesIngestWidgetFrameTag,
             glassesForceAnchorUnitScale,
+            flatBridgeAnchorM: flatBridgeAnchorM != null ? Number(flatBridgeAnchorM.toFixed(5)) : null,
+            parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
             bboxCentered: true,
             ry180Applied,
             localBboxCenterPreBindM: lbPreBind

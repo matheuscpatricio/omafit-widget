@@ -64,7 +64,7 @@ export const OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE = 0.5;
  * AR flat MindAR (`glassesAdminParityFlat`): aproxima a armação ao rosto vs preview
  * estático (câmara z=0,45 m). Negativo = para a pele; soma ao `wearZ` do lojista.
  */
-export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = -0.015;
+export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = -0.025;
 
 /** Profundidade técnica opcional (m) fora do modo simples; no simples usar só `wearZ`. */
 export const OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M = 0;
