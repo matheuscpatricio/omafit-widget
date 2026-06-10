@@ -611,7 +611,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-rodin-color-v235";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-selfie-axes-v236";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2346,6 +2346,13 @@ function omafitGlassesApplyRodinPbrEnvOnFace(THREE, root, envTexture) {
     for (const mat of mats) {
       if (!mat || mat.userData?.omafitArLensMaterial) continue;
       if (!mat.envMap) mat.envMap = envTexture;
+      if (!mat.userData?.omafitRodinEnvTuned && "envMapIntensity" in mat) {
+        const src = Number(mat.envMapIntensity);
+        const base = Number.isFinite(src) && src > 0 ? src : 1;
+        mat.envMapIntensity = base * OMAFIT_GLASSES_RODIN_AR_ENV_INTENSITY_MUL;
+        mat.userData = mat.userData || {};
+        mat.userData.omafitRodinEnvTuned = true;
+      }
       const isLens = omafitIsGlassesLensMeshMaterial(THREE, root, mat, child.name, mat.name);
       if (isLens && Number(mat.transmission) > 0.02) {
         mat.transparent = true;
@@ -5327,6 +5334,10 @@ function omafitAnchorMatrixForceUnitScale(matrix, dec) {
 /** Profundidade alvo da âncora facial selfie (m) — calibra tradução MindAR bruta. */
 const OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M = 0.62;
 
+/** RoomEnvironment AR vs preview admin estático — atenua reflexos que clareiam demais o Rodin. */
+const OMAFIT_GLASSES_RODIN_AR_ENV_INTENSITY_MUL = 0.48;
+const OMAFIT_GLASSES_RODIN_AR_TONE_EXPOSURE = 0.88;
+
 /**
  * MindAR `getCameraParams().near/far` calibram para tradução bruta em cm (~||T||≈63).
  * Com `transMul`→metros (~0,62 m), near/far cm deixa ndc.z≈−2 (clip) enquanto XY parece OK.
@@ -5393,6 +5404,24 @@ function omafitGlassesFixMeterAnchorPitchInvert(THREE, quat) {
 }
 
 /**
+ * Flat admin parity + selfie MindAR: corrige pitch (v231), yaw e translação X
+ * (movimento lateral invertido vs vídeo espelhado). Não usar espelho extra no GLB.
+ */
+function omafitGlassesFixMeterAnchorSelfieFlatAxes(THREE, dec, mirrorSelfie) {
+  if (!THREE || !dec?.q || !dec?.p) return;
+  omafitGlassesFixMeterAnchorPitchInvert(THREE, dec.q);
+  if (mirrorSelfie === false) return;
+  if (!omafitGlassesFixMeterAnchorSelfieFlatAxes._euler) {
+    omafitGlassesFixMeterAnchorSelfieFlatAxes._euler = new THREE.Euler(0, 0, 0, "YXZ");
+  }
+  const e = omafitGlassesFixMeterAnchorSelfieFlatAxes._euler;
+  e.setFromQuaternion(dec.q, "YXZ");
+  e.y = -e.y;
+  dec.q.setFromEuler(e);
+  dec.p.x = -dec.p.x;
+}
+
+/**
  * Converte tradução bruta MindAR → metros. Cheek heuristic (0,01) falha quando
  * `||rawP||` ≫ 63 (ex.: ~359 → 3,6 m após ×0,01). Com `stripUnitScale`, reescala
  * para ~0,62 m mantendo direcção.
@@ -5440,7 +5469,7 @@ function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts, THREE) 
     (Math.abs(dec.s.x) + Math.abs(dec.s.y) + Math.abs(dec.s.z)) / 3,
   );
   if (stripUnit) {
-    omafitGlassesFixMeterAnchorPitchInvert(THREE, dec.q);
+    omafitGlassesFixMeterAnchorSelfieFlatAxes(THREE, dec, opts?.mirrorSelfie !== false);
     dec.s.set(1, 1, 1);
     matrix.compose(dec.p, dec.q, dec.s);
   }
@@ -5452,6 +5481,7 @@ function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts, THREE) 
     rawDist,
     fixedDist,
     strippedUnitScale: stripUnit,
+    mirrorSelfieFlatAxes: stripUnit && opts?.mirrorSelfie !== false,
     rawP,
     fixedP: { x: dec.p.x, y: dec.p.y, z: dec.p.z },
   };
@@ -13322,18 +13352,15 @@ async function runArSession({
         negModelX = !disableFaceMirror;
       }
       if (negModelX && !flipSceneX) projectionMirrorFix.scale.set(-1, 1, 1);
-      else if (glassesAdminParityFlat && !disableFaceMirror && !flipSceneX) {
-        /** Flat admin parity: espelho no ramo GLB (MindAR selfie); calibRot estava irmão vazio de projectionMirrorFix. */
-        projectionMirrorFix.scale.set(-1, 1, 1);
-      } else projectionMirrorFix.scale.set(1, 1, 1);
+      else projectionMirrorFix.scale.set(1, 1, 1);
     } catch {
       wearPosition.scale.set(1, 1, 1);
       projectionMirrorFix.scale.set(1, 1, 1);
     }
     wearPosition.add(projectionMirrorFix);
     if (glassesAdminParityFlat) {
-      /** Admin flat: wearPosition → projectionMirrorFix (selfie X) → calibRot → GLB. */
-      projectionMirrorFix.add(calibRot);
+      /** Admin flat: wearPosition → calibRot → GLB (espelho só na âncora MindAR, v236). */
+      wearPosition.add(calibRot);
     } else {
       projectionMirrorFix.add(faceParentGroup);
       faceParentGroup.add(calibRot);
@@ -13621,6 +13648,7 @@ async function runArSession({
       monolithicLensRegenWarned: false,
       glassesLensLoadState,
       glassesPreserveRodinGlbLenses: !!glassesPreserveRodinGlbLenses,
+      disableFaceMirror,
       glassesNdcScreenLock,
       glassesNdcBlendFromMp,
       glassesLensDistortK,
@@ -14204,7 +14232,11 @@ async function runArSession({
             faceArEnhancementState?.glassesLensLoadState?.preserveRodinGlb,
         );
         renderer.toneMappingExposure =
-          accessoryType === "glasses" ? (rodinColorParity ? 1 : 1.1) : 1.08;
+          accessoryType === "glasses"
+            ? rodinColorParity
+              ? OMAFIT_GLASSES_RODIN_AR_TONE_EXPOSURE
+              : 1.1
+            : 1.08;
       } catch {
         /* ignore */
       }
@@ -14602,7 +14634,10 @@ async function runArSession({
                   st.anchorRawScratch,
                   st.anchorDec,
                   lm,
-                  { stripUnitScale: !!st.glassesForceAnchorUnitScale },
+                  {
+                    stripUnitScale: !!st.glassesForceAnchorUnitScale,
+                    mirrorSelfie: st.disableFaceMirror !== true,
+                  },
                   THREE,
                 );
                 return st.anchorRawScratch;
@@ -14620,6 +14655,7 @@ async function runArSession({
             anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
             effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
             strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
+            mirrorSelfieFlatAxes: !!anchorNormInfo.mirrorSelfieFlatAxes,
             glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
             glassesAdminParityFlat: !!st.glassesAdminParityFlat,
             note: "transMul + stripUnitScale; meshScale admin; wear em m.",
