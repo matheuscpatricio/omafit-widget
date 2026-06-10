@@ -615,7 +615,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v247";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v248";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13034,16 +13034,13 @@ async function runArSession({
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         /**
-         * Bake ingest centra na AABB (não na ponte). Alinhar midpoint interpupilar /
-         * frente das lentes à origem antes do Ry180 — paridade com `position.sub(frontCenter)` no load.
+         * v248: admin preview só faz bake bbox→origem (`omafitGlassesBakeLocalBboxCenterToOrigin`).
+         * Não subtrair ponte/lentes — empurrava óculos para a frente vs admin.
          */
         let flatBridgeAnchorM = null;
         const flatBridgePt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
         if (flatBridgePt && flatBridgePt.length() > 0.001) {
-          glasses.position.sub(flatBridgePt);
           flatBridgeAnchorM = flatBridgePt.length();
-          glasses.updateMatrix();
-          glasses.updateMatrixWorld(true);
         }
         /**
          * v228: Ry180 só após bake local bbox ≈ 0 (vértices). Com drift ~0,58 m residual,
@@ -13075,7 +13072,7 @@ async function runArSession({
           autoFitFlat,
         );
         const angularMulInit = omafitGlassesAdminParityAngularScaleMul(
-          OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
+          OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
           mindarThree?.camera?.fov,
         );
         glasses.scale.setScalar(
