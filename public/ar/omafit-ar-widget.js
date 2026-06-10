@@ -32,6 +32,7 @@ import {
   OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
   OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
   OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
+  OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
   OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M,
   OMAFIT_GLASSES_REFERENCE_IPD_M,
   OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
@@ -616,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-track-latency-v253";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-physical-scale-v254";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5432,7 +5433,10 @@ function omafitGlassesFixMeterAnchorPitchInvert(THREE, quat) {
 }
 
 /**
- * Selfie flat: pitch (v231) + yaw na rotação da âncora (movimento lateral ao virar a cabeça).
+ * Selfie flat: pitch (v231) + espelho X completo na rotação da âncora.
+ * Espelho em X matematicamente correcto nega yaw **e** roll (q→(w,x,−y,−z));
+ * v253 e anteriores negavam só yaw — em viragens laterais naturais (yaw+roll
+ * combinados) a rotação composta saía errada e os óculos "não acompanhavam".
  * Não negar `dec.p.x` — `projectionMirrorFix` scaleX=-1 alinha a ponte ao LM168;
  * negar X na tradução da âncora deslocava o GLB para a esquerda (v239/v240).
  */
@@ -5446,6 +5450,7 @@ function omafitGlassesFixMeterAnchorSelfieFlatAxes(THREE, dec, mirrorSelfie) {
   const e = omafitGlassesFixMeterAnchorSelfieFlatAxes._euler;
   e.setFromQuaternion(dec.q, "YXZ");
   e.y = -e.y;
+  e.z = -e.z;
   dec.q.setFromEuler(e);
 }
 
@@ -13158,12 +13163,17 @@ async function runArSession({
           }),
           autoFitFlat,
         );
-        const angularMulInit = omafitGlassesAdminParityAngularScaleMul(
-          OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
-          mindarThree?.camera?.fov,
-        );
+        /**
+         * v254: escala FÍSICA fixa — PnP MindAR já põe a face canónica (IPD 63mm)
+         * à distância real; mesh em metros projecta proporcional ao rosto em
+         * qualquer distância. Referência: slider 50% (default) = armação 145mm.
+         * Sem factor angular por distância (v253 recalculava por frame → "respirar").
+         */
         glasses.scale.setScalar(
-          clampGlassesDisplayMeshScale(adminMeshScaleInit * angularMulInit, autoFitFlat),
+          clampGlassesDisplayMeshScale(
+            adminMeshScaleInit / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
+            autoFitFlat,
+          ),
         );
         applyGlassesMerchantCalibRotation(THREE, calibRot, mcFlat);
         calibRot.add(glasses);
@@ -15054,9 +15064,11 @@ async function runArSession({
                 { depthOnAnchor: true },
               );
               const wearZNow = Number(merchantCal?.wearZ) || 0;
+              /** v254: log só em mudança de wearZ ou Δdistância > 2cm — por frame matava o loop. */
               if (
                 st.glassesLastWearZ !== wearZNow ||
-                st.glassesLastTargetAnchorDistM !== flatTargetAnchorDistM
+                !Number.isFinite(st.glassesLastTargetAnchorDistM) ||
+                Math.abs(st.glassesLastTargetAnchorDistM - flatTargetAnchorDistM) > 0.02
               ) {
                 st.glassesLastWearZ = wearZNow;
                 st.glassesLastTargetAnchorDistM = flatTargetAnchorDistM;
@@ -15094,17 +15106,16 @@ async function runArSession({
                 autoFitBase,
               );
               /**
-               * v251: escala angular usa a profundidade REAL da âncora (tracking+wearZ).
-               * Com d fixo=0,45 e âncora a ~0,83 m, o tamanho projectado caía para ~54%
-               * — óculos pequenos e "a flutuar" em relação aos olhos.
+               * v254: escala FÍSICA constante (metros na face canónica PnP) — NÃO
+               * depende da distância. v253 multiplicava por angularMul(d) com d a
+               * variar por frame → tamanho a "respirar"/flutuar. Slider 50% = 145mm.
                */
-              const angularMul = omafitGlassesAdminParityAngularScaleMul(
-                flatTargetAnchorDistM || OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
-                mindarThree?.camera?.fov,
-              );
               const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
               const displayScale = st.glassesForceAnchorUnitScale
-                ? clampGlassesDisplayMeshScale(adminMeshScale * angularMul, autoFitBase)
+                ? clampGlassesDisplayMeshScale(
+                    adminMeshScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
+                    autoFitBase,
+                  )
                 : clampGlassesDisplayMeshScale(
                     resolveGlassesMindarLocalMeshScale(
                       adminMeshScale,
@@ -15116,7 +15127,7 @@ async function runArSession({
               st.glassesLastAdminMeshScale = adminMeshScale;
               st.glassesLastAnchorUnitsPerMeter = anchorU;
               st.glassesLastScaleSource = st.glassesForceAnchorUnitScale
-                ? "admin-parity-flat×merchant×angular"
+                ? "physical-145mm-ref(50%)"
                 : "admin-parity-flat÷u";
               glasses.scale.setScalar(displayScale);
               omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses, {
