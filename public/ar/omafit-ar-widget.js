@@ -11,6 +11,7 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
+  omafitGlassesBakeLocalBboxCenterToOrigin,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -610,7 +611,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-bind-v227";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-04-ar-glasses-bake-v228";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -11824,29 +11825,26 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * v226: paridade admin — AABB `position.sub(center)` uma vez após bakeGLBTransforms.
-       * Bake geométrico nos vértices deixava residual ~0,58 m (× meshScale ≈ 4 m off-screen).
+       * v228: bake AABB local nos vértices (`localBboxCenterM` → 0). `position.sub` só
+       * move pivot — drift ~0,58 m × meshScale ≈ 4 m off-screen no runtime flat.
        */
       if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
         try {
-          const centered = omafitCenterObject3OnBboxOrigin(THREE, glasses);
-          if (centered.ok && centered.center) {
-            const driftM = centered.center.length();
-            const lbAfter = omafitGlassesLocalBboxCenterM(THREE, glasses);
-            const driftAfterM = lbAfter ? lbAfter.length() : 0;
-            if (
-              driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M ||
-              driftAfterM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M
-            ) {
-              console.log("[omafit-ar] glasses AABB centered to origin (load)", {
-                build: OMAFIT_AR_WIDGET_BUILD,
-                driftM: Number(driftM.toFixed(5)),
-                driftAfterM: Number(driftAfterM.toFixed(5)),
-                offsetM: centered.center.toArray().map((v) => Number(v.toFixed(5))),
-                ingestSplit: glassesIngestWidgetFrameTag,
-                canonicalBlenderExport: glassesCanonicalBlenderExport,
-              });
-            }
+          const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
+          if (
+            baked?.ok &&
+            (baked.driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M ||
+              (baked.driftAfterM ?? 0) > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M)
+          ) {
+            console.log("[omafit-ar] glasses local bbox baked to origin (load)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              driftM: Number(baked.driftM.toFixed(5)),
+              driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
+              offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
+              bakedMeshes: baked.bakedMeshes,
+              ingestSplit: glassesIngestWidgetFrameTag,
+              canonicalBlenderExport: glassesCanonicalBlenderExport,
+            });
           }
         } catch {
           /* ignore */
@@ -12772,14 +12770,16 @@ async function runArSession({
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         /**
-         * v227: paridade admin — Ry180 após AABB center (v226). Export canónico −Z frente;
-         * MindAR +Z = para câmara; identidade apontava lentes para dentro do rosto.
-         * v222 y≈−80 era drift ~0,58 m × escala, não o Ry180 em si.
+         * v228: Ry180 só após bake local bbox ≈ 0 (vértices). Com drift ~0,58 m residual,
+         * Ry180 × meshScale empurrava centerM.y ≈ 4 m (v227).
          */
-        glasses.rotateOnWorldAxis(
-          new THREE.Vector3(0, 1, 0),
-          OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
-        );
+        const lbPreBind = omafitGlassesLocalBboxCenterM(THREE, glasses);
+        if (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
+          glasses.rotateOnWorldAxis(
+            new THREE.Vector3(0, 1, 0),
+            OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
+          );
+        }
         glasses.updateMatrix();
         glasses.updateMatrixWorld(true);
         calibRot.rotation.order = "YXZ";
@@ -12821,7 +12821,7 @@ async function runArSession({
             glassesForceAnchorUnitScale,
             bboxCentered: true,
             note: glassesForceAnchorUnitScale
-              ? "meshScale admin; wear em m; bind Ry180 canónico (paridade admin)."
+              ? "meshScale admin; wear em m; Ry180 só se localBboxCenter ≈ 0 pós-bake."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
