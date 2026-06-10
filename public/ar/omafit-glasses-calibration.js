@@ -240,18 +240,19 @@ export function applyGlassesMerchantWearToAnchorPosition(position, anchorMatrixW
 }
 
 /**
- * Flat admin parity: wearX/Y/Z em metros nos eixos locais da âncora (igual preview
- * `/calibrate` — `wearPosition.position.set(wearX, wearY, wearZ)`). Com
- * `glassesForceAnchorUnitScale`, a âncora já está em metros; não converter via R^T.
+ * Flat admin parity: wearX/Y em metros nos eixos da cena → local da âncora (R^T).
+ * wearZ em metros **locais** ao longo do eixo Z da âncora (normal ao rosto) — o
+ * slider de profundidade do admin move o mesh ao longo da profundidade; em AR isso
+ * corresponde ao eixo local da face, não ao Z fixo da cena (v249).
  *
  * @param {import("three").Vector3} position
- * @param {import("three").Matrix4 | null | undefined} _anchorMatrixWorld reservado (ignorado v248+)
+ * @param {import("three").Matrix4 | null | undefined} anchorMatrixWorld
  * @param {{ wearX?: number, wearY?: number, wearZ?: number }} cal
  * @param {{ parityFlatZInsetM?: number, adminWearParity?: boolean }} [opts]
  */
 export function applyGlassesMerchantWearAdminParityFlat(
   position,
-  _anchorMatrixWorld,
+  anchorMatrixWorld,
   cal,
   opts = {},
 ) {
@@ -262,7 +263,18 @@ export function applyGlassesMerchantWearAdminParityFlat(
   const wz =
     (Number(cal?.wearZ) || 0) +
     (opts.adminWearParity === false ? Number(opts.parityFlatZInsetM) || 0 : 0);
-  position.set(wx, wy, wz);
+  if (!anchorMatrixWorld?.elements) {
+    position.set(wx, wy, wz);
+    return;
+  }
+  const e = anchorMatrixWorld.elements;
+  const sx = Math.hypot(e[0], e[1], e[2]) || 1;
+  const sy = Math.hypot(e[4], e[5], e[6]) || 1;
+  position.set(
+    (e[0] / sx) * wx + (e[1] / sx) * wy,
+    (e[4] / sy) * wx + (e[5] / sy) * wy,
+    wz,
+  );
 }
 
 /**
