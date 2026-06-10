@@ -60,6 +60,12 @@ export const OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE = 1;
 /** Paridade `AR_GLASSES_SCALE_DEFAULT` em `app/ar-calibration.shared.js` (50% no slider). */
 export const OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE = 0.5;
 
+/**
+ * AR flat MindAR (`glassesAdminParityFlat`): aproxima a armação ao rosto vs preview
+ * estático (câmara z=0,45 m). Negativo = para a pele; soma ao `wearZ` do lojista.
+ */
+export const OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M = -0.015;
+
 /** Profundidade técnica opcional (m) fora do modo simples; no simples usar só `wearZ`. */
 export const OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M = 0;
 
@@ -195,17 +201,19 @@ export function omafitAnchorUnitsPerMeter(matrixWorld) {
  * @param {import("three").Vector3} position
  * @param {import("three").Matrix4 | null | undefined} anchorMatrixWorld
  * @param {{ wearX?: number, wearY?: number, wearZ?: number }} cal
+ * @param {{ parityFlatZInsetM?: number }} [opts]
  */
-export function applyGlassesMerchantWearToAnchorPosition(position, anchorMatrixWorld, cal) {
+export function applyGlassesMerchantWearToAnchorPosition(position, anchorMatrixWorld, cal, opts = {}) {
   if (!position) return;
   const u =
     anchorMatrixWorld && anchorMatrixWorld.elements
       ? omafitAnchorUnitsPerMeter(anchorMatrixWorld)
       : 1;
+  const zInset = Number(opts.parityFlatZInsetM) || 0;
   position.set(
     (Number(cal?.wearX) || 0) / u,
     (Number(cal?.wearY) || 0) / u,
-    (Number(cal?.wearZ) || 0) / u,
+    ((Number(cal?.wearZ) || 0) + zInset) / u,
   );
 }
 

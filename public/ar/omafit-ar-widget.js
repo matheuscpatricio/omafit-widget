@@ -29,6 +29,7 @@ import {
   resetMindarGlassesPivotSmoother,
 } from "./omafit-mindar-glasses-pivot-rig.js";
 import {
+  OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
   OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
   OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M,
   OMAFIT_GLASSES_REFERENCE_IPD_M,
@@ -611,7 +612,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-rodin-admin-light-v242";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-flat-depth-v243";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13316,6 +13317,7 @@ async function runArSession({
         wearPosition.position,
         glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
         readGlassesMerchantCal(),
+        { parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M },
       );
     } else if (wearPosMEffective) {
       wearPosition.position.set(wearPosMEffective.x, wearPosMEffective.y, wearPosMEffective.z);
@@ -14857,6 +14859,7 @@ async function runArSession({
                 wearPosition.position,
                 st.glassesForceAnchorUnitScale ? null : anchor.group.matrixWorld,
                 merchantCal,
+                { parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M },
               );
               applyGlassesMerchantCalibRotation(THREE, calibRot, merchantCal);
               const autoFitBase =
