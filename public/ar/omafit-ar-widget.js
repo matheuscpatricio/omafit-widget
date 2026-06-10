@@ -14762,6 +14762,9 @@ async function runArSession({
             transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
             rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
             fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
+            targetAnchorDistM: st.glassesAdminParityFlat
+              ? Number(flatTargetAnchorDistM.toFixed(4))
+              : OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
             anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
             effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
             strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
