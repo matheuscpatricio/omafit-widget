@@ -11,7 +11,6 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
-  omafitGlassesBakeLocalBboxCenterToOrigin,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -617,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-bind-v258";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-mesh-parity-v259";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2083,6 +2082,9 @@ function bakeGLBTransforms(THREE, root, onDone) {
     mesh.updateMatrixWorld(true);
     const clonedGeom = mesh.geometry.clone();
     clonedGeom.applyMatrix4(mesh.matrixWorld);
+    if (typeof clonedGeom.computeVertexNormals === "function") {
+      clonedGeom.computeVertexNormals();
+    }
     mesh.geometry = clonedGeom;
   }
 
@@ -12072,6 +12074,16 @@ async function runArSession({
     glasses.traverse((obj) => {
       if (obj && obj.name === "omafit_ar_canonical") hasOmafitCanonicalNode = true;
     });
+    if (accessoryType === "glasses" && omafitGlassesGlbHasIngestWidgetFrameTag(glasses)) {
+      glassesIngestWidgetFrameTag = true;
+      glassesWorkerFrameRemapped = true;
+      if (faceArEnhancementState) {
+        faceArEnhancementState.glassesWorkerFrameRemapped = true;
+      }
+    }
+    const glassesSkipBakeFlatten =
+      accessoryType === "glasses" &&
+      (glassesIngestWidgetFrameTag || hasOmafitCanonicalNode);
     const necklaceCanonicalBlenderExport =
       accessoryType === "necklace" &&
       (/^(1|true|yes|on)$/i.test(
@@ -12125,19 +12137,38 @@ async function runArSession({
     let skippedAnimatedMeshCount = 0;
     /** Colar Tripo: bake pode esvaziar hierarquia / deslocar pivots — manter transforms do GLB. */
     if (accessoryType !== "necklace") {
-      try {
-        bakeGLBTransforms(THREE, glasses, (info) => {
-          bakedMeshCount = info.baked;
-          skippedAnimatedMeshCount = info.skipped;
-        });
-      } catch (e) {
-        console.warn(
-          "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
-          e?.message || e,
-        );
+      if (glassesSkipBakeFlatten) {
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         glasses.scale.setScalar(1);
+        glasses.updateMatrixWorld(true);
+        try {
+          console.log(
+            "[omafit-ar] glasses ingest/canonical — bake flatten omitido (paridade preview)",
+            {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              hasOmafitCanonicalNode,
+              ingestTag: glassesIngestWidgetFrameTag,
+            },
+          );
+        } catch {
+          /* ignore */
+        }
+      } else {
+        try {
+          bakeGLBTransforms(THREE, glasses, (info) => {
+            bakedMeshCount = info.baked;
+            skippedAnimatedMeshCount = info.skipped;
+          });
+        } catch (e) {
+          console.warn(
+            "[omafit-ar] bake do GLB falhou, seguindo só com reset do root:",
+            e?.message || e,
+          );
+          glasses.rotation.set(0, 0, 0);
+          glasses.quaternion.identity();
+          glasses.scale.setScalar(1);
+        }
       }
     } else {
       glasses.rotation.set(0, 0, 0);
@@ -12152,24 +12183,6 @@ async function runArSession({
       glassesWorkerFrameRemapped = true;
       if (faceArEnhancementState) {
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
-      }
-      /** v219: canónico tem origem na ponte — não recentrar bbox (v217 deslocava ~4 m). */
-      if (!glassesCanonicalBlenderExport) {
-        try {
-          glasses.updateMatrixWorld(true);
-          const ingestBbox = new THREE.Box3().setFromObject(glasses);
-          const ingestCenter = ingestBbox.getCenter(new THREE.Vector3());
-          if (ingestCenter.length() > 0.08) {
-            glasses.position.sub(ingestCenter);
-            glasses.updateMatrixWorld(true);
-            console.log("[omafit-ar] glasses ingest: origem deslocada → centrada na bbox", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              offsetM: ingestCenter.toArray().map((v) => Number(v.toFixed(5))),
-            });
-          }
-        } catch {
-          /* ignore */
-        }
       }
     }
 
@@ -12264,37 +12277,11 @@ async function runArSession({
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
-      /**
-       * v228: bake AABB local nos vértices (`localBboxCenterM` → 0). `position.sub` só
-       * move pivot — drift ~0,58 m × meshScale ≈ 4 m off-screen no runtime flat.
-       */
-      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
-        try {
-          const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
-          if (
-            baked?.ok &&
-            (baked.driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M ||
-              (baked.driftAfterM ?? 0) > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M)
-          ) {
-            console.log("[omafit-ar] glasses local bbox baked to origin (load)", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              driftM: Number(baked.driftM.toFixed(5)),
-              driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
-              offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
-              bakedMeshes: baked.bakedMeshes,
-              ingestSplit: glassesIngestWidgetFrameTag,
-              canonicalBlenderExport: glassesCanonicalBlenderExport,
-            });
-          }
-        } catch {
-          /* ignore */
-        }
-      } else {
-        const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
-        if (frontCenter) glasses.position.sub(frontCenter);
-        else glasses.position.sub(box.getCenter(new THREE.Vector3()));
-        glasses.updateMatrixWorld(true);
-      }
+      /** Paridade preview admin: centrar na ponte/lentes (sempre, inclusive ingest/canónico). */
+      const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+      if (frontCenter) glasses.position.sub(frontCenter);
+      else glasses.position.sub(box.getCenter(new THREE.Vector3()));
+      glasses.updateMatrixWorld(true);
     } else if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
