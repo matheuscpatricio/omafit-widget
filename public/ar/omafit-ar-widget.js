@@ -11,6 +11,7 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
+  omafitGlassesBakeLocalBboxCenterToOrigin,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -616,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-visible-v260";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-center-v261";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12074,13 +12075,6 @@ async function runArSession({
     glasses.traverse((obj) => {
       if (obj && obj.name === "omafit_ar_canonical") hasOmafitCanonicalNode = true;
     });
-    if (accessoryType === "glasses" && omafitGlassesGlbHasIngestWidgetFrameTag(glasses)) {
-      glassesIngestWidgetFrameTag = true;
-      glassesWorkerFrameRemapped = true;
-      if (faceArEnhancementState) {
-        faceArEnhancementState.glassesWorkerFrameRemapped = true;
-      }
-    }
     const necklaceCanonicalBlenderExport =
       accessoryType === "necklace" &&
       (/^(1|true|yes|on)$/i.test(
@@ -12161,6 +12155,24 @@ async function runArSession({
       glassesWorkerFrameRemapped = true;
       if (faceArEnhancementState) {
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
+      }
+      /** v219: canónico tem origem na ponte — não recentrar bbox (v217 deslocava ~4 m). */
+      if (!glassesCanonicalBlenderExport) {
+        try {
+          glasses.updateMatrixWorld(true);
+          const ingestBbox = new THREE.Box3().setFromObject(glasses);
+          const ingestCenter = ingestBbox.getCenter(new THREE.Vector3());
+          if (ingestCenter.length() > 0.08) {
+            glasses.position.sub(ingestCenter);
+            glasses.updateMatrixWorld(true);
+            console.log("[omafit-ar] glasses ingest: origem deslocada → centrada na bbox", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              offsetM: ingestCenter.toArray().map((v) => Number(v.toFixed(5))),
+            });
+          }
+        } catch {
+          /* ignore */
+        }
       }
     }
 
@@ -12255,11 +12267,39 @@ async function runArSession({
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
-      /** Paridade preview admin: centrar na ponte/lentes (sempre, inclusive ingest/canónico). */
-      const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
-      if (frontCenter) glasses.position.sub(frontCenter);
-      else glasses.position.sub(box.getCenter(new THREE.Vector3()));
-      glasses.updateMatrixWorld(true);
+      /**
+       * Ingest/canónico: bake AABB local nos vértices (`localBboxCenterM` → 0).
+       * `position.sub` só move pivot — o tracking wrap repõe `position` depois;
+       * sem bake nos vértices o modelo some (regressão v259/v260).
+       * Demais GLBs: centró na ponte/lentes (paridade preview admin).
+       */
+      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
+        try {
+          const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
+          if (
+            baked?.ok &&
+            (baked.driftM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M ||
+              (baked.driftAfterM ?? 0) > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M)
+          ) {
+            console.log("[omafit-ar] glasses local bbox baked to origin (load)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              driftM: Number(baked.driftM.toFixed(5)),
+              driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
+              offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
+              bakedMeshes: baked.bakedMeshes,
+              ingestSplit: glassesIngestWidgetFrameTag,
+              canonicalBlenderExport: glassesCanonicalBlenderExport,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      } else {
+        const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+        if (frontCenter) glasses.position.sub(frontCenter);
+        else glasses.position.sub(box.getCenter(new THREE.Vector3()));
+        glasses.updateMatrixWorld(true);
+      }
     } else if (!glassesCanonicalBlenderExport) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
@@ -13242,11 +13282,7 @@ async function runArSession({
          */
         const lbPreBind = omafitGlassesLocalBboxCenterM(THREE, glasses);
         let ry180Applied = false;
-        const ry180Eligible =
-          (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) ||
-          glassesIngestWidgetFrameTag ||
-          glassesWorkerFrameRemapped;
-        if (ry180Eligible) {
+        if (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
           glasses.rotateOnWorldAxis(
             new THREE.Vector3(0, 1, 0),
             OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
