@@ -616,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-rodin-color-v252";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-track-latency-v253";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -928,7 +928,7 @@ const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH = 0.2;
  * Óculos: λ na `omafitDampMatrix4` (malha facial + âncora quando sem One Euro no 168).
  * Valor mais baixo = mais suavização (menos jitter na base do rosto).
  */
-const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH_GLASSES = 0.22;
+const OMAFIT_FACE_MATRIX_EXTRA_SMOOTH_GLASSES = 0.4;
 /** Lerp/slerp pivot manual óculos: fração do **alvo** por frame (0.6–0.85 típico). */
 const OMAFIT_GLASSES_MANUAL_PIVOT_LERP_DEFAULT = 0.72;
 /** Colar: λ mais conservador que óculos (menos “colado” à malha; evita puxar o colar com o mesmo agressivo). */
@@ -973,8 +973,12 @@ const OMAFIT_NECKLACE_POSE_BLEND_ACTIVE = true;
  */
 const OMAFIT_NECKLACE_TRAPEZIUS_FRACTION = 0.58;
 /** One Euro na descomposição posição+quaternion da âncora 168 (pós MindAR). */
-const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.24;
-const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.052;
+/**
+ * v253: minCutoff 0.24→0.9 Hz (τ repouso ~0,66s→~0,18s) e beta 0.052→0.15 —
+ * a âncora seguia a rotação lateral com ~1s de atraso e demorava a recentrar.
+ */
+const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.9;
+const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.15;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF = 1.02;
 /** Largura da armação = `factor` × distância métrica 234–454 (bochechas). Override: `data-ar-glasses-anatomic-width-factor`. */
 const OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR = 1.05;
@@ -11370,6 +11374,50 @@ async function runArSession({
       /* ignore */
     }
 
+    /**
+     * v253: download do GLB + Draco em paralelo com câmara/WASM MediaPipe.
+     * Antes era serial (câmara → depois GLB) — os óculos demoravam segundos
+     * a aparecer depois do vídeo abrir.
+     */
+    const glbPrefetch = (() => {
+      try {
+        const r =
+          typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+        const domVer = r
+          ? String(r.dataset.arGlbVersion || r.getAttribute("data-ar-glb-version") || "").trim()
+          : "";
+        const sessionUrl =
+          omafitReadGlbUrlFromRootOrQuery() ||
+          omafitAbsolutizeGlbUrlMaybe(String(glbUrl || "").trim());
+        const ver =
+          domVer ||
+          String(
+            arCfg?.dataset?.arGlbVersion || arCfg?.getAttribute?.("data-ar-glb-version") || "",
+          ).trim();
+        const loadUrl = buildGlbLoaderUrl(sessionUrl, ver) || sessionUrl;
+        const wantDraco = !/^(0|false|off|no)$/i.test(
+          String(cfgAttr("arGlbDraco", "1")).trim(),
+        );
+        return {
+          loadUrl,
+          bufferPromise: loadUrl
+            ? fetch(loadUrl, { mode: "cors" })
+                .then((resp) => (resp.ok ? resp.arrayBuffer() : null))
+                .catch(() => null)
+            : Promise.resolve(null),
+          dracoPromise: wantDraco
+            ? omafitGetSharedDracoLoader().catch(() => null)
+            : Promise.resolve(null),
+        };
+      } catch {
+        return {
+          loadUrl: "",
+          bufferPromise: Promise.resolve(null),
+          dracoPromise: Promise.resolve(null),
+        };
+      }
+    })();
+
     await startMindARFaceWithReliableCamera(
       mindarThree,
       omafitBuildFaceUserMediaVideoIdeal(arDeviceProfile),
@@ -11535,7 +11583,7 @@ async function runArSession({
     let dracoLoaderFace = null;
     if (arGlbDraco) {
       try {
-        dracoLoaderFace = await omafitGetSharedDracoLoader();
+        dracoLoaderFace = (await glbPrefetch.dracoPromise) || (await omafitGetSharedDracoLoader());
       } catch (e) {
         console.warn("[omafit-ar] Draco indisponível (GLB sem Draco continua OK):", e?.message || e);
       }
@@ -11552,19 +11600,41 @@ async function runArSession({
     } catch {
       /* ignore */
     }
+    /** v253: usar o buffer pré-carregado (parse directo) — sem segundo download. */
+    const prefetchedGlbBuffer =
+      glbPrefetch.loadUrl && glbPrefetch.loadUrl === glbLoadUrl
+        ? await glbPrefetch.bufferPromise
+        : null;
     const gltf = await new Promise((resolve, reject) => {
-      loader.load(
-        glbLoadUrl,
-        resolve,
-        undefined,
-        (err) => {
-          console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
-            url: glbLoadUrl,
-            message: err?.message || String(err),
+      const loadFromNetwork = () => {
+        loader.load(
+          glbLoadUrl,
+          resolve,
+          undefined,
+          (err) => {
+            console.error("[omafit-ar] GLTFLoader falhou", OMAFIT_AR_WIDGET_BUILD, {
+              url: glbLoadUrl,
+              message: err?.message || String(err),
+            });
+            reject(err);
+          },
+        );
+      };
+      if (prefetchedGlbBuffer) {
+        try {
+          loader.parse(prefetchedGlbBuffer, "", resolve, (err) => {
+            console.warn(
+              "[omafit-ar] GLB prefetch parse falhou — fallback download",
+              err?.message || err,
+            );
+            loadFromNetwork();
           });
-          reject(err);
-        },
-      );
+          return;
+        } catch (e) {
+          console.warn("[omafit-ar] GLB prefetch parse erro síncrono:", e?.message || e);
+        }
+      }
+      loadFromNetwork();
     });
     let glasses = gltf.scene;
     /** Root GLB: estado conhecido antes de bake / bind (óculos). */
