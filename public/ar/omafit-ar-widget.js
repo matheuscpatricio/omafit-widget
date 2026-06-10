@@ -617,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-physical-scale-v254";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-bridge-pivot-v255";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -978,8 +978,8 @@ const OMAFIT_NECKLACE_TRAPEZIUS_FRACTION = 0.58;
  * v253: minCutoff 0.24→0.9 Hz (τ repouso ~0,66s→~0,18s) e beta 0.052→0.15 —
  * a âncora seguia a rotação lateral com ~1s de atraso e demorava a recentrar.
  */
-const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 0.9;
-const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.15;
+const OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF = 1.2;
+const OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA = 0.28;
 const OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF = 1.02;
 /** Largura da armação = `factor` × distância métrica 234–454 (bochechas). Override: `data-ar-glasses-anatomic-width-factor`. */
 const OMAFIT_GLASSES_ANATOMIC_WIDTH_FACTOR = 1.05;
@@ -5433,12 +5433,10 @@ function omafitGlassesFixMeterAnchorPitchInvert(THREE, quat) {
 }
 
 /**
- * Selfie flat: pitch (v231) + espelho X completo na rotação da âncora.
- * Espelho em X matematicamente correcto nega yaw **e** roll (q→(w,x,−y,−z));
- * v253 e anteriores negavam só yaw — em viragens laterais naturais (yaw+roll
- * combinados) a rotação composta saía errada e os óculos "não acompanhavam".
+ * Selfie flat: pitch (v231) + yaw na rotação da âncora (movimento lateral ao virar a cabeça).
  * Não negar `dec.p.x` — `projectionMirrorFix` scaleX=-1 alinha a ponte ao LM168;
  * negar X na tradução da âncora deslocava o GLB para a esquerda (v239/v240).
+ * v254 negava roll também — inclinações naturais ficavam invertidas; revertido v255.
  */
 function omafitGlassesFixMeterAnchorSelfieFlatAxes(THREE, dec, mirrorSelfie) {
   if (!THREE || !dec?.q) return;
@@ -5450,7 +5448,6 @@ function omafitGlassesFixMeterAnchorSelfieFlatAxes(THREE, dec, mirrorSelfie) {
   const e = omafitGlassesFixMeterAnchorSelfieFlatAxes._euler;
   e.setFromQuaternion(dec.q, "YXZ");
   e.y = -e.y;
-  e.z = -e.z;
   dec.q.setFromEuler(e);
 }
 
@@ -5525,7 +5522,21 @@ function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts, THREE) 
     matrix.compose(dec.p, dec.q, dec.s);
     matrix.decompose(dec.p, dec.q, dec.s);
     const curDist = Math.hypot(dec.p.x, dec.p.y, dec.p.z);
-    if (curDist > 1e-6 && Number.isFinite(targetDistM)) {
+    const wearZ = Number(opts?.wearZ) || 0;
+    /**
+     * v255 flat: profundidade NATIVA MindAR (só cm→m). Rescale radial para
+     * trackedFaceDistM (v250–v254) movia a âncora ~9 cm por frame → óculos
+     * não acompanhavam os olhos. wearZ soma à distância nativa; sem tracked EMA.
+     */
+    if (opts?.nativeAnchorDepth === true) {
+      if (curDist > 1e-6 && Math.abs(wearZ) > 1e-6) {
+        const depthScale = (curDist + wearZ) / curDist;
+        dec.p.x *= depthScale;
+        dec.p.y *= depthScale;
+        dec.p.z *= depthScale;
+        matrix.compose(dec.p, dec.q, dec.s);
+      }
+    } else if (curDist > 1e-6 && Number.isFinite(targetDistM)) {
       const depthScale = targetDistM / curDist;
       dec.p.x *= depthScale;
       dec.p.y *= depthScale;
@@ -13149,6 +13160,16 @@ async function runArSession({
         }
         glasses.updateMatrix();
         glasses.updateMatrixWorld(true);
+        /**
+         * v255: pivot de rotação na ponte/lentes (LM168), não no centróide da bbox.
+         * Bbox bake deixa origem no centro geométrico (~0,58 m da ponte) — viragens
+         * laterais faziam as lentes "escorregarem" dos olhos.
+         */
+        const bridgePivotPt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+        if (bridgePivotPt && bridgePivotPt.length() > 0.001) {
+          glasses.position.sub(bridgePivotPt);
+          glasses.updateMatrixWorld(true);
+        }
         calibRot.rotation.order = "YXZ";
         const mcFlat = readGlassesMerchantCal();
         const autoFitFlat = resolveGlassesCalibScaleBase({
@@ -13209,7 +13230,7 @@ async function runArSession({
               ? Number(lbPreBind.length().toFixed(5))
               : null,
             note: glassesForceAnchorUnitScale
-              ? "meshScale admin (z=0,45); âncora=tracking+wearZ; bbox centro (sem ponte)."
+              ? "meshScale físico fixo; âncora MindAR nativa+wearZ; pivot ponte LM168."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
@@ -14820,12 +14841,13 @@ async function runArSession({
           }
         }
 
-        /** v221: T→tracking MindAR + wearZ; escala admin usa z=0,45 fixo (angularMul). */
+        /** v221: T→tracking MindAR nativo + wearZ; sem rescale radial tracked (v255). */
         let anchorNormInfo = null;
         let flatTargetAnchorDistM = OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M;
         let flatTrackedFaceDistM = null;
+        let merchantCalFrame = null;
         if (st.glassesAdminParityFlat && st.readGlassesMerchantCal) {
-          const merchantCalFrame = st.readGlassesMerchantCal();
+          merchantCalFrame = st.readGlassesMerchantCal();
           if (st.anchorRawScratch && anchor?.group?.matrix?.elements) {
             const ae = anchor.group.matrix.elements;
             flatTrackedFaceDistM = estimateMindarTrackedFaceDistM(
@@ -14833,16 +14855,6 @@ async function runArSession({
               { x: ae[12], y: ae[13], z: ae[14] },
               omafitMindarMetricToMetersScale,
             );
-            /** v251: EMA na distância estimada — sem isto a profundidade alvo (e a
-             * escala angular) pulsam com o ruído bruto do MindAR ("flutuar"). */
-            if (flatTrackedFaceDistM != null) {
-              const prevD = Number(st.glassesTrackedFaceDistSmoothM);
-              st.glassesTrackedFaceDistSmoothM =
-                Number.isFinite(prevD) && prevD > 0
-                  ? prevD + (flatTrackedFaceDistM - prevD) * 0.12
-                  : flatTrackedFaceDistM;
-              flatTrackedFaceDistM = st.glassesTrackedFaceDistSmoothM;
-            }
           }
           flatTargetAnchorDistM = resolveGlassesMerchantFlatAnchorDepthM(
             merchantCalFrame,
@@ -14863,6 +14875,8 @@ async function runArSession({
                   {
                     stripUnitScale: !!st.glassesForceAnchorUnitScale,
                     mirrorSelfie: st.disableFaceMirror !== true,
+                    nativeAnchorDepth: !!st.glassesAdminParityFlat,
+                    wearZ: Number(merchantCalFrame?.wearZ) || 0,
                     targetAnchorDistM: st.glassesAdminParityFlat
                       ? flatTargetAnchorDistM
                       : OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
@@ -14895,7 +14909,8 @@ async function runArSession({
             mirrorSelfieFlatAxes: !!anchorNormInfo.mirrorSelfieFlatAxes,
             glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
             glassesAdminParityFlat: !!st.glassesAdminParityFlat,
-            note: "transMul + stripUnitScale; meshScale admin; wear em m.",
+            nativeAnchorDepth: !!st.glassesAdminParityFlat,
+            note: "transMul + stripUnitScale; flat=v255 native depth + bridge pivot; wearZ em m.",
           });
         }
 
@@ -14941,31 +14956,56 @@ async function runArSession({
           ) {
             anchorRawMat.decompose(st.anchorDec.p, st.anchorDec.q, st.anchorDec.s);
             const tSec = nowMs * 0.001;
-            const pF = omafitOneEuroFilterVec3(
-              [st.anchorDec.p.x, st.anchorDec.p.y, st.anchorDec.p.z],
-              tSec,
-              st.anchorEuroPosState,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
-            );
-            omafitOneEuroFilterQuaternion(
-              THREE,
-              st.anchorDec.q,
-              tSec,
-              st.anchorEuroQuatState,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
-              OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
-            );
-            if (st.glassesForceAnchorUnitScale) {
-              st.anchorDec.s.set(1, 1, 1);
+            /**
+             * v255 flat: One Euro só na rotação — posição bruta MindAR (PnP).
+             * Filtrar tradução + rotação em separado desacopla os óculos dos olhos
+             * em viragens laterais (posição atrasa rotação).
+             */
+            if (st.glassesAdminParityFlat) {
+              omafitOneEuroFilterQuaternion(
+                THREE,
+                st.anchorDec.q,
+                tSec,
+                st.anchorEuroQuatState,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
+              );
+              if (st.glassesForceAnchorUnitScale) {
+                st.anchorDec.s.set(1, 1, 1);
+              }
+              st.smoothAnchorMat.compose(
+                st.anchorDec.p,
+                st.anchorEuroQuatState.qPrev,
+                st.anchorDec.s,
+              );
+            } else {
+              const pF = omafitOneEuroFilterVec3(
+                [st.anchorDec.p.x, st.anchorDec.p.y, st.anchorDec.p.z],
+                tSec,
+                st.anchorEuroPosState,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
+              );
+              omafitOneEuroFilterQuaternion(
+                THREE,
+                st.anchorDec.q,
+                tSec,
+                st.anchorEuroQuatState,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
+              );
+              if (st.glassesForceAnchorUnitScale) {
+                st.anchorDec.s.set(1, 1, 1);
+              }
+              st.smoothAnchorMat.compose(
+                st.anchorDec.p.set(pF[0], pF[1], pF[2]),
+                st.anchorEuroQuatState.qPrev,
+                st.anchorDec.s,
+              );
             }
-            st.smoothAnchorMat.compose(
-              st.anchorDec.p.set(pF[0], pF[1], pF[2]),
-              st.anchorEuroQuatState.qPrev,
-              st.anchorDec.s,
-            );
           } else {
             if (accessoryType === "necklace") {
               omafitDampMatrix4PosRotOnly(
