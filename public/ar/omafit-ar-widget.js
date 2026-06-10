@@ -46,6 +46,7 @@ import {
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
+  estimateMindarTrackedFaceDistM,
   resolveGlassesMerchantFlatAnchorDepthM,
   resolveGlassesMindarLocalMeshScale,
   clampGlassesDisplayMeshScale,
@@ -615,7 +616,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v249";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-ar-glasses-admin-depth-v250";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13034,17 +13035,13 @@ async function runArSession({
         glasses.rotation.set(0, 0, 0);
         glasses.quaternion.identity();
         /**
-         * Bake bbox→origem no load; aqui alinhar ponte/lentes (LM168) à origem antes
-         * do Ry180. v248 removeu isto e afastou os óculos — admin centra bbox mas AR
-         * precisa da ponte na âncora MindAR.
+         * v250: paridade admin = bbox ao centro (sem subtrair ponte). A ponte na
+         * âncora MindAR empurrava ~flatBridgeAnchorM à frente do preview /calibrate.
          */
         let flatBridgeAnchorM = null;
         const flatBridgePt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
         if (flatBridgePt && flatBridgePt.length() > 0.001) {
-          glasses.position.sub(flatBridgePt);
           flatBridgeAnchorM = flatBridgePt.length();
-          glasses.updateMatrix();
-          glasses.updateMatrixWorld(true);
         }
         /**
          * v228: Ry180 só após bake local bbox ≈ 0 (vértices). Com drift ~0,58 m residual,
@@ -13116,7 +13113,7 @@ async function runArSession({
               ? Number(lbPreBind.length().toFixed(5))
               : null,
             note: glassesForceAnchorUnitScale
-              ? "meshScale admin; wear em m; Ry180 só se localBboxCenter ≈ 0 pós-bake."
+              ? "meshScale admin (z=0,45); âncora=tracking+wearZ; bbox centro (sem ponte)."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
           });
         } catch {
@@ -13385,6 +13382,7 @@ async function runArSession({
         wearPosition.position,
         anchor.group.matrixWorld,
         readGlassesMerchantCal(),
+        { depthOnAnchor: true },
       );
     } else if (wearPosMEffective) {
       wearPosition.position.set(wearPosMEffective.x, wearPosMEffective.y, wearPosMEffective.z);
@@ -14726,13 +14724,27 @@ async function runArSession({
           }
         }
 
-        /** v221: T→~0,62 m + stripUnitScale (u≈1 efectivo); flat admin quando canónico. */
+        /** v221: T→tracking MindAR + wearZ; escala admin usa z=0,45 fixo (angularMul). */
         let anchorNormInfo = null;
         let flatTargetAnchorDistM = OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M;
+        let flatTrackedFaceDistM = null;
         if (st.glassesAdminParityFlat && st.readGlassesMerchantCal) {
-          flatTargetAnchorDistM = resolveGlassesMerchantFlatAnchorDepthM(null, {
-            parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
-          });
+          const merchantCalFrame = st.readGlassesMerchantCal();
+          if (st.anchorRawScratch && anchor?.group?.matrix?.elements) {
+            const ae = anchor.group.matrix.elements;
+            flatTrackedFaceDistM = estimateMindarTrackedFaceDistM(
+              lm,
+              { x: ae[12], y: ae[13], z: ae[14] },
+              omafitMindarMetricToMetersScale,
+            );
+          }
+          flatTargetAnchorDistM = resolveGlassesMerchantFlatAnchorDepthM(
+            merchantCalFrame,
+            {
+              parityFlatZInsetM: OMAFIT_GLASSES_ADMIN_PARITY_FLAT_Z_INSET_M,
+              trackedFaceDistM: flatTrackedFaceDistM,
+            },
+          );
         }
         const anchorRawMat =
           accessoryType === "glasses" && st.anchorRawScratch && st.anchorDec && lm
@@ -14763,9 +14775,14 @@ async function runArSession({
             transMul: Number(anchorNormInfo.transMul?.toFixed(6)),
             rawDist: Number(anchorNormInfo.rawDist?.toFixed(4)),
             fixedDist: Number(anchorNormInfo.fixedDist?.toFixed(4)),
+            trackedFaceDistM:
+              flatTrackedFaceDistM != null
+                ? Number(flatTrackedFaceDistM.toFixed(4))
+                : null,
             targetAnchorDistM: st.glassesAdminParityFlat
               ? Number(flatTargetAnchorDistM.toFixed(4))
               : OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
+            adminPreviewCamDistM: OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
             anchorUnitsPerMeter: Number(anchorNormInfo.u.toFixed(4)),
             effectiveAnchorUAfterNorm: Number(effectiveU.toFixed(4)),
             strippedUnitScale: !!anchorNormInfo.strippedUnitScale,
@@ -14938,6 +14955,7 @@ async function runArSession({
                 wearPosition.position,
                 anchor.group.matrixWorld,
                 merchantCal,
+                { depthOnAnchor: true },
               );
               const wearZNow = Number(merchantCal?.wearZ) || 0;
               if (
@@ -14949,6 +14967,11 @@ async function runArSession({
                 console.log("[omafit-ar] glasses wear (admin parity flat)", {
                   build: OMAFIT_AR_WIDGET_BUILD,
                   wearZ: wearZNow,
+                  wearZOnAnchor: true,
+                  trackedFaceDistM:
+                    flatTrackedFaceDistM != null
+                      ? Number(flatTrackedFaceDistM.toFixed(4))
+                      : null,
                   targetAnchorDistM: Number(flatTargetAnchorDistM.toFixed(4)),
                   adminPreviewCamDistM: OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
                   wearPositionLocal: {
@@ -14975,10 +14998,7 @@ async function runArSession({
                 autoFitBase,
               );
               const angularMul = omafitGlassesAdminParityAngularScaleMul(
-                flatTargetAnchorDistM ||
-                  anchorNormInfo?.fixedDist ||
-                  st.faceProjectionOpts?.faceAnchorDistM ||
-                  OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
+                OMAFIT_GLASSES_ADMIN_PREVIEW_CAM_DIST_M,
                 mindarThree?.camera?.fov,
               );
               const anchorU = omafitAnchorUnitsPerMeter(anchor.group.matrixWorld);
