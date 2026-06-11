@@ -641,10 +641,16 @@ export function omafitBakeGlassesIngestMeshLocalTransforms(THREE, root) {
   let bakedMeshes = 0;
   let mode = "mesh-local";
   if (canonical && canonical.children.length > 0) {
-    const identity = new THREE.Matrix4();
+    canonical.updateMatrix();
+    const canLocal = new THREE.Matrix4().copy(canonical.matrix);
     for (const child of canonical.children) {
-      bakedMeshes += bakeSubtree(child, identity);
+      bakedMeshes += bakeSubtree(child, canLocal);
     }
+    canonical.position.set(0, 0, 0);
+    canonical.rotation.set(0, 0, 0);
+    canonical.scale.set(1, 1, 1);
+    canonical.quaternion.identity();
+    canonical.updateMatrix();
     mode = "canonical-children";
   } else {
     root.traverse((child) => {
@@ -978,8 +984,12 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
   let scaledNodes = 0;
   root.traverse((child) => {
     if (child === root) return;
-    /** hierarchy-preserve bake coloca offsets do canónico em `mesh.position`. */
     child.position.multiplyScalar(factor);
+    /** Meshes: só `position` — escalar `mesh.scale` encolhe a geometria (ingest ~10 mm). */
+    if (child.isMesh) {
+      child.updateMatrix();
+      return;
+    }
     const sx = child.scale?.x ?? 1;
     const sy = child.scale?.y ?? 1;
     const sz = child.scale?.z ?? 1;
