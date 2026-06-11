@@ -476,6 +476,65 @@ export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
 }
 
 /**
+ * Absorve o transform local de `omafit_ar_canonical` nos filhos directos
+ * (`omafit_frame` / `omafit_lens`) — **sem** achatar meshes nem zerar grupos.
+ * Preserva rotações das hastes (paridade preview).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @returns {{ ok: boolean, mode: string, bakedMeshes: number, canonicalFound: boolean }}
+ */
+export function omafitBakeGlassesIngestCanonicalPreserveHierarchy(THREE, root) {
+  if (!THREE || !root) {
+    return { ok: false, mode: "missing-three-or-root", bakedMeshes: 0, canonicalFound: false };
+  }
+  root.updateMatrixWorld(true);
+  let canonical = null;
+  root.traverse((child) => {
+    if (child === root) return;
+    if (String(child.name || "") === "omafit_ar_canonical") canonical = child;
+  });
+  if (!canonical) {
+    const flat = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, root);
+    return {
+      ok: flat.ok,
+      mode: "flatten-fallback",
+      bakedMeshes: flat.bakedMeshes ?? 0,
+      canonicalFound: false,
+    };
+  }
+  canonical.updateMatrix();
+  const canLocal = new THREE.Matrix4().copy(canonical.matrix);
+  const pos = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const scl = new THREE.Vector3();
+  const composeScratch = new THREE.Matrix4();
+  let childCount = 0;
+  for (const child of canonical.children) {
+    composeScratch.multiplyMatrices(canLocal, child.matrix);
+    composeScratch.decompose(pos, quat, scl);
+    child.position.copy(pos);
+    child.quaternion.copy(quat);
+    child.scale.copy(scl);
+    child.updateMatrix();
+    childCount += 1;
+  }
+  canonical.position.set(0, 0, 0);
+  canonical.rotation.set(0, 0, 0);
+  canonical.scale.set(1, 1, 1);
+  canonical.quaternion.identity();
+  canonical.updateMatrix();
+  root.updateMatrixWorld(true);
+  return {
+    ok: childCount > 0,
+    mode: "hierarchy-preserve",
+    bakedMeshes: 0,
+    canonicalFound: true,
+    childCount,
+  };
+}
+
+/**
  * Bake transforms do nó `omafit_ar_canonical` (e pais intermédios) nos vértices,
  * **sem** achatar `omafit_frame` / `omafit_lens` para o root — paridade preview.
  *
