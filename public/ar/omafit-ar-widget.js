@@ -49,7 +49,6 @@ import {
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
-  resolveGlassesMerchantMeshScaleBboxWidth,
   estimateMindarTrackedFaceDistM,
   resolveGlassesMerchantFlatAnchorDepthM,
   resolveGlassesMindarLocalMeshScale,
@@ -57,6 +56,7 @@ import {
   computeGlassesSimpleFaceIpdMeshScale,
   computeFaceMatrixUniformScale,
   OMAFIT_GLASSES_SIMPLE_FACE_IPD_MUL,
+  OMAFIT_GLASSES_UNDERSIZED_BBOX_WIDTH_M,
 } from "./omafit-glasses-calibration.js";
 import {
   OMAFIT_NECKLACE_ORIENT_SLERP,
@@ -620,7 +620,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v289";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v290";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12279,6 +12279,9 @@ async function runArSession({
               z: Number(szPostBake.z.toFixed(5)),
             },
             maxNodePosLenM: Number(maxNodePosLenM.toFixed(5)),
+            meshScaleBboxWidthHintM: Number(
+              Math.max(glassesIngestIntrinsicSpanM || 0, szPostBake.x, 1e-4).toFixed(5),
+            ),
           },
         );
       } catch (ingPrepErr) {
@@ -12313,11 +12316,22 @@ async function runArSession({
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
-      glassesMeshScaleBboxWidth = glassesIngestWidgetFrameTag
-        ? resolveGlassesMerchantMeshScaleBboxWidth(glassesFrameWidthRawLocal, {
-            ingestSplit: true,
-          })
-        : glassesFrameWidthRawLocal;
+      if (
+        glassesIngestWidgetFrameTag &&
+        glassesFrameWidthRawLocal < OMAFIT_GLASSES_UNDERSIZED_BBOX_WIDTH_M
+      ) {
+        /**
+         * Pós root-bake: vértices ainda ~10 mm — meshScale ≈ fitW/0,01 (~14).
+         * Não usar 145 mm como denominador (v289 → escala ~1, óculos minúsculos).
+         */
+        glassesMeshScaleBboxWidth = Math.max(
+          glassesIngestIntrinsicSpanM || 0,
+          glassesFrameWidthRawLocal,
+          1e-4,
+        );
+      } else {
+        glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
+      }
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesMeshScaleBboxWidth);
       glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesMeshScaleBboxWidth;
     }
@@ -12362,7 +12376,7 @@ async function runArSession({
             build: OMAFIT_AR_WIDGET_BUILD,
             bbox: { x: szIngPost.x, y: szIngPost.y, z: szIngPost.z },
             scaleSpanM: glassesMeshScaleBboxWidth,
-            meshScaleBboxWidthM: glassesMeshScaleBboxWidth,
+            meshScaleBboxWidthM: Number(glassesMeshScaleBboxWidth.toFixed(5)),
             frameWidthFitLocal: glassesFrameWidthLocal,
           });
         } catch {
