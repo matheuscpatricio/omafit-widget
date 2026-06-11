@@ -15,6 +15,7 @@ import {
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
+  omafitResolveGlassesIngestWearOffsetM,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -617,7 +618,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-center-v261";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-glb-parity-v262";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10992,6 +10993,8 @@ async function runArSession({
     /** GLB Rodin/worker remapeado para +Y topo, −Z frente (paridade export canónico). */
     let glassesWorkerFrameRemapped = false;
     let glassesIngestWidgetFrameTag = false;
+    /** Pivot ponte/lentes (m) — ingest: sem bake nos vértices. */
+    let glassesIngestWearOffsetM = null;
     /**
      * Rig estrutural MindAR (`data-ar-glasses-structural-mindar-rig="1"`) — definido cedo
      * para o pipeline de standardização GLB e outros flags o poderem referenciar.
@@ -12086,12 +12089,16 @@ async function runArSession({
     await new Promise((resolve) => requestAnimationFrame(resolve));
     glasses.updateMatrixWorld(true);
 
+    const glassesIngestPreBake =
+      accessoryType === "glasses" && omafitGlassesGlbHasIngestWidgetFrameTag(glasses);
+
     if (
       accessoryType === "glasses" &&
       glassesAutoAlignModel &&
       !glassesManualMindarRig &&
       !glassesCanonicalBlenderExport &&
-      !glassesGlbStandardize
+      !glassesGlbStandardize &&
+      !glassesIngestPreBake
     ) {
       try {
         omafitAutoAlignGlassesModel(glasses, THREE);
@@ -12127,7 +12134,7 @@ async function runArSession({
     let bakedMeshCount = 0;
     let skippedAnimatedMeshCount = 0;
     /** Colar Tripo: bake pode esvaziar hierarquia / deslocar pivots — manter transforms do GLB. */
-    if (accessoryType !== "necklace") {
+    if (accessoryType !== "necklace" && !glassesIngestPreBake) {
       try {
         bakeGLBTransforms(THREE, glasses, (info) => {
           bakedMeshCount = info.baked;
@@ -12142,7 +12149,16 @@ async function runArSession({
         glasses.quaternion.identity();
         glasses.scale.setScalar(1);
       }
-    } else {
+    } else if (accessoryType === "glasses" && glassesIngestPreBake) {
+      try {
+        console.log(
+          "[omafit-ar] glasses GLB ingest — skip bake/flatten (paridade preview GLB intacto)",
+          { build: OMAFIT_AR_WIDGET_BUILD, hasOmafitCanonicalNode },
+        );
+      } catch {
+        /* ignore */
+      }
+    } else if (accessoryType === "necklace") {
       glasses.rotation.set(0, 0, 0);
       glasses.quaternion.identity();
       glasses.scale.setScalar(1);
@@ -12156,24 +12172,6 @@ async function runArSession({
       if (faceArEnhancementState) {
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
       }
-      /** v219: canónico tem origem na ponte — não recentrar bbox (v217 deslocava ~4 m). */
-      if (!glassesCanonicalBlenderExport) {
-        try {
-          glasses.updateMatrixWorld(true);
-          const ingestBbox = new THREE.Box3().setFromObject(glasses);
-          const ingestCenter = ingestBbox.getCenter(new THREE.Vector3());
-          if (ingestCenter.length() > 0.08) {
-            glasses.position.sub(ingestCenter);
-            glasses.updateMatrixWorld(true);
-            console.log("[omafit-ar] glasses ingest: origem deslocada → centrada na bbox", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              offsetM: ingestCenter.toArray().map((v) => Number(v.toFixed(5))),
-            });
-          }
-        } catch {
-          /* ignore */
-        }
-      }
     }
 
     if (
@@ -12185,7 +12183,7 @@ async function runArSession({
       try {
         if (glassesIngestWidgetFrameTag) {
           console.log(
-            "[omafit-ar] glasses GLB ingest (omafit_ar_canonical) — orientação baked, sem remap runtime",
+            "[omafit-ar] glasses GLB ingest (omafit_ar_canonical) — hierarquia intacta, sem remap runtime",
             { build: OMAFIT_AR_WIDGET_BUILD, hasOmafitCanonicalNode },
           );
         } else if (omafitGlassesGlbIsWidgetCanonicalFrame(THREE, glasses)) {
@@ -12268,12 +12266,23 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * Ingest/canónico: bake AABB local nos vértices (`localBboxCenterM` → 0).
-       * `position.sub` só move pivot — o tracking wrap repõe `position` depois;
-       * sem bake nos vértices o modelo some (regressão v259/v260).
+       * Ingest: hierarquia `omafit_ar_canonical` intacta (sem bake nos vértices).
+       * Canónico Blender: bake AABB local nos vértices.
        * Demais GLBs: centró na ponte/lentes (paridade preview admin).
        */
-      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
+      if (glassesIngestWidgetFrameTag) {
+        try {
+          glassesIngestWearOffsetM = omafitResolveGlassesIngestWearOffsetM(THREE, glasses);
+          console.log("[omafit-ar] glasses ingest wear offset (hierarchy pivot)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            offsetM: glassesIngestWearOffsetM
+              .toArray()
+              .map((v) => Number(v.toFixed(5))),
+          });
+        } catch {
+          /* ignore */
+        }
+      } else if (glassesCanonicalBlenderExport) {
         try {
           const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
           if (
@@ -12287,7 +12296,7 @@ async function runArSession({
               driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
               offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
               bakedMeshes: baked.bakedMeshes,
-              ingestSplit: glassesIngestWidgetFrameTag,
+              ingestSplit: false,
               canonicalBlenderExport: glassesCanonicalBlenderExport,
             });
           }
@@ -13536,10 +13545,13 @@ async function runArSession({
           glasses.position.y += cy;
           glasses.position.z += cz;
         } else if (glassesTrackingWrap) {
+          const ox = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.x : 0;
+          const oy = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.y : 0;
+          const oz = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.z : 0;
           glasses.position.set(
-            cx + glassesEmpiricalAlignM.x,
-            cy + glassesEmpiricalAlignM.y,
-            cz + glassesEmpiricalAlignM.z,
+            ox + cx + glassesEmpiricalAlignM.x,
+            oy + cy + glassesEmpiricalAlignM.y,
+            oz + cz + glassesEmpiricalAlignM.z,
           );
         } else {
           glasses.position.set(cx, cy, cz);
@@ -14005,6 +14017,10 @@ async function runArSession({
       glassesMeshWidthNormMul,
       glassesCanonicalBlenderExport: !!glassesCanonicalBlenderExport,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
+      glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
+      glassesIngestWearOffsetM: glassesIngestWearOffsetM
+        ? glassesIngestWearOffsetM.clone()
+        : null,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
         bboxWidthLocal: glassesFrameWidthRawLocal,
         canonicalBlenderExport: glassesCanonicalBlenderExport,
@@ -15715,7 +15731,17 @@ async function runArSession({
                     if (!st.glassesDrawablePerFrameApplied) {
                       st.glassesDrawablePerFrameApplied = true;
                       try {
-                        omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+                        if (
+                          st.glassesPreserveRodinGlbLenses ||
+                          st.glassesLensLoadState?.preserveRodinGlb
+                        ) {
+                          omafitEnsureGlassesMeshesRenderable(THREE, glasses);
+                          omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses, {
+                            preserveRodinGlb: true,
+                          });
+                        } else {
+                          omafitFinalizeGlassesWidgetDrawable(THREE, glasses);
+                        }
                       } catch {
                         /* ignore */
                       }
@@ -15873,7 +15899,11 @@ async function runArSession({
                     /* noop */
                   }
                   {
-                    glasses.position.set(0, 0, 0);
+                    if (st.glassesIngestWearOffsetM) {
+                      glasses.position.copy(st.glassesIngestWearOffsetM);
+                    } else {
+                      glasses.position.set(0, 0, 0);
+                    }
                     if (!st.positionLogged) {
                       st.positionLogged = true;
                       const merchantCalLog = st.readGlassesMerchantCal

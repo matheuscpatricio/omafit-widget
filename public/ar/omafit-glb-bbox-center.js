@@ -474,3 +474,25 @@ export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
     bakedMeshes: baked?.bakedMeshes ?? 0,
   };
 }
+
+/**
+ * GLB pós-ingest (`omafit_ar_canonical`): alinha a ponte/lentes à origem do root
+ * **sem** mutar vértices — paridade com o preview directo do ficheiro GLB.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @returns {import("three").Vector3}
+ */
+export function omafitResolveGlassesIngestWearOffsetM(THREE, root) {
+  if (!THREE || !root) return new THREE.Vector3(0, 0, 0);
+  root.updateMatrixWorld(true);
+  const bridge = omafitComputeGlassesLensAnchorPoint(THREE, root);
+  if (bridge && bridge.lengthSq() > 1e-10) {
+    return bridge.clone().negate();
+  }
+  const center = omafitGlassesLocalBboxCenterM(THREE, root);
+  if (center && center.lengthSq() > 1e-10) {
+    return center.clone().negate();
+  }
+  return new THREE.Vector3(0, 0, 0);
+}
