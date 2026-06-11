@@ -384,6 +384,22 @@ export function resolveGlassesCalibScaleBase(p) {
   return computeGlassesPreviewBaseScale(p.bboxWidthLocal);
 }
 
+/**
+ * Largura X para `resolveGlassesMerchantMeshScale` — ingest hierárquico pode
+ * reportar bbox ~10 mm antes do bake do nó canónico; usar referência física.
+ *
+ * @param {number} rawLocal
+ * @param {{ ingestSplit?: boolean }} [opts]
+ * @returns {number}
+ */
+export function resolveGlassesMerchantMeshScaleBboxWidth(rawLocal, opts = {}) {
+  const raw = Math.max(Number(rawLocal) || 0, 1e-4);
+  if (opts.ingestSplit && raw < OMAFIT_GLASSES_UNDERSIZED_BBOX_WIDTH_M) {
+    return OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
+  }
+  return raw;
+}
+
 /** Tecto base para clamp (modo legado widget — preferir `clampGlassesDisplayMeshScale`). */
 export const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.04;
 export const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 2.5;

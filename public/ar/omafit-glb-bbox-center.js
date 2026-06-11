@@ -483,6 +483,50 @@ export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
  * @param {import("three").Object3D} root
  * @returns {import("three").Vector3}
  */
+/**
+ * Bake transforms do nó `omafit_ar_canonical` (e pais intermédios) nos vértices,
+ * **sem** achatar `omafit_frame` / `omafit_lens` para o root — paridade preview.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @returns {{ ok: boolean, bakedMeshes: number }}
+ */
+export function omafitBakeGlassesIngestCanonicalNodeOnly(THREE, root) {
+  if (!THREE || !root) return { ok: false, bakedMeshes: 0 };
+  root.updateMatrixWorld(true);
+  const rootInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  let bakedMeshes = 0;
+  root.traverse((child) => {
+    if (!child.isMesh || child.isSkinnedMesh || !child.geometry) return;
+    const morphs = child.morphTargetInfluences;
+    if (Array.isArray(morphs) && morphs.length > 0) return;
+    child.updateMatrixWorld(true);
+    const bakedLocal = new THREE.Matrix4().multiplyMatrices(rootInv, child.matrixWorld);
+    const geom = child.geometry.clone();
+    geom.applyMatrix4(bakedLocal);
+    if (typeof geom.computeVertexNormals === "function") {
+      geom.computeVertexNormals();
+    }
+    child.geometry = geom;
+    child.position.set(0, 0, 0);
+    child.rotation.set(0, 0, 0);
+    child.scale.set(1, 1, 1);
+    child.quaternion.identity();
+    child.updateMatrix();
+    bakedMeshes += 1;
+  });
+  root.traverse((child) => {
+    if (child === root || child.isMesh) return;
+    child.position.set(0, 0, 0);
+    child.rotation.set(0, 0, 0);
+    child.scale.set(1, 1, 1);
+    child.quaternion.identity();
+    child.updateMatrix();
+  });
+  root.updateMatrixWorld(true);
+  return { ok: bakedMeshes > 0, bakedMeshes };
+}
+
 export function omafitResolveGlassesIngestWearOffsetM(THREE, root) {
   if (!THREE || !root) return new THREE.Vector3(0, 0, 0);
   root.updateMatrixWorld(true);

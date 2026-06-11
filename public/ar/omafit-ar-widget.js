@@ -15,6 +15,7 @@ import {
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
+  omafitBakeGlassesIngestCanonicalNodeOnly,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -45,6 +46,7 @@ import {
   computeGlassesPreviewBaseScale,
   normalizeGlassesMerchantCalibration,
   resolveGlassesCalibScaleBase,
+  resolveGlassesMerchantMeshScaleBboxWidth,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
   estimateMindarTrackedFaceDistM,
@@ -617,7 +619,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-tracking-v264";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-canonical-bake-v265";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12257,11 +12259,16 @@ async function runArSession({
     /** Largura do frame para fit IPD (m) — bbox bruta vs referência física ~145 mm. */
     let glassesFrameWidthLocal = 1;
     let glassesFrameWidthRawLocal = 1;
+    let glassesMeshScaleBboxWidth = 1;
     let glassesMeshWidthNormMul = 1;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
-      glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesFrameWidthRawLocal;
+      glassesMeshScaleBboxWidth = resolveGlassesMerchantMeshScaleBboxWidth(
+        glassesFrameWidthRawLocal,
+        { ingestSplit: glassesIngestWidgetFrameTag },
+      );
+      glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesMeshScaleBboxWidth;
     }
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
     let necklaceArcSpanPrepM = null;
@@ -12273,6 +12280,21 @@ async function runArSession({
        * Canónico Blender: mesmo bake AABB. Demais: centró na ponte via `position.sub`.
        */
       if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
+        if (glassesIngestWidgetFrameTag) {
+          try {
+            const canBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, glasses);
+            console.log("[omafit-ar] glasses ingest canonical-node bake (hierarchy kept)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              ok: canBake?.ok,
+              bakedMeshes: canBake?.bakedMeshes ?? 0,
+            });
+          } catch (canBakeErr) {
+            console.warn(
+              "[omafit-ar] glasses ingest canonical-node bake:",
+              canBakeErr?.message || canBakeErr,
+            );
+          }
+        }
         try {
           const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
           if (
@@ -12305,14 +12327,20 @@ async function runArSession({
         const boxIngPost = new THREE.Box3().setFromObject(glasses);
         const szIngPost = new THREE.Vector3();
         boxIngPost.getSize(szIngPost);
-        glassesFrameWidthRawLocal = Math.max(szIngPost.x, 0.001);
-        glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
-        glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesFrameWidthRawLocal;
+        const rawIngW = Math.max(szIngPost.x, 0.001);
+        glassesFrameWidthRawLocal = rawIngW;
+        glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(rawIngW);
+        const meshScaleBboxW = resolveGlassesMerchantMeshScaleBboxWidth(rawIngW, {
+          ingestSplit: true,
+        });
+        glassesMeshScaleBboxWidth = meshScaleBboxW;
+        glassesMeshWidthNormMul = glassesFrameWidthLocal / meshScaleBboxW;
         try {
           console.log("[omafit-ar] glasses ingest bbox pós-center (escala física)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             bbox: { x: szIngPost.x, y: szIngPost.y, z: szIngPost.z },
-            frameWidthRawLocal: glassesFrameWidthRawLocal,
+            frameWidthRawLocal: rawIngW,
+            meshScaleBboxWidth: meshScaleBboxW,
             frameWidthFitLocal: glassesFrameWidthLocal,
           });
         } catch {
@@ -13068,11 +13096,11 @@ async function runArSession({
         if (glassesSimpleFaceOnly) {
           const mc = readGlassesMerchantCal();
           const autoFitBase = resolveGlassesCalibScaleBase({
-            bboxWidthLocal: glassesFrameWidthRawLocal,
+            bboxWidthLocal: glassesMeshScaleBboxWidth,
           });
           const bootScale = clampGlassesDisplayMeshScale(
             resolveGlassesMerchantMeshScale({
-              bboxWidthLocal: glassesFrameWidthRawLocal,
+              bboxWidthLocal: glassesMeshScaleBboxWidth,
               merchantScaleMul: mc?.scale,
               canonicalBlenderExport: glassesCanonicalBlenderExport,
               simpleFaceOnly: true,
@@ -13135,7 +13163,7 @@ async function runArSession({
       glassesFrameWidthLocal,
       glassesMeshWidthNormMul,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
-        bboxWidthLocal: glassesFrameWidthRawLocal,
+        bboxWidthLocal: glassesMeshScaleBboxWidth,
         canonicalBlenderExport: glassesCanonicalBlenderExport,
         simpleFaceOnly: glassesSimpleFaceOnly,
       }),
@@ -13327,11 +13355,11 @@ async function runArSession({
         calibRot.rotation.order = "YXZ";
         const mcFlat = readGlassesMerchantCal();
         const autoFitFlat = resolveGlassesCalibScaleBase({
-          bboxWidthLocal: glassesFrameWidthRawLocal,
+          bboxWidthLocal: glassesMeshScaleBboxWidth,
         });
         const adminMeshScaleInit = clampGlassesDisplayMeshScale(
           resolveGlassesMerchantMeshScale({
-            bboxWidthLocal: glassesFrameWidthRawLocal,
+            bboxWidthLocal: glassesMeshScaleBboxWidth,
             merchantScaleMul: mcFlat?.scale,
             canonicalBlenderExport: true,
             simpleFaceOnly: true,
@@ -14030,13 +14058,14 @@ async function runArSession({
       glassesPipelineCanonicalBlender: !!glassesPipelineCanonicalBlender,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
+      glassesMeshScaleBboxWidth,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
-        bboxWidthLocal: glassesFrameWidthRawLocal,
+        bboxWidthLocal: glassesMeshScaleBboxWidth,
         canonicalBlenderExport: glassesCanonicalBlenderExport,
         simpleFaceOnly: glassesSimpleFaceOnly,
       }),
       glassesAutoFitScaleRef: resolveGlassesCalibScaleBase({
-        bboxWidthLocal: glassesFrameWidthRawLocal,
+        bboxWidthLocal: glassesMeshScaleBboxWidth,
         canonicalBlenderExport: glassesCanonicalBlenderExport,
         simpleFaceOnly: glassesSimpleFaceOnly,
       }),
@@ -15290,11 +15319,11 @@ async function runArSession({
                 Number(st.glassesCalibAutoScaleBase) > 0
                   ? st.glassesCalibAutoScaleBase
                   : resolveGlassesCalibScaleBase({
-                      bboxWidthLocal: st.glassesFrameWidthRawLocal,
+                      bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                     });
               const adminMeshScale = clampGlassesDisplayMeshScale(
                 resolveGlassesMerchantMeshScale({
-                  bboxWidthLocal: st.glassesFrameWidthRawLocal,
+                  bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                   merchantScaleMul: merchantCal?.scale,
                   canonicalBlenderExport: true,
                   simpleFaceOnly: true,
@@ -15649,7 +15678,7 @@ async function runArSession({
                       Number(st.glassesCalibAutoScaleBase) > 0
                         ? st.glassesCalibAutoScaleBase
                         : resolveGlassesCalibScaleBase({
-                            bboxWidthLocal: st.glassesFrameWidthRawLocal,
+                            bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                           });
                     const pickEyeLm = (idx, out) => {
                       const p = st.lmSmoother?.get(idx);
@@ -15683,7 +15712,7 @@ async function runArSession({
                     if (useV160MerchantScale) {
                       displayScale = clampGlassesDisplayMeshScale(
                         resolveGlassesMerchantMeshScale({
-                          bboxWidthLocal: st.glassesFrameWidthRawLocal,
+                          bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                           merchantScaleMul: merchantCal?.scale,
                           canonicalBlenderExport: st.glassesCanonicalBlenderExport,
                           simpleFaceOnly: true,
@@ -15725,7 +15754,7 @@ async function runArSession({
                     if (!Number.isFinite(displayScale)) {
                       displayScale = clampGlassesDisplayMeshScale(
                         resolveGlassesMerchantMeshScale({
-                          bboxWidthLocal: st.glassesFrameWidthRawLocal,
+                          bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                           merchantScaleMul: merchantCal?.scale,
                           canonicalBlenderExport: st.glassesCanonicalBlenderExport,
                           simpleFaceOnly: st.glassesSimpleFaceOnly,
@@ -16865,12 +16894,12 @@ async function runArSession({
         frameWidthFit: glassesFrameWidthLocal,
         meshWidthNormMul: glassesMeshWidthNormMul,
         glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
-          bboxWidthLocal: glassesFrameWidthRawLocal,
+          bboxWidthLocal: glassesMeshScaleBboxWidth,
           canonicalBlenderExport: glassesCanonicalBlenderExport,
           simpleFaceOnly: glassesSimpleFaceOnly,
         }),
         autoFitScaleRef: resolveGlassesCalibScaleBase({
-          bboxWidthLocal: glassesFrameWidthRawLocal,
+          bboxWidthLocal: glassesMeshScaleBboxWidth,
           canonicalBlenderExport: glassesCanonicalBlenderExport,
           simpleFaceOnly: glassesSimpleFaceOnly,
         }),
