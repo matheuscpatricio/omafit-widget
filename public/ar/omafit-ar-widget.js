@@ -15,8 +15,6 @@ import {
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
-  omafitBakeGlassesIngestCanonicalNodeOnly,
-  omafitNormalizeGlassesIngestSubPhysicalGeometry,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -37,7 +35,6 @@ import {
   OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
   OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M,
   OMAFIT_GLASSES_REFERENCE_IPD_M,
-  OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M,
   OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
   addGlassesMerchantWearToPositionM,
   applyGlassesMerchantWearAdminParityFlat,
@@ -50,7 +47,6 @@ import {
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
-  resolveGlassesPhysicalMeterDisplayScale,
   estimateMindarTrackedFaceDistM,
   resolveGlassesMerchantFlatAnchorDepthM,
   resolveGlassesMindarLocalMeshScale,
@@ -621,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-physical-scale-v268";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-preview-parity-v269";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12263,7 +12259,8 @@ async function runArSession({
     let glassesFrameWidthRawLocal = 1;
     let glassesMeshScaleBboxWidth = 1;
     let glassesMeshWidthNormMul = 1;
-    let glassesIngestPhysicalNormalized = false;
+    /** Offset de ponte (local) reaplicado a cada frame — evita bake nos vértices. */
+    let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
@@ -12274,27 +12271,29 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * Ingest: hierarquia `omafit_ar_canonical` intacta (sem flatten bake).
-       * Centróide AABB nos vértices (só translação) — tracking repõe `position=0`;
-       * sem isto o modelo some (v262). A deformação vinha do flatten, não deste bake.
-       * Canónico Blender: mesmo bake AABB. Demais: centró na ponte via `position.sub`.
+       * Ingest: GLB intacto (paridade preview) — só `position.sub` na ponte, sem
+       * bake nos vértices (canonical-node / AABB / normalize deformavam a forma).
+       * Canónico Blender: bake AABB nos vértices. Demais: centró na ponte.
        */
-      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
-        if (glassesIngestWidgetFrameTag) {
-          try {
-            const canBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, glasses);
-            console.log("[omafit-ar] glasses ingest canonical-node bake (hierarchy kept)", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              ok: canBake?.ok,
-              bakedMeshes: canBake?.bakedMeshes ?? 0,
-            });
-          } catch (canBakeErr) {
-            console.warn(
-              "[omafit-ar] glasses ingest canonical-node bake:",
-              canBakeErr?.message || canBakeErr,
-            );
-          }
+      if (glassesIngestWidgetFrameTag) {
+        try {
+          const rec = omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
+          glassesIngestBridgePositionLocal = glasses.position.clone();
+          console.log("[omafit-ar] glasses ingest lens-bridge recenter (GLB intact)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            ok: rec?.ok,
+            mode: rec?.mode,
+            bridgeLocal: glassesIngestBridgePositionLocal
+              ?.toArray?.()
+              .map((v) => Number(v.toFixed(5))),
+          });
+        } catch (ingRecErr) {
+          console.warn(
+            "[omafit-ar] glasses ingest lens recenter:",
+            ingRecErr?.message || ingRecErr,
+          );
         }
+      } else if (glassesCanonicalBlenderExport) {
         try {
           const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
           if (
@@ -12308,33 +12307,11 @@ async function runArSession({
               driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
               offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
               bakedMeshes: baked.bakedMeshes,
-              ingestSplit: glassesIngestWidgetFrameTag,
-              flattenSkipped: glassesIngestWidgetFrameTag,
               canonicalBlenderExport: glassesCanonicalBlenderExport,
             });
           }
         } catch {
           /* ignore */
-        }
-        if (glassesIngestWidgetFrameTag) {
-          try {
-            const physNorm = omafitNormalizeGlassesIngestSubPhysicalGeometry(THREE, glasses);
-            if (physNorm?.applied) {
-              glassesIngestPhysicalNormalized = true;
-              console.log("[omafit-ar] glasses ingest sub-physical geometry normalized", {
-                build: OMAFIT_AR_WIDGET_BUILD,
-                spanXBefore: Number(physNorm.spanXBefore.toFixed(5)),
-                spanXAfter: Number(physNorm.spanXAfter.toFixed(5)),
-                mul: Number(physNorm.mul.toFixed(4)),
-                bakedMeshes: physNorm.bakedMeshes,
-              });
-            }
-          } catch (physErr) {
-            console.warn(
-              "[omafit-ar] glasses ingest physical normalize:",
-              physErr?.message || physErr,
-            );
-          }
         }
       } else {
         const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
@@ -12352,12 +12329,6 @@ async function runArSession({
         glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(rawIngW);
         glassesMeshScaleBboxWidth = rawIngW;
         glassesMeshWidthNormMul = glassesFrameWidthLocal / rawIngW;
-        if (glassesIngestPhysicalNormalized) {
-          glassesFrameWidthRawLocal = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
-          glassesFrameWidthLocal = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
-          glassesMeshScaleBboxWidth = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
-          glassesMeshWidthNormMul = 1;
-        }
         try {
           console.log("[omafit-ar] glasses ingest bbox pós-center (escala física)", {
             build: OMAFIT_AR_WIDGET_BUILD,
@@ -13129,18 +13100,12 @@ async function runArSession({
             }),
             autoFitBase,
           );
-          const bootScale =
-            glassesIngestPhysicalNormalized && glassesForceAnchorUnitScale
-              ? clampGlassesDisplayMeshScale(
-                  resolveGlassesPhysicalMeterDisplayScale(mc?.scale),
-                  1,
-                )
-              : glassesForceAnchorUnitScale
-                ? clampGlassesDisplayMeshScale(
-                    adminBootScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
-                    autoFitBase,
-                  )
-                : adminBootScale;
+          const bootScale = glassesForceAnchorUnitScale
+            ? clampGlassesDisplayMeshScale(
+                adminBootScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
+                autoFitBase,
+              )
+            : adminBootScale;
           glasses.scale.set(bootScale, bootScale, bootScale);
         } else {
           glasses.scale.set(1, 1, 1);
@@ -13621,11 +13586,15 @@ async function runArSession({
           glasses.position.y += cy;
           glasses.position.z += cz;
         } else if (glassesTrackingWrap) {
-          glasses.position.set(
-            cx + glassesEmpiricalAlignM.x,
-            cy + glassesEmpiricalAlignM.y,
-            cz + glassesEmpiricalAlignM.z,
-          );
+          if (glassesIngestBridgePositionLocal) {
+            glasses.position.copy(glassesIngestBridgePositionLocal);
+          } else {
+            glasses.position.set(
+              cx + glassesEmpiricalAlignM.x,
+              cy + glassesEmpiricalAlignM.y,
+              cz + glassesEmpiricalAlignM.z,
+            );
+          }
         } else {
           glasses.position.set(cx, cy, cz);
         }
@@ -14092,7 +14061,9 @@ async function runArSession({
       glassesPipelineCanonicalBlender: !!glassesPipelineCanonicalBlender,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
-      glassesIngestPhysicalNormalized: !!glassesIngestPhysicalNormalized,
+      glassesIngestBridgePositionLocal: glassesIngestBridgePositionLocal
+        ? glassesIngestBridgePositionLocal.clone()
+        : null,
       glassesMeshScaleBboxWidth,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
         bboxWidthLocal: glassesMeshScaleBboxWidth,
@@ -15095,7 +15066,8 @@ async function runArSession({
                   {
                     stripUnitScale: !!st.glassesForceAnchorUnitScale,
                     mirrorSelfie: st.disableFaceMirror !== true,
-                    nativeAnchorDepth: !!st.glassesAdminParityFlat,
+                    nativeAnchorDepth:
+                      !!st.glassesAdminParityFlat || !!st.glassesIngestWidgetFrameTag,
                     wearZ: Number(merchantCalFrame?.wearZ) || 0,
                     targetAnchorDistM: st.glassesAdminParityFlat
                       ? flatTargetAnchorDistM
@@ -15129,8 +15101,9 @@ async function runArSession({
             mirrorSelfieFlatAxes: !!anchorNormInfo.mirrorSelfieFlatAxes,
             glassesForceAnchorUnitScale: !!st.glassesForceAnchorUnitScale,
             glassesAdminParityFlat: !!st.glassesAdminParityFlat,
-            nativeAnchorDepth: !!st.glassesAdminParityFlat,
-            note: "transMul + stripUnitScale; flat=v255 native depth + bridge pivot; wearZ em m.",
+            nativeAnchorDepth:
+              !!st.glassesAdminParityFlat || !!st.glassesIngestWidgetFrameTag,
+            note: "transMul + stripUnitScale; nativeDepth=ingest|flat; wearZ em m.",
           });
         }
 
@@ -15754,21 +15727,14 @@ async function runArSession({
                         }),
                         autoFitBase,
                       );
-                      if (
-                        st.glassesIngestPhysicalNormalized &&
-                        st.glassesForceAnchorUnitScale
-                      ) {
-                        displayScale = clampGlassesDisplayMeshScale(
-                          resolveGlassesPhysicalMeterDisplayScale(merchantCal?.scale),
-                          1,
-                        );
-                        scaleSource = "ingest-physical-145mm-ref";
-                      } else if (st.glassesForceAnchorUnitScale) {
+                      if (st.glassesForceAnchorUnitScale) {
                         displayScale = clampGlassesDisplayMeshScale(
                           adminMeshScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
                           autoFitBase,
                         );
-                        scaleSource = "physical-145mm-ref(tracking)";
+                        scaleSource = st.glassesIngestWidgetFrameTag
+                          ? "ingest-preview-parity(tracking)"
+                          : "physical-145mm-ref(tracking)";
                       } else {
                         displayScale = clampGlassesDisplayMeshScale(
                           resolveGlassesMindarLocalMeshScale(
@@ -16000,7 +15966,11 @@ async function runArSession({
                     /* noop */
                   }
                   {
-                    glasses.position.set(0, 0, 0);
+                    if (st.glassesIngestBridgePositionLocal) {
+                      glasses.position.copy(st.glassesIngestBridgePositionLocal);
+                    } else {
+                      glasses.position.set(0, 0, 0);
+                    }
                     if (!st.positionLogged) {
                       st.positionLogged = true;
                       const merchantCalLog = st.readGlassesMerchantCal
