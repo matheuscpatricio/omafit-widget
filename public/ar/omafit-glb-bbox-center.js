@@ -866,14 +866,19 @@ export function omafitGlassesIngestMeshWorldMaxDimM(THREE, root) {
  */
 export function omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root) {
   if (!THREE || !root) return 0;
+  const intrinsicM = omafitGlassesIngestIntrinsicMeshMaxSpanM(THREE, root);
   root.updateMatrixWorld(true);
   const sz = new THREE.Vector3();
   new THREE.Box3().setFromObject(root).getSize(sz);
   const maxDim = Math.max(sz.x, sz.y, sz.z, 1e-6);
-  const minDim = Math.max(Math.min(sz.x, sz.y, sz.z), 1e-6);
   if (maxDim < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M) {
     return maxDim;
   }
+  /** Grupos canónicos em metros inflacionam a bbox; vértices ~10 mm são a referência. */
+  if (intrinsicM > 0 && intrinsicM < maxDim) {
+    return intrinsicM;
+  }
+  const minDim = Math.max(Math.min(sz.x, sz.y, sz.z), 1e-6);
   return minDim;
 }
 

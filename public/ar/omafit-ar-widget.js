@@ -11,7 +11,10 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
+  omafitBakeGlassesIngestCanonicalPreserveHierarchy,
+  omafitDownscaleGlassesIngestGroupPositionsForced,
   omafitGlassesBakeLocalBboxCenterToOrigin,
+  omafitGlassesIngestPreHierarchyScaleSpanM,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -618,7 +621,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v285";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v286";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12246,6 +12249,39 @@ async function runArSession({
       }
     }
 
+    /** Span pré-hierarquia (~10 mm vértices) — medir antes do bake canónico ingest. */
+    let glassesIngestPreHierarchySpanM = null;
+    if (accessoryType === "glasses" && glassesIngestWidgetFrameTag) {
+      try {
+        glassesIngestPreHierarchySpanM = omafitGlassesIngestPreHierarchyScaleSpanM(
+          THREE,
+          glasses,
+        );
+        const hierarchyBake = omafitBakeGlassesIngestCanonicalPreserveHierarchy(THREE, glasses);
+        const downscale = omafitDownscaleGlassesIngestGroupPositionsForced(
+          THREE,
+          glasses,
+          glassesIngestPreHierarchySpanM,
+        );
+        console.log(
+          "[omafit-ar] glasses ingest → admin parity flat (hierarchy+downscale, vértices intactos)",
+          {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            preHierarchySpanM: Number(glassesIngestPreHierarchySpanM.toFixed(5)),
+            hierarchyBakeMode: hierarchyBake?.mode,
+            downscaleApplied: downscale?.applied,
+            downscaleFactor: Number((downscale?.factor ?? 1).toFixed(5)),
+            scaledGroups: downscale?.scaledGroups ?? 0,
+          },
+        );
+      } catch (ingPrepErr) {
+        console.warn(
+          "[omafit-ar] glasses ingest hierarchy+downscale:",
+          ingPrepErr?.message || ingPrepErr,
+        );
+      }
+    }
+
     /** 2) Bbox (tamanho) + **âncora funcional** (midpoint entre lentes na fatia frontal, se
      *    detetado; senão centróide frontal com menor Z), não o centróide nu da AABB.
      *    `position.sub(frontCenter)` — **todos** os modos óculos (incl. manual MindAR). Modo manual:
@@ -12270,35 +12306,20 @@ async function runArSession({
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
+      if (glassesIngestPreHierarchySpanM > 0) {
+        glassesMeshScaleBboxWidth = glassesIngestPreHierarchySpanM;
+        glassesFrameWidthRawLocal = glassesMeshScaleBboxWidth;
+      } else {
+        glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
+      }
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
-      glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
       glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesMeshScaleBboxWidth;
     }
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
-      /**
-       * Ingest v285: GLB intacto — escala/bbox já definidos acima; montagem via
-       * `glassesAdminParityFlat` (paridade preview admin /calibrate).
-       */
       if (glassesIngestWidgetFrameTag) {
-        try {
-          console.log("[omafit-ar] glasses ingest → admin parity flat (GLB intact)", {
-            build: OMAFIT_AR_WIDGET_BUILD,
-            bboxMaxDimM: Number(maxDim.toFixed(5)),
-            meshScaleBboxWidthM: Number(glassesMeshScaleBboxWidth.toFixed(5)),
-            previewBaseScale: Number(
-              (
-                glassesFrameWidthLocal / Math.max(glassesMeshScaleBboxWidth, 1e-4)
-              ).toFixed(3),
-            ),
-          });
-        } catch (ingParityErr) {
-          console.warn(
-            "[omafit-ar] glasses ingest admin parity:",
-            ingParityErr?.message || ingParityErr,
-          );
-        }
+        /* prep hierarchy+downscale + meshScaleBboxWidth já aplicados acima */
       } else if (glassesCanonicalBlenderExport) {
         try {
           const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
@@ -13411,6 +13432,10 @@ async function runArSession({
             localBboxCenterPreBindM: lbPreBind
               ? Number(lbPreBind.length().toFixed(5))
               : null,
+            ingestPreHierarchySpanM:
+              glassesIngestPreHierarchySpanM != null
+                ? Number(glassesIngestPreHierarchySpanM.toFixed(5))
+                : null,
             note: glassesForceAnchorUnitScale
               ? "meshScale físico fixo; âncora MindAR nativa+wearZ; pivot ponte LM168."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
