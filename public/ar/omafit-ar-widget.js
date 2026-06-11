@@ -15,7 +15,6 @@ import {
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
-  omafitResolveGlassesIngestWearOffsetM,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -618,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-glb-parity-v262";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-no-flatten-v263";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -10993,8 +10992,8 @@ async function runArSession({
     /** GLB Rodin/worker remapeado para +Y topo, −Z frente (paridade export canónico). */
     let glassesWorkerFrameRemapped = false;
     let glassesIngestWidgetFrameTag = false;
-    /** Pivot ponte/lentes (m) — ingest: sem bake nos vértices. */
-    let glassesIngestWearOffsetM = null;
+    /** GLB ingest detectado no load — skip flatten bake + `position.sub` precoce. */
+    let glassesIngestPreBake = false;
     /**
      * Rig estrutural MindAR (`data-ar-glasses-structural-mindar-rig="1"`) — definido cedo
      * para o pipeline de standardização GLB e outros flags o poderem referenciar.
@@ -11765,6 +11764,7 @@ async function runArSession({
       glasses.rotation.set(0, 0, 0);
       glasses.scale.set(1, 1, 1);
       glasses.quaternion.identity();
+      glassesIngestPreBake = omafitGlassesGlbHasIngestWidgetFrameTag(glasses);
     }
     try {
       let meshN = 0;
@@ -12050,7 +12050,8 @@ async function runArSession({
       accessoryType === "glasses" &&
       !glassesManualMindarRig &&
       !glassesCanonicalBlenderExport &&
-      !glassesGlbStandardize
+      !glassesGlbStandardize &&
+      !glassesIngestPreBake
     ) {
       glasses.updateMatrixWorld(true);
       const fcLoad = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
@@ -12088,9 +12089,6 @@ async function runArSession({
     /** Frame de assentamento (materiais/morphs/skin) antes do bbox. */
     await new Promise((resolve) => requestAnimationFrame(resolve));
     glasses.updateMatrixWorld(true);
-
-    const glassesIngestPreBake =
-      accessoryType === "glasses" && omafitGlassesGlbHasIngestWidgetFrameTag(glasses);
 
     if (
       accessoryType === "glasses" &&
@@ -12266,23 +12264,12 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * Ingest: hierarquia `omafit_ar_canonical` intacta (sem bake nos vértices).
-       * Canónico Blender: bake AABB local nos vértices.
-       * Demais GLBs: centró na ponte/lentes (paridade preview admin).
+       * Ingest: hierarquia `omafit_ar_canonical` intacta (sem flatten bake).
+       * Centróide AABB nos vértices (só translação) — tracking repõe `position=0`;
+       * sem isto o modelo some (v262). A deformação vinha do flatten, não deste bake.
+       * Canónico Blender: mesmo bake AABB. Demais: centró na ponte via `position.sub`.
        */
-      if (glassesIngestWidgetFrameTag) {
-        try {
-          glassesIngestWearOffsetM = omafitResolveGlassesIngestWearOffsetM(THREE, glasses);
-          console.log("[omafit-ar] glasses ingest wear offset (hierarchy pivot)", {
-            build: OMAFIT_AR_WIDGET_BUILD,
-            offsetM: glassesIngestWearOffsetM
-              .toArray()
-              .map((v) => Number(v.toFixed(5))),
-          });
-        } catch {
-          /* ignore */
-        }
-      } else if (glassesCanonicalBlenderExport) {
+      if (glassesIngestWidgetFrameTag || glassesCanonicalBlenderExport) {
         try {
           const baked = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, glasses);
           if (
@@ -12296,7 +12283,8 @@ async function runArSession({
               driftAfterM: Number((baked.driftAfterM ?? 0).toFixed(5)),
               offsetM: baked.center?.toArray?.().map((v) => Number(v.toFixed(5))),
               bakedMeshes: baked.bakedMeshes,
-              ingestSplit: false,
+              ingestSplit: glassesIngestWidgetFrameTag,
+              flattenSkipped: glassesIngestWidgetFrameTag,
               canonicalBlenderExport: glassesCanonicalBlenderExport,
             });
           }
@@ -13545,13 +13533,10 @@ async function runArSession({
           glasses.position.y += cy;
           glasses.position.z += cz;
         } else if (glassesTrackingWrap) {
-          const ox = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.x : 0;
-          const oy = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.y : 0;
-          const oz = glassesIngestWearOffsetM ? glassesIngestWearOffsetM.z : 0;
           glasses.position.set(
-            ox + cx + glassesEmpiricalAlignM.x,
-            oy + cy + glassesEmpiricalAlignM.y,
-            oz + cz + glassesEmpiricalAlignM.z,
+            cx + glassesEmpiricalAlignM.x,
+            cy + glassesEmpiricalAlignM.y,
+            cz + glassesEmpiricalAlignM.z,
           );
         } else {
           glasses.position.set(cx, cy, cz);
@@ -14018,9 +14003,6 @@ async function runArSession({
       glassesCanonicalBlenderExport: !!glassesCanonicalBlenderExport,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
-      glassesIngestWearOffsetM: glassesIngestWearOffsetM
-        ? glassesIngestWearOffsetM.clone()
-        : null,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
         bboxWidthLocal: glassesFrameWidthRawLocal,
         canonicalBlenderExport: glassesCanonicalBlenderExport,
@@ -15899,11 +15881,7 @@ async function runArSession({
                     /* noop */
                   }
                   {
-                    if (st.glassesIngestWearOffsetM) {
-                      glasses.position.copy(st.glassesIngestWearOffsetM);
-                    } else {
-                      glasses.position.set(0, 0, 0);
-                    }
+                    glasses.position.set(0, 0, 0);
                     if (!st.positionLogged) {
                       st.positionLogged = true;
                       const merchantCalLog = st.readGlassesMerchantCal
