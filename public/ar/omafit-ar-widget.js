@@ -37,6 +37,7 @@ import {
   OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
   OMAFIT_GLASSES_DEPTH_FORWARD_DEFAULT_M,
   OMAFIT_GLASSES_REFERENCE_IPD_M,
+  OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M,
   OMAFIT_GLASSES_SCALE_IPD_MUL_SIMPLE_FACE,
   addGlassesMerchantWearToPositionM,
   applyGlassesMerchantWearAdminParityFlat,
@@ -49,6 +50,7 @@ import {
   resolveGlassesCalibScaleBase,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
+  resolveGlassesPhysicalMeterDisplayScale,
   estimateMindarTrackedFaceDistM,
   resolveGlassesMerchantFlatAnchorDepthM,
   resolveGlassesMindarLocalMeshScale,
@@ -619,7 +621,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-scale-parity-v267";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-physical-scale-v268";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12261,6 +12263,7 @@ async function runArSession({
     let glassesFrameWidthRawLocal = 1;
     let glassesMeshScaleBboxWidth = 1;
     let glassesMeshWidthNormMul = 1;
+    let glassesIngestPhysicalNormalized = false;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
@@ -12317,6 +12320,7 @@ async function runArSession({
           try {
             const physNorm = omafitNormalizeGlassesIngestSubPhysicalGeometry(THREE, glasses);
             if (physNorm?.applied) {
+              glassesIngestPhysicalNormalized = true;
               console.log("[omafit-ar] glasses ingest sub-physical geometry normalized", {
                 build: OMAFIT_AR_WIDGET_BUILD,
                 spanXBefore: Number(physNorm.spanXBefore.toFixed(5)),
@@ -12348,6 +12352,12 @@ async function runArSession({
         glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(rawIngW);
         glassesMeshScaleBboxWidth = rawIngW;
         glassesMeshWidthNormMul = glassesFrameWidthLocal / rawIngW;
+        if (glassesIngestPhysicalNormalized) {
+          glassesFrameWidthRawLocal = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
+          glassesFrameWidthLocal = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
+          glassesMeshScaleBboxWidth = OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M;
+          glassesMeshWidthNormMul = 1;
+        }
         try {
           console.log("[omafit-ar] glasses ingest bbox pós-center (escala física)", {
             build: OMAFIT_AR_WIDGET_BUILD,
@@ -13110,7 +13120,7 @@ async function runArSession({
           const autoFitBase = resolveGlassesCalibScaleBase({
             bboxWidthLocal: glassesMeshScaleBboxWidth,
           });
-          const bootScale = clampGlassesDisplayMeshScale(
+          const adminBootScale = clampGlassesDisplayMeshScale(
             resolveGlassesMerchantMeshScale({
               bboxWidthLocal: glassesMeshScaleBboxWidth,
               merchantScaleMul: mc?.scale,
@@ -13119,6 +13129,18 @@ async function runArSession({
             }),
             autoFitBase,
           );
+          const bootScale =
+            glassesIngestPhysicalNormalized && glassesForceAnchorUnitScale
+              ? clampGlassesDisplayMeshScale(
+                  resolveGlassesPhysicalMeterDisplayScale(mc?.scale),
+                  1,
+                )
+              : glassesForceAnchorUnitScale
+                ? clampGlassesDisplayMeshScale(
+                    adminBootScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
+                    autoFitBase,
+                  )
+                : adminBootScale;
           glasses.scale.set(bootScale, bootScale, bootScale);
         } else {
           glasses.scale.set(1, 1, 1);
@@ -14070,6 +14092,7 @@ async function runArSession({
       glassesPipelineCanonicalBlender: !!glassesPipelineCanonicalBlender,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
+      glassesIngestPhysicalNormalized: !!glassesIngestPhysicalNormalized,
       glassesMeshScaleBboxWidth,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
         bboxWidthLocal: glassesMeshScaleBboxWidth,
@@ -15722,7 +15745,7 @@ async function runArSession({
                       (st.glassesCanonicalBlenderExport ||
                         st.glassesWorkerFrameRemapped);
                     if (useV160MerchantScale) {
-                      displayScale = clampGlassesDisplayMeshScale(
+                      const adminMeshScale = clampGlassesDisplayMeshScale(
                         resolveGlassesMerchantMeshScale({
                           bboxWidthLocal: st.glassesMeshScaleBboxWidth ?? st.glassesFrameWidthRawLocal,
                           merchantScaleMul: merchantCal?.scale,
@@ -15731,11 +15754,39 @@ async function runArSession({
                         }),
                         autoFitBase,
                       );
-                      st.glassesLastAdminMeshScale = displayScale;
+                      if (
+                        st.glassesIngestPhysicalNormalized &&
+                        st.glassesForceAnchorUnitScale
+                      ) {
+                        displayScale = clampGlassesDisplayMeshScale(
+                          resolveGlassesPhysicalMeterDisplayScale(merchantCal?.scale),
+                          1,
+                        );
+                        scaleSource = "ingest-physical-145mm-ref";
+                      } else if (st.glassesForceAnchorUnitScale) {
+                        displayScale = clampGlassesDisplayMeshScale(
+                          adminMeshScale / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE,
+                          autoFitBase,
+                        );
+                        scaleSource = "physical-145mm-ref(tracking)";
+                      } else {
+                        displayScale = clampGlassesDisplayMeshScale(
+                          resolveGlassesMindarLocalMeshScale(
+                            adminMeshScale,
+                            anchor.group.matrixWorld,
+                          ),
+                          autoFitBase /
+                            Math.max(
+                              omafitAnchorUnitsPerMeter(anchor.group.matrixWorld),
+                              1e-6,
+                            ),
+                        );
+                        scaleSource = "merchantScale÷u (v160-tracking)";
+                      }
+                      st.glassesLastAdminMeshScale = adminMeshScale;
                       st.glassesLastAnchorUnitsPerMeter = omafitAnchorUnitsPerMeter(
                         anchor.group.matrixWorld,
                       );
-                      scaleSource = "merchantScale (v160-parity)";
                     } else if (st.glassesSimpleFaceOnly && lmLoc) {
                       const er = fa.eyeR;
                       const el = fa.eyeL;

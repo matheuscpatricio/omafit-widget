@@ -400,6 +400,22 @@ export function resolveGlassesMerchantMeshScaleBboxWidth(rawLocal, opts = {}) {
   return raw;
 }
 
+/**
+ * Escala do mesh quando a geometria ingest já está em metros físicos (~145 mm
+ * largura X) após `omafitNormalizeGlassesIngestSubPhysicalGeometry`.
+ * Slider 50% (default) → largura de referência; 100% → 2×.
+ *
+ * @param {number} [merchantScaleMul]
+ * @returns {number}
+ */
+export function resolveGlassesPhysicalMeterDisplayScale(merchantScaleMul) {
+  const cal =
+    Number(merchantScaleMul) > 0
+      ? Number(merchantScaleMul)
+      : OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE;
+  return cal / OMAFIT_GLASSES_DEFAULT_MERCHANT_SCALE;
+}
+
 /** Tecto base para clamp (modo legado widget — preferir `clampGlassesDisplayMeshScale`). */
 export const OMAFIT_GLASSES_MESH_SCALE_ABS_MIN = 0.04;
 export const OMAFIT_GLASSES_MESH_SCALE_ABS_MAX = 2.5;
