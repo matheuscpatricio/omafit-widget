@@ -15,6 +15,7 @@ import {
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
+  omafitBakeGlassesIngestCanonicalNodeOnly,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -617,7 +618,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-preview-parity-v269";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-bridge-depth-v271";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5464,10 +5465,15 @@ function omafitGlassesResolveMindarTranslationMetersMul(
   rawP,
   stripUnitScale,
   targetDistM,
+  nativeAnchorDepth,
 ) {
   const cheekMul = omafitMindarMetricToMetersScale(lm);
   const rawDist = Math.hypot(rawP.x, rawP.y, rawP.z);
   if (!Number.isFinite(rawDist) || rawDist < 1e-6) return 1;
+  if (nativeAnchorDepth === true) {
+    /** Ingest/flat: só cm→m; não colapsar para targetDistM fixo (~0,62 m). */
+    return cheekMul < 1 ? cheekMul : 1;
+  }
   const target = Math.max(
     0.28,
     Number(targetDistM) || OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M,
@@ -5508,6 +5514,7 @@ function omafitGlassesNormalizeMindarAnchorMatrix(matrix, dec, lm, opts, THREE) 
     rawP,
     stripUnit,
     targetDistM,
+    opts?.nativeAnchorDepth === true,
   );
   if (transMul !== 1) {
     e[12] *= transMul;
@@ -12259,7 +12266,7 @@ async function runArSession({
     let glassesFrameWidthRawLocal = 1;
     let glassesMeshScaleBboxWidth = 1;
     let glassesMeshWidthNormMul = 1;
-    /** Offset de ponte (local) reaplicado a cada frame — evita bake nos vértices. */
+    /** Offset de ponte (local) reaplicado a cada frame — evita bake AABB nos vértices. */
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
@@ -12271,15 +12278,27 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       /**
-       * Ingest: GLB intacto (paridade preview) — só `position.sub` na ponte, sem
-       * bake nos vértices (canonical-node / AABB / normalize deformavam a forma).
-       * Canónico Blender: bake AABB nos vértices. Demais: centró na ponte.
+       * Ingest: bake canónico (visibilidade) + recenter na ponte via `position`
+       * (paridade preview, sem bake AABB nos vértices). Canónico Blender: bake AABB.
        */
       if (glassesIngestWidgetFrameTag) {
         try {
+          const canBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, glasses);
+          console.log("[omafit-ar] glasses ingest canonical-node bake (hierarchy kept)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            ok: canBake?.ok,
+            bakedMeshes: canBake?.bakedMeshes ?? 0,
+          });
+        } catch (canBakeErr) {
+          console.warn(
+            "[omafit-ar] glasses ingest canonical-node bake:",
+            canBakeErr?.message || canBakeErr,
+          );
+        }
+        try {
           const rec = omafitRecenterObject3OnGlassesLensFront(THREE, glasses);
           glassesIngestBridgePositionLocal = glasses.position.clone();
-          console.log("[omafit-ar] glasses ingest lens-bridge recenter (GLB intact)", {
+          console.log("[omafit-ar] glasses ingest lens-bridge recenter (pós-canonical)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             ok: rec?.ok,
             mode: rec?.mode,
