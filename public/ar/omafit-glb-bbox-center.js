@@ -476,14 +476,6 @@ export function omafitGlassesCorrectLocalBboxCenterIfNeeded(
 }
 
 /**
- * GLB pós-ingest (`omafit_ar_canonical`): alinha a ponte/lentes à origem do root
- * **sem** mutar vértices — paridade com o preview directo do ficheiro GLB.
- *
- * @param {typeof import("three")} THREE
- * @param {import("three").Object3D} root
- * @returns {import("three").Vector3}
- */
-/**
  * Bake transforms do nó `omafit_ar_canonical` (e pais intermédios) nos vértices,
  * **sem** achatar `omafit_frame` / `omafit_lens` para o root — paridade preview.
  *
@@ -525,6 +517,58 @@ export function omafitBakeGlassesIngestCanonicalNodeOnly(THREE, root) {
   });
   root.updateMatrixWorld(true);
   return { ok: bakedMeshes > 0, bakedMeshes };
+}
+
+/** Largura física de referência (m) — paridade `OMAFIT_GLASSES_REFERENCE_FRAME_WIDTH_M`. */
+const OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M = 0.145;
+/** Bbox X abaixo disto → geometria sub-física após bake canónico. */
+const OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M = 0.08;
+
+/**
+ * Escala uniforme nos vértices quando a bbox X do ingest fica &lt; 80 mm após
+ * bake canónico + center (escala do nó não reflectida na bbox local).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {number} [targetWidthM]
+ * @returns {{ applied: boolean, spanXBefore: number, spanXAfter: number, mul: number, bakedMeshes: number }}
+ */
+export function omafitNormalizeGlassesIngestSubPhysicalGeometry(
+  THREE,
+  root,
+  targetWidthM = OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
+) {
+  if (!THREE || !root) {
+    return { applied: false, spanXBefore: 0, spanXAfter: 0, mul: 1, bakedMeshes: 0 };
+  }
+  root.updateMatrixWorld(true);
+  const szBefore = new THREE.Vector3();
+  new THREE.Box3().setFromObject(root).getSize(szBefore);
+  const spanXBefore = Math.max(szBefore.x, 1e-6);
+  const targetW = Math.max(Number(targetWidthM) || 0, 1e-4);
+  if (spanXBefore >= OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M) {
+    return {
+      applied: false,
+      spanXBefore,
+      spanXAfter: spanXBefore,
+      mul: 1,
+      bakedMeshes: 0,
+    };
+  }
+  const mul = targetW / spanXBefore;
+  let bakedMeshes = 0;
+  root.traverse((child) => {
+    if (!child.isMesh || child.isInstancedMesh || !child.geometry) return;
+    child.geometry.scale(mul, mul, mul);
+    if (child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    if (child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
+    bakedMeshes += 1;
+  });
+  root.updateMatrixWorld(true);
+  const szAfter = new THREE.Vector3();
+  new THREE.Box3().setFromObject(root).getSize(szAfter);
+  const spanXAfter = Math.max(szAfter.x, 1e-6);
+  return { applied: true, spanXBefore, spanXAfter, mul, bakedMeshes };
 }
 
 export function omafitResolveGlassesIngestWearOffsetM(THREE, root) {

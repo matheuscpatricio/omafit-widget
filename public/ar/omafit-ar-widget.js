@@ -16,6 +16,7 @@ import {
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
   omafitBakeGlassesIngestCanonicalNodeOnly,
+  omafitNormalizeGlassesIngestSubPhysicalGeometry,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -46,7 +47,6 @@ import {
   computeGlassesPreviewBaseScale,
   normalizeGlassesMerchantCalibration,
   resolveGlassesCalibScaleBase,
-  resolveGlassesMerchantMeshScaleBboxWidth,
   resolveGlassesFrameWidthForFit,
   resolveGlassesMerchantMeshScale,
   estimateMindarTrackedFaceDistM,
@@ -619,7 +619,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-canonical-bake-v265";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-phys-scale-v266";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12264,10 +12264,7 @@ async function runArSession({
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
       glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
-      glassesMeshScaleBboxWidth = resolveGlassesMerchantMeshScaleBboxWidth(
-        glassesFrameWidthRawLocal,
-        { ingestSplit: glassesIngestWidgetFrameTag },
-      );
+      glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
       glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesMeshScaleBboxWidth;
     }
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
@@ -12316,6 +12313,25 @@ async function runArSession({
         } catch {
           /* ignore */
         }
+        if (glassesIngestWidgetFrameTag) {
+          try {
+            const physNorm = omafitNormalizeGlassesIngestSubPhysicalGeometry(THREE, glasses);
+            if (physNorm?.applied) {
+              console.log("[omafit-ar] glasses ingest sub-physical geometry normalized", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                spanXBefore: Number(physNorm.spanXBefore.toFixed(5)),
+                spanXAfter: Number(physNorm.spanXAfter.toFixed(5)),
+                mul: Number(physNorm.mul.toFixed(4)),
+                bakedMeshes: physNorm.bakedMeshes,
+              });
+            }
+          } catch (physErr) {
+            console.warn(
+              "[omafit-ar] glasses ingest physical normalize:",
+              physErr?.message || physErr,
+            );
+          }
+        }
       } else {
         const frontCenter = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
         if (frontCenter) glasses.position.sub(frontCenter);
@@ -12330,17 +12346,13 @@ async function runArSession({
         const rawIngW = Math.max(szIngPost.x, 0.001);
         glassesFrameWidthRawLocal = rawIngW;
         glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(rawIngW);
-        const meshScaleBboxW = resolveGlassesMerchantMeshScaleBboxWidth(rawIngW, {
-          ingestSplit: true,
-        });
-        glassesMeshScaleBboxWidth = meshScaleBboxW;
-        glassesMeshWidthNormMul = glassesFrameWidthLocal / meshScaleBboxW;
+        glassesMeshScaleBboxWidth = rawIngW;
+        glassesMeshWidthNormMul = glassesFrameWidthLocal / rawIngW;
         try {
           console.log("[omafit-ar] glasses ingest bbox pós-center (escala física)", {
             build: OMAFIT_AR_WIDGET_BUILD,
             bbox: { x: szIngPost.x, y: szIngPost.y, z: szIngPost.z },
             frameWidthRawLocal: rawIngW,
-            meshScaleBboxWidth: meshScaleBboxW,
             frameWidthFitLocal: glassesFrameWidthLocal,
           });
         } catch {
