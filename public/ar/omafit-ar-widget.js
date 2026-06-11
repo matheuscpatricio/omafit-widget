@@ -617,7 +617,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-no-flatten-v263";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-tracking-v264";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12171,6 +12171,9 @@ async function runArSession({
         faceArEnhancementState.glassesWorkerFrameRemapped = true;
       }
     }
+    /** Export Blender manual — não confundir com GLB Rodin/ingest (`omafit_ar_canonical`). */
+    const glassesPipelineCanonicalBlender =
+      glassesCanonicalBlenderExport && !glassesIngestWidgetFrameTag;
 
     if (
       accessoryType === "glasses" &&
@@ -12297,7 +12300,26 @@ async function runArSession({
         else glasses.position.sub(box.getCenter(new THREE.Vector3()));
         glasses.updateMatrixWorld(true);
       }
-    } else if (!glassesCanonicalBlenderExport) {
+      if (accessoryType === "glasses" && glassesIngestWidgetFrameTag) {
+        glasses.updateMatrixWorld(true);
+        const boxIngPost = new THREE.Box3().setFromObject(glasses);
+        const szIngPost = new THREE.Vector3();
+        boxIngPost.getSize(szIngPost);
+        glassesFrameWidthRawLocal = Math.max(szIngPost.x, 0.001);
+        glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
+        glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesFrameWidthRawLocal;
+        try {
+          console.log("[omafit-ar] glasses ingest bbox pós-center (escala física)", {
+            build: OMAFIT_AR_WIDGET_BUILD,
+            bbox: { x: szIngPost.x, y: szIngPost.y, z: szIngPost.z },
+            frameWidthRawLocal: glassesFrameWidthRawLocal,
+            frameWidthFitLocal: glassesFrameWidthLocal,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    } else if (!glassesPipelineCanonicalBlender) {
       if (accessoryType === "necklace") {
         const neckCenter = omafitCenterObject3OnBboxOrigin(THREE, glasses);
         let tripBind = null;
@@ -12697,7 +12719,10 @@ async function runArSession({
           glassesSimpleFaceOnly &&
           !glassesManualMindarRig &&
           !glassesGlbStandardize &&
-          !!glassesCanonicalBlenderExport,
+          !!glassesPipelineCanonicalBlender &&
+          !glassesIngestWidgetFrameTag,
+        glassesIngestWidgetFrameTag,
+        glassesPipelineCanonicalBlender,
         useTripoOffsetContainer,
         hint: glassesSimpleFaceOnly
           ? "Pipeline simples: admin parity flat quando canónico/ingest."
@@ -12806,19 +12831,7 @@ async function runArSession({
       !glassesManualMindarRig &&
       !glassesGlbStandardize
     ) {
-      if (glassesCanonicalBlenderExport) {
-        glasses.updateMatrixWorld(true);
-        const szCan = new THREE.Vector3();
-        new THREE.Box3().setFromObject(glasses).getSize(szCan);
-        glassesFaceWideAxisX = szCan.x >= szCan.z;
-        try {
-          console.log("[omafit-ar] glasses canonical Blender export — sem bind automático / Tripo.", {
-            bbox: { x: szCan.x, y: szCan.y, z: szCan.z },
-          });
-        } catch {
-          /* ignore */
-        }
-      } else if (glassesIngestWidgetFrameTag || glassesWorkerFrameRemapped) {
+      if (glassesIngestWidgetFrameTag || glassesWorkerFrameRemapped) {
         /**
          * GLB pós-Rodin/ingest (`omafit_ar_canonical`) ou remap runtime já em frame
          * widget (+Y topo, −Z frente). Auto-bind / Ry(180°) no mesh distorce a forma
@@ -12834,6 +12847,18 @@ async function runArSession({
             ingestTag: glassesIngestWidgetFrameTag,
             workerRemapped: glassesWorkerFrameRemapped,
             bbox: { x: szIng.x, y: szIng.y, z: szIng.z },
+          });
+        } catch {
+          /* ignore */
+        }
+      } else if (glassesPipelineCanonicalBlender) {
+        glasses.updateMatrixWorld(true);
+        const szCan = new THREE.Vector3();
+        new THREE.Box3().setFromObject(glasses).getSize(szCan);
+        glassesFaceWideAxisX = szCan.x >= szCan.z;
+        try {
+          console.log("[omafit-ar] glasses canonical Blender export — sem bind automático / Tripo.", {
+            bbox: { x: szCan.x, y: szCan.y, z: szCan.z },
           });
         } catch {
           /* ignore */
@@ -13141,7 +13166,8 @@ async function runArSession({
       glassesSimpleFaceOnly &&
       !glassesManualMindarRig &&
       !glassesGlbStandardize &&
-      !!glassesCanonicalBlenderExport &&
+      !!glassesPipelineCanonicalBlender &&
+      !glassesIngestWidgetFrameTag &&
       glassesForceAnchorUnitScale;
 
     if (glassesForceAnchorUnitScale) {
@@ -13478,9 +13504,9 @@ async function runArSession({
         glasses.updateMatrix();
         glassesStaticBindWrap.position.set(0, 0, 0);
         glassesStaticBindWrap.scale.set(1, 1, 1);
-        if (glassesCanonicalBlenderExport && glassesSimpleFaceOnly) {
+        if (glassesPipelineCanonicalBlender && glassesSimpleFaceOnly) {
           /**
-           * v219 / v160: AR canónico — sem Ry180 no bind estático.
+           * v219 / v160: AR canónico Blender — sem Ry180 no bind estático.
            * MindAR + export Blender (−Z frente) já alinham; Ry extra empurrava fora do ecrã.
            */
           glassesStaticBindWrap.quaternion.identity();
@@ -14001,6 +14027,7 @@ async function runArSession({
       glassesFrameWidthRawLocal,
       glassesMeshWidthNormMul,
       glassesCanonicalBlenderExport: !!glassesCanonicalBlenderExport,
+      glassesPipelineCanonicalBlender: !!glassesPipelineCanonicalBlender,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
       glassesCalibAutoScaleBase: resolveGlassesCalibScaleBase({
