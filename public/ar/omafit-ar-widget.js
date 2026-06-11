@@ -11,7 +11,7 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
-  omafitBakeGlassesIngestMeshLocalTransforms,
+  omafitBakeGlassesIngestCanonicalNodeOnly,
   omafitGlassesBakeLocalBboxCenterToOrigin,
   omafitGlassesIngestPreHierarchyScaleSpanM,
   omafitGlassesLocalBboxCenterM,
@@ -620,7 +620,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v288";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v289";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12248,36 +12248,42 @@ async function runArSession({
       }
     }
 
-    /** Ingest admin flat: bake transforms nos vértices (paridade preview), sem downscale. */
+    /** Ingest admin flat: bake matrixWorld→root nos vértices; zerar nós intermédios. */
     let glassesIngestIntrinsicSpanM = null;
-    let glassesIngestMeshLocalBaked = false;
+    let glassesIngestNodeBaked = false;
     if (accessoryType === "glasses" && glassesIngestWidgetFrameTag) {
       try {
         glassesIngestIntrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(
           THREE,
           glasses,
         );
-        const meshBake = omafitBakeGlassesIngestMeshLocalTransforms(THREE, glasses);
-        glassesIngestMeshLocalBaked = !!meshBake?.ok;
+        const nodeBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, glasses);
+        glassesIngestNodeBaked = !!nodeBake?.ok;
+        glasses.updateMatrixWorld(true);
         const szPostBake = new THREE.Vector3();
         new THREE.Box3().setFromObject(glasses).getSize(szPostBake);
+        let maxNodePosLenM = 0;
+        glasses.traverse((child) => {
+          if (child === glasses) return;
+          maxNodePosLenM = Math.max(maxNodePosLenM, child.position.length());
+        });
         console.log(
-          "[omafit-ar] glasses ingest → admin parity flat (mesh-local bake, vértices intactos)",
+          "[omafit-ar] glasses ingest → admin parity flat (root bake, vértices intactos)",
           {
             build: OMAFIT_AR_WIDGET_BUILD,
             intrinsicSpanM: Number(glassesIngestIntrinsicSpanM.toFixed(5)),
-            meshLocalBakeMode: meshBake?.mode,
-            meshLocalBakeMeshes: meshBake?.bakedMeshes ?? 0,
+            nodeBakeMeshes: nodeBake?.bakedMeshes ?? 0,
             bboxPostBakeM: {
               x: Number(szPostBake.x.toFixed(5)),
               y: Number(szPostBake.y.toFixed(5)),
               z: Number(szPostBake.z.toFixed(5)),
             },
+            maxNodePosLenM: Number(maxNodePosLenM.toFixed(5)),
           },
         );
       } catch (ingPrepErr) {
         console.warn(
-          "[omafit-ar] glasses ingest mesh-local bake:",
+          "[omafit-ar] glasses ingest root bake:",
           ingPrepErr?.message || ingPrepErr,
         );
       }
@@ -12307,8 +12313,12 @@ async function runArSession({
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
-      glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
-      glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesFrameWidthRawLocal);
+      glassesMeshScaleBboxWidth = glassesIngestWidgetFrameTag
+        ? resolveGlassesMerchantMeshScaleBboxWidth(glassesFrameWidthRawLocal, {
+            ingestSplit: true,
+          })
+        : glassesFrameWidthRawLocal;
+      glassesFrameWidthLocal = resolveGlassesFrameWidthForFit(glassesMeshScaleBboxWidth);
       glassesMeshWidthNormMul = glassesFrameWidthLocal / glassesMeshScaleBboxWidth;
     }
     /** Span do arco (m) após center+Tripo — usado para escala (não recomputar após partition). */
@@ -13350,7 +13360,14 @@ async function runArSession({
          */
         const lbPreBind = omafitGlassesLocalBboxCenterM(THREE, glasses);
         let ry180Applied = false;
-        if (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
+        if (glassesIngestWidgetFrameTag) {
+          /** Ingest: frente −Z → Ry π (contrato; heurística lbPre falha pós-split). */
+          glasses.rotateOnWorldAxis(
+            new THREE.Vector3(0, 1, 0),
+            OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
+          );
+          ry180Applied = true;
+        } else if (lbPreBind && lbPreBind.length() <= OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
           glasses.rotateOnWorldAxis(
             new THREE.Vector3(0, 1, 0),
             OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
@@ -13432,7 +13449,7 @@ async function runArSession({
               glassesIngestIntrinsicSpanM != null
                 ? Number(glassesIngestIntrinsicSpanM.toFixed(5))
                 : null,
-            ingestMeshLocalBaked: glassesIngestMeshLocalBaked,
+            ingestMeshLocalBaked: glassesIngestNodeBaked,
             note: glassesForceAnchorUnitScale
               ? "meshScale físico fixo; âncora MindAR nativa+wearZ; pivot ponte LM168."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
