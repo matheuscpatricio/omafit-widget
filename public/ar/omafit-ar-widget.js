@@ -621,7 +621,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v286";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v287";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12257,21 +12257,35 @@ async function runArSession({
           THREE,
           glasses,
         );
+        /** Downscale primeiro (nó canónico); bake absorve; downscale de novo (meshes). */
+        const downscalePre = omafitDownscaleGlassesIngestGroupPositionsForced(
+          THREE,
+          glasses,
+          glassesIngestPreHierarchySpanM,
+        );
         const hierarchyBake = omafitBakeGlassesIngestCanonicalPreserveHierarchy(THREE, glasses);
         const downscale = omafitDownscaleGlassesIngestGroupPositionsForced(
           THREE,
           glasses,
           glassesIngestPreHierarchySpanM,
         );
+        let maxNodePosLenM = 0;
+        glasses.traverse((child) => {
+          if (child === glasses) return;
+          maxNodePosLenM = Math.max(maxNodePosLenM, child.position.length());
+        });
         console.log(
           "[omafit-ar] glasses ingest → admin parity flat (hierarchy+downscale, vértices intactos)",
           {
             build: OMAFIT_AR_WIDGET_BUILD,
             preHierarchySpanM: Number(glassesIngestPreHierarchySpanM.toFixed(5)),
             hierarchyBakeMode: hierarchyBake?.mode,
+            downscalePreApplied: downscalePre?.applied,
             downscaleApplied: downscale?.applied,
             downscaleFactor: Number((downscale?.factor ?? 1).toFixed(5)),
-            scaledGroups: downscale?.scaledGroups ?? 0,
+            scaledNodesPre: downscalePre?.scaledNodes ?? downscalePre?.scaledGroups ?? 0,
+            scaledNodesPost: downscale?.scaledNodes ?? downscale?.scaledGroups ?? 0,
+            maxNodePosLenM: Number(maxNodePosLenM.toFixed(5)),
           },
         );
       } catch (ingPrepErr) {

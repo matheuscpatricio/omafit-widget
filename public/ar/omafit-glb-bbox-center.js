@@ -924,9 +924,9 @@ export function omafitDownscaleGlassesIngestGroupPositionsToVertexUnits(
     return { applied: false, factor: 1, scaledGroups: 0, spanXRaw: raw };
   }
   const factor = raw / targetW;
-  let scaledGroups = 0;
+  let scaledNodes = 0;
   root.traverse((child) => {
-    if (child === root || child.isMesh) return;
+    if (child === root) return;
     child.position.multiplyScalar(factor);
     const sx = child.scale?.x ?? 1;
     const sy = child.scale?.y ?? 1;
@@ -939,10 +939,10 @@ export function omafitDownscaleGlassesIngestGroupPositionsToVertexUnits(
       child.scale.multiplyScalar(factor);
     }
     child.updateMatrix();
-    scaledGroups += 1;
+    scaledNodes += 1;
   });
   root.updateMatrixWorld(true);
-  return { applied: true, factor, scaledGroups, spanXRaw: raw, targetWidthM: targetW };
+  return { applied: true, factor, scaledGroups: scaledNodes, scaledNodes, spanXRaw: raw, targetWidthM: targetW };
 }
 
 /**
@@ -975,9 +975,10 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
     };
   }
   const factor = raw / targetW;
-  let scaledGroups = 0;
+  let scaledNodes = 0;
   root.traverse((child) => {
-    if (child === root || child.isMesh) return;
+    if (child === root) return;
+    /** hierarchy-preserve bake coloca offsets do canónico em `mesh.position`. */
     child.position.multiplyScalar(factor);
     const sx = child.scale?.x ?? 1;
     const sy = child.scale?.y ?? 1;
@@ -990,13 +991,14 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
       child.scale.multiplyScalar(factor);
     }
     child.updateMatrix();
-    scaledGroups += 1;
+    scaledNodes += 1;
   });
   root.updateMatrixWorld(true);
   return {
     applied: true,
     factor,
-    scaledGroups,
+    scaledGroups: scaledNodes,
+    scaledNodes,
     spanXIntrinsic: raw,
     targetWidthM: targetW,
   };
