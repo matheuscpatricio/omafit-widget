@@ -11,9 +11,8 @@ import {
 import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
-  omafitBakeGlassesIngestCanonicalNodeOnly,
+  omafitPrepareGlassesIngestAdminParityFlat,
   omafitGlassesBakeLocalBboxCenterToOrigin,
-  omafitGlassesIngestPreHierarchyScaleSpanM,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
   omafitRecenterObject3OnGlassesLensFront,
@@ -56,7 +55,6 @@ import {
   computeGlassesSimpleFaceIpdMeshScale,
   computeFaceMatrixUniformScale,
   OMAFIT_GLASSES_SIMPLE_FACE_IPD_MUL,
-  OMAFIT_GLASSES_UNDERSIZED_BBOX_WIDTH_M,
 } from "./omafit-glasses-calibration.js";
 import {
   OMAFIT_NECKLACE_ORIENT_SLERP,
@@ -620,7 +618,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v290";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v292";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12248,45 +12246,37 @@ async function runArSession({
       }
     }
 
-    /** Ingest admin flat: bake matrixWorld→root nos vértices; zerar nós intermédios. */
-    let glassesIngestIntrinsicSpanM = null;
-    let glassesIngestNodeBaked = false;
+    /** Ingest admin flat: pipeline único (root bake → físico ~145mm → centróide). */
+    let glassesIngestPrep = null;
     if (accessoryType === "glasses" && glassesIngestWidgetFrameTag) {
       try {
-        glassesIngestIntrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(
-          THREE,
-          glasses,
-        );
-        const nodeBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, glasses);
-        glassesIngestNodeBaked = !!nodeBake?.ok;
-        glasses.updateMatrixWorld(true);
-        const szPostBake = new THREE.Vector3();
-        new THREE.Box3().setFromObject(glasses).getSize(szPostBake);
-        let maxNodePosLenM = 0;
-        glasses.traverse((child) => {
-          if (child === glasses) return;
-          maxNodePosLenM = Math.max(maxNodePosLenM, child.position.length());
-        });
+        glassesIngestPrep = omafitPrepareGlassesIngestAdminParityFlat(THREE, glasses);
         console.log(
-          "[omafit-ar] glasses ingest → admin parity flat (root bake, vértices intactos)",
+          "[omafit-ar] glasses ingest → admin parity flat (prep físico previsível)",
           {
             build: OMAFIT_AR_WIDGET_BUILD,
-            intrinsicSpanM: Number(glassesIngestIntrinsicSpanM.toFixed(5)),
-            nodeBakeMeshes: nodeBake?.bakedMeshes ?? 0,
-            bboxPostBakeM: {
-              x: Number(szPostBake.x.toFixed(5)),
-              y: Number(szPostBake.y.toFixed(5)),
-              z: Number(szPostBake.z.toFixed(5)),
-            },
-            maxNodePosLenM: Number(maxNodePosLenM.toFixed(5)),
-            meshScaleBboxWidthHintM: Number(
-              Math.max(glassesIngestIntrinsicSpanM || 0, szPostBake.x, 1e-4).toFixed(5),
+            ...glassesIngestPrep,
+            intrinsicSpanM: Number((glassesIngestPrep.intrinsicSpanM ?? 0).toFixed(5)),
+            physicalNormMul: Number((glassesIngestPrep.physicalNormMul ?? 1).toFixed(3)),
+            localBboxDriftBeforeM: Number(
+              (glassesIngestPrep.localBboxDriftBeforeM ?? 0).toFixed(5),
             ),
+            localBboxDriftAfterM: Number(
+              (glassesIngestPrep.localBboxDriftAfterM ?? 0).toFixed(5),
+            ),
+            maxNodePosLenM: Number((glassesIngestPrep.maxNodePosLenM ?? 0).toFixed(5)),
+            bboxPostM: glassesIngestPrep.bboxPostM
+              ? {
+                  x: Number(glassesIngestPrep.bboxPostM.x.toFixed(5)),
+                  y: Number(glassesIngestPrep.bboxPostM.y.toFixed(5)),
+                  z: Number(glassesIngestPrep.bboxPostM.z.toFixed(5)),
+                }
+              : null,
           },
         );
       } catch (ingPrepErr) {
         console.warn(
-          "[omafit-ar] glasses ingest root bake:",
+          "[omafit-ar] glasses ingest prep:",
           ingPrepErr?.message || ingPrepErr,
         );
       }
@@ -12316,19 +12306,8 @@ async function runArSession({
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
-      if (
-        glassesIngestWidgetFrameTag &&
-        glassesFrameWidthRawLocal < OMAFIT_GLASSES_UNDERSIZED_BBOX_WIDTH_M
-      ) {
-        /**
-         * Pós root-bake: vértices ainda ~10 mm — meshScale ≈ fitW/0,01 (~14).
-         * Não usar 145 mm como denominador (v289 → escala ~1, óculos minúsculos).
-         */
-        glassesMeshScaleBboxWidth = Math.max(
-          glassesIngestIntrinsicSpanM || 0,
-          glassesFrameWidthRawLocal,
-          1e-4,
-        );
+      if (glassesIngestPrep?.ok && glassesIngestPrep.bboxPostM?.x > 0) {
+        glassesMeshScaleBboxWidth = Math.max(glassesIngestPrep.bboxPostM.x, 1e-3);
       } else {
         glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
       }
@@ -13374,8 +13353,16 @@ async function runArSession({
          */
         const lbPreBind = omafitGlassesLocalBboxCenterM(THREE, glasses);
         let ry180Applied = false;
+        /**
+         * v255: pivot na ponte/lentes (LM168), não no centróide da bbox.
+         * Ingest: ponte antes de Ry π (prep já centrou vértices; evita drift × escala).
+         */
+        const bridgePivotPt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
+        if (bridgePivotPt && bridgePivotPt.length() > 0.001) {
+          glasses.position.sub(bridgePivotPt);
+          glasses.updateMatrixWorld(true);
+        }
         if (glassesIngestWidgetFrameTag) {
-          /** Ingest: frente −Z → Ry π (contrato; heurística lbPre falha pós-split). */
           glasses.rotateOnWorldAxis(
             new THREE.Vector3(0, 1, 0),
             OMAFIT_GLASSES_CANONICAL_BIND_RY_RAD,
@@ -13390,16 +13377,6 @@ async function runArSession({
         }
         glasses.updateMatrix();
         glasses.updateMatrixWorld(true);
-        /**
-         * v255: pivot de rotação na ponte/lentes (LM168), não no centróide da bbox.
-         * Bbox bake deixa origem no centro geométrico (~0,58 m da ponte) — viragens
-         * laterais faziam as lentes "escorregarem" dos olhos.
-         */
-        const bridgePivotPt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
-        if (bridgePivotPt && bridgePivotPt.length() > 0.001) {
-          glasses.position.sub(bridgePivotPt);
-          glasses.updateMatrixWorld(true);
-        }
         calibRot.rotation.order = "YXZ";
         const mcFlat = readGlassesMerchantCal();
         const autoFitFlat = resolveGlassesCalibScaleBase({
@@ -13459,11 +13436,18 @@ async function runArSession({
             localBboxCenterPreBindM: lbPreBind
               ? Number(lbPreBind.length().toFixed(5))
               : null,
-            ingestIntrinsicSpanM:
-              glassesIngestIntrinsicSpanM != null
-                ? Number(glassesIngestIntrinsicSpanM.toFixed(5))
-                : null,
-            ingestMeshLocalBaked: glassesIngestNodeBaked,
+            ingestPrep: glassesIngestPrep
+              ? {
+                  physicalNormApplied: glassesIngestPrep.physicalNormApplied,
+                  physicalNormMul: Number(
+                    (glassesIngestPrep.physicalNormMul ?? 1).toFixed(3),
+                  ),
+                  localBboxDriftAfterM: Number(
+                    (glassesIngestPrep.localBboxDriftAfterM ?? 0).toFixed(5),
+                  ),
+                  bboxPostM: glassesIngestPrep.bboxPostM,
+                }
+              : null,
             note: glassesForceAnchorUnitScale
               ? "meshScale físico fixo; âncora MindAR nativa+wearZ; pivot ponte LM168."
               : "meshScale = adminMeshScale / u (MindAR) por frame",
@@ -14137,6 +14121,7 @@ async function runArSession({
       glassesPipelineCanonicalBlender: !!glassesPipelineCanonicalBlender,
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
+      glassesIngestPhysicalPrep: !!glassesIngestPrep?.physicalNormApplied,
       glassesIngestBridgePositionLocal: glassesIngestBridgePositionLocal
         ? glassesIngestBridgePositionLocal.clone()
         : null,

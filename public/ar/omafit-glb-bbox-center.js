@@ -723,6 +723,7 @@ export function omafitNormalizeGlassesIngestSubPhysicalGeometry(
   THREE,
   root,
   targetWidthM = OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
+  spanXOverride = 0,
 ) {
   if (!THREE || !root) {
     return { applied: false, spanXBefore: 0, spanXAfter: 0, mul: 1, bakedMeshes: 0 };
@@ -730,7 +731,12 @@ export function omafitNormalizeGlassesIngestSubPhysicalGeometry(
   root.updateMatrixWorld(true);
   const szBefore = new THREE.Vector3();
   new THREE.Box3().setFromObject(root).getSize(szBefore);
-  const spanXBefore = Math.max(szBefore.x, 1e-6);
+  const bboxSpanX = Math.max(szBefore.x, 1e-6);
+  const override = Math.max(Number(spanXOverride) || 0, 0);
+  const spanXBefore =
+    override > 0 && override < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M
+      ? override
+      : bboxSpanX;
   const targetW = Math.max(Number(targetWidthM) || 0, 1e-4);
   if (spanXBefore >= OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M) {
     return {
@@ -1011,6 +1017,71 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
     scaledNodes,
     spanXIntrinsic: raw,
     targetWidthM: targetW,
+  };
+}
+
+/**
+ * Pipeline ingest previsível (admin parity flat):
+ * 1) root bake — transforms nos vértices, nós zerados
+ * 2) normalização física — vértices ~10 mm → ~145 mm (sem meshScale ~14)
+ * 3) bake centróide local — evita drift × escala off-screen
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ */
+export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
+  if (!THREE || !root) {
+    return {
+      ok: false,
+      intrinsicSpanM: 0,
+      nodeBakeMeshes: 0,
+      physicalNormApplied: false,
+      physicalNormMul: 1,
+      localBboxDriftBeforeM: 0,
+      localBboxDriftAfterM: 0,
+      localBboxBakedMeshes: 0,
+      maxNodePosLenM: 0,
+      bboxPostM: { x: 0, y: 0, z: 0 },
+    };
+  }
+  const intrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root);
+  const nodeBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, root);
+  const physicalNorm = omafitNormalizeGlassesIngestSubPhysicalGeometry(
+    THREE,
+    root,
+    OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
+    intrinsicSpanM,
+  );
+  const lbBefore = omafitGlassesLocalBboxCenterM(THREE, root);
+  const localBboxDriftBeforeM = lbBefore ? lbBefore.length() : 0;
+  let localBboxBakedMeshes = 0;
+  let localBboxDriftAfterM = localBboxDriftBeforeM;
+  if (localBboxDriftBeforeM > 1e-6) {
+    const bboxBake = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, root);
+    localBboxBakedMeshes = bboxBake?.bakedMeshes ?? 0;
+    localBboxDriftAfterM = bboxBake?.driftAfterM ?? localBboxDriftBeforeM;
+  }
+  root.updateMatrixWorld(true);
+  let maxNodePosLenM = 0;
+  root.traverse((child) => {
+    if (child === root) return;
+    maxNodePosLenM = Math.max(maxNodePosLenM, child.position.length());
+  });
+  const sz = new THREE.Vector3();
+  new THREE.Box3().setFromObject(root).getSize(sz);
+  return {
+    ok: Boolean(nodeBake?.ok),
+    intrinsicSpanM,
+    nodeBakeMeshes: nodeBake?.bakedMeshes ?? 0,
+    physicalNormApplied: Boolean(physicalNorm?.applied),
+    physicalNormMul: physicalNorm?.mul ?? 1,
+    spanXBeforeM: physicalNorm?.spanXBefore ?? 0,
+    spanXAfterM: physicalNorm?.spanXAfter ?? 0,
+    localBboxDriftBeforeM,
+    localBboxDriftAfterM,
+    localBboxBakedMeshes,
+    maxNodePosLenM,
+    bboxPostM: { x: sz.x, y: sz.y, z: sz.z },
   };
 }
 
