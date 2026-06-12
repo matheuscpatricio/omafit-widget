@@ -2,6 +2,7 @@
 function normalizeShopifyImagePath(pathname: string): string {
   return pathname
     .toLowerCase()
+    .replace(/@2x(?=\.[a-z0-9]+$)/i, '')
     .replace(/_(\d+x\d+|\d+x)(?=\.[a-z0-9]+$)/i, '')
     .replace(
       /_((?:grande|large|medium|small|thumb|compact|master|original|crop(?:_center)?))(?=\.[a-z0-9]+$)/i,
@@ -18,6 +19,12 @@ function shopifyFileStemFromPath(pathname: string): string {
 function isShopifyCdnHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   return /\.shopify\.com$/i.test(h) || h.includes('shopifycdn');
+}
+
+/** CDN Shopify: cdn.shopify.com, shopifycdn ou /cdn/shop/ no domínio da loja. */
+function isShopifyProductImageUrl(hostname: string, pathname: string): boolean {
+  if (isShopifyCdnHost(hostname)) return true;
+  return /\/cdn\/shop\//i.test(pathname);
 }
 
 function decodeImageUrl(url: string): string {
@@ -57,9 +64,10 @@ export function galleryDedupeKey(url: string): string {
     const parsed = new URL(normalized);
     const host = parsed.hostname.toLowerCase();
     const path = normalizeShopifyImagePath(parsed.pathname);
-    if (isShopifyCdnHost(host)) {
+    if (isShopifyProductImageUrl(host, parsed.pathname)) {
       const stem = shopifyFileStemFromPath(parsed.pathname);
-      if (stem) return `${host}::file::${stem}`;
+      // Mesmo ficheiro pode vir de cdn.shopify.com ou do /cdn/shop/ do domínio da loja.
+      if (stem) return `shopify::file::${stem}`;
     }
     return `${host}${path}`;
   } catch {
@@ -98,7 +106,17 @@ export function mergeProductImageGallery(
     }
   }
 
-  return result;
+  return collapseGalleryDuplicates(result);
+}
+
+/** Segunda passagem — cobre pares que escapam à chave (ex.: hosts mistos antes do fix). */
+function collapseGalleryDuplicates(urls: string[]): string[] {
+  const out: string[] = [];
+  for (const url of urls) {
+    if (out.some((existing) => galleryUrlsEqual(existing, url))) continue;
+    out.push(url);
+  }
+  return out;
 }
 
 export function parseProductImagesMessage(payload: unknown): string[] {

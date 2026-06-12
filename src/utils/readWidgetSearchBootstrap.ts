@@ -1,4 +1,13 @@
 import { detectWidgetLanguage } from '../locales/widget-translations';
+import { mergeProductImageGallery, normalizeGalleryUrl } from './productImageGallery';
+
+function tryDecodeUrlParam(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 /**
  * Lê parâmetros críticos da URL no primeiro paint (antes do primeiro useEffect).
@@ -66,7 +75,9 @@ export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
   }
   const params = new URLSearchParams(window.location.search);
 
-  const productImage = params.get('productImage')?.trim() || '';
+  const productImage = normalizeGalleryUrl(
+    tryDecodeUrlParam(params.get('productImage')?.trim() || '')
+  );
   const productHandle =
     params.get('productHandle')?.trim() ||
     params.get('product_handle')?.trim() ||
@@ -79,11 +90,17 @@ export function readWidgetSearchBootstrap(): WidgetSearchBootstrap {
     try {
       const parsed = JSON.parse(decodeURIComponent(imagesParam));
       if (Array.isArray(parsed)) {
-        productImages = parsed.filter((item): item is string => typeof item === 'string');
+        const fromQuery = parsed
+          .filter((item): item is string => typeof item === 'string')
+          .map((item) => normalizeGalleryUrl(tryDecodeUrlParam(item.trim())))
+          .filter(Boolean);
+        productImages = mergeProductImageGallery(productImage, fromQuery);
       }
     } catch {
       /* ignore */
     }
+  } else if (productImage) {
+    productImages = [productImage];
   }
 
   const tryonLayoutBackgroundImage =

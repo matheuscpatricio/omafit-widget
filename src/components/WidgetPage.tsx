@@ -14,6 +14,7 @@ import { getOmafitCatalogRuntimeConfig } from '../utils/omafitEnv';
 import {
   inferProductHandleFromReferrer,
   mergeProductImageGallery,
+  normalizeGalleryUrl,
   parseProductImagesMessage,
 } from '../utils/productImageGallery';
 
@@ -96,25 +97,6 @@ const tryDecodeUrlParam = (value: string | null): string => {
   } catch {
     return value;
   }
-};
-
-const upgradeShopifyMediaToHttps = (url: string): string => {
-  const s = String(url || '').trim();
-  if (!s) return s;
-  if (s.startsWith('//')) return `https:${s}`;
-  try {
-    if (/^http:\/\/cdn\.shopify\.com\//i.test(s)) {
-      return `https://${s.slice('http://'.length)}`;
-    }
-    const u = new URL(s);
-    if (u.protocol === 'http:' && /\.shopify\.com$/i.test(u.hostname)) {
-      u.protocol = 'https:';
-      return u.toString();
-    }
-  } catch {
-    /* ignore */
-  }
-  return s;
 };
 
 /** Resíduo de `{{ metafield | json }}` no drop (Shopify) — não serializar o objeto metafield. */
@@ -235,7 +217,7 @@ const parseEyewearArBootstrapFromSearch = (search: string): EyewearArBootstrap |
   }
 
   const productTitle = tryDecodeUrlParam(q.get('productName')) || 'Produto';
-  const productImage = upgradeShopifyMediaToHttps(tryDecodeUrlParam(q.get('productImage')) || '');
+  const productImage = normalizeGalleryUrl(tryDecodeUrlParam(q.get('productImage')) || '');
   const lang =
     normalizeWidgetLanguage(
       q.get('adminLocale') ||
@@ -571,8 +553,9 @@ export function WidgetPage() {
     console.log('   - 🎁 recommendedProductUrl:', recommendedProductUrlParam || 'não fornecido');
     console.log('   - config length:', configParam?.length || 0);
 
-    if (image) {
-      setProductImage(image);
+    const heroImage = image ? normalizeGalleryUrl(image.trim()) : productImage;
+    if (heroImage) {
+      setProductImage(heroImage);
     }
 
     if (imagesParam) {
@@ -581,11 +564,11 @@ export function WidgetPage() {
         if (Array.isArray(images)) {
           const normalized = images
             .filter((item): item is string => typeof item === 'string')
-            .map((item) => upgradeShopifyMediaToHttps(item.trim()))
+            .map((item) => normalizeGalleryUrl(item.trim()))
             .filter(Boolean);
           if (normalized.length > 0) {
             setProductImages((prev) =>
-              mergeProductImageGallery(image || productImage, prev, normalized)
+              mergeProductImageGallery(heroImage, prev, normalized)
             );
           }
         }
@@ -1041,7 +1024,7 @@ export function WidgetPage() {
         });
         if (cancelled || error || !product) return;
         const imgs = (product.images?.length ? product.images : [product.image_url])
-          .map((u) => upgradeShopifyMediaToHttps(String(u || '').trim()))
+          .map((u) => normalizeGalleryUrl(String(u || '').trim()))
           .filter(Boolean);
         if (imgs.length > 0) {
           setProductImages((prev) => mergeProductImageGallery(productImage, prev, imgs));

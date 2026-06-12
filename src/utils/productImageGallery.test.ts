@@ -30,6 +30,26 @@ describe('mergeProductImageGallery', () => {
     expect(mergeProductImageGallery(https, [rel])).toHaveLength(1);
   });
 
+  it('dedupes featured from shop domain cdn/shop vs cdn.shopify.com', () => {
+    const fromPage =
+      'https://loja-exemplo.com.br/cdn/shop/files/camisa-preta.webp?v=1&width=533';
+    const fromApi =
+      'https://cdn.shopify.com/s/files/1/0123/4567/products/camisa-preta_800x800.jpg?v=2';
+    expect(mergeProductImageGallery(fromPage, [fromApi])).toHaveLength(1);
+    expect(galleryUrlsEqual(fromPage, fromApi)).toBe(true);
+  });
+
+  it('dedupes garment param when gallery list repeats featured image', () => {
+    const featured =
+      'https://cdn.shopify.com/s/files/1/0123/4567/products/polo.jpg';
+    const gallery = [
+      featured,
+      'https://cdn.shopify.com/s/files/1/0123/4567/products/polo_2048x2048.jpg',
+      'https://cdn.shopify.com/s/files/1/0123/4567/products/costas.jpg',
+    ];
+    expect(mergeProductImageGallery(featured, gallery)).toHaveLength(2);
+  });
+
   it('keeps distinct product photos', () => {
     const a = 'https://cdn.shopify.com/s/files/1/000/products/front.jpg';
     const b = 'https://cdn.shopify.com/s/files/1/000/products/back.jpg';
