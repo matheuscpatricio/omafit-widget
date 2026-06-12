@@ -1,8 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import {
-  resolveShopContact,
-  sendShopifyUninstallEmail,
-} from "../_shared/shopify-uninstall-email.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { resolveShopContact } from "../_shared/shopify-shop-contact.ts";
+import { sendShopifyUninstallEmail } from "../_shared/shopify-uninstall-email.ts";
 import { verifyShopifyWebhook } from "../_shared/shopify-webhook-verify.ts";
 
 type ShopifyShopPayload = {
@@ -29,9 +28,20 @@ Deno.serve(async (req: Request) => {
   const topic = req.headers.get("X-Shopify-Topic");
   const shopDomainHeader = req.headers.get("X-Shopify-Shop-Domain");
 
+  console.log("[shopify-app-uninstalled-webhook] received", {
+    topic,
+    shop: shopDomainHeader,
+    bodyLength: rawBody.length,
+  });
+
   const valid = await verifyShopifyWebhook(rawBody, hmac, secret);
   if (!valid) {
-    return new Response("Invalid webhook signature", { status: 400 });
+    console.error("[shopify-app-uninstalled-webhook] invalid HMAC", {
+      topic,
+      shop: shopDomainHeader,
+      hasHmac: Boolean(hmac),
+    });
+    return new Response("Invalid webhook signature", { status: 401 });
   }
 
   if (topic !== "app/uninstalled") {
@@ -48,30 +58,27 @@ Deno.serve(async (req: Request) => {
     return new Response("Invalid JSON body", { status: 400 });
   }
 
-  const shopDomain = (
-    shopDomainHeader ??
-    payload.myshopify_domain ??
-    ""
-  ).trim().toLowerCase();
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
 
-  if (!shopDomain) {
-    return new Response(JSON.stringify({ ok: true, skipped: true, reason: "missing_shop" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const contact = await resolveShopContact(supabase, shopDomainHeader, payload);
 
-  const contact = await resolveShopContact(shopDomain, {
-    shopName: payload.name,
-    shopEmail: payload.customer_email ?? payload.email,
-    countryCode: payload.country_code,
+  console.log("[shopify-app-uninstalled-webhook] resolved contact", {
+    shopDomain: contact.shopDomain,
+    emailSource: contact.emailSource,
+    hasEmail: Boolean(contact.shopEmail),
   });
 
-  if (!contact) {
-    console.error("[shopify-app-uninstalled-webhook] could not resolve shop email", {
-      shopDomain,
-    });
-    return new Response(JSON.stringify({ ok: true, skipped: true, reason: "missing_email" }), {
+  if (!contact.shopDomain || !contact.shopEmail) {
+    console.error("[shopify-app-uninstalled-webhook] missing shop domain or email", contact);
+    return new Response(JSON.stringify({
+      ok: true,
+      skipped: true,
+      reason: "missing_data",
+      email_source: contact.emailSource,
+    }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -79,13 +86,13 @@ Deno.serve(async (req: Request) => {
 
   try {
     const result = await sendShopifyUninstallEmail({
-      shopDomain,
+      shopDomain: contact.shopDomain,
       shopName: contact.shopName,
       shopEmail: contact.shopEmail,
       countryCode: contact.countryCode,
     });
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ ...result, email_source: contact.emailSource }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

@@ -27,62 +27,6 @@ function getSupabase(): SupabaseClient {
   );
 }
 
-export async function resolveShopContact(
-  shopDomain: string,
-  payload: {
-    shopName?: string;
-    shopEmail?: string;
-    countryCode?: string | null;
-  },
-): Promise<{ shopName: string; shopEmail: string; countryCode: string | null } | null> {
-  const normalizedDomain = shopDomain.trim().toLowerCase();
-  let shopName = payload.shopName?.trim() || "";
-  let shopEmail = payload.shopEmail?.trim().toLowerCase() || "";
-  let countryCode = payload.countryCode?.trim().toUpperCase() ?? null;
-
-  const supabase = getSupabase();
-
-  if (!shopEmail || !countryCode) {
-    const { data: welcome } = await supabase
-      .from("shopify_welcome_emails")
-      .select("shop_contact_email, shop_country_code")
-      .eq("shop_domain", normalizedDomain)
-      .maybeSingle();
-
-    if (!shopEmail && welcome?.shop_contact_email) {
-      shopEmail = welcome.shop_contact_email.trim().toLowerCase();
-    }
-    if (!countryCode && welcome?.shop_country_code) {
-      countryCode = welcome.shop_country_code;
-    }
-  }
-
-  if (!shopEmail || !countryCode) {
-    const { data: shop } = await supabase
-      .from("shopify_shops")
-      .select("shop_contact_email, shop_country_code")
-      .eq("shop_domain", normalizedDomain)
-      .maybeSingle();
-
-    if (!shopEmail && shop?.shop_contact_email) {
-      shopEmail = shop.shop_contact_email.trim().toLowerCase();
-    }
-    if (!countryCode && shop?.shop_country_code) {
-      countryCode = shop.shop_country_code;
-    }
-  }
-
-  if (!shopEmail) {
-    return null;
-  }
-
-  return {
-    shopName: shopName || normalizedDomain,
-    shopEmail,
-    countryCode,
-  };
-}
-
 export async function sendShopifyUninstallEmail(
   input: UninstallEmailInput,
 ): Promise<UninstallEmailResult> {

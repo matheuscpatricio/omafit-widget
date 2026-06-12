@@ -65,7 +65,6 @@ Deno.serve(async (req: Request) => {
       countryCode: body.country_code,
       force: body.force,
     });
-
     return jsonResponse(result);
   } catch (error) {
     console.error("[shopify-uninstall-email] send failed:", error);
