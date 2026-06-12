@@ -1021,10 +1021,11 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
 }
 
 /**
- * Pipeline ingest previsível (admin parity flat):
- * 1) root bake — transforms nos vértices, nós zerados
- * 2) normalização física — vértices ~10 mm → ~145 mm (sem meshScale ~14)
- * 3) bake centróide local — evita drift × escala off-screen
+ * Pipeline ingest previsível (admin parity flat) — paridade preview `/calibrate`:
+ * 1) `PreserveHierarchy` — absorve só `omafit_ar_canonical`; mantém dobragem das hastes
+ * 2) downscale de `position` dos grupos (vértices ~10 mm vs offsets em metros)
+ * 3) normalização física uniforme nos vértices + grupos (~145 mm de largura)
+ * 4) recentro no **root** (ponte/lentes), sem bake de centróide nos vértices
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} root
@@ -1033,6 +1034,7 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
   if (!THREE || !root) {
     return {
       ok: false,
+      prepMode: "hierarchy-preserve",
       intrinsicSpanM: 0,
       nodeBakeMeshes: 0,
       physicalNormApplied: false,
@@ -1045,7 +1047,13 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
     };
   }
   const intrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root);
-  const nodeBake = omafitBakeGlassesIngestCanonicalNodeOnly(THREE, root);
+  const hierarchyBake = omafitBakeGlassesIngestCanonicalPreserveHierarchy(THREE, root);
+  const groupDownscale = omafitDownscaleGlassesIngestGroupPositionsForced(
+    THREE,
+    root,
+    intrinsicSpanM,
+    OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
+  );
   const physicalNorm = omafitNormalizeGlassesIngestSubPhysicalGeometry(
     THREE,
     root,
@@ -1056,10 +1064,17 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
   const localBboxDriftBeforeM = lbBefore ? lbBefore.length() : 0;
   let localBboxBakedMeshes = 0;
   let localBboxDriftAfterM = localBboxDriftBeforeM;
-  if (localBboxDriftBeforeM > 1e-6) {
-    const bboxBake = omafitGlassesBakeLocalBboxCenterToOrigin(THREE, root);
-    localBboxBakedMeshes = bboxBake?.bakedMeshes ?? 0;
-    localBboxDriftAfterM = bboxBake?.driftAfterM ?? localBboxDriftBeforeM;
+  let recenterMode = "none";
+  if (localBboxDriftBeforeM > OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M) {
+    const lensRecenter = omafitRecenterObject3OnGlassesLensFront(THREE, root);
+    recenterMode = lensRecenter?.mode || "lens-front-root";
+    localBboxDriftAfterM =
+      omafitGlassesLocalBboxCenterM(THREE, root)?.length() ?? localBboxDriftBeforeM;
+  } else if (localBboxDriftBeforeM > 1e-6) {
+    omafitCenterObject3OnBboxOrigin(THREE, root);
+    recenterMode = "bbox-root";
+    localBboxDriftAfterM =
+      omafitGlassesLocalBboxCenterM(THREE, root)?.length() ?? localBboxDriftBeforeM;
   }
   root.updateMatrixWorld(true);
   let maxNodePosLenM = 0;
@@ -1070,9 +1085,14 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
   const sz = new THREE.Vector3();
   new THREE.Box3().setFromObject(root).getSize(sz);
   return {
-    ok: Boolean(nodeBake?.ok),
+    ok: Boolean(hierarchyBake?.ok),
+    prepMode: "hierarchy-preserve",
+    hierarchyBakeMode: hierarchyBake?.mode ?? "unknown",
+    hierarchyCanonicalFound: Boolean(hierarchyBake?.canonicalFound),
+    groupDownscaleApplied: Boolean(groupDownscale?.applied),
+    groupDownscaleFactor: groupDownscale?.factor ?? 1,
     intrinsicSpanM,
-    nodeBakeMeshes: nodeBake?.bakedMeshes ?? 0,
+    nodeBakeMeshes: 0,
     physicalNormApplied: Boolean(physicalNorm?.applied),
     physicalNormMul: physicalNorm?.mul ?? 1,
     spanXBeforeM: physicalNorm?.spanXBefore ?? 0,
@@ -1080,6 +1100,7 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
     localBboxDriftBeforeM,
     localBboxDriftAfterM,
     localBboxBakedMeshes,
+    recenterMode,
     maxNodePosLenM,
     bboxPostM: { x: sz.x, y: sz.y, z: sz.z },
   };
