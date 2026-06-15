@@ -1117,6 +1117,71 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
   };
 }
 
+/**
+ * Ingest + paridade preview admin: **zero mutação** do GLB (vértices, grupos, bake).
+ * Escala física só em runtime via `computeGlassesPreviewBaseScale` × merchant.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ */
+export function omafitPrepareGlassesIngestAdminPreviewIntact(THREE, root) {
+  if (!THREE || !root) {
+    return {
+      ok: false,
+      prepMode: "admin-preview-intact",
+      intrinsicSpanM: 0,
+      intrinsicMeshSpanM: 0,
+      nodeBakeMeshes: 0,
+      physicalNormApplied: false,
+      physicalNormMul: 1,
+      localBboxDriftBeforeM: 0,
+      localBboxDriftAfterM: 0,
+      localBboxBakedMeshes: 0,
+      maxNodePosLenM: 0,
+      bboxPostM: { x: 0, y: 0, z: 0 },
+    };
+  }
+  root.updateMatrixWorld(true);
+  let canonicalFound = false;
+  root.traverse((child) => {
+    if (child !== root && String(child.name || "") === "omafit_ar_canonical") {
+      canonicalFound = true;
+    }
+  });
+  const intrinsicMeshSpanM = omafitGlassesIngestIntrinsicMeshMaxSpanM(THREE, root);
+  const intrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root);
+  const lb = omafitGlassesLocalBboxCenterM(THREE, root);
+  const localBboxDriftM = lb ? lb.length() : 0;
+  let maxNodePosLenM = 0;
+  root.traverse((child) => {
+    if (child === root) return;
+    maxNodePosLenM = Math.max(maxNodePosLenM, child.position.length());
+  });
+  const sz = new THREE.Vector3();
+  new THREE.Box3().setFromObject(root).getSize(sz);
+  return {
+    ok: true,
+    prepMode: "admin-preview-intact",
+    hierarchyBakeMode: "skipped",
+    hierarchyCanonicalFound: canonicalFound,
+    groupDownscaleApplied: false,
+    groupDownscaleFactor: 1,
+    intrinsicSpanM,
+    intrinsicMeshSpanM,
+    nodeBakeMeshes: 0,
+    physicalNormApplied: false,
+    physicalNormMul: 1,
+    spanXBeforeM: intrinsicSpanM,
+    spanXAfterM: intrinsicSpanM,
+    localBboxDriftBeforeM: localBboxDriftM,
+    localBboxDriftAfterM: localBboxDriftM,
+    localBboxBakedMeshes: 0,
+    recenterMode: "none",
+    maxNodePosLenM,
+    bboxPostM: { x: sz.x, y: sz.y, z: sz.z },
+  };
+}
+
 export function omafitResolveGlassesIngestWearOffsetM(THREE, root) {
   if (!THREE || !root) return new THREE.Vector3(0, 0, 0);
   root.updateMatrixWorld(true);

@@ -12,6 +12,7 @@ import {
   omafitCenterObject3OnBboxOrigin,
   omafitComputeGlassesLensAnchorPoint,
   omafitPrepareGlassesIngestAdminParityFlat,
+  omafitPrepareGlassesIngestAdminPreviewIntact,
   omafitGlassesBakeLocalBboxCenterToOrigin,
   omafitGlassesLocalBboxCenterM,
   OMAFIT_GLASSES_LOCAL_BBOX_CENTER_MAX_M,
@@ -618,7 +619,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v295";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v296";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12246,34 +12247,63 @@ async function runArSession({
       }
     }
 
-    /** Ingest admin flat: pipeline único (root bake → físico ~145mm → centróide). */
+    /** Ingest admin flat: intact (preview) ou pipeline legado (bake + físico). */
     let glassesIngestPrep = null;
     if (accessoryType === "glasses" && glassesIngestWidgetFrameTag) {
+      const glassesIngestAdminPreviewIntact =
+        !glassesGlbStandardize &&
+        !glassesManualMindarRig &&
+        !glassesStructuralMindarRig &&
+        !glassesCheekOrthogonalBasis &&
+        !/^(1|true|yes|on)$/i.test(String(cfgAttr("arGlassesGeometryAnchor", "0")).trim());
       try {
-        glassesIngestPrep = omafitPrepareGlassesIngestAdminParityFlat(THREE, glasses);
-        console.log(
-          "[omafit-ar] glasses ingest → admin parity flat (hierarchy preserve + escala)",
-          {
-            build: OMAFIT_AR_WIDGET_BUILD,
-            ...glassesIngestPrep,
-            intrinsicSpanM: Number((glassesIngestPrep.intrinsicSpanM ?? 0).toFixed(5)),
-            physicalNormMul: Number((glassesIngestPrep.physicalNormMul ?? 1).toFixed(3)),
-            localBboxDriftBeforeM: Number(
-              (glassesIngestPrep.localBboxDriftBeforeM ?? 0).toFixed(5),
-            ),
-            localBboxDriftAfterM: Number(
-              (glassesIngestPrep.localBboxDriftAfterM ?? 0).toFixed(5),
-            ),
-            maxNodePosLenM: Number((glassesIngestPrep.maxNodePosLenM ?? 0).toFixed(5)),
-            bboxPostM: glassesIngestPrep.bboxPostM
-              ? {
-                  x: Number(glassesIngestPrep.bboxPostM.x.toFixed(5)),
-                  y: Number(glassesIngestPrep.bboxPostM.y.toFixed(5)),
-                  z: Number(glassesIngestPrep.bboxPostM.z.toFixed(5)),
-                }
-              : null,
-          },
-        );
+        if (glassesIngestAdminPreviewIntact) {
+          glassesIngestPrep = omafitPrepareGlassesIngestAdminPreviewIntact(THREE, glasses);
+          console.log(
+            "[omafit-ar] glasses ingest → admin preview intact (GLB sem mutação)",
+            {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              ...glassesIngestPrep,
+              intrinsicSpanM: Number((glassesIngestPrep.intrinsicSpanM ?? 0).toFixed(5)),
+              intrinsicMeshSpanM: Number(
+                (glassesIngestPrep.intrinsicMeshSpanM ?? 0).toFixed(5),
+              ),
+              maxNodePosLenM: Number((glassesIngestPrep.maxNodePosLenM ?? 0).toFixed(5)),
+              bboxPostM: glassesIngestPrep.bboxPostM
+                ? {
+                    x: Number(glassesIngestPrep.bboxPostM.x.toFixed(5)),
+                    y: Number(glassesIngestPrep.bboxPostM.y.toFixed(5)),
+                    z: Number(glassesIngestPrep.bboxPostM.z.toFixed(5)),
+                  }
+                : null,
+            },
+          );
+        } else {
+          glassesIngestPrep = omafitPrepareGlassesIngestAdminParityFlat(THREE, glasses);
+          console.log(
+            "[omafit-ar] glasses ingest → admin parity flat (hierarchy preserve + escala)",
+            {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              ...glassesIngestPrep,
+              intrinsicSpanM: Number((glassesIngestPrep.intrinsicSpanM ?? 0).toFixed(5)),
+              physicalNormMul: Number((glassesIngestPrep.physicalNormMul ?? 1).toFixed(3)),
+              localBboxDriftBeforeM: Number(
+                (glassesIngestPrep.localBboxDriftBeforeM ?? 0).toFixed(5),
+              ),
+              localBboxDriftAfterM: Number(
+                (glassesIngestPrep.localBboxDriftAfterM ?? 0).toFixed(5),
+              ),
+              maxNodePosLenM: Number((glassesIngestPrep.maxNodePosLenM ?? 0).toFixed(5)),
+              bboxPostM: glassesIngestPrep.bboxPostM
+                ? {
+                    x: Number(glassesIngestPrep.bboxPostM.x.toFixed(5)),
+                    y: Number(glassesIngestPrep.bboxPostM.y.toFixed(5)),
+                    z: Number(glassesIngestPrep.bboxPostM.z.toFixed(5)),
+                  }
+                : null,
+            },
+          );
+        }
       } catch (ingPrepErr) {
         console.warn(
           "[omafit-ar] glasses ingest prep:",
@@ -12306,7 +12336,15 @@ async function runArSession({
     let glassesIngestBridgePositionLocal = null;
     if (accessoryType === "glasses") {
       glassesFrameWidthRawLocal = Math.max(sz.x, 0.001);
-      if (glassesIngestPrep?.ok && glassesIngestPrep.bboxPostM?.x > 0) {
+      if (glassesIngestPrep?.prepMode === "admin-preview-intact") {
+        const spanM = Math.max(
+          Number(glassesIngestPrep.intrinsicSpanM) ||
+            Number(glassesIngestPrep.intrinsicMeshSpanM) ||
+            0,
+          1e-4,
+        );
+        glassesMeshScaleBboxWidth = spanM;
+      } else if (glassesIngestPrep?.ok && glassesIngestPrep.bboxPostM?.x > 0) {
         glassesMeshScaleBboxWidth = Math.max(glassesIngestPrep.bboxPostM.x, 1e-3);
       } else {
         glassesMeshScaleBboxWidth = glassesFrameWidthRawLocal;
@@ -13355,10 +13393,16 @@ async function runArSession({
         let ry180Applied = false;
         /**
          * v255: pivot na ponte/lentes (LM168), não no centróide da bbox.
-         * Ingest: ponte antes de Ry π (prep já centrou vértices; evita drift × escala).
+         * v296 ingest intact: sem subtrair ponte (paridade preview admin — GLB intacto).
          */
+        const ingestPreviewIntact =
+          glassesIngestPrep?.prepMode === "admin-preview-intact";
         const bridgePivotPt = omafitComputeGlassesLensAnchorPoint(THREE, glasses);
-        if (bridgePivotPt && bridgePivotPt.length() > 0.001) {
+        if (
+          !ingestPreviewIntact &&
+          bridgePivotPt &&
+          bridgePivotPt.length() > 0.001
+        ) {
           glasses.position.sub(bridgePivotPt);
           glasses.updateMatrixWorld(true);
         }
