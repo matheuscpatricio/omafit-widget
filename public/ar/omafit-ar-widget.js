@@ -625,7 +625,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v302";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v303";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -2392,6 +2392,49 @@ function omafitGlassesApplyRodinAdminParityLighting(THREE, root, renderer) {
   });
 }
 
+/**
+ * Repõe luzes/exposure do preview admin — bloqueia `omafitStepFaceAdaptiveLighting`
+ * que empurra ambient→~0,98 e exposure→~1,18 (óculos “lavados” vs /calibrate).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").WebGLRenderer | null | undefined} renderer
+ * @param {import("three").AmbientLight | null | undefined} ambient
+ * @param {import("three").DirectionalLight | null | undefined} key
+ * @param {import("three").DirectionalLight | null | undefined} fill
+ * @param {import("three").HemisphereLight | null | undefined} hemi
+ */
+function omafitGlassesRestoreAdminPreviewSceneLighting(
+  THREE,
+  renderer,
+  ambient,
+  key,
+  fill,
+  hemi,
+) {
+  if (ambient) ambient.intensity = OMAFIT_GLASSES_ADMIN_PREVIEW_AMBIENT_INTENSITY;
+  if (key) {
+    key.intensity = OMAFIT_GLASSES_ADMIN_PREVIEW_KEY_INTENSITY;
+    key.color.setHex(0xffffff);
+    key.position.set(0.5, 0.8, 1.2);
+  }
+  if (fill) {
+    fill.intensity = OMAFIT_GLASSES_ADMIN_PREVIEW_FILL_INTENSITY;
+    fill.position.set(-0.8, -0.2, 0.6);
+  }
+  if (hemi) {
+    hemi.intensity = 0;
+    hemi.visible = false;
+  }
+  if (renderer) {
+    try {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = OMAFIT_GLASSES_ADMIN_PREVIEW_TONE_EXPOSURE;
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 /** @deprecated Usar {@link omafitGlassesApplyRodinAdminParityLighting}. */
 function omafitGlassesApplyRodinPbrShineOnFace(THREE, root, _envTexture, renderer) {
   omafitGlassesApplyRodinAdminParityLighting(THREE, root, renderer);
@@ -2433,9 +2476,15 @@ function omafitGlassesFlatModeForceDrawableOnFace(THREE, root, opts = {}) {
       const isRodinLens =
         !isRuntimeLens &&
         omafitIsGlassesLensMeshMaterial(THREE, root, mat, child.name, mat.name);
-      /** Flat AR: compõe por cima do vídeo — depth off em TODAS as meshes (clip Z ainda aplica). */
-      mat.depthTest = false;
-      mat.depthWrite = false;
+      /** Flat AR: compõe por cima do vídeo — lentes sem depth; armação Rodin = preview admin. */
+      if (preserveRodinGlb && !isRuntimeLens && !isRodinLens) {
+        mat.depthTest = true;
+        mat.depthWrite = mat.transparent !== true;
+        mat.side = THREE.FrontSide;
+      } else {
+        mat.depthTest = false;
+        mat.depthWrite = false;
+      }
       if (!preserveRodinGlb && sceneEnv && mat.envMap == null) mat.envMap = sceneEnv;
       if (preserveRodinGlb && mat.envMap) {
         mat.envMap = null;
@@ -2472,6 +2521,9 @@ function omafitGlassesFlatModeForceDrawableOnFace(THREE, root, opts = {}) {
           mat.opacity = 1;
           mat.transparent = false;
         }
+        if (!isRodinLens && !isRuntimeLens) {
+          mat.side = THREE.FrontSide;
+        }
       } else {
         if (mat.color?.getHex && mat.color.getHex() < 0x222222) mat.color.setHex(0x444444);
         if (mat.emissive?.setHex) {
@@ -2486,7 +2538,9 @@ function omafitGlassesFlatModeForceDrawableOnFace(THREE, root, opts = {}) {
           mat.transparent = false;
         }
       }
-      mat.side = THREE.DoubleSide;
+      if (!(preserveRodinGlb && !isRuntimeLens && !isRodinLens)) {
+        mat.side = THREE.DoubleSide;
+      }
       mat.toneMapped = true;
       mat.needsUpdate = true;
     }
@@ -2513,24 +2567,18 @@ function omafitGlassesBoostAdminParityArVisibility(THREE, root) {
       ) {
         continue;
       }
-      if (mat.color && typeof mat.color.getHex === "function" && mat.color.getHex() < 0x151515) {
-        mat.color.setHex(0x353535);
+      if (Number(mat.opacity) < 0.05) {
+        mat.opacity = 1;
+        mat.transparent = false;
       }
-      if ("emissive" in mat && mat.emissive?.setHex) {
-        mat.emissive.setHex(0x1a1a1a);
-        mat.emissiveIntensity = 0.55;
+      if (mat.envMap) {
+        mat.envMap = null;
+        if ("envMapIntensity" in mat) mat.envMapIntensity = 0;
       }
-      if ("metalness" in mat) {
-        mat.metalness = THREE.MathUtils.clamp(Number(mat.metalness) || 0.32, 0.18, 0.48);
-      }
-      if ("roughness" in mat) {
-        mat.roughness = THREE.MathUtils.clamp(Number(mat.roughness) || 0.42, 0.24, 0.58);
-      }
-      if ("envMapIntensity" in mat && !mat.envMap) mat.envMapIntensity = 0;
       mat.toneMapped = true;
       mat.depthTest = true;
       mat.depthWrite = mat.transparent !== true;
-      mat.side = THREE.DoubleSide;
+      mat.side = THREE.FrontSide;
       mat.needsUpdate = true;
     }
   });
@@ -5378,6 +5426,9 @@ const OMAFIT_GLASSES_FACE_ANCHOR_DEPTH_M = 0.62;
 
 /** Paridade preview admin `/calibrate`: exposure fixo, sem PMREM. */
 const OMAFIT_GLASSES_ADMIN_PREVIEW_TONE_EXPOSURE = 1.1;
+const OMAFIT_GLASSES_ADMIN_PREVIEW_AMBIENT_INTENSITY = 0.85;
+const OMAFIT_GLASSES_ADMIN_PREVIEW_KEY_INTENSITY = 0.9;
+const OMAFIT_GLASSES_ADMIN_PREVIEW_FILL_INTENSITY = 0.35;
 
 /**
  * MindAR `getCameraParams().near/far` calibram para tradução bruta em cm (~||T||≈63).
@@ -11355,7 +11406,10 @@ async function runArSession({
         (!r0.toneMapping || r0.toneMapping === THREE.NoToneMapping)
       ) {
         r0.toneMapping = THREE.ACESFilmicToneMapping;
-        r0.toneMappingExposure = accessoryType === "glasses" ? 1.1 : 1.02;
+        r0.toneMappingExposure =
+          accessoryType === "glasses"
+            ? OMAFIT_GLASSES_ADMIN_PREVIEW_TONE_EXPOSURE
+            : 1.02;
       }
     } catch {
       /* ignore */
@@ -11368,7 +11422,12 @@ async function runArSession({
       mindarThree.shouldFaceUser = arPreferredCam !== "environment";
     }
     /** Luz ambiente + hemisfério + chave — óculos: paridade preview admin (calibrate). */
-    const faceAmbientLight = new THREE.AmbientLight(0xffffff, accessoryType === "glasses" ? 0.85 : 0.62);
+    const faceAmbientLight = new THREE.AmbientLight(
+      0xffffff,
+      accessoryType === "glasses"
+        ? OMAFIT_GLASSES_ADMIN_PREVIEW_AMBIENT_INTENSITY
+        : 0.62,
+    );
     const faceHemisphereLight = new THREE.HemisphereLight(
       0xb8daf8,
       0xa09078,
@@ -11381,7 +11440,9 @@ async function runArSession({
     mindarThree.scene.add(faceHemisphereLight);
     const faceKeyLight = new THREE.DirectionalLight(
       0xffffff,
-      accessoryType === "glasses" ? 0.9 : 0.36,
+      accessoryType === "glasses"
+        ? OMAFIT_GLASSES_ADMIN_PREVIEW_KEY_INTENSITY
+        : 0.36,
     );
     faceKeyLight.name = "omafit-ar-face-key";
     if (accessoryType === "glasses") {
@@ -11392,7 +11453,10 @@ async function runArSession({
     mindarThree.scene.add(faceKeyLight);
     let faceFillLight = null;
     if (accessoryType === "glasses") {
-      faceFillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+      faceFillLight = new THREE.DirectionalLight(
+        0xffffff,
+        OMAFIT_GLASSES_ADMIN_PREVIEW_FILL_INTENSITY,
+      );
       faceFillLight.name = "omafit-ar-face-fill";
       faceFillLight.position.set(-0.8, -0.2, 0.6);
       mindarThree.scene.add(faceFillLight);
@@ -14697,6 +14761,7 @@ async function runArSession({
           : null,
       necklaceShadowRes: accessoryType === "necklace" ? necklaceShadowParts : null,
       faceAdaptiveLight: (() => {
+        if (glassesAdminParityFlat) return null;
         if (
           /^(0|false|off|no)$/i.test(String(cfgAttr("arFaceAmbientAdaptive", "1")).trim())
         ) {
@@ -17329,9 +17394,20 @@ async function runArSession({
         /* ignore */
       }
       try {
-        const fad = faceArEnhancementState?.faceAdaptiveLight;
-        if (fad) {
-          omafitStepFaceAdaptiveLighting(THREE, fad, mindarHost, renderer);
+        if (st.glassesAdminParityFlat && accessoryType === "glasses") {
+          omafitGlassesRestoreAdminPreviewSceneLighting(
+            THREE,
+            renderer,
+            faceAmbientLight,
+            faceKeyLight,
+            faceFillLight,
+            faceHemisphereLight,
+          );
+        } else {
+          const fad = faceArEnhancementState?.faceAdaptiveLight;
+          if (fad) {
+            omafitStepFaceAdaptiveLighting(THREE, fad, mindarHost, renderer);
+          }
         }
       } catch {
         /* ignore */
