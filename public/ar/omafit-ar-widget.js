@@ -19,6 +19,8 @@ import {
   omafitRecenterObject3OnGlassesLensFront,
   omafitGlassesIngestMeshWorldMaxDimM,
   omafitGlassesApplyBridgePivotAfterScale,
+  omafitGlassesCompensateIngestHierarchyForRootMeshScale,
+  omafitGlassesReadCanonicalNodeUniformScale,
 } from "./omafit-glb-bbox-center.js";
 import {
   createOmafitBraceletWristPlacementState,
@@ -625,7 +627,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v305";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v306";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13511,6 +13513,8 @@ async function runArSession({
     let glassesPivot = null;
     /** Cópia da posição inicial do pivot (Z inclui `arGlassesZFitExtra` se aplicável) — repor antes do alinhamento debug 168. */
     let glassesPivotBaseLocalPos = null;
+    /** v306: compensação hastes ingest (log + state). */
+    let hierarchyScaleComp = null;
     if (accessoryType === "glasses") {
       if (glassesAdminParityFlat) {
         glasses.name = "omafit-ar-glasses-model";
@@ -13591,20 +13595,38 @@ async function runArSession({
          * à distância real; mesh em metros projecta proporcional ao rosto em
          * qualquer distância. Referência: slider 50% (default) = armação 145mm.
          * Sem factor angular por distância (v253 recalculava por frame → "respirar").
+         *
+         * v306: antes de S no root, P' = P/S nos grupos — hastes Rodin (offsets m)
+         * deixam de esticar com S≈14 (preview GLB intacto; escala v303 inalterada).
          */
-        glasses.scale.setScalar(
-          glassesForceAnchorUnitScale
-            ? displayScaleInit
-            : clampGlassesDisplayMeshScale(
-                resolveGlassesMindarLocalMeshScale(adminMeshScaleInit, anchor.group.matrixWorld),
-                autoFitFlat / Math.max(omafitAnchorUnitsPerMeter(anchor.group.matrixWorld), 1e-6),
-              ),
-        );
+        const meshScaleInit = glassesForceAnchorUnitScale
+          ? displayScaleInit
+          : clampGlassesDisplayMeshScale(
+              resolveGlassesMindarLocalMeshScale(adminMeshScaleInit, anchor.group.matrixWorld),
+              autoFitFlat / Math.max(omafitAnchorUnitsPerMeter(anchor.group.matrixWorld), 1e-6),
+            );
+        if (
+          glassesIngestWidgetFrameTag &&
+          glassesIngestPrep?.prepMode === "admin-preview-intact" &&
+          meshScaleInit > 1.05 &&
+          (glassesIngestPrep?.canonicalNodeMaxScale ??
+            omafitGlassesReadCanonicalNodeUniformScale(THREE, glasses)) < 1.05
+        ) {
+          hierarchyScaleComp = omafitGlassesCompensateIngestHierarchyForRootMeshScale(
+            THREE,
+            glasses,
+            meshScaleInit,
+          );
+        }
+        glasses.scale.setScalar(meshScaleInit);
         const bridgePivotPostScale = omafitGlassesApplyBridgePivotAfterScale(
           THREE,
           glasses,
           glasses.scale.x,
         );
+        if (glassesIngestPrep?.prepMode === "admin-preview-intact") {
+          glassesIngestBridgePositionLocal = glasses.position.clone();
+        }
         applyGlassesMerchantCalibRotation(THREE, calibRot, mcFlat);
         calibRot.add(glasses);
         try {
@@ -13650,6 +13672,8 @@ async function runArSession({
               : null,
             ingestPrep: glassesIngestPrep
               ? {
+                  prepMode: glassesIngestPrep.prepMode,
+                  hierarchyScaleComp,
                   physicalNormApplied: glassesIngestPrep.physicalNormApplied,
                   physicalNormMul: Number(
                     (glassesIngestPrep.physicalNormMul ?? 1).toFixed(3),
@@ -14334,6 +14358,13 @@ async function runArSession({
       glassesWorkerFrameRemapped: !!glassesWorkerFrameRemapped,
       glassesIngestWidgetFrameTag: !!glassesIngestWidgetFrameTag,
       glassesIngestPhysicalPrep: !!glassesIngestPrep?.physicalNormApplied,
+      glassesIngestPrepMode: glassesIngestPrep?.prepMode ?? null,
+      glassesIngestHierarchyScaleCompensated: !!hierarchyScaleComp?.applied,
+      glassesIngestCanonicalNodeMaxScale:
+        glassesIngestPrep?.canonicalNodeMaxScale ??
+        (glassesIngestWidgetFrameTag
+          ? omafitGlassesReadCanonicalNodeUniformScale(THREE, glasses)
+          : 1),
       glassesIngestCanonicalPreScaled: !!glassesIngestCanonicalPreScaled,
       glassesIngestIntrinsicMeshSpanM,
       glassesIngestWorldMeshMaxDimM,
@@ -15675,8 +15706,29 @@ async function runArSession({
               st.glassesLastMeshScale = displayScale;
               st.glassesLastAdminMeshScale = adminMeshScale;
               st.glassesLastAnchorUnitsPerMeter = anchorU;
+              if (
+                st.glassesIngestWidgetFrameTag &&
+                st.glassesIngestPrepMode === "admin-preview-intact" &&
+                !st.glassesIngestHierarchyScaleCompensated &&
+                displayScale > 1.05 &&
+                (st.glassesIngestCanonicalNodeMaxScale ?? 1) < 1.05
+              ) {
+                const compRt = omafitGlassesCompensateIngestHierarchyForRootMeshScale(
+                  THREE,
+                  glasses,
+                  displayScale,
+                );
+                st.glassesIngestHierarchyScaleCompensated = !!compRt?.applied;
+              }
               glasses.scale.setScalar(displayScale);
-              omafitGlassesApplyBridgePivotAfterScale(THREE, glasses, displayScale);
+              if (
+                st.glassesIngestPrepMode === "admin-preview-intact" &&
+                st.glassesIngestBridgePositionLocal
+              ) {
+                glasses.position.copy(st.glassesIngestBridgePositionLocal);
+              } else {
+                omafitGlassesApplyBridgePivotAfterScale(THREE, glasses, displayScale);
+              }
               omafitGlassesFlatModeForceDrawableOnFace(THREE, glasses, {
                 preserveRodinGlb: Boolean(
                   st.glassesPreserveRodinGlbLenses || st.glassesLensLoadState?.preserveRodinGlb,

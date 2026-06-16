@@ -1025,6 +1025,53 @@ export function omafitDownscaleGlassesIngestGroupPositionsForced(
 }
 
 /**
+ * Compensa offsets de grupo/hastes **antes** de `root.scale = S`: após escalar o root,
+ * `position` efectiva = S·P; com P' = P/S fica P (paridade preview GLB intacto).
+ * Preferir isto ao downscale por bbox em `omafitPrepareGlassesIngestAdminPreviewIntact`.
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @param {number} displayScale meshScale uniforme iminente (≈14 ingest Rodin)
+ */
+export function omafitGlassesCompensateIngestHierarchyForRootMeshScale(
+  THREE,
+  root,
+  displayScale,
+) {
+  if (!THREE || !root) {
+    return { applied: false, factor: 1, scaledNodes: 0, reason: "missing-three-or-root" };
+  }
+  const S = Math.max(Number(displayScale) || 1, 1e-6);
+  if (S <= 1.05) {
+    return { applied: false, factor: 1, scaledNodes: 0, reason: "scale-unity", displayScale: S };
+  }
+  const factor = 1 / S;
+  let scaledNodes = 0;
+  root.traverse((child) => {
+    if (child === root) return;
+    child.position.multiplyScalar(factor);
+    if (child.isMesh) {
+      child.updateMatrix();
+      return;
+    }
+    const sx = child.scale?.x ?? 1;
+    const sy = child.scale?.y ?? 1;
+    const sz = child.scale?.z ?? 1;
+    if (
+      Math.abs(sx - sy) < 1e-5 &&
+      Math.abs(sy - sz) < 1e-5 &&
+      Math.abs(sx - 1) > 1e-6
+    ) {
+      child.scale.multiplyScalar(factor);
+    }
+    child.updateMatrix();
+    scaledNodes += 1;
+  });
+  root.updateMatrixWorld(true);
+  return { applied: true, factor, scaledNodes, displayScale: S };
+}
+
+/**
  * Pipeline ingest previsível (admin parity flat) — paridade preview `/calibrate`:
  * 1) `PreserveHierarchy` — absorve só `omafit_ar_canonical`; mantém dobragem das hastes
  * 2) downscale de `position` dos grupos (vértices ~10 mm vs offsets em metros)
@@ -1138,8 +1185,9 @@ export function omafitGlassesReadCanonicalNodeUniformScale(THREE, root) {
 }
 
 /**
- * Ingest + paridade preview admin: vértices intactos; downscale só de `position`
- * dos grupos antes do `meshScale` runtime (hastes em metros × ~14 esticavam).
+ * Ingest + paridade preview admin: **zero mutação de vértices** — telemetria só.
+ * Compensação de hastes (offsets de grupo) acontece no widget imediatamente antes
+ * de `glasses.scale = displayScale` (ver `omafitGlassesCompensateIngestHierarchyForRootMeshScale`).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} root
@@ -1172,24 +1220,6 @@ export function omafitPrepareGlassesIngestAdminPreviewIntact(THREE, root) {
   const intrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root);
   const canonicalNodeMaxScale = omafitGlassesReadCanonicalNodeUniformScale(THREE, root);
   const worldMeshMaxDimM = omafitGlassesIngestMeshWorldMaxDimM(THREE, root);
-  const needsRuntimeMeshUpScale =
-    worldMeshMaxDimM < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M &&
-    intrinsicSpanM < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M;
-  let groupDownscale = {
-    applied: false,
-    factor: 1,
-    scaledGroups: 0,
-    reason: "already-physical",
-  };
-  if (needsRuntimeMeshUpScale) {
-    groupDownscale = omafitDownscaleGlassesIngestGroupPositionsForced(
-      THREE,
-      root,
-      intrinsicSpanM,
-      OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
-    );
-    root.updateMatrixWorld(true);
-  }
   const lb = omafitGlassesLocalBboxCenterM(THREE, root);
   const localBboxDriftM = lb ? lb.length() : 0;
   let maxNodePosLenM = 0;
@@ -1206,9 +1236,9 @@ export function omafitPrepareGlassesIngestAdminPreviewIntact(THREE, root) {
     hierarchyCanonicalFound: canonicalFound,
     canonicalNodeMaxScale,
     worldMeshMaxDimM,
-    needsRuntimeMeshUpScale,
-    groupDownscaleApplied: Boolean(groupDownscale?.applied),
-    groupDownscaleFactor: groupDownscale?.factor ?? 1,
+    groupDownscaleApplied: false,
+    groupDownscaleFactor: 1,
+    groupDownscaleReason: "deferred-to-root-meshScale",
     intrinsicSpanM,
     intrinsicMeshSpanM,
     nodeBakeMeshes: 0,
