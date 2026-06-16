@@ -1118,8 +1118,28 @@ export function omafitPrepareGlassesIngestAdminParityFlat(THREE, root) {
 }
 
 /**
- * Ingest + paridade preview admin: **zero mutação** (GLB pós-postprocess já escalado).
- * Só telemetria — escala/posição em runtime como o preview admin.
+ * Escala uniforme do nó `omafit_ar_canonical` (postprocess gltf-transform).
+ *
+ * @param {typeof import("three")} THREE
+ * @param {import("three").Object3D} root
+ * @returns {number}
+ */
+export function omafitGlassesReadCanonicalNodeUniformScale(THREE, root) {
+  if (!THREE || !root) return 1;
+  let maxS = 1;
+  root.traverse((child) => {
+    if (child === root) return;
+    if (String(child.name || "") !== "omafit_ar_canonical") return;
+    const s = child.scale;
+    if (!s) return;
+    maxS = Math.max(maxS, Math.abs(s.x), Math.abs(s.y), Math.abs(s.z));
+  });
+  return maxS;
+}
+
+/**
+ * Ingest + paridade preview admin: vértices intactos; downscale só de `position`
+ * dos grupos antes do `meshScale` runtime (hastes em metros × ~14 esticavam).
  *
  * @param {typeof import("three")} THREE
  * @param {import("three").Object3D} root
@@ -1150,6 +1170,26 @@ export function omafitPrepareGlassesIngestAdminPreviewIntact(THREE, root) {
   });
   const intrinsicMeshSpanM = omafitGlassesIngestIntrinsicMeshMaxSpanM(THREE, root);
   const intrinsicSpanM = omafitGlassesIngestPreHierarchyScaleSpanM(THREE, root);
+  const canonicalNodeMaxScale = omafitGlassesReadCanonicalNodeUniformScale(THREE, root);
+  const worldMeshMaxDimM = omafitGlassesIngestMeshWorldMaxDimM(THREE, root);
+  const needsRuntimeMeshUpScale =
+    worldMeshMaxDimM < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M &&
+    intrinsicSpanM < OMAFIT_GLASSES_INGEST_MIN_PHYSICAL_WIDTH_M;
+  let groupDownscale = {
+    applied: false,
+    factor: 1,
+    scaledGroups: 0,
+    reason: "already-physical",
+  };
+  if (needsRuntimeMeshUpScale) {
+    groupDownscale = omafitDownscaleGlassesIngestGroupPositionsForced(
+      THREE,
+      root,
+      intrinsicSpanM,
+      OMAFIT_GLASSES_INGEST_TARGET_WIDTH_M,
+    );
+    root.updateMatrixWorld(true);
+  }
   const lb = omafitGlassesLocalBboxCenterM(THREE, root);
   const localBboxDriftM = lb ? lb.length() : 0;
   let maxNodePosLenM = 0;
@@ -1164,8 +1204,11 @@ export function omafitPrepareGlassesIngestAdminPreviewIntact(THREE, root) {
     prepMode: "admin-preview-intact",
     hierarchyBakeMode: "skipped",
     hierarchyCanonicalFound: canonicalFound,
-    groupDownscaleApplied: false,
-    groupDownscaleFactor: 1,
+    canonicalNodeMaxScale,
+    worldMeshMaxDimM,
+    needsRuntimeMeshUpScale,
+    groupDownscaleApplied: Boolean(groupDownscale?.applied),
+    groupDownscaleFactor: groupDownscale?.factor ?? 1,
     intrinsicSpanM,
     intrinsicMeshSpanM,
     nodeBakeMeshes: 0,

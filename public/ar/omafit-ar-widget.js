@@ -625,7 +625,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v303";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v305";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -12418,6 +12418,9 @@ async function runArSession({
           Number(glassesIngestPrep.intrinsicMeshSpanM) || 0,
           0,
         );
+        if (Number(glassesIngestPrep.worldMeshMaxDimM) > 0) {
+          glassesIngestWorldMeshMaxDimM = Number(glassesIngestPrep.worldMeshMaxDimM);
+        }
         glassesIngestCanonicalPreScaled = omafitGlassesIngestIsCanonicalPreScaled({
           hasOmafitCanonicalNode,
           ingestWidgetFrame: true,
@@ -12445,18 +12448,31 @@ async function runArSession({
     let necklaceArcSpanPrepM = null;
     if (accessoryType === "glasses") {
       if (glassesIngestWidgetFrameTag) {
-        try {
-          const centered = omafitCenterObject3OnBboxOrigin(THREE, glasses);
-          if (centered?.ok) {
-            console.log("[omafit-ar] glasses ingest center bbox (admin parity)", {
-              build: OMAFIT_AR_WIDGET_BUILD,
-              preScaled: glassesIngestCanonicalPreScaled,
-              centerM: centered.center?.toArray?.().map((v) => Number(v.toFixed(5))),
-              sizeM: centered.size?.toArray?.().map((v) => Number(v.toFixed(5))),
-            });
+        const intactIngest = glassesIngestPrep?.prepMode === "admin-preview-intact";
+        if (!intactIngest) {
+          try {
+            const centered = omafitCenterObject3OnBboxOrigin(THREE, glasses);
+            if (centered?.ok) {
+              console.log("[omafit-ar] glasses ingest center bbox (admin parity)", {
+                build: OMAFIT_AR_WIDGET_BUILD,
+                preScaled: glassesIngestCanonicalPreScaled,
+                centerM: centered.center?.toArray?.().map((v) => Number(v.toFixed(5))),
+                sizeM: centered.size?.toArray?.().map((v) => Number(v.toFixed(5))),
+              });
+            }
+          } catch {
+            /* ignore */
           }
-        } catch {
-          /* ignore */
+        } else {
+          try {
+            console.log("[omafit-ar] glasses ingest intact — skip bbox re-center (GLB postprocess)", {
+              build: OMAFIT_AR_WIDGET_BUILD,
+              groupDownscaleApplied: glassesIngestPrep?.groupDownscaleApplied,
+              groupDownscaleFactor: glassesIngestPrep?.groupDownscaleFactor,
+            });
+          } catch {
+            /* ignore */
+          }
         }
         glasses.updateMatrixWorld(true);
       } else if (glassesCanonicalBlenderExport) {
