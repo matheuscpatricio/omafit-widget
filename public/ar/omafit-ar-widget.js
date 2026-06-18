@@ -628,7 +628,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v325";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v326";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13547,6 +13547,20 @@ async function runArSession({
       "arGlassesLiftY",
       0.012,
     );
+    /**
+     * v326: proximidade aos olhos (m). A âncora MindAR fica na cana do nariz e o
+     * `wearZ` é forçado a 0 (depthOnAnchor), por isso o centro dos óculos assenta
+     * ~3-4 cm À FRENTE do pivô de yaw. Esse braço de alavanca faz os óculos
+     * "abrirem"/saírem dos olhos ao virar a cabeça (diag: glassesWorldX − anchorWorldX
+     * cresce ∝ ao deslocamento). Puxamos os óculos no eixo Z LOCAL da âncora, na
+     * direção CONTRÁRIA à câmara (para o rosto), reduzindo dz→0 e o swing lateral.
+     * Knob: `?omafit_ar_glasses_eye_z=0.03` (positivo = mais perto dos olhos).
+     */
+    const glassesEyeZM = resolveGlassesNumber(
+      "omafit_ar_glasses_eye_z",
+      "arGlassesEyeZ",
+      0.03,
+    );
 
     if (glassesForceAnchorUnitScale) {
       faceProjectionOpts.faceAnchorDistM = glassesAdminParityFlat
@@ -14549,6 +14563,7 @@ async function runArSession({
       glassesCamYM,
       glassesTrackLambda,
       glassesLiftYM,
+      glassesEyeZM,
       glassesLastLateralDiagMs: 0,
       anchorFaceLm: anchorIndex,
       readGlassesMerchantCal,
@@ -15848,6 +15863,37 @@ async function runArSession({
                 { depthOnAnchor: true },
               );
               /**
+               * v326: proximidade aos olhos — puxa os óculos no eixo Z LOCAL da
+               * âncora na direção CONTRÁRIA à câmara. `wearPosition.position` está em
+               * metros anchor-local (escala 1), logo basta deslocar .z. O sinal de
+               * "para o rosto" é derivado da própria matriz (dot do Z local com o
+               * vector âncora→câmara) — imune a convenções de espelho/Ry180.
+               */
+              const eyeZM = Number.isFinite(st.glassesEyeZM) ? st.glassesEyeZM : 0;
+              if (eyeZM !== 0 && mindarThree?.camera) {
+                try {
+                  if (!st.glassesEyeZS) {
+                    st.glassesEyeZS = {
+                      localZ: new THREE.Vector3(),
+                      anchorPos: new THREE.Vector3(),
+                      camPos: new THREE.Vector3(),
+                    };
+                  }
+                  const ez = st.glassesEyeZS;
+                  anchor.group.updateMatrixWorld(true);
+                  mindarThree.camera.updateMatrixWorld(true);
+                  ez.localZ.setFromMatrixColumn(anchor.group.matrixWorld, 2).normalize();
+                  ez.anchorPos.setFromMatrixPosition(anchor.group.matrixWorld);
+                  ez.camPos.setFromMatrixPosition(mindarThree.camera.matrixWorld);
+                  const towardCam = ez.localZ.dot(ez.camPos.sub(ez.anchorPos));
+                  const fwdSign = towardCam >= 0 ? 1 : -1;
+                  /** −fwdSign·eyeZ = mover para longe da câmara (para o rosto). */
+                  wearPosition.position.z -= fwdSign * eyeZM;
+                } catch {
+                  /* ignore */
+                }
+              }
+              /**
                * v321: correção lateral DETERMINÍSTICA em espaço de câmara.
                *
                * Diagnóstico v320 provou `mpAvailable:false` — este build MindAR
@@ -16090,8 +16136,10 @@ async function runArSession({
                       eyeMidLmX != null ? Number(eyeMidLmX.toFixed(4)) : null,
                     mpAvailable: !!mp168,
                     camXM: Number(st.glassesCamXM) || 0,
+                    eyeZM: Number(st.glassesEyeZM) || 0,
+                    gapX: Number((gw.x - aw.x).toFixed(4)),
                     anchorTxMirror: st.glassesFlatAnchorTxMirror === true,
-                    note: "Erro ~constante em METROS. Dial ?omafit_ar_glasses_cam_x_m até os óculos centrarem nos olhos.",
+                    note: "gapX→0 em yaw = proximidade OK. Dial ?omafit_ar_glasses_eye_z se ainda abrir ao virar.",
                   });
                 } catch {
                   /* ignore */
