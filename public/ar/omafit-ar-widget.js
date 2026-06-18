@@ -628,7 +628,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v326";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v327";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13537,29 +13537,22 @@ async function runArSession({
       ),
     );
     /**
-     * v325: lift vertical HEAD-RELATIVE (m). A âncora fica na cana do nariz, pelo
-     * que os óculos assentam ligeiramente abaixo da linha dos olhos — somamos no
-     * eixo +Y local (acompanha a inclinação da cabeça, ao contrário de camY).
-     * Knob: `?omafit_ar_glasses_lift_y=0.01` (positivo = sobe). Default +12 mm.
+     * v327: fine-tune vertical (m) APÓS alinhamento mid-olhos via metricLandmarks.
+     * Default 0 — o offset 168→olhos já inclui Y. Knob: `?omafit_ar_glasses_lift_y`.
      */
     const glassesLiftYM = resolveGlassesNumber(
       "omafit_ar_glasses_lift_y",
       "arGlassesLiftY",
-      0.012,
+      0,
     );
     /**
-     * v326: proximidade aos olhos (m). A âncora MindAR fica na cana do nariz e o
-     * `wearZ` é forçado a 0 (depthOnAnchor), por isso o centro dos óculos assenta
-     * ~3-4 cm À FRENTE do pivô de yaw. Esse braço de alavanca faz os óculos
-     * "abrirem"/saírem dos olhos ao virar a cabeça (diag: glassesWorldX − anchorWorldX
-     * cresce ∝ ao deslocamento). Puxamos os óculos no eixo Z LOCAL da âncora, na
-     * direção CONTRÁRIA à câmara (para o rosto), reduzindo dz→0 e o swing lateral.
-     * Knob: `?omafit_ar_glasses_eye_z=0.03` (positivo = mais perto dos olhos).
+     * v327: fine-tune profundidade (m) APÓS alinhamento mid-olhos. Default 0.
+     * Knob: `?omafit_ar_glasses_eye_z` (positivo = mais perto do rosto).
      */
     const glassesEyeZM = resolveGlassesNumber(
       "omafit_ar_glasses_eye_z",
       "arGlassesEyeZ",
-      0.03,
+      0,
     );
 
     if (glassesForceAnchorUnitScale) {
@@ -15844,55 +15837,64 @@ async function runArSession({
               const merchantCal = st.readGlassesMerchantCal
                 ? st.readGlassesMerchantCal()
                 : { scale: 1, wearX: 0, wearY: 0, wearZ: 0 };
+              const lmFlat = est?.metricLandmarks;
               /**
-               * v325: lift vertical head-relative. Injecta-se no `wearY` para usar a
-               * MESMA base de rotação da âncora que a calibração do lojista — assim
-               * o offset acompanha a inclinação da cabeça (não é world-Y cru) e
-               * corrige os óculos a assentarem abaixo da linha dos olhos. Não depende
-               * de landmarks normalizados (indisponíveis neste build MindAR).
+               * v327: proximidade real — `wearPosition` no mid(olhos), não na âncora 168.
+               * `metricLandmarks` (263/33/168) está disponível neste MindAR; o delta
+               * mid−168 em metros anchor-local roda com a cabeça (mesmo referencial
+               * canónico que o PnP). Elimina o braço de alavanca que fazia os óculos
+               * "abrirem" ao virar (gapX ∝ anchorX nos logs v326).
                */
-              const liftYM = Number.isFinite(st.glassesLiftYM) ? st.glassesLiftYM : 0;
-              const wearCalFlat =
-                liftYM !== 0
-                  ? { ...merchantCal, wearY: (Number(merchantCal?.wearY) || 0) + liftYM }
-                  : merchantCal;
-              applyGlassesMerchantWearAdminParityFlat(
-                wearPosition.position,
-                anchor.group.matrixWorld,
-                wearCalFlat,
-                { depthOnAnchor: true },
-              );
-              /**
-               * v326: proximidade aos olhos — puxa os óculos no eixo Z LOCAL da
-               * âncora na direção CONTRÁRIA à câmara. `wearPosition.position` está em
-               * metros anchor-local (escala 1), logo basta deslocar .z. O sinal de
-               * "para o rosto" é derivado da própria matriz (dot do Z local com o
-               * vector âncora→câmara) — imune a convenções de espelho/Ry180.
-               */
-              const eyeZM = Number.isFinite(st.glassesEyeZM) ? st.glassesEyeZM : 0;
-              if (eyeZM !== 0 && mindarThree?.camera) {
-                try {
-                  if (!st.glassesEyeZS) {
-                    st.glassesEyeZS = {
-                      localZ: new THREE.Vector3(),
-                      anchorPos: new THREE.Vector3(),
-                      camPos: new THREE.Vector3(),
-                    };
+              let eyeMidOk = false;
+              if (st.glassesEyeMidpointAlign && lmFlat && st.eyeMidWearTarget) {
+                if (
+                  omafitGlassesEyeMidpointDeltaFrom168(
+                    THREE,
+                    lmFlat,
+                    st.lmSmoother,
+                    st.eyeMidWearTarget,
+                  )
+                ) {
+                  const metersMul = omafitMindarMetricToMetersScale(lmFlat);
+                  st.eyeMidWearTarget.multiplyScalar(metersMul);
+                  const liftYM = Number.isFinite(st.glassesLiftYM) ? st.glassesLiftYM : 0;
+                  const eyeZM = Number.isFinite(st.glassesEyeZM) ? st.glassesEyeZM : 0;
+                  if (liftYM !== 0) st.eyeMidWearTarget.y += liftYM;
+                  if (eyeZM !== 0) st.eyeMidWearTarget.z -= eyeZM;
+                  if (st.eyeMidWearSmoothed) {
+                    const snap =
+                      st.eyeMidWearZero &&
+                      st.eyeMidWearSmoothed.distanceToSquared(st.eyeMidWearZero) < 1e-12;
+                    const t = snap
+                      ? 1
+                      : Math.max(
+                          0.5,
+                          Number.isFinite(st.glassesTrackLambda)
+                            ? st.glassesTrackLambda
+                            : 0.92,
+                        );
+                    st.eyeMidWearSmoothed.lerp(st.eyeMidWearTarget, t);
+                    wearPosition.position.copy(st.eyeMidWearSmoothed);
+                  } else {
+                    wearPosition.position.copy(st.eyeMidWearTarget);
                   }
-                  const ez = st.glassesEyeZS;
-                  anchor.group.updateMatrixWorld(true);
-                  mindarThree.camera.updateMatrixWorld(true);
-                  ez.localZ.setFromMatrixColumn(anchor.group.matrixWorld, 2).normalize();
-                  ez.anchorPos.setFromMatrixPosition(anchor.group.matrixWorld);
-                  ez.camPos.setFromMatrixPosition(mindarThree.camera.matrixWorld);
-                  const towardCam = ez.localZ.dot(ez.camPos.sub(ez.anchorPos));
-                  const fwdSign = towardCam >= 0 ? 1 : -1;
-                  /** −fwdSign·eyeZ = mover para longe da câmara (para o rosto). */
-                  wearPosition.position.z -= fwdSign * eyeZM;
-                } catch {
-                  /* ignore */
+                  eyeMidOk = true;
                 }
               }
+              if (!eyeMidOk) {
+                wearPosition.position.set(0, 0, 0);
+              }
+              /** Merchant wearX/Y (fine-tune loja) somado ao mid-olhos. */
+              if (!st.glassesWearOffScratch) {
+                st.glassesWearOffScratch = new THREE.Vector3();
+              }
+              applyGlassesMerchantWearAdminParityFlat(
+                st.glassesWearOffScratch,
+                anchor.group.matrixWorld,
+                merchantCal,
+                { depthOnAnchor: true },
+              );
+              wearPosition.position.add(st.glassesWearOffScratch);
               /**
                * v321: correção lateral DETERMINÍSTICA em espaço de câmara.
                *
@@ -16138,8 +16140,13 @@ async function runArSession({
                     camXM: Number(st.glassesCamXM) || 0,
                     eyeZM: Number(st.glassesEyeZM) || 0,
                     gapX: Number((gw.x - aw.x).toFixed(4)),
+                    eyeMidWearM: {
+                      x: Number(wearPosition.position.x.toFixed(4)),
+                      y: Number(wearPosition.position.y.toFixed(4)),
+                      z: Number(wearPosition.position.z.toFixed(4)),
+                    },
                     anchorTxMirror: st.glassesFlatAnchorTxMirror === true,
-                    note: "gapX→0 em yaw = proximidade OK. Dial ?omafit_ar_glasses_eye_z se ainda abrir ao virar.",
+                    note: "gapX→0 em yaw = pivô nos olhos (v327 metricLandmarks). Dial ?omafit_ar_glasses_eye_z se ainda longe.",
                   });
                 } catch {
                   /* ignore */
