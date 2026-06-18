@@ -628,7 +628,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v324";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v325";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -13525,6 +13525,28 @@ async function runArSession({
       "arGlassesCamYM",
       0,
     );
+    const glassesTrackLambda = Math.max(
+      0,
+      Math.min(
+        1,
+        resolveGlassesNumber(
+          "omafit_ar_glasses_track_lambda",
+          "arGlassesTrackLambda",
+          0.92,
+        ),
+      ),
+    );
+    /**
+     * v325: lift vertical HEAD-RELATIVE (m). A âncora fica na cana do nariz, pelo
+     * que os óculos assentam ligeiramente abaixo da linha dos olhos — somamos no
+     * eixo +Y local (acompanha a inclinação da cabeça, ao contrário de camY).
+     * Knob: `?omafit_ar_glasses_lift_y=0.01` (positivo = sobe). Default +12 mm.
+     */
+    const glassesLiftYM = resolveGlassesNumber(
+      "omafit_ar_glasses_lift_y",
+      "arGlassesLiftY",
+      0.012,
+    );
 
     if (glassesForceAnchorUnitScale) {
       faceProjectionOpts.faceAnchorDistM = glassesAdminParityFlat
@@ -14525,6 +14547,8 @@ async function runArSession({
       glassesNdcLockFlat,
       glassesCamXM,
       glassesCamYM,
+      glassesTrackLambda,
+      glassesLiftYM,
       glassesLastLateralDiagMs: 0,
       anchorFaceLm: anchorIndex,
       readGlassesMerchantCal,
@@ -15653,15 +15677,21 @@ async function runArSession({
              */
             if (st.glassesAdminParityFlat && st.glassesIngestFlatFaceTrack) {
               /**
-               * v318 ingest intact: posição+rotação da âncora em conjunto. Piso de
-               * lambda mais alto (0.85) reduz o lag lateral durante o movimento sem
-               * One Euro só na rotação (que desacoplava T vs R).
+               * v325: posição+rotação da âncora em conjunto (T e R acoplados, sem
+               * One Euro só-na-rotação que desacoplava). O lag durante o movimento
+               * ("óculos sai do rosto") é proporcional a (1−lambda): subimos o piso
+               * para 0.92 (segue o rosto muito mais de perto) e expomos um knob
+               * `?omafit_ar_glasses_track_lambda=0..1` (1 = sem suavização/zero lag,
+               * valores baixos = mais suave mas mais atrasado).
                */
               omafitDampMatrix4PosRotOnly(
                 THREE,
                 st.smoothAnchorMat,
                 anchorRawMat,
-                Math.max(0.85, faceMatrixExtraLambda),
+                Math.max(
+                  Number.isFinite(st.glassesTrackLambda) ? st.glassesTrackLambda : 0.92,
+                  faceMatrixExtraLambda,
+                ),
               );
             } else if (st.glassesAdminParityFlat) {
               omafitOneEuroFilterQuaternion(
@@ -15799,10 +15829,22 @@ async function runArSession({
               const merchantCal = st.readGlassesMerchantCal
                 ? st.readGlassesMerchantCal()
                 : { scale: 1, wearX: 0, wearY: 0, wearZ: 0 };
+              /**
+               * v325: lift vertical head-relative. Injecta-se no `wearY` para usar a
+               * MESMA base de rotação da âncora que a calibração do lojista — assim
+               * o offset acompanha a inclinação da cabeça (não é world-Y cru) e
+               * corrige os óculos a assentarem abaixo da linha dos olhos. Não depende
+               * de landmarks normalizados (indisponíveis neste build MindAR).
+               */
+              const liftYM = Number.isFinite(st.glassesLiftYM) ? st.glassesLiftYM : 0;
+              const wearCalFlat =
+                liftYM !== 0
+                  ? { ...merchantCal, wearY: (Number(merchantCal?.wearY) || 0) + liftYM }
+                  : merchantCal;
               applyGlassesMerchantWearAdminParityFlat(
                 wearPosition.position,
                 anchor.group.matrixWorld,
-                merchantCal,
+                wearCalFlat,
                 { depthOnAnchor: true },
               );
               /**
