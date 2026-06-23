@@ -293,79 +293,6 @@ function omafitGetSharedDracoLoader() {
 }
 
 /**
- * Cache de buffers GLB (por loadUrl) — partilhado entre o warmup (load da
- * página / abertura do modal) e a sessão AR. Permite iniciar o download em
- * paralelo com o bundle Three/MindAR e a câmara; o parse reutiliza o buffer.
- * @type {Map<string, Promise<ArrayBuffer|null>>}
- */
-const __omafitGlbBufferPromises = new Map();
-
-/**
- * Inicia (uma única vez por URL) o download do GLB como ArrayBuffer e cacheia a
- * promise. Chamado o mais cedo possível (warmup) e reutilizado na sessão.
- * @param {string} loadUrl URL final (já com versão) do GLB
- * @returns {Promise<ArrayBuffer|null>}
- */
-function omafitWarmGlbBuffer(loadUrl) {
-  const url = String(loadUrl || "").trim();
-  if (!url) return Promise.resolve(null);
-  const cached = __omafitGlbBufferPromises.get(url);
-  if (cached) return cached;
-  const p =
-    typeof fetch === "function"
-      ? fetch(url, { mode: "cors" })
-          .then((resp) => (resp && resp.ok ? resp.arrayBuffer() : null))
-          .catch(() => null)
-      : Promise.resolve(null);
-  __omafitGlbBufferPromises.set(url, p);
-  return p;
-}
-
-/**
- * Resolve a URL final do GLB (sessão + versão) a partir do DOM/query, sem
- * efeitos colaterais — para iniciar o warmup antes de abrir a sessão AR.
- * @returns {string}
- */
-function omafitResolveGlbLoadUrlFromDom() {
-  try {
-    const r =
-      typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
-    const ver = r
-      ? String(r.dataset.arGlbVersion || r.getAttribute("data-ar-glb-version") || "").trim()
-      : "";
-    const sessionUrl = omafitReadGlbUrlFromRootOrQuery();
-    if (!sessionUrl) return "";
-    return buildGlbLoaderUrl(sessionUrl, ver) || sessionUrl;
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Aquece DNS/TLS para o host do GLB (CDN Shopify) — preconnect leve, idempotente.
- * @param {string} loadUrl
- */
-function omafitWarmGlbConnection(loadUrl) {
-  try {
-    if (typeof document === "undefined" || !document.head) return;
-    const origin = new URL(
-      String(loadUrl || ""),
-      typeof location !== "undefined" ? location.href : undefined,
-    ).origin;
-    if (!origin || /^null$/i.test(origin)) return;
-    if (document.querySelector('link[data-omafit-glb-preconnect="' + origin + '"]')) return;
-    const link = document.createElement("link");
-    link.rel = "preconnect";
-    link.href = origin;
-    link.crossOrigin = "anonymous";
-    link.setAttribute("data-omafit-glb-preconnect", origin);
-    document.head.appendChild(link);
-  } catch {
-    /* non-blocking */
-  }
-}
-
-/**
  * @param {import("three").Object3D} root
  * @returns {number}
  */
@@ -701,7 +628,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v337";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v335";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -8465,13 +8392,6 @@ function injectGlobalStyles(root, primaryOverride, tryonLayout = "default") {
     }
     .omafit-ar-link:hover { opacity: 0.7; text-decoration-thickness: 2px; }
     .omafit-ar-try-on-link:focus { outline: 2px solid ${primary}; outline-offset: 2px; }
-    #omafit-ar-root[data-ar-cta-deferred="1"] {
-      display: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      height: 0 !important;
-      overflow: hidden !important;
-    }
     /* Temas que metem x via ::before/::after em <button> — sem isto parecem dois X sobrepostos. */
     /* div[role=button] evita regras globais do tema em button::before (X duplicado). */
     .omafit-ar-shell .omafit-ar-close-btn {
@@ -10283,22 +10203,6 @@ async function runArSession({
   productId,
 }) {
   colContent.innerHTML = "";
-  // ⚡ Garante que o download do GLB já está a correr (idempotente) — cobre o
-  // caminho de mão e casos em que o URL não estava pronto no load da página.
-  try {
-    const warmSessionGlbUrl =
-      omafitResolveGlbLoadUrlFromDom() ||
-      buildGlbLoaderUrl(
-        omafitAbsolutizeGlbUrlMaybe(String(glbUrl || "").trim()),
-        document.getElementById("omafit-ar-root")?.dataset?.arGlbVersion || "",
-      );
-    if (warmSessionGlbUrl) {
-      omafitWarmGlbConnection(warmSessionGlbUrl);
-      omafitWarmGlbBuffer(warmSessionGlbUrl);
-    }
-  } catch {
-    /* non-blocking */
-  }
   const arSessionLayoutProfile = omafitResolveArDeviceRuntimeProfile({});
   const arSessionIsDesktop = arSessionLayoutProfile.formFactor === "desktop";
   let headerDisplayBeforeAr = "";
@@ -11884,9 +11788,10 @@ async function runArSession({
         );
         return {
           loadUrl,
-          // Reutiliza o buffer já iniciado no warmup (load/abertura do modal).
           bufferPromise: loadUrl
-            ? omafitWarmGlbBuffer(loadUrl)
+            ? fetch(loadUrl, { mode: "cors" })
+                .then((resp) => (resp.ok ? resp.arrayBuffer() : null))
+                .catch(() => null)
             : Promise.resolve(null),
           dracoPromise: wantDraco
             ? omafitGetSharedDracoLoader().catch(() => null)
@@ -20922,7 +20827,9 @@ async function runHandArSession({
     draco: Boolean(dracoLoaderHand),
   });
   await new Promise((resolve, reject) => {
-    const __omafitOnHandGltf = (gltf) => {
+    glbLoader.load(
+      finalGlbUrl,
+      (gltf) => {
         const glbScene = gltf.scene || gltf.scenes?.[0];
         if (!glbScene) {
           dbgBraceletAr("H1", "glb:onLoad", "gltf_no_scene", {});
@@ -21273,8 +21180,9 @@ async function runHandArSession({
             : null,
         });
         resolve();
-    };
-    const __omafitOnHandGltfErr = (err) => {
+      },
+      undefined,
+      (err) => {
         dbgBraceletAr("H1", "glb:onError", "load_failed", {
           message: String(err?.message || err).slice(0, 200),
         });
@@ -21283,28 +21191,8 @@ async function runHandArSession({
           url: String(finalGlbUrl || "").slice(0, 260),
         });
         reject(err);
-    };
-    const __omafitLoadHandFromNetwork = () =>
-      glbLoader.load(finalGlbUrl, __omafitOnHandGltf, undefined, __omafitOnHandGltfErr);
-    // Reutiliza o buffer já descarregado no warmup (parse directo, sem 2.º download).
-    const __omafitHandBufP = __omafitGlbBufferPromises.get(finalGlbUrl);
-    if (__omafitHandBufP) {
-      __omafitHandBufP
-        .then((buf) => {
-          if (!buf) {
-            __omafitLoadHandFromNetwork();
-            return;
-          }
-          try {
-            glbLoader.parse(buf, "", __omafitOnHandGltf, () => __omafitLoadHandFromNetwork());
-          } catch {
-            __omafitLoadHandFromNetwork();
-          }
-        })
-        .catch(() => __omafitLoadHandFromNetwork());
-    } else {
-      __omafitLoadHandFromNetwork();
-    }
+      },
+    );
   });
 
   if (debug) {
@@ -23513,17 +23401,6 @@ async function main() {
         .toLowerCase() === "1";
     if (!deferPreload) {
       getOmafitArModuleBundle().catch(() => {});
-    }
-    // ⚡ Começa já o download do GLB (em paralelo com módulos/câmara) e aquece
-    // a conexão à CDN — sem esperar o clique em "iniciar AR".
-    try {
-      const warmGlbUrl = omafitResolveGlbLoadUrlFromDom();
-      if (warmGlbUrl) {
-        omafitWarmGlbConnection(warmGlbUrl);
-        omafitWarmGlbBuffer(warmGlbUrl);
-      }
-    } catch {
-      /* non-blocking */
     }
   }
 

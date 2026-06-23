@@ -6,8 +6,9 @@
  *   `omafit-ar-runtime-core.js`, `omafit-ar-resolve-frame.js`, `omafit-ar-certify.js`, `omafit-ar-fit-contract.js`,
  *   `omafit-ar-certified-template.js`,
  *   `ar-manifest.schema.json`, `ar-manifest.sample.json`.
- *   O `WidgetPage` carrega `/ar/omafit-ar-widget.js`; o browser resolve `./foo.js`
- *   relativamente a esse URL → `/ar/foo.js` (compatível com SPA redirects na raiz).
+ *   O `WidgetPage` carrega `/ar/omafit-ar-widget.<build>.js` (path versionado —
+ *   evita CDN servir `omafit-ar-widget.js` antigo ignorando `?v=`); o browser
+ *   resolve `./foo.js` relativamente a esse URL → `/ar/foo.js`.
  * - `public/omafit-widget.js` — na raiz (sem imports relativos ao AR).
  *
  * Uso: na raiz de omafit-widget → `npm run sync:theme-ar`
@@ -18,7 +19,7 @@
  * o mesmo sufixo em `src/components/WidgetPage.tsx` (`OMAFIT_AR_MODULE_CACHE_BUST`)
  * e em `omafit-embed.liquid` (`oma_ar_asset=…`) para não servir módulo antigo.
  */
-import { copyFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -71,6 +72,20 @@ for (const f of AR_BUNDLE) {
   const dest = join(arDir, f);
   copyFileSync(src, dest);
   console.log("[sync-ar]", f, "→", dest);
+}
+
+/** Cópia com build no path — cada release é URL nova na CDN (não reutiliza cache de v332). */
+const mainAr = join(arDir, "omafit-ar-widget.js");
+try {
+  const txt = readFileSync(mainAr, "utf8");
+  const m = txt.match(/OMAFIT_AR_WIDGET_BUILD\s*=\s*"([^"]+)"/);
+  if (m?.[1]) {
+    const versioned = join(arDir, `omafit-ar-widget.${m[1]}.js`);
+    copyFileSync(mainAr, versioned);
+    console.log("[sync-ar] versioned →", versioned);
+  }
+} catch (e) {
+  console.warn("[sync-ar] versioned copy skipped:", e);
 }
 
 const widgetLegacy = "omafit-widget.js";
