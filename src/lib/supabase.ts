@@ -1,13 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+/** Mesmo projecto/anon key já expostos em `public/omafit-widget.js` (Shopify embed). */
+const OMAFIT_SUPABASE_URL_FALLBACK = 'https://lhkgnirolvbmomeduoaj.supabase.co';
+const OMAFIT_SUPABASE_ANON_KEY_FALLBACK =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxoa2duaXJvbHZibW9tZWR1b2FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NjE2NDYsImV4cCI6MjA2MzMzNzY0Nn0.aSBMJMT8TiAqvdO_Z9D_oINLaQrFMZIK5IEQJG6KaOI';
+
+const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim() || OMAFIT_SUPABASE_URL_FALLBACK;
+const supabaseAnonKey =
+  String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim() || OMAFIT_SUPABASE_ANON_KEY_FALLBACK;
 
 console.log('🔧 Configuração Supabase:', {
-  urlValid: supabaseUrl?.includes('supabase.co'),
+  urlValid: supabaseUrl.includes('supabase.co'),
   hasUrl: !!supabaseUrl,
   hasKey: !!supabaseAnonKey,
-  environment: import.meta.env.MODE
+  usedFallback:
+    !import.meta.env.VITE_SUPABASE_URL?.trim() || !import.meta.env.VITE_SUPABASE_ANON_KEY?.trim(),
+  environment: import.meta.env.MODE,
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {

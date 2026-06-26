@@ -293,6 +293,79 @@ function omafitGetSharedDracoLoader() {
 }
 
 /**
+ * Cache de buffers GLB (por loadUrl) — partilhado entre o warmup (load da
+ * página / abertura do modal) e a sessão AR. Permite iniciar o download em
+ * paralelo com o bundle Three/MindAR e a câmara; o parse reutiliza o buffer.
+ * @type {Map<string, Promise<ArrayBuffer|null>>}
+ */
+const __omafitGlbBufferPromises = new Map();
+
+/**
+ * Inicia (uma única vez por URL) o download do GLB como ArrayBuffer e cacheia a
+ * promise. Chamado o mais cedo possível (warmup) e reutilizado na sessão.
+ * @param {string} loadUrl URL final (já com versão) do GLB
+ * @returns {Promise<ArrayBuffer|null>}
+ */
+function omafitWarmGlbBuffer(loadUrl) {
+  const url = String(loadUrl || "").trim();
+  if (!url) return Promise.resolve(null);
+  const cached = __omafitGlbBufferPromises.get(url);
+  if (cached) return cached;
+  const p =
+    typeof fetch === "function"
+      ? fetch(url, { mode: "cors" })
+          .then((resp) => (resp && resp.ok ? resp.arrayBuffer() : null))
+          .catch(() => null)
+      : Promise.resolve(null);
+  __omafitGlbBufferPromises.set(url, p);
+  return p;
+}
+
+/**
+ * Resolve a URL final do GLB (sessão + versão) a partir do DOM/query, sem
+ * efeitos colaterais — para iniciar o warmup antes de abrir a sessão AR.
+ * @returns {string}
+ */
+function omafitResolveGlbLoadUrlFromDom() {
+  try {
+    const r =
+      typeof document !== "undefined" ? document.getElementById("omafit-ar-root") : null;
+    const ver = r
+      ? String(r.dataset.arGlbVersion || r.getAttribute("data-ar-glb-version") || "").trim()
+      : "";
+    const sessionUrl = omafitReadGlbUrlFromRootOrQuery();
+    if (!sessionUrl) return "";
+    return buildGlbLoaderUrl(sessionUrl, ver) || sessionUrl;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Aquece DNS/TLS para o host do GLB (CDN Shopify) — preconnect leve, idempotente.
+ * @param {string} loadUrl
+ */
+function omafitWarmGlbConnection(loadUrl) {
+  try {
+    if (typeof document === "undefined" || !document.head) return;
+    const origin = new URL(
+      String(loadUrl || ""),
+      typeof location !== "undefined" ? location.href : undefined,
+    ).origin;
+    if (!origin || /^null$/i.test(origin)) return;
+    if (document.querySelector('link[data-omafit-glb-preconnect="' + origin + '"]')) return;
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = origin;
+    link.crossOrigin = "anonymous";
+    link.setAttribute("data-omafit-glb-preconnect", origin);
+    document.head.appendChild(link);
+  } catch {
+    /* non-blocking */
+  }
+}
+
+/**
  * @param {import("three").Object3D} root
  * @returns {number}
  */
@@ -628,7 +701,7 @@ const OMAFIT_HAND_FLIP_GUARD_RAD = 2.618;
  * a servir a versão ANTERIOR do asset (precisas correr `npm run deploy`
  * OU `shopify app deploy`). Sobe o sufixo sempre que editares este ficheiro.
  */
-const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v336";
+const OMAFIT_AR_WIDGET_BUILD = "2026-06-10-glasses-ingest-admin-flat-v344";
 
 try {
   console.info("[omafit-ar] asset carregado:", OMAFIT_AR_WIDGET_BUILD);
@@ -5156,6 +5229,44 @@ function omafitGlassesManualFaceBasisFromLm(THREE, lm, smoother, outEyeDir, outT
     if (forward.lengthSq() < 1e-14) return false;
     forward.normalize();
   }
+  return true;
+}
+
+/** Quat identidade reutilizado ao separar translação (âncora) de rotação (faceTrackRot). */
+let _omafitAnchorIdentityQ = null;
+
+/**
+ * Rotação da cabeça a partir do quaternion PnP MindAR (`anchorDec.q` após
+ * normalização selfie). No modo admin-parity-flat aplica-se **depois** do
+ * `projectionMirrorFix` (scaleX=-1).
+ *
+ * v341: `anchorYawNeg` no normalize é omitido neste modo — era heurística
+ * para rotação **antes** do espelho e invertia o yaw ao virar a cabeça.
+ *
+ * @returns {boolean}
+ */
+function omafitGlassesApplyFaceTrackRotFromAnchorQuat(
+  THREE,
+  group,
+  sourceQ,
+  smoothState,
+) {
+  if (!THREE || !group?.quaternion || !sourceQ) return false;
+  if (!smoothState.targetQ) smoothState.targetQ = new THREE.Quaternion();
+  smoothState.targetQ.copy(sourceQ);
+  const alpha =
+    smoothState && Number.isFinite(smoothState.alpha) && smoothState.alpha > 0
+      ? Math.min(1, smoothState.alpha)
+      : 0.92;
+  if (!smoothState.initialized || alpha >= 1 - 1e-6) {
+    group.quaternion.copy(smoothState.targetQ);
+    smoothState.initialized = true;
+  } else {
+    omafitQuatShortestPathToward(group.quaternion, smoothState.targetQ);
+    group.quaternion.slerp(smoothState.targetQ, alpha);
+    group.quaternion.normalize();
+  }
+  group.updateMatrix?.();
   return true;
 }
 
@@ -10210,6 +10321,22 @@ async function runArSession({
   productId,
 }) {
   colContent.innerHTML = "";
+  // ⚡ Garante que o download do GLB já está a correr (idempotente) — cobre o
+  // caminho de mão e casos em que o URL não estava pronto no load da página.
+  try {
+    const warmSessionGlbUrl =
+      omafitResolveGlbLoadUrlFromDom() ||
+      buildGlbLoaderUrl(
+        omafitAbsolutizeGlbUrlMaybe(String(glbUrl || "").trim()),
+        document.getElementById("omafit-ar-root")?.dataset?.arGlbVersion || "",
+      );
+    if (warmSessionGlbUrl) {
+      omafitWarmGlbConnection(warmSessionGlbUrl);
+      omafitWarmGlbBuffer(warmSessionGlbUrl);
+    }
+  } catch {
+    /* non-blocking */
+  }
   const arSessionLayoutProfile = omafitResolveArDeviceRuntimeProfile({});
   const arSessionIsDesktop = arSessionLayoutProfile.formFactor === "desktop";
   let headerDisplayBeforeAr = "";
@@ -11795,10 +11922,9 @@ async function runArSession({
         );
         return {
           loadUrl,
+          // Reutiliza o buffer já iniciado no warmup (load/abertura do modal).
           bufferPromise: loadUrl
-            ? fetch(loadUrl, { mode: "cors" })
-                .then((resp) => (resp.ok ? resp.arrayBuffer() : null))
-                .catch(() => null)
+            ? omafitWarmGlbBuffer(loadUrl)
             : Promise.resolve(null),
           dracoPromise: wantDraco
             ? omafitGetSharedDracoLoader().catch(() => null)
@@ -13812,6 +13938,23 @@ async function runArSession({
       );
       return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.85;
     })();
+    /**
+     * v340–v342: rotação PnP nos óculos (modo flat / ingest canónico).
+     *
+     * v340–v341: rotação só em `faceTrackRot` pós-mirror + âncora só T → yaw OK
+     * (v341) mas deslize/flutuação ao virar (`gapX`/`gapEyeNdcX` crescem).
+     * v342: pose T+R unificada na âncora; `faceTrackRot` identidade.
+     * v343: `anchorYawNeg` default ON no normalize (rotação na âncora,
+     * **antes** do mirror) — v341/v342 tinham yawNeg OFF (só válido pós-mirror).
+     * v344: eye-mid align no flat (calibRot += mid(olhos)−168) + One Euro na
+     * rotação PnP da âncora (menos jitter / sensação de flutuar).
+     * Knob: `?omafit_ar_glasses_face_rot=0` desliga faceTrackRot (legado).
+     */
+    const glassesFaceRotFromMesh = resolveGlassesSignToggle(
+      "omafit_ar_glasses_face_rot",
+      "arGlassesFaceRot",
+      true,
+    );
 
     if (glassesForceAnchorUnitScale) {
       faceProjectionOpts.faceAnchorDistM = glassesAdminParityFlat
@@ -13917,6 +14060,8 @@ async function runArSession({
     let microUxModelWrap = null;
     /** Grupo filho do pivot: origem = ponto lógico de try-on; o mesh `glasses` desloca-se dentro sem editar o GLB. */
     let glassesModelWrap = null;
+    /** @type {InstanceType<typeof GroupCtor> | null} Rotação cabeça (landmarks) — só admin parity flat. */
+    let faceTrackRotGroup = null;
     /** @type {THREE.Group | null} Pose facial (matrix da malha) — filho do model wrap; o GLB filho mantém só correcções estáticas. */
     let glassesTrackingWrap = null;
     /** Calibração wearX/Y/Z (m) — filho do tracking wrap; tem de existir no âmbito de `faceArEnhancementState`. */
@@ -14504,8 +14649,15 @@ async function runArSession({
     }
     wearPosition.add(projectionMirrorFix);
     if (glassesAdminParityFlat) {
-      /** Admin flat: wearPosition → projectionMirrorFix (selfie X) → calibRot → GLB. */
-      projectionMirrorFix.add(calibRot);
+      /** Admin flat: wear → projectionMirrorFix (selfie X) → faceTrackRot → calibRot → GLB. */
+      if (glassesFaceRotFromMesh) {
+        faceTrackRotGroup = new GroupCtor();
+        faceTrackRotGroup.name = "omafit-ar-face-track-rot";
+        projectionMirrorFix.add(faceTrackRotGroup);
+        faceTrackRotGroup.add(calibRot);
+      } else {
+        projectionMirrorFix.add(calibRot);
+      }
     } else {
       projectionMirrorFix.add(faceParentGroup);
       faceParentGroup.add(calibRot);
@@ -14818,6 +14970,10 @@ async function runArSession({
       glassesLiftYM,
       glassesEyeZM,
       glassesDepthLock,
+      glassesFaceRotFromMesh: !!glassesFaceRotFromMesh,
+      faceTrackRotGroup: faceTrackRotGroup || null,
+      faceTrackRotSmooth: { initialized: false, alpha: 0.92, targetQ: null },
+      glassesFaceRotLogged: false,
       glassesAnchorDistEma: NaN,
       glassesLastLateralDiagMs: 0,
       anchorFaceLm: anchorIndex,
@@ -14868,6 +15024,8 @@ async function runArSession({
       eyeMidWearSmoothed: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
       eyeMidWearTarget: glassesEyeMidpointAlign ? new THREE.Vector3() : null,
       eyeMidWearZero: glassesEyeMidpointAlign ? new THREE.Vector3(0, 0, 0) : null,
+      eyeMidFlatPrimed: false,
+      glassesEyeMidFlatLogged: false,
       glassesForceBboxAlign168,
       glassesManualMindarRig: !!glassesManualMindarRig,
       glassesManualMindarFinalLogged: false,
@@ -15627,6 +15785,7 @@ async function runArSession({
             st.faceProjectionOpts.principalShiftNdcLp.y *= 0.88;
           }
           st.smoothInitialized = false;
+          if (st.faceTrackRotSmooth) st.faceTrackRotSmooth.initialized = false;
           st.lmSmoother?.reset();
           st.smoothedCheekW = null;
           st.smoothedFaceScale = null;
@@ -15637,6 +15796,7 @@ async function runArSession({
           }
           st.glassesPivotFaceScale = OMAFIT_GLASSES_PIVOT_FACE_SCALE_BASE;
           if (st.eyeMidWearSmoothed) st.eyeMidWearSmoothed.set(0, 0, 0);
+          st.eyeMidFlatPrimed = false;
           if (st.necklaceSwing?.swingGroup) {
             st.necklaceSwing.vel.set(0, 0, 0);
             st.necklaceSwing.eVel.set(0, 0, 0);
@@ -15856,6 +16016,7 @@ async function runArSession({
                     stripUnitScale: !!st.glassesForceAnchorUnitScale,
                     mirrorSelfie: st.disableFaceMirror !== true,
                     anchorTxMirror: st.glassesFlatAnchorTxMirror === true,
+                    /** v343: rotação na âncora (pré-mirror) → `anchorYawNeg` default ON. */
                     anchorYawNeg: st.glassesFlatAnchorYawNeg !== false,
                     anchorPitchInvert: st.glassesFlatAnchorPitchInvert !== false,
                     anchorRollNeg: st.glassesFlatAnchorRollNeg === true,
@@ -15913,6 +16074,10 @@ async function runArSession({
           }
           st.glassesAnchorDistEma = NaN;
           st.smoothAnchorMat.copy(anchorRawMat);
+          if (st.glassesFaceRotFromMesh && st.faceTrackRotGroup) {
+            st.faceTrackRotGroup.quaternion.identity();
+            st.faceTrackRotGroup.updateMatrix?.();
+          }
           anchor.group.matrix.copy(st.smoothAnchorMat);
           for (let fi = 0; fi < mindarThree.faceMeshes.length; fi++) {
             const fm = mindarThree.faceMeshes[fi];
@@ -16004,11 +16169,48 @@ async function runArSession({
                 pz *= s;
               }
               if (st.glassesForceAnchorUnitScale) st.anchorDec.s.set(1, 1, 1);
+              omafitOneEuroFilterQuaternion(
+                THREE,
+                st.anchorDec.q,
+                tSecFlat,
+                st.anchorEuroQuatState,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_MIN_CUTOFF,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_BETA,
+                OMAFIT_GLASSES_ANCHOR_ONE_EURO_D_CUTOFF,
+              );
               st.smoothAnchorMat.compose(
                 st.anchorDec.p.set(px, py, pz),
-                st.anchorDec.q,
+                st.anchorEuroQuatState.qPrev,
                 st.anchorDec.s,
               );
+              if (st.glassesFaceRotFromMesh && st.faceTrackRotGroup) {
+                st.faceTrackRotGroup.quaternion.identity();
+                st.faceTrackRotGroup.updateMatrix?.();
+                if (!st.glassesFaceRotLogged) {
+                  st.glassesFaceRotLogged = true;
+                  let anchorYawDeg = null;
+                  try {
+                    if (!st.glassesDiagE) {
+                      st.glassesDiagE = new THREE.Euler(0, 0, 0, "YXZ");
+                    }
+                    st.glassesDiagE.setFromQuaternion(st.anchorDec.q, "YXZ");
+                    anchorYawDeg = Number(
+                      ((st.glassesDiagE.y * 180) / Math.PI).toFixed(1),
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                  console.log("[omafit-ar] glasses face-rot ON (pose T+R na âncora)", {
+                    build: OMAFIT_AR_WIDGET_BUILD,
+                    source: "anchorDec.p+q",
+                    anchorYawDeg,
+                    anchorYawNegInNormalize: st.glassesFlatAnchorYawNeg !== false,
+                    note:
+                      "v343: pose PnP unificada + anchorYawNeg selfie (pré-mirror).",
+                    knob: "omafit_ar_glasses_anchor_yaw_neg=0 inverte yaw",
+                  });
+                }
+              }
             } else {
               const pF = omafitOneEuroFilterVec3(
                 [st.anchorDec.p.x, st.anchorDec.p.y, st.anchorDec.p.z],
@@ -16147,7 +16349,53 @@ async function runArSession({
                 merchantCal,
                 { depthOnAnchor: true },
               );
+              if (st.faceTrackRotGroup && !st.glassesFaceRotFromMesh) {
+                st.faceTrackRotGroup.quaternion.identity();
+              }
               calibRot.position.set(0, 0, 0);
+              /**
+               * v344: modo flat ignorava `glassesEyeMidpointAlign` (bloco tracking
+               * wrap só corre com `!glassesAdminParityFlat`). Âncora 168 = ponte;
+               * lentes ficam em mid(33,263) — offset local no calibRot (segue yaw).
+               */
+              if (st.glassesEyeMidpointAlign && lm && st.eyeMidWearTarget && st.eyeMidWearSmoothed) {
+                if (
+                  omafitGlassesEyeMidpointDeltaFrom168(
+                    THREE,
+                    lm,
+                    st.lmSmoother,
+                    st.eyeMidWearTarget,
+                  )
+                ) {
+                  const metricMul = omafitMindarMetricToMetersScale(lm);
+                  st.eyeMidWearTarget.multiplyScalar(metricMul);
+                  const proxZ = Number(st.glassesIngestFaceProximityInsetZ) || 0;
+                  if (proxZ) st.eyeMidWearTarget.z += proxZ;
+                  const off = st.glassesOffsetFinalM;
+                  if (off) {
+                    st.eyeMidWearTarget.x += Number(off.x) || 0;
+                    st.eyeMidWearTarget.y += Number(off.y) || 0;
+                    st.eyeMidWearTarget.z += Number(off.z) || 0;
+                  }
+                  const eyeMidAlpha = 0.42;
+                  if (!st.eyeMidFlatPrimed) {
+                    st.eyeMidWearSmoothed.copy(st.eyeMidWearTarget);
+                    st.eyeMidFlatPrimed = true;
+                  } else {
+                    st.eyeMidWearSmoothed.lerp(st.eyeMidWearTarget, eyeMidAlpha);
+                  }
+                  calibRot.position.copy(st.eyeMidWearSmoothed);
+                  if (!st.glassesEyeMidFlatLogged) {
+                    st.glassesEyeMidFlatLogged = true;
+                    console.log("[omafit-ar] glasses flat eye-mid align ON", {
+                      build: OMAFIT_AR_WIDGET_BUILD,
+                      metricMul: Number(metricMul.toFixed(4)),
+                      faceProximityInsetZ: proxZ || 0,
+                      note: "calibRot += mid(olhos)−168 em m; segue rotação da âncora.",
+                    });
+                  }
+                }
+              }
               /**
                * v334: PROXIMIDADE ao vivo. O wear-Z na âncora está desativado
                * (depthOnAnchor=true zera wearZ p/ manter o screen-lock do v333),
@@ -16158,7 +16406,7 @@ async function runArSession({
                */
               {
                 const eyeZ = Number(st.glassesEyeZM) || 0;
-                if (eyeZ) calibRot.position.z = eyeZ;
+                if (eyeZ) calibRot.position.z += eyeZ;
               }
               /**
                * v321: correção lateral DETERMINÍSTICA em espaço de câmara.
@@ -20834,9 +21082,7 @@ async function runHandArSession({
     draco: Boolean(dracoLoaderHand),
   });
   await new Promise((resolve, reject) => {
-    glbLoader.load(
-      finalGlbUrl,
-      (gltf) => {
+    const __omafitOnHandGltf = (gltf) => {
         const glbScene = gltf.scene || gltf.scenes?.[0];
         if (!glbScene) {
           dbgBraceletAr("H1", "glb:onLoad", "gltf_no_scene", {});
@@ -21187,9 +21433,8 @@ async function runHandArSession({
             : null,
         });
         resolve();
-      },
-      undefined,
-      (err) => {
+    };
+    const __omafitOnHandGltfErr = (err) => {
         dbgBraceletAr("H1", "glb:onError", "load_failed", {
           message: String(err?.message || err).slice(0, 200),
         });
@@ -21198,8 +21443,28 @@ async function runHandArSession({
           url: String(finalGlbUrl || "").slice(0, 260),
         });
         reject(err);
-      },
-    );
+    };
+    const __omafitLoadHandFromNetwork = () =>
+      glbLoader.load(finalGlbUrl, __omafitOnHandGltf, undefined, __omafitOnHandGltfErr);
+    // Reutiliza o buffer já descarregado no warmup (parse directo, sem 2.º download).
+    const __omafitHandBufP = __omafitGlbBufferPromises.get(finalGlbUrl);
+    if (__omafitHandBufP) {
+      __omafitHandBufP
+        .then((buf) => {
+          if (!buf) {
+            __omafitLoadHandFromNetwork();
+            return;
+          }
+          try {
+            glbLoader.parse(buf, "", __omafitOnHandGltf, () => __omafitLoadHandFromNetwork());
+          } catch {
+            __omafitLoadHandFromNetwork();
+          }
+        })
+        .catch(() => __omafitLoadHandFromNetwork());
+    } else {
+      __omafitLoadHandFromNetwork();
+    }
   });
 
   if (debug) {
@@ -23408,6 +23673,17 @@ async function main() {
         .toLowerCase() === "1";
     if (!deferPreload) {
       getOmafitArModuleBundle().catch(() => {});
+    }
+    // ⚡ Começa já o download do GLB (em paralelo com módulos/câmara) e aquece
+    // a conexão à CDN — sem esperar o clique em "iniciar AR".
+    try {
+      const warmGlbUrl = omafitResolveGlbLoadUrlFromDom();
+      if (warmGlbUrl) {
+        omafitWarmGlbConnection(warmGlbUrl);
+        omafitWarmGlbBuffer(warmGlbUrl);
+      }
+    } catch {
+      /* non-blocking */
     }
   }
 
