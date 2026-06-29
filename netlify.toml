@@ -2,8 +2,23 @@
   command = "npm run build"
   publish = "dist"
 
+# Alias sem versão — revalidar rápido (sync local dev).
+[[headers]]
+  for = "/ar/omafit-ar-widget.js"
+  [headers.values]
+    Cache-Control = "public, max-age=300, stale-while-revalidate=3600"
+    Netlify-CDN-Cache-Control = "public, max-age=300, stale-while-revalidate=3600"
+
+# Build versionado (URL com cache-bust) — imutável na CDN.
+[[headers]]
+  for = "/ar/omafit-ar-widget.*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Netlify-CDN-Cache-Control = "public, max-age=31536000, immutable"
+
+# Módulos satélite (/ar/*.js) — cache 1d + SWR.
 [[headers]]
   for = "/ar/*"
   [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-    Netlify-CDN-Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+    Netlify-CDN-Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"

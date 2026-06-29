@@ -6,6 +6,7 @@ import {
 } from '../utils/pickPreferredCollectionHandle';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { readWidgetInitialStoreLanguage, readWidgetSearchBootstrap } from '../utils/readWidgetSearchBootstrap';
+import { useTryonMobileFullscreenChrome } from '../hooks/useTryonMobileFullscreenChrome';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -64,6 +65,7 @@ export function ShoeARWidgetPage() {
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
+  const tryonFullscreenChrome = useTryonMobileFullscreenChrome(tryonSidebarChrome);
   const [productImage, setProductImage] = useState<string>(sb.productImage);
   const [productId, setProductId] = useState<string>('');
   const [productHandle, setProductHandle] = useState<string>(sb.productHandle || '');
@@ -288,7 +290,7 @@ export function ShoeARWidgetPage() {
   return (
     <div
       className={
-        tryonSidebarChrome
+        tryonFullscreenChrome
           ? 'flex h-dvh min-h-0 flex-col overflow-hidden bg-transparent p-0'
           : 'flex min-h-screen items-center justify-center bg-transparent px-2 py-4 sm:p-4'
       }
@@ -297,7 +299,7 @@ export function ShoeARWidgetPage() {
     >
       <div
         className={
-          tryonSidebarChrome
+          tryonFullscreenChrome
             ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden'
             : 'max-h-[92vh] w-full overflow-auto sm:max-w-6xl'
         }

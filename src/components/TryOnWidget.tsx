@@ -51,6 +51,10 @@ import {
   type StoreProfile,
 } from '../utils/storeProfile';
 import {
+  inferChartGenderScopeFromRows,
+  resolveForcedCalculatorGender,
+} from '../utils/chartGenderScope';
+import {
   inferProductHandleFromReferrer,
   galleryUrlsEqual,
   mergeProductImageGallery,
@@ -1563,21 +1567,15 @@ export function TryOnWidget({
 
     let cancelled = false;
 
-    const normalize = (raw: unknown): 'both' | 'male' | 'female' => {
-      const v = String(raw || '').trim().toLowerCase();
-      return v === 'male' || v === 'female' ? v : 'both';
-    };
-
-    const fetchScope = async (
+    const fetchChartsForScope = async (
       productHandleQuery: string,
       collectionHandleQuery: string
-    ): Promise<'both' | 'male' | 'female' | null> => {
+    ): Promise<Array<{ gender?: string; gender_scope?: string }>> => {
       const params = new URLSearchParams();
       params.set('shop_domain', `eq.${shop}`);
       params.set('product_handle', `eq.${productHandleQuery}`);
       params.set('collection_handle', `eq.${collectionHandleQuery}`);
-      params.set('select', 'gender_scope');
-      params.set('limit', '1');
+      params.set('select', 'gender,gender_scope');
       const res = await fetch(`${supabaseUrl}/rest/v1/size_charts?${params.toString()}`, {
         headers: {
           apikey: supabaseKey,
@@ -1592,11 +1590,10 @@ export function TryOnWidget({
             '⚠️ Coluna gender_scope ausente em size_charts — execute supabase_add_gender_scope_to_size_charts.sql'
           );
         }
-        return null;
+        return [];
       }
-      const rows: Array<{ gender_scope?: string }> = await res.json().catch(() => []);
-      if (!Array.isArray(rows) || rows.length === 0) return null;
-      return normalize(rows[0]?.gender_scope);
+      const rows = await res.json().catch(() => []);
+      return Array.isArray(rows) ? rows : [];
     };
 
     type ScopeTask = {
@@ -1644,27 +1641,23 @@ export function TryOnWidget({
           tasks.map(async (task) => ({
             priority: task.priority,
             label: task.label,
-            scope: await fetchScope(task.productHandle, task.collectionHandle),
+            scope: inferChartGenderScopeFromRows(
+              await fetchChartsForScope(task.productHandle, task.collectionHandle)
+            ),
           }))
         );
         if (cancelled) return;
 
         const hit = results
-          .filter((r) => r.scope === 'male' || r.scope === 'female')
+          .filter((r) => r.scope === 'male' || r.scope === 'female' || r.scope === 'both')
           .sort((a, b) => a.priority - b.priority)[0];
 
         if (hit?.scope) {
           console.log('👤 gender_scope (paralelo):', hit.label, hit.scope);
           setChartGenderScope(hit.scope);
         } else {
-          const globalRow = results.find((r) => r.label === 'global');
-          if (globalRow?.scope) {
-            console.log('👤 gender_scope global:', globalRow.scope);
-            setChartGenderScope(globalRow.scope);
-          } else {
-            console.log('👤 Nenhum gender_scope — usando "both"');
-            setChartGenderScope('both');
-          }
+          console.log('👤 Nenhuma size_chart — usando "both" (escolha de gênero)');
+          setChartGenderScope('both');
         }
         setChartGenderScopeResolved(true);
       } catch (err) {
@@ -6699,7 +6692,7 @@ const handleSubmit = async (
             onContinueWithoutPhoto={handleCalculatorContinueWithoutPhoto}
             primaryColor={effectivePrimaryColor}
             defaultGender={defaultGender as 'male' | 'female' | 'unisex'}
-            forcedGender={chartGenderScope === 'male' || chartGenderScope === 'female' ? chartGenderScope : null}
+            forcedGender={resolveForcedCalculatorGender(chartGenderScope, defaultGender)}
             language={currentLanguage}
           />
           </motion.div>

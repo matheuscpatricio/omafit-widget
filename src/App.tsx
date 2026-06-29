@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LandingPage } from './components/LandingPage';
-import { WidgetPage } from './components/WidgetPage';
+const WidgetPage = lazy(() => import('./components/WidgetPage').then((m) => ({ default: m.WidgetPage })));
 import { ShoeARWidgetPage } from './components/ShoeARWidgetPage';
 import { AuthForm } from './components/AuthForm';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -182,7 +182,23 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/widget" element={<WidgetPage />} />
+        <Route
+          path="/widget"
+          element={
+            <Suspense
+              fallback={
+                <div className="min-h-screen bg-white flex items-center justify-center p-6">
+                  <div className="text-center">
+                    <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-[#810707]" />
+                    <p className="text-sm text-gray-600">A preparar provador…</p>
+                  </div>
+                </div>
+              }
+            >
+              <WidgetPage />
+            </Suspense>
+          }
+        />
         <Route path="/widget-shoes" element={<ShoeARWidgetPage />} />
       </Routes>
       </Suspense>

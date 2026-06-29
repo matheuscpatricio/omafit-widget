@@ -17,13 +17,19 @@ import {
   normalizeGalleryUrl,
   parseProductImagesMessage,
 } from '../utils/productImageGallery';
+import {
+  buildArModuleUrl,
+  loadArWidgetModule,
+  primeArLoadPipeline,
+} from '../utils/arLoadAccelerator';
+import { useTryonMobileFullscreenChrome } from '../hooks/useTryonMobileFullscreenChrome';
 
 /**
  * Forçar novo `import()` do módulo AR após `sync:theme-ar` (evita módulo antigo
  * no cache do browser). Manter alinhado a `OMAFIT_AR_WIDGET_BUILD` no
  * `extensions/omafit-theme/assets/omafit-ar-widget.js`.
  */
-const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-10-glasses-ingest-admin-flat-v344';
+const OMAFIT_AR_MODULE_CACHE_BUST = '2026-06-10-glasses-ingest-admin-flat-v349';
 
 const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
   const raw = String(value || '').trim().toLowerCase().replace('_', '-');
@@ -502,6 +508,7 @@ export function WidgetPage() {
   const handleTryonLayoutChange = useCallback((layout: TryonLayoutMode) => {
     setTryonSidebarChrome(layout === 'sidebar' || layout === 'hero');
   }, []);
+  const tryonFullscreenChrome = useTryonMobileFullscreenChrome(tryonSidebarChrome);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1142,48 +1149,50 @@ export function WidgetPage() {
     if (eyewearBootstrap.tryonLayout !== undefined) return eyewearBootstrap.tryonLayout;
     if (eyewearTryonLayoutFromMessage !== null) return eyewearTryonLayoutFromMessage;
     if (eyewearTryonLayoutFromDb !== null) return eyewearTryonLayoutFromDb;
+    /** Não bloquear no Supabase — default imediato; DB actualiza layout depois. */
     return 'default';
   }, [showEyewearArNetlify, eyewearBootstrap, eyewearTryonLayoutFromMessage, eyewearTryonLayoutFromDb]);
+
+  /** Preload AR (módulo + MindAR + GLB) assim que a query AR é conhecida — em paralelo com Supabase/React. */
+  useEffect(() => {
+    if (!showEyewearArNetlify || !eyewearBootstrap || typeof window === 'undefined') return;
+    const arModuleUrl = buildArModuleUrl(window.location.origin, OMAFIT_AR_MODULE_CACHE_BUST);
+    primeArLoadPipeline({ arModuleUrl, glbUrl: eyewearBootstrap.glbUrl });
+  }, [showEyewearArNetlify, eyewearBootstrap]);
 
   const [arModuleBootError, setArModuleBootError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showEyewearArNetlify || !eyewearBootstrap) return;
     if (eyewearResolvedTryonLayout === null) return;
-    const sd = (eyewearBootstrap.shopDomain || '').trim();
-    if (sd && eyewearShopConfig.status !== 'ready') return;
     setArModuleBootError(null);
     let cancelled = false;
-    const arModuleUrl = `${window.location.origin}/ar/omafit-ar-widget.${encodeURIComponent(
-      OMAFIT_AR_MODULE_CACHE_BUST,
-    )}.js`;
+    const arModuleUrl = buildArModuleUrl(window.location.origin, OMAFIT_AR_MODULE_CACHE_BUST);
     const tryStart = () => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (cancelled) return;
-          try {
-            const start = (
-              window as Window & {
-                __omafitArStart?: () => void | Promise<void>;
-              }
-            ).__omafitArStart;
-            if (typeof start !== 'function') {
-              setArModuleBootError(
-                'O módulo AR carregou mas __omafitArStart não está disponível (avaliação do script falhou?).',
-              );
-              return;
+        if (cancelled) return;
+        try {
+          const start = (
+            window as Window & {
+              __omafitArStart?: () => void | Promise<void>;
             }
-            void start();
-          } catch (e) {
-            setArModuleBootError(e instanceof Error ? e.message : String(e));
+          ).__omafitArStart;
+          if (typeof start !== 'function') {
+            setArModuleBootError(
+              'O módulo AR carregou mas __omafitArStart não está disponível (avaliação do script falhou?).',
+            );
+            return;
           }
-        });
+          void start();
+        } catch (e) {
+          setArModuleBootError(e instanceof Error ? e.message : String(e));
+        }
       });
     };
 
     const load = async () => {
       try {
-        await import(/* @vite-ignore */ arModuleUrl);
+        await loadArWidgetModule(arModuleUrl);
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -1201,7 +1210,7 @@ export function WidgetPage() {
     return () => {
       cancelled = true;
     };
-  }, [showEyewearArNetlify, eyewearBootstrap, eyewearResolvedTryonLayout, eyewearShopConfig.status]);
+  }, [showEyewearArNetlify, eyewearBootstrap, eyewearResolvedTryonLayout]);
 
   if (typeof window !== 'undefined' && shouldBlockClothingTryonFromUrlParams() && !eyewearBootstrap) {
     return (
@@ -1219,9 +1228,7 @@ export function WidgetPage() {
   }
 
   if (showEyewearArNetlify && eyewearBootstrap) {
-    const eyewearNeedsShopRow = Boolean((eyewearBootstrap.shopDomain || '').trim());
-    const eyewearShopRowPending = eyewearNeedsShopRow && eyewearShopConfig.status !== 'ready';
-    if (eyewearResolvedTryonLayout === null || eyewearShopRowPending) {
+    if (eyewearResolvedTryonLayout === null) {
       return (
         <div className="min-h-screen bg-white flex items-center justify-center p-6" onContextMenu={(e) => e.preventDefault()}>
           <div className="text-center">
@@ -1286,7 +1293,10 @@ export function WidgetPage() {
     }
 
     return (
-      <div className="min-h-screen bg-white" onContextMenu={(e) => e.preventDefault()}>
+      <div
+        className={tryonFullscreenChrome ? 'flex h-dvh min-h-0 flex-col bg-white' : 'min-h-screen bg-white'}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {arModuleBootError ? (
           <div
             className="max-w-lg mx-auto p-6 text-center text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg m-4"
@@ -1332,7 +1342,8 @@ export function WidgetPage() {
 
   if (!productImage) {
     const layoutHint = parseTryonLayoutFromLocation();
-    const chromeEarly = layoutHint === 'hero' || layoutHint === 'sidebar';
+    const chromeEarly =
+      tryonFullscreenChrome || layoutHint === 'hero' || layoutHint === 'sidebar';
     return (
       <div
         className={
@@ -1365,7 +1376,7 @@ export function WidgetPage() {
   return (
     <div
       className={
-        tryonSidebarChrome
+        tryonFullscreenChrome
           ? 'flex h-dvh min-h-0 flex-col overflow-hidden bg-transparent p-0'
           : 'flex min-h-screen items-center justify-center bg-transparent px-2 py-4 sm:p-4'
       }
@@ -1374,7 +1385,7 @@ export function WidgetPage() {
     >
       <div
         className={
-          tryonSidebarChrome
+          tryonFullscreenChrome
             ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden'
             : `flex w-full min-h-0 max-h-[85vh] flex-col overflow-hidden ${
                 tryonIframeSidebar ? 'sm:max-w-6xl' : 'sm:max-w-2xl'
