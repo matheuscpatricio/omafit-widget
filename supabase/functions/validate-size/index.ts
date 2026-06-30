@@ -51,17 +51,10 @@ function shouldSkipUserMessageValidation(data: ValidateSizeRequest): boolean {
 
 function isStylistConsultantRequest(data: ValidateSizeRequest): boolean {
   const intent = String(data.intencao_usuario || "").trim();
-  if (
-    intent === "legenda_tryon_secundario" ||
-    intent === "sugerir_combinacoes" ||
-    intent === "induzir_adicionar_carrinho" ||
-    intent === "consultor_outfit_inicial"
-  ) {
+  if (intent === "sugerir_combinacoes" || intent === "consultor_outfit_inicial") {
     return true;
   }
-  if (intent === "custom_message" && String(data.custom_message || "").trim()) {
-    return true;
-  }
+  /** Candidatos de catálogo = consultor de look (Growth+). Perguntas livres no chat usam buildCustomMessagePrompt. */
   return Array.isArray(data.candidate_products) && data.candidate_products.length > 0;
 }
 

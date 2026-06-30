@@ -4836,22 +4836,6 @@ const handleSubmit = async (
   };
 
   const callGPTAssistant = async (intention: string = 'add_to_cart', complementaryProduct?: any, customMessage?: string) => {
-    if (intention === 'custom' && !stylistEnabled) {
-      const planMessages = {
-        pt: 'O consultor de estilo com sugestões de look está disponível no plano Growth ou superior.',
-        es: 'El consultor de estilo con sugerencias de look está disponible en el plan Growth o superior.',
-        en: 'The style consultant with outfit suggestions is available on the Growth plan or higher.',
-      };
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: planMessages[currentLanguage] || planMessages.en,
-          timestamp: Date.now(),
-        },
-      ]);
-      return;
-    }
     if (intention === 'add_to_cart' && suppressCartGptNudgeRef.current) {
       return;
     }
@@ -6196,8 +6180,8 @@ const handleSubmit = async (
             <div ref={chatEndRef} />
           </div>
 
-          {/* Input Area */}
-          {stylistEnabled && interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
+          {/* Input Area — chat disponível em todos os planos; chips/consultor de look só Growth+ */}
+          {interactionCount < GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <motion.div
               className="p-4 border-t bg-gray-50"
               initial={{ opacity: 0, y: 12 }}
@@ -6224,76 +6208,78 @@ const handleSubmit = async (
               )}
 
               <p className="text-sm text-gray-600 text-center mb-3">
-                {t('chatStylingHint')}
+                {stylistEnabled ? t('chatStylingHint') : t('chatHint')}
               </p>
 
-              <div className="mb-3 flex flex-wrap justify-center gap-2">
-                {(
-                  currentLanguage === 'es'
-                    ? [
-                        {
-                          label: 'Más formal',
-                          message: 'Busco un look más formal para ocasión especial',
-                        },
-                        {
-                          label: 'Otra opción',
-                          message:
-                            'No me gustaron las sugerencias, quiero otra opción diferente',
-                        },
-                        {
-                          label: 'Más casual',
-                          message: 'Quiero algo casual para el día a día',
-                        },
-                      ]
-                    : currentLanguage === 'en'
+              {stylistEnabled && (
+                <div className="mb-3 flex flex-wrap justify-center gap-2">
+                  {(
+                    currentLanguage === 'es'
                       ? [
                           {
-                            label: 'More formal',
-                            message: 'I want a more formal look for a special occasion',
+                            label: 'Más formal',
+                            message: 'Busco un look más formal para ocasión especial',
                           },
                           {
-                            label: 'Something else',
+                            label: 'Otra opción',
                             message:
-                              "I didn't like those suggestions, show me something else",
+                              'No me gustaron las sugerencias, quiero otra opción diferente',
                           },
                           {
-                            label: 'More casual',
-                            message: 'Something casual for everyday wear',
+                            label: 'Más casual',
+                            message: 'Quiero algo casual para el día a día',
                           },
                         ]
-                      : [
-                          {
-                            label: 'Mais formal',
-                            message: 'Quero um look mais formal para ocasião especial',
-                          },
-                          {
-                            label: 'Outra opção',
-                            message:
-                              'Não gostei das sugestões, quero outra opção diferente',
-                          },
-                          {
-                            label: 'Mais casual',
-                            message: 'Quero algo casual para o dia a dia',
-                          },
-                        ]
-                ).map((chip) => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    disabled={gptLoading || interactionCount >= GPT_INTERACTION_LIMIT}
-                    onClick={() => {
-                      setChatMessages((prev) => [
-                        ...prev,
-                        { role: 'user', content: chip.message, timestamp: Date.now() },
-                      ]);
-                      void callGPTAssistant('custom', undefined, chip.message);
-                    }}
-                    className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
+                      : currentLanguage === 'en'
+                        ? [
+                            {
+                              label: 'More formal',
+                              message: 'I want a more formal look for a special occasion',
+                            },
+                            {
+                              label: 'Something else',
+                              message:
+                                "I didn't like those suggestions, show me something else",
+                            },
+                            {
+                              label: 'More casual',
+                              message: 'Something casual for everyday wear',
+                            },
+                          ]
+                        : [
+                            {
+                              label: 'Mais formal',
+                              message: 'Quero um look mais formal para ocasião especial',
+                            },
+                            {
+                              label: 'Outra opção',
+                              message:
+                                'Não gostei das sugestões, quero outra opção diferente',
+                            },
+                            {
+                              label: 'Mais casual',
+                              message: 'Quero algo casual para o dia a dia',
+                            },
+                          ]
+                  ).map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      disabled={gptLoading || interactionCount >= GPT_INTERACTION_LIMIT}
+                      onClick={() => {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: 'user', content: chip.message, timestamp: Date.now() },
+                        ]);
+                        void callGPTAssistant('custom', undefined, chip.message);
+                      }}
+                      className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <input
                 ref={chatPhotoInputRef}
@@ -6303,7 +6289,6 @@ const handleSubmit = async (
                 onChange={handleImageChange}
               />
 
-              {/* Text Input */}
               <div className="flex gap-2 items-stretch">
                 <button
                   type="button"
@@ -6316,7 +6301,7 @@ const handleSubmit = async (
                 </button>
                 <input
                   type="text"
-                  placeholder={t('chatPlaceholderStylist')}
+                  placeholder={stylistEnabled ? t('chatPlaceholderStylist') : t('chatPlaceholder')}
                   className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
                   style={{ focusRing: localPrimaryColor }}
                   onKeyPress={(e) => {
@@ -6357,43 +6342,8 @@ const handleSubmit = async (
             </motion.div>
           )}
 
-          {!stylistEnabled && chatMessages.length > 0 && !gptLoading && (
-            <motion.div
-              className="p-4 border-t bg-gray-50"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={isAddingToCart}
-                className="w-full px-4 py-3 rounded-xl font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: localPrimaryColor,
-                  color: getContrastTextColor(localPrimaryColor),
-                }}
-              >
-                {isAddingToCart
-                  ? currentLanguage === 'pt'
-                    ? 'Adicionando ao carrinho...'
-                    : currentLanguage === 'es'
-                      ? 'Agregando al carrito...'
-                      : 'Adding to cart...'
-                  : currentLanguage === 'pt'
-                    ? 'Adicionar ao carrinho'
-                    : currentLanguage === 'es'
-                      ? 'Agregar al carrito'
-                      : 'Add to cart'}
-              </button>
-              {addToCartFeedback ? (
-                <p className="text-xs text-center text-gray-600 mt-3">{addToCartFeedback}</p>
-              ) : null}
-            </motion.div>
-          )}
-
           {/* Mensagem de agradecimento quando limite for atingido */}
-          {stylistEnabled && interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
+          {interactionCount >= GPT_INTERACTION_LIMIT && chatMessages.length > 0 && !gptLoading && (
             <motion.div
               className="p-4 border-t bg-gray-50"
               initial={{ opacity: 0, y: 8 }}

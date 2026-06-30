@@ -107,6 +107,8 @@ export const widgetTranslations = {
     addToCartError: 'Não foi possível adicionar ao carrinho.',
 
     // Chat / consultor + catálogo Omafit
+    chatPlaceholder: 'Digite sua dúvida sobre o tamanho ou o produto…',
+    chatHint: 'Tem alguma dúvida? Pergunte abaixo',
     chatPlaceholderStylist: 'Pergunte sobre combinações ou diga o que procura…',
     chatStylingHint: 'Quer ideias para combinar? Pergunte abaixo',
     stylistInitialOutfitAsk:
@@ -229,6 +231,8 @@ export const widgetTranslations = {
     addToCartSuccess: 'Producto agregado al carrito!',
     addToCartError: 'No se pudo agregar al carrito.',
 
+    chatPlaceholder: 'Escribe tu duda sobre la talla o el producto…',
+    chatHint: '¿Alguna duda? Pregunta abajo',
     chatPlaceholderStylist: 'Pregunta combinaciones o di qué buscas…',
     chatStylingHint: '¿Ideas para combinar? Pregunta abajo',
     stylistInitialOutfitAsk:
@@ -351,6 +355,8 @@ export const widgetTranslations = {
     addToCartSuccess: 'Product added to cart!',
     addToCartError: 'Could not add product to cart.',
 
+    chatPlaceholder: 'Ask about sizing or this product…',
+    chatHint: 'Have a question? Ask below',
     chatPlaceholderStylist: 'Ask about outfit pairings or describe what you want…',
     chatStylingHint: 'Want outfit ideas? Ask below',
     stylistInitialOutfitAsk:
