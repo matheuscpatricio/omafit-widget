@@ -54,6 +54,7 @@ import {
   inferChartGenderScopeFromRows,
   resolveForcedCalculatorGender,
 } from '../utils/chartGenderScope';
+import { readHttpJsonResponse } from '../utils/readHttpJsonResponse';
 import {
   inferProductHandleFromReferrer,
   galleryUrlsEqual,
@@ -298,7 +299,16 @@ async function uploadTryOnModelImage(blob: Blob, fileName?: string): Promise<str
     throw new Error(`Failed to prepare direct upload: ${errorText}`);
   }
 
-  const uploadMetadata = await metadataResponse.json();
+  const uploadParsed = await readHttpJsonResponse<{
+    token?: string;
+    path?: string;
+    bucket?: string;
+    error?: string;
+  }>(metadataResponse);
+  if (!uploadParsed.ok || !uploadParsed.data?.token) {
+    throw new Error(uploadParsed.error || uploadParsed.data?.error || 'Failed to prepare direct upload');
+  }
+  const uploadMetadata = uploadParsed.data;
   const { error } = await supabase.storage
     .from(uploadMetadata.bucket || 'tryon-images')
     .uploadToSignedUrl(uploadMetadata.path, uploadMetadata.token, blob, {
@@ -4000,9 +4010,9 @@ const handleSubmit = async (
       formData.append('product_name', payload.product_name);
       formData.append('product_id', payload.product_id);
       formData.append('public_id', payload.public_id || '');
-      formData.append('user_measurements', JSON.stringify(payload.user_measurements));
-      formData.append('pose_landmarks', JSON.stringify(payload.pose_landmarks));
-      formData.append('detected_measurements', JSON.stringify(payload.detected_measurements));
+      formData.append('user_measurements', JSON.stringify(payload.user_measurements ?? null));
+      formData.append('pose_landmarks', JSON.stringify(payload.pose_landmarks ?? null));
+      formData.append('detected_measurements', JSON.stringify(payload.detected_measurements ?? null));
       response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tryon`, {
         method: 'POST',
         headers: {
@@ -4014,11 +4024,24 @@ const handleSubmit = async (
 
     if (!response.ok) {
       stylistCatalogPrefetchPromiseRef.current = null;
-      const errorData = await response.json();
-      throw new Error(errorData.error || t('processingError'));
     }
 
-    const result = await response.json();
+    const tryonParsed = await readHttpJsonResponse<{
+      success?: boolean;
+      error?: string;
+      fal_request_id?: string;
+      tryon_disabled?: boolean;
+      body_measurements?: Record<string, unknown>;
+      debug?: Record<string, unknown>;
+      timings?: unknown;
+    }>(response);
+
+    if (!tryonParsed.ok || !tryonParsed.data) {
+      stylistCatalogPrefetchPromiseRef.current = null;
+      throw new Error(tryonParsed.error || tryonParsed.data?.error || t('processingError'));
+    }
+
+    const result = tryonParsed.data;
 
     console.log('📦 Resposta inicial do try-on:', {
       requestId: result.fal_request_id,
@@ -4150,7 +4173,12 @@ const handleSubmit = async (
   } catch (error: any) {
     console.error('Erro no try-on:', error);
     stylistCatalogPrefetchPromiseRef.current = null;
-    setError(error.message || t('processingError'));
+    const msg = String(error?.message || '');
+    const friendly =
+      /unexpected token|json\.parse|not valid json/i.test(msg)
+        ? t('processingError')
+        : msg || t('processingError');
+    setError(friendly);
     leaveTryOnErrorStep();
     setLoading(false);
   }
@@ -4199,17 +4227,24 @@ const handleSubmit = async (
         if (!statusResponse.ok) {
           console.error('❌ Status check failed:', statusResponse.status);
 
-          try {
-            const errorData = await statusResponse.json();
-            console.error('Error details:', errorData);
+          const statusErrParsed = await readHttpJsonResponse<{
+            status?: string;
+            error?: string;
+          }>(statusResponse);
 
-            if (errorData.status === 'error' || errorData.status === 'failed') {
+          if (statusErrParsed.data) {
+            console.error('Error details:', statusErrParsed.data);
+
+            if (
+              statusErrParsed.data.status === 'error' ||
+              statusErrParsed.data.status === 'failed'
+            ) {
               clearPollingTimers();
               openFinalStepWithoutImage();
               return;
             }
-          } catch (e) {
-            console.error('Failed to parse error response:', e);
+          } else if (statusErrParsed.error) {
+            console.error('Failed to parse error response:', statusErrParsed.error);
           }
 
           if (statusResponse.status >= 500) {
@@ -4222,7 +4257,26 @@ const handleSubmit = async (
           return;
         }
 
-        const statusData = await statusResponse.json();
+        const statusParsed = await readHttpJsonResponse<{
+          status?: string;
+          stage?: string;
+          fal_status?: string;
+          output?: string | string[];
+          timings?: unknown;
+        }>(statusResponse);
+
+        if (!statusParsed.ok || !statusParsed.data) {
+          console.error('❌ Status response inválida:', statusParsed.error);
+          if (statusResponse.status >= 500) {
+            clearPollingTimers();
+            openFinalStepWithoutImage();
+            return;
+          }
+          scheduleNextPoll(getPollingDelayMs(pollCount));
+          return;
+        }
+
+        const statusData = statusParsed.data;
         console.log('📦 TRY-ON STATUS:', {
           predictionId,
           pollCount,
