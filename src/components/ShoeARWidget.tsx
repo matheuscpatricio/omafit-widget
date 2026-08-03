@@ -13,6 +13,7 @@ import {
   resolveCollectionHandleWithSavedSizeChart,
   sortHandlesBySpecificityDesc,
 } from '../utils/pickPreferredCollectionHandle';
+import { resolveSizeChartRecord } from '../utils/resolveSizeChart';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { useTryonLayoutPreference } from '../hooks/useTryonLayoutPreference';
 import type { TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
@@ -802,40 +803,18 @@ export function ShoeARWidget({
         }
 
         const normalizedCollectionHandle = handleForChart;
-
-        let sizeChartRecord: any = null;
-        let chartError: any = null;
         const effectiveProductHandle = String(productHandle || '').trim();
 
-        if (effectiveProductHandle) {
-          const productChartResult = await supabase
-            .from('size_charts')
-            .select('id, shop_domain, collection_handle, product_handle, sizes, measurement_refs')
-            .eq('shop_domain', effectiveShopDomain)
-            .eq('product_handle', effectiveProductHandle)
-            .limit(1)
-            .maybeSingle();
+        console.log('🔍 calçados: cascade product → collection → default');
+        console.log('   product_handle:', effectiveProductHandle || '(vazio)');
+        console.log('   collection_handle:', normalizedCollectionHandle || '(vazio)');
 
-          if (productChartResult.error) {
-            console.warn('⚠️ Busca de tabela de calçado por product_handle falhou:', productChartResult.error);
-          } else if (productChartResult.data) {
-            sizeChartRecord = productChartResult.data;
-          }
-        }
-
-        if (!sizeChartRecord) {
-          const collectionChartResult = await supabase
-            .from('size_charts')
-            .select('id, shop_domain, collection_handle, product_handle, sizes, measurement_refs')
-            .eq('shop_domain', effectiveShopDomain)
-            .eq('collection_handle', normalizedCollectionHandle)
-            .eq('product_handle', '')
-            .limit(1)
-            .maybeSingle();
-
-          sizeChartRecord = collectionChartResult.data;
-          chartError = collectionChartResult.error;
-        }
+        const { record: sizeChartRecord, error: chartError } = await resolveSizeChartRecord(supabase, {
+          shopDomain: effectiveShopDomain,
+          gender: '',
+          productHandle: effectiveProductHandle,
+          collectionHandle: normalizedCollectionHandle,
+        });
 
         if (chartError) {
           console.error('Erro ao buscar size_chart para calçados:', chartError);
@@ -1736,13 +1715,6 @@ export function ShoeARWidget({
                         <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
                       </button>
                     </motion.div>
-
-                    <motion.p
-                      variants={textStaggerChild}
-                      className="max-w-sm text-center text-xs leading-snug text-gray-500"
-                    >
-                      {t.privacyNote}
-                    </motion.p>
                   </motion.div>
                 </div>
 
@@ -1774,7 +1746,6 @@ export function ShoeARWidget({
                       {replaceStoreName(t.sizeButton, storeName)}
                       <ArrowRight className="h-5 w-5" />
                     </button>
-                    <p className="text-left text-xs text-gray-500 sm:text-sm">{t.privacyNote}</p>
                   </motion.div>
                 </motion.div>
               </>
@@ -1985,6 +1956,7 @@ export function ShoeARWidget({
                     onChange={handleSelectFootPhoto}
                     className="hidden"
                   />
+                  <p className="mt-3 text-center text-xs text-gray-500 sm:text-sm">{t.privacyNote}</p>
                 </div>
               </div>
             </div>

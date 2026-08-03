@@ -79,11 +79,13 @@ export async function resolveCollectionHandleWithSavedSizeChart(
     return null;
   };
 
+  // Só tabelas por coleção (product_handle vazio) — evita linhas por produto.
   if (searchGender == null || String(searchGender).trim() === '') {
     const { data, error } = await supabase
       .from('size_charts')
       .select('collection_handle')
       .eq('shop_domain', shopDomain.trim())
+      .eq('product_handle', '')
       .in('collection_handle', ordered);
 
     if (error) {
@@ -101,6 +103,7 @@ export async function resolveCollectionHandleWithSavedSizeChart(
       .from('size_charts')
       .select('collection_handle')
       .eq('shop_domain', shopDomain.trim())
+      .eq('product_handle', '')
       .in('collection_handle', ordered)
       .eq('gender', g);
 
