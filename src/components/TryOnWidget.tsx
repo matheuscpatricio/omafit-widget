@@ -15,10 +15,12 @@ import {
 } from '../utils/resolveSizeChart';
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
+import { useShopperProfileController } from '../hooks/useShopperProfileController';
 import { resolveShopifyProductIdFromPage } from '../utils/shopifyProductId';
 import { parseTryonLayoutFromLocation, type TryonLayoutMode } from '../utils/parseTryonLayoutFromUrl';
 import { isTryonWidgetEmbedded } from '../utils/isTryonWidgetEmbedded';
 import { TryonLayoutPendingSplash } from './tryon/TryonLayoutPendingSplash';
+import { TryOnInfoStartActions } from './tryon/TryOnInfoStartActions';
 import { TryOnLayoutShellSidebar } from './tryon/TryOnLayoutShellSidebar';
 import { TryOnLayoutShellHero } from './tryon/TryOnLayoutShellHero';
 import { TRYON_CLOTHING_SIDEBAR_STEPS } from './tryon/tryonSidebarStepMeta';
@@ -66,24 +68,7 @@ import {
   getSupabaseFunctionUrl,
   getSupabaseProjectUrl,
 } from '../utils/supabaseFunctions';
-import {
-  appendTryonHistory,
-  applyForcedGenderToMeasurements,
-  deleteShopperProfile,
-  fetchShopperProfile,
-  hasActiveShopperConsent,
-  isValidShopperMeasurements,
-  normalizeShopDomain,
-  recordShopperProfileEvent,
-  saveShopperProfile,
-  saveShopperMarketingWhatsapp,
-  revokeShopperMarketingWhatsapp,
-  hasActiveMarketingWhatsappConsent,
-  setShopperDeviceIdFromParent,
-  getShopperDeviceId,
-  shopperMeasurementsEqual,
-  type ShopperProfile,
-} from '../utils/shopperProfile';
+import { setShopperDeviceIdFromParent } from '../utils/shopperProfile';
 import { ShopperProfilePrompt } from './ShopperProfilePrompt';
 import { ShopperWhatsAppOptInPrompt } from './ShopperWhatsAppOptInPrompt';
 import {
@@ -96,599 +81,48 @@ import {
 import { hasGrowthPlusPlan } from '../utils/shopifyPlanAccess';
 import { isWhatsappMarketingEnabledForShop } from '../utils/whatsappPilotAccess';
 
-/** Até o primeiro fetch ao Supabase (ou cache), não renderizar layout default/sidebar para evitar flash. */
-type TryonLayoutState = TryonLayoutMode | 'pending';
 
-const TRYON_LAYOUT_SESSION_PREFIX = 'omafit_tryon_layout:';
-const SHOPPER_RESTORE_DISMISS_PREFIX = 'omafit_shopper_restore_dismissed_v2:';
-const SHOPPER_SAVE_DISMISS_PREFIX = 'omafit_shopper_save_dismissed_v1:';
-
-function readTryonLayoutFromSession(shopDomain: string): TryonLayoutMode | null {
-  if (typeof window === 'undefined' || !shopDomain) return null;
-  try {
-    const raw = window.sessionStorage.getItem(`${TRYON_LAYOUT_SESSION_PREFIX}${shopDomain}`);
-    if (raw === 'hero' || raw === 'sidebar' || raw === 'default') return raw;
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-function writeTryonLayoutToSession(shopDomain: string, layout: TryonLayoutMode) {
-  if (!shopDomain) return;
-  try {
-    window.sessionStorage.setItem(`${TRYON_LAYOUT_SESSION_PREFIX}${shopDomain}`, layout);
-  } catch {
-    /* ignore */
-  }
-}
-
-interface TryOnWidgetProps {
-  garmentImage: string;
-  productId?: string;
-  productHandle?: string;
-  productName?: string;
-  storeName?: string;
-  storeLogo?: string;
-  primaryColor?: string;
-  fontFamily?: string;
-  publicId?: string;
-  productImages?: string[];
-  shopDomain?: string;
-  collectionId?: string;
-  collectionHandle?: string;
-  /** Handles de todas as coleções do produto (Shopify); usado para escolher o mais específico que tenha size chart no Supabase */
-  collectionHandles?: string[];
-  gender?: string;
-  defaultGender?: string;
-  collectionType?: 'upper' | 'lower' | 'full';
-  collectionElasticity?: 'structured' | 'light_flex' | 'flexible' | 'high_elasticity';
-  recommendedProductName?: string;
-  recommendedProductUrl?: string;
-  language?: 'pt' | 'es' | 'en';
-  productCatalog?: ProductCatalog;
-  selectedVariantId?: string;
-  selectedVariantOptions?: Record<string, string>;
-  /**
-   * Se definido (ex.: query `tryonEnabled=false` no iframe), aplica logo — não depende só do fetch ao Supabase.
-   * Evita corrida em que o utilizador submete antes de `widget_configurations.tryon_enabled` chegar.
-   */
-  tryonEnabled?: boolean;
-  /** Força layout do iframe (ex. query na WidgetPage); se omitido, usa Supabase `tryon_layout`. */
-  tryonLayoutOverride?: TryonLayoutMode;
-  tryonLayoutBackgroundImage?: string;
-  /** Notifica a página (ex. WidgetPage) quando o layout efetivo muda — útil para full-bleed no iframe. */
-  onTryonLayoutChange?: (layout: TryonLayoutMode) => void;
-  /** Consultor stylist (chat pós provador, sugestões, catalog-search): plano Growth ou superior. */
-  stylistModeEnabled?: boolean;
-  /** Device ID persistido no domínio da loja (Shopify) — evita perda no iframe. */
-  shopperDeviceId?: string;
-}
-
-interface ProductCatalog {
-  sizes: string[];
-  colors: string[];
-  variants: any[];
-}
-
-interface SizeChartEntry {
-  size: string;
-  peito?: string;
-  chest?: string;
-  cintura?: string;
-  waist?: string;
-  quadril?: string;
-  hip?: string;
-  comprimento?: string;
-  length?: string;
-}
-
-interface OptimizedModelImage {
-  sourceId: string;
-  blob: Blob;
-  previewUrl: string;
-  width: number;
-  height: number;
-}
-
-interface PreparedPoseAnalysis {
-  sourceId: string;
-  detectedLandmarks: Array<{ x: number; y: number; z: number; visibility?: number }> | null;
-  detectedMeasurements: any | null;
-  validationMessage: string | null;
-}
-
-const GPT_INTERACTION_LIMIT = 8;
-const TRYON_IMAGE_MAX_DIMENSION = 1024;
-const TRYON_IMAGE_QUALITY = 0.76;
-const TRYON_REMOTE_IMAGE_MAX_DIMENSION = 1024;
-const TRYON_REMOTE_IMAGE_QUALITY = 75;
-const TRYON_MAX_POLL_MS = 300000;
-
-/** Entrada de textos (Framer Motion) — variantes estáveis fora do componente. */
-const tryonTextStaggerParent = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.07, delayChildren: 0.05 },
-  },
-} as const;
-
-const tryonTextStaggerChild = {
-  hidden: { opacity: 0, y: 12 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.38, ease: [0.22, 1, 0.36, 1] as const },
-  },
-} as const;
-
-const tryonFadeUp = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
-} as const;
-
-function inferCollectionTypeFromProductType(productType: string): 'upper' | 'lower' | 'full' {
-  const p = String(productType || '').toLowerCase();
-  if (
-    /pant|jeans?|trouser|short|bermuda|saia|skirt|legging|calç|calca|bottom|bikini|swim/.test(p)
-  ) {
-    return 'lower';
-  }
-  if (/dress|vestido|macac|jumpsuit|mono|full|body|enterizo|overall/.test(p)) {
-    return 'full';
-  }
-  return 'upper';
-}
-
-/** Product type Shopify pode vir vazio/genérico — usar também título e handle (ex.: slug calça-jeans). */
-function inferCollectionTypeFromOmafitProduct(product: {
-  product_type?: string;
-  title?: string;
-  handle?: string;
-}): 'upper' | 'lower' | 'full' {
-  const blob = [product.product_type, product.title, product.handle].filter(Boolean).join(' ');
-  return inferCollectionTypeFromProductType(blob);
-}
-
-function safeDecodeUriComponent(url: string): string {
-  try {
-    return decodeURIComponent(url);
-  } catch {
-    return url;
-  }
-}
-
-const loadImageElement = (src: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-
-const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> =>
-  new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error('Falha ao converter canvas para blob'));
-      }
-    }, type, quality);
-  });
-
-const applyMaxWidthSearchParam = (url: URL, width: number) => {
-  const existingWidth = Number(url.searchParams.get('width') || '0');
-  if (!existingWidth || existingWidth > width) {
-    url.searchParams.set('width', String(width));
-  }
-};
-
-const getOptimizedRemoteTryOnImageUrl = (rawUrl: string): string => {
-  if (!rawUrl || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
-    return rawUrl;
-  }
-
-  try {
-    const parsedUrl = new URL(rawUrl);
-    const supabasePublicMarker = '/storage/v1/object/public/';
-
-    if (parsedUrl.pathname.includes(supabasePublicMarker)) {
-      const publicPath = parsedUrl.pathname.split(supabasePublicMarker)[1];
-      if (publicPath) {
-        const optimizedUrl = new URL(`/storage/v1/render/image/public/${publicPath}`, parsedUrl.origin);
-        optimizedUrl.searchParams.set('width', String(TRYON_REMOTE_IMAGE_MAX_DIMENSION));
-        optimizedUrl.searchParams.set('quality', String(TRYON_REMOTE_IMAGE_QUALITY));
-        return optimizedUrl.toString();
-      }
-    }
-
-    if (parsedUrl.hostname.includes('shopify.com')) {
-      applyMaxWidthSearchParam(parsedUrl, TRYON_REMOTE_IMAGE_MAX_DIMENSION);
-      return parsedUrl.toString();
-    }
-
-    return rawUrl;
-  } catch {
-    return rawUrl;
-  }
-};
-
-async function uploadTryOnModelImage(
-  blob: Blob,
-  options: { fileName?: string; publicId: string; shopDomain: string },
-): Promise<string> {
-  const metadataResponse = await fetch(getSupabaseFunctionUrl('tryon-upload-url'), {
-    method: 'POST',
-    headers: getSupabaseFunctionHeaders({
-      'Content-Type': 'application/json',
-    }),
-    body: JSON.stringify({
-      mimeType: blob.type || 'image/jpeg',
-      folder: 'tryon-models',
-      fileName: options.fileName || 'tryon-model.jpg',
-      public_id: options.publicId.trim(),
-      shop_domain: options.shopDomain.trim(),
-    }),
-  });
-
-  const uploadParsed = await readHttpJsonResponse<{
-    token?: string;
-    path?: string;
-    bucket?: string;
-    error?: string;
-  }>(metadataResponse);
-  if (!uploadParsed.ok || !uploadParsed.data?.token) {
-    throw new Error(uploadParsed.error || uploadParsed.data?.error || 'Failed to prepare direct upload');
-  }
-  const uploadMetadata = uploadParsed.data;
-  const { error } = await supabase.storage
-    .from(uploadMetadata.bucket || 'tryon-images')
-    .uploadToSignedUrl(uploadMetadata.path, uploadMetadata.token, blob, {
-      contentType: blob.type || 'image/jpeg',
-      cacheControl: '3600',
-    });
-
-  if (error) {
-    throw new Error(`Failed to upload model image: ${error.message}`);
-  }
-
-  const bucket = uploadMetadata.bucket || 'tryon-images';
-  const { data: signedRead, error: signError } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(uploadMetadata.path, 7200);
-
-  if (signError || !signedRead?.signedUrl) {
-    throw new Error(
-      signError?.message || 'Failed to create signed read URL for model image',
-    );
-  }
-
-  return signedRead.signedUrl;
-}
-
-async function optimizeTryOnImage(file: File): Promise<{ blob: Blob; previewUrl: string; width: number; height: number }> {
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
-    const image = await loadImageElement(objectUrl);
-    const longestSide = Math.max(image.width, image.height);
-    const scale = longestSide > TRYON_IMAGE_MAX_DIMENSION
-      ? TRYON_IMAGE_MAX_DIMENSION / longestSide
-      : 1;
-
-    const targetWidth = Math.max(1, Math.round(image.width * scale));
-    const targetHeight = Math.max(1, Math.round(image.height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('Falha ao obter contexto do canvas');
-    }
-
-    context.drawImage(image, 0, 0, targetWidth, targetHeight);
-
-    const compressedBlob = await canvasToBlob(canvas, 'image/jpeg', TRYON_IMAGE_QUALITY);
-    const shouldUseOriginal =
-      scale === 1 &&
-      file.type === 'image/jpeg' &&
-      compressedBlob.size >= file.size * 0.95;
-
-    const blob = shouldUseOriginal ? file : compressedBlob;
-    const previewUrl = URL.createObjectURL(blob);
-
-    return {
-      blob,
-      previewUrl,
-      width: targetWidth,
-      height: targetHeight,
-    };
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-const logTryOnTimings = (label: string, timings?: Record<string, unknown> | null) => {
-  if (!timings || typeof timings !== 'object') {
-    console.log(`⏱️ ${label}: timings não disponíveis`);
-    return;
-  }
-
-  console.log(`⏱️ ${label}:`);
-  Object.entries(timings).forEach(([key, value]) => {
-    console.log(`   • ${key}:`, value);
-  });
-};
-
-const normalizeWidgetLanguage = (value: unknown): 'pt' | 'es' | 'en' | null => {
-  const raw = String(value || '').trim().toLowerCase().replace('_', '-');
-  if (!raw) return null;
-  const base = raw.split('-')[0];
-  if (base === 'pt' || base === 'es' || base === 'en') return base;
-  if (raw === 'portuguese' || raw === 'portugues') return 'pt';
-  if (raw === 'spanish' || raw === 'espanol' || raw === 'español') return 'es';
-  if (raw === 'english' || raw === 'ingles' || raw === 'inglês') return 'en';
-  return null;
-};
-
-const normalizeOptionList = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  const unique = new Set<string>();
-  for (const item of value) {
-    const normalized = String(item || '').trim();
-    if (normalized) unique.add(normalized);
-  }
-  return Array.from(unique);
-};
-
-const verboseTryOnDebug = import.meta.env.DEV;
-
-const logVerboseTryOn = (...args: unknown[]) => {
-  if (verboseTryOnDebug) {
-    console.log(...args);
-  }
-};
-
-const normalizeOptionValue = (value: unknown): string => String(value || '').trim();
-const normalizeSizeToken = (value: unknown): string =>
-  String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
-
-function escapeRegexSegmentAssistant(sizeLabel: string): string {
-  return String(sizeLabel || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Detecta se o texto já menciona explicitamente o tamanho do algoritmo (espelha a heurística do validate-size). */
-function assistantReplyMissingExplicitSize(text: string, sizeLabel: string): boolean {
-  const s = String(sizeLabel || '').trim();
-  if (!s) return false;
-  const body = String(text || '');
-  if (
-    /\b(tamanho|talla|size)\s*ideal\b/i.test(body) &&
-    new RegExp(`\\b${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)
-  ) {
-    return false;
-  }
-  if (
-    new RegExp(`\\b(tamanho|talla|size)\\s*[:,\\-]?\\s*${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)
-  ) {
-    return false;
-  }
-  if (s.length >= 2 || /^\d{2,3}$/.test(s)) {
-    if (new RegExp(`\\b${escapeRegexSegmentAssistant(s)}\\b`, 'i').test(body)) return false;
-  }
-  return true;
-}
-
-function prependIdealSizeLeadIfMissing(
-  explicacao: string,
-  sizeLabel: string,
-  productName: string,
-  lang: 'pt' | 'es' | 'en'
-): string {
-  const sz = String(sizeLabel || '').trim();
-  const body = String(explicacao || '').trim();
-  if (!sz || !assistantReplyMissingExplicitSize(body, sz)) return body;
-  const pn = resolveDisplayProductName(productName);
-  let lead = '';
-  if (lang === 'es') {
-    lead = pn
-      ? `Tu talla ideal para ${pn} es ${sz}. `
-      : `Tu talla ideal para esta prenda es ${sz}. `;
-  } else if (lang === 'en') {
-    lead = pn
-      ? `Your ideal size for ${pn} is ${sz}. `
-      : `Your ideal size for this garment is ${sz}. `;
-  } else {
-    lead = pn
-      ? `Seu tamanho ideal para ${pn} é ${sz}. `
-      : `Seu tamanho ideal para esta peça é ${sz}. `;
-  }
-  return `${lead}${body}`.trim();
-}
-
-const normalizeSelectedVariantOptions = (value: unknown): Record<string, string> => {
-  if (!value || typeof value !== 'object') return {};
-
-  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, optionValue]) => {
-    const normalizedKey = normalizeOptionValue(key);
-    const normalizedValue = normalizeOptionValue(optionValue);
-    if (!normalizedKey || !normalizedValue) return acc;
-    acc[normalizedKey] = normalizedValue;
-    return acc;
-  }, {});
-};
-
-const normalizeProductCatalog = (catalog?: Partial<ProductCatalog> | null): ProductCatalog => ({
-  sizes: normalizeOptionList(catalog?.sizes),
-  colors: normalizeOptionList(catalog?.colors),
-  variants: Array.isArray(catalog?.variants) ? catalog.variants : [],
-});
-
-const detectOptionKind = (name: string): 'size' | 'color' | 'other' => {
-  const normalized = normalizeOptionValue(name).toLowerCase();
-  if (/size|tamanho|talla|taille|größe|grosse/.test(normalized)) return 'size';
-  if (/color|cor|colour|couleur|farbe/.test(normalized)) return 'color';
-  return 'other';
-};
-
-/** Linha de carrinho derivada de um try-on concluído (variante ≈ tamanho algorítmico na altura do resultado). */
-type TryOnCartLineSnapshot = {
-  productId: string;
-  productName: string;
-  variantId: string;
-};
-
-function cloneProductCatalogSnapshot(catalog: ProductCatalog): ProductCatalog {
-  try {
-    return JSON.parse(JSON.stringify(catalog)) as ProductCatalog;
-  } catch {
-    return {
-      sizes: [...(catalog.sizes || [])],
-      colors: [...(catalog.colors || [])],
-      variants: Array.isArray(catalog.variants) ? [...catalog.variants] : [],
-    };
-  }
-}
-
-/** Resolve variant Shopify a partir do catálogo local do widget + opções + tamanho do algoritmo (espelha o raciocínio do add-to-cart no tema). */
-function resolveWidgetCartVariantId(params: {
-  catalog: ProductCatalog;
-  selectedVariantOptions: Record<string, string>;
-  selectedVariantId: string;
-  selectedProductImage: string;
-  selectedColorHex: string;
-  algorithmSize: string;
-}): string | null {
-  const variants = params.catalog?.variants || [];
-  if (!variants.length) return null;
-
-  const sizeOptionName =
-    Object.keys(params.selectedVariantOptions || {}).find((optionName) => detectOptionKind(optionName) === 'size') ||
-    'Tamanho';
-
-  const baseRecommendedSize = normalizeOptionValue(params.algorithmSize);
-  const recommendedToken = normalizeSizeToken(baseRecommendedSize);
-  const catalogSizes = params.catalog.sizes || [];
-  const matchedCatalogSize =
-    catalogSizes.find((sizeLabel) => normalizeSizeToken(sizeLabel) === recommendedToken) ||
-    catalogSizes.find(
-      (sizeLabel) =>
-        normalizeSizeToken(sizeLabel).includes(recommendedToken) ||
-        recommendedToken.includes(normalizeSizeToken(sizeLabel)),
-    ) ||
-    '';
-  const recommendedCartSize = normalizeOptionValue(matchedCatalogSize || baseRecommendedSize);
-
-  const mergedOptions: Record<string, string> = { ...params.selectedVariantOptions };
-  if (recommendedCartSize) {
-    mergedOptions[sizeOptionName] = recommendedCartSize;
-  }
-
-  const getVo = (v: any, key: string): string => {
-    const vo = (v?.selectedOptions || {}) as Record<string, unknown>;
-    const nk = normalizeOptionValue(key);
-    if (vo[key] != null) return normalizeOptionValue(vo[key]);
-    const hit = Object.keys(vo).find((k) => normalizeOptionValue(k).toLowerCase() === nk.toLowerCase());
-    return hit ? normalizeOptionValue(vo[hit]) : '';
-  };
-
-  const variantMatches = (v: any): boolean => {
-    for (const [key, wantRaw] of Object.entries(mergedOptions)) {
-      const want = normalizeOptionValue(wantRaw);
-      if (!want) continue;
-      let vk = getVo(v, key);
-      if (!vk && typeof v === 'object') {
-        for (let i = 1; i <= 3; i++) {
-          const oi = v[`option${i}`];
-          if (oi != null && normalizeOptionValue(oi)) {
-            vk = normalizeOptionValue(oi);
-            break;
-          }
-        }
-      }
-      if (!vk) return false;
-      if (detectOptionKind(key) === 'size') {
-        if (normalizeSizeToken(vk) !== normalizeSizeToken(want)) return false;
-      } else if (normalizeOptionValue(vk).toLowerCase() !== want.toLowerCase()) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const pool = variants.filter((v: any) => v.available !== false);
-  const chosen =
-    pool.find((v: any) => variantMatches(v)) || variants.find((v: any) => variantMatches(v)) || null;
-
-  if (chosen?.id != null) {
-    return String(chosen.id);
-  }
-
-  const hintId = normalizeOptionValue(params.selectedVariantId);
-  if (hintId && variants.some((v: any) => String(v.id) === hintId)) {
-    return hintId;
-  }
-
-  return null;
-}
-
-async function fetchUrlAsTryOnModelFile(url: string): Promise<File> {
-  const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`Falha ao obter imagem do try-on anterior (HTTP ${res.status})`);
-  }
-  const blob = await res.blob();
-  const type = blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg';
-  return new File([blob], `tryon-chain-person.${type.includes('png') ? 'png' : 'jpg'}`, { type });
-}
-
-const logProductCatalogDebug = (
-  source: string,
-  catalog: { sizes: string[]; colors: string[]; variants: any[] }
-) => {
-  console.log(`📦 [CATALOG:${source}] Resumo recebido no widget:`);
-  console.log('   • sizes:', catalog.sizes.length, catalog.sizes);
-  console.log('   • colors:', catalog.colors.length, catalog.colors);
-  console.log('   • variants:', catalog.variants.length);
-  if (catalog.variants.length > 0) {
-    console.log('   • sample variants:', catalog.variants.slice(0, 5));
-  }
-};
-
-/** Medidas torácicas enviadas ao validate-size (MediaPipe ou estimativa). */
-function computeTorsoCmForValidate(
-  sizeData: { gender?: string; weight: number; bodyTypeIndex?: number },
-  finalBodyMeasurements: { chest: number; waist: number; hip: number } | null | undefined
-): { peito_cm: number; cintura_cm: number; quadril_cm: number } {
-  if (finalBodyMeasurements) {
-    return {
-      peito_cm: Math.round(finalBodyMeasurements.chest),
-      cintura_cm: Math.round(finalBodyMeasurements.waist),
-      quadril_cm: Math.round(finalBodyMeasurements.hip),
-    };
-  }
-  const female = sizeData.gender === 'female';
-  return {
-    peito_cm: female
-      ? Math.round(80 + (sizeData.weight - 50) * 0.5 + (sizeData.bodyTypeIndex || 0) * 5)
-      : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 6),
-    cintura_cm: female
-      ? Math.round(60 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 4)
-      : Math.round(75 + (sizeData.weight - 60) * 0.7 + (sizeData.bodyTypeIndex || 0) * 5),
-    quadril_cm: female
-      ? Math.round(85 + (sizeData.weight - 50) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5)
-      : Math.round(90 + (sizeData.weight - 60) * 0.6 + (sizeData.bodyTypeIndex || 0) * 5),
-  };
-}
-
+import {
+  GPT_INTERACTION_LIMIT,
+  TRYON_MAX_POLL_MS,
+  tryonFadeUp,
+  tryonTextStaggerChild,
+  tryonTextStaggerParent,
+} from './tryon/tryonWidgetConstants';
+import { logVerboseTryOn } from './tryon/tryonWidgetDebug';
+import { readTryonLayoutFromSession, writeTryonLayoutToSession } from './tryon/tryonLayoutSession';
+import type {
+  OptimizedModelImage,
+  PreparedPoseAnalysis,
+  ProductCatalog,
+  SizeChartEntry,
+  TryOnCartLineSnapshot,
+  TryOnWidgetProps,
+  TryonLayoutState,
+} from './tryon/tryonWidgetTypes';
+import { prependIdealSizeLeadIfMissing } from '../services/tryonAssistantCopy';
+import {
+  fetchUrlAsTryOnModelFile,
+  getOptimizedRemoteTryOnImageUrl,
+  loadImageElement,
+  logTryOnTimings,
+  optimizeTryOnImage,
+  uploadTryOnModelImage,
+} from '../services/tryonImagePrep';
+import {
+  cloneProductCatalogSnapshot,
+  computeTorsoCmForValidate,
+  inferCollectionTypeFromOmafitProduct,
+  detectOptionKind,
+  logProductCatalogDebug,
+  normalizeOptionValue,
+  normalizeProductCatalog,
+  normalizeSelectedVariantOptions,
+  normalizeSizeToken,
+  normalizeWidgetLanguage,
+  resolveWidgetCartVariantId,
+  safeDecodeUriComponent,
+} from '../services/tryonProductContext';
 export function TryOnWidget({
   garmentImage,
   productId = 'unknown',
@@ -911,26 +345,6 @@ export function TryOnWidget({
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
   /** UUID em tryon_sessions (via track-footwear-tryon), alinhado ao fluxo do ShoeARWidget */
   const [analyticsSessionId, setAnalyticsSessionId] = useState<string | null>(null);
-  const [shopperProfile, setShopperProfile] = useState<ShopperProfile | null>(null);
-  const [shopperProfileLoading, setShopperProfileLoading] = useState(false);
-  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
-  const [restoreOfferLogged, setRestoreOfferLogged] = useState(false);
-  const [shopperSaveConsent, setShopperSaveConsent] = useState(false);
-  const [shopperSaveEmail, setShopperSaveEmail] = useState('');
-  const [shopperProfileSaving, setShopperProfileSaving] = useState(false);
-  const [shopperProfileSaved, setShopperProfileSaved] = useState(false);
-  const [shopperSaveError, setShopperSaveError] = useState<string | null>(null);
-  const [shopperSaveDismissed, setShopperSaveDismissed] = useState(false);
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [whatsappConsent, setWhatsappConsent] = useState(false);
-  const [whatsappPhotoConsent, setWhatsappPhotoConsent] = useState(false);
-  const [whatsappSaving, setWhatsappSaving] = useState(false);
-  const [whatsappSaved, setWhatsappSaved] = useState(false);
-  const [whatsappRevoked, setWhatsappRevoked] = useState(false);
-  const [whatsappRevoking, setWhatsappRevoking] = useState(false);
-  const [whatsappError, setWhatsappError] = useState<string | null>(null);
-  const [whatsappDismissed, setWhatsappDismissed] = useState(false);
-  const [shopperForgetting, setShopperForgetting] = useState(false);
   const tryonHistoryRecordedRef = useRef<string | null>(null);
   const loadShopperProfileRef = useRef<(() => void) | null>(null);
   const [interactionCount, setInteractionCount] = useState(0);
@@ -3182,369 +2596,62 @@ export function TryOnWidget({
     setSizeData(cleanData);
   };
 
-  const getShopperProfileFetchConfig = () => {
-    const shopDomain = normalizeShopDomain(effectiveShopDomain);
-    if (!shopDomain) return null;
-    return {
-      shopDomain,
-      publicId: (publicIdRef.current || publicId || '').trim(),
-    };
-  };
-
-  const getShopperProfileWriteConfig = () => {
-    const config = getShopperProfileFetchConfig();
-    if (!config?.publicId) return null;
-    return config;
-  };
-
-  const isRestoreDismissedThisSession = (shopDomain: string) => {
-    const normalized = normalizeShopDomain(shopDomain);
-    if (!normalized || typeof window === 'undefined') return false;
-    try {
-      return Boolean(window.sessionStorage.getItem(`${SHOPPER_RESTORE_DISMISS_PREFIX}${normalized}`));
-    } catch {
-      return false;
-    }
-  };
-
-  const dismissRestorePromptForSession = (shopDomain: string) => {
-    const normalized = normalizeShopDomain(shopDomain);
-    if (!normalized || typeof window === 'undefined') return;
-    try {
-      window.sessionStorage.setItem(`${SHOPPER_RESTORE_DISMISS_PREFIX}${normalized}`, '1');
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const dismissSavePromptForSession = (shopDomain: string) => {
-    const normalized = normalizeShopDomain(shopDomain);
-    if (!normalized || typeof window === 'undefined') return;
-    try {
-      window.sessionStorage.setItem(`${SHOPPER_SAVE_DISMISS_PREFIX}${normalized}`, '1');
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const shouldOfferShopperRestore = (profile: ShopperProfile | null) => {
-    if (!profile || !hasActiveShopperConsent(profile)) return false;
-    if (!isValidShopperMeasurements(profile.measurements)) return false;
-    if (isRestoreDismissedThisSession(effectiveShopDomain)) return false;
-    return true;
-  };
-
-  const handleAcceptShopperRestore = () => {
-    if (!shopperProfile || !isValidShopperMeasurements(shopperProfile.measurements)) return;
-    const forcedGender = resolveForcedCalculatorGender(chartGenderScope, defaultGender);
-    const measurements = applyForcedGenderToMeasurements(shopperProfile.measurements, forcedGender);
-    setShowRestorePrompt(false);
-    setSizeData(measurements);
-    const config = getShopperProfileWriteConfig();
-    if (config) {
-      void recordShopperProfileEvent(config, 'profile_accepted');
-      void recordShopperProfileEvent(config, 'profile_skipped_calculator');
-    }
-    if (tryOnEnabled === false) {
-      handleCalculatorContinueWithoutPhoto(measurements);
-      return;
-    }
-    setStep('photo');
-  };
-
-  const handleDeclineShopperRestore = () => {
-    setShowRestorePrompt(false);
-    dismissRestorePromptForSession(effectiveShopDomain);
-  };
-
-  const handleUpdateShopperMeasurements = () => {
-    setShowRestorePrompt(false);
-    setStep('calculator');
-  };
-
-  const handleForgetShopperProfile = async () => {
-    const config = getShopperProfileWriteConfig();
-    if (!config) return;
-    setShopperForgetting(true);
-    try {
-      await deleteShopperProfile(config);
-      setShopperProfile(null);
-      setShowRestorePrompt(false);
-      setShopperProfileSaved(false);
-      setShopperSaveConsent(false);
-      setShopperSaveEmail('');
-      dismissRestorePromptForSession(effectiveShopDomain);
-    } catch {
-      setError(t('shopperProfileDeleteError'));
-    } finally {
-      setShopperForgetting(false);
-    }
-  };
-
-  const handleSaveShopperProfile = async (consentOverride?: boolean) => {
-    const hasConsent = consentOverride ?? shopperSaveConsent;
-    if (!sizeData || !hasConsent) return;
-    const config = getShopperProfileWriteConfig();
-    if (!config) return;
-    setShopperProfileSaving(true);
-    setShopperSaveError(null);
-    try {
-      const saved = await saveShopperProfile(config, sizeData, {
-        email: shopperSaveEmail,
-        event: 'profile_saved',
-      });
-      setShopperProfile(saved);
-      setShopperProfileSaved(true);
-    } catch {
-      setShopperSaveError(t('shopperProfileSaveError'));
-    } finally {
-      setShopperProfileSaving(false);
-    }
-  };
-
-  const handleShopperSaveConsentChange = (checked: boolean) => {
-    setShopperSaveConsent(checked);
-    if (checked) {
-      void handleSaveShopperProfile(true);
-    }
-  };
-
-  const handleDismissShopperSave = () => {
-    setShopperSaveDismissed(true);
-    dismissSavePromptForSession(effectiveShopDomain);
-  };
-
-  const shopperProfileStoredInDb =
-    Boolean(shopperProfile) &&
-    hasActiveShopperConsent(shopperProfile) &&
-    isValidShopperMeasurements(shopperProfile?.measurements);
-
-  const shopperMeasurementsMatchStoredProfile =
-    shopperProfileStoredInDb &&
-    Boolean(sizeData) &&
-    isValidShopperMeasurements(sizeData) &&
-    shopperMeasurementsEqual(sizeData, shopperProfile!.measurements);
-
-  const shouldShowShopperSavePrompt =
-    step === 'processing' &&
-    tryOnEnabled !== false &&
-    Boolean(sizeData) &&
-    isValidShopperMeasurements(sizeData) &&
-    !shopperSaveDismissed &&
-    !shopperProfileLoading &&
-    (
-      shopperProfileSaved ||
-      shopperMeasurementsMatchStoredProfile ||
-      !shopperProfileStoredInDb
-    );
-
-  const shopperSavePromptShowsSaved =
-    shopperProfileSaved || shopperMeasurementsMatchStoredProfile;
-
-  const shouldShowWhatsappOptIn =
-    step === 'result' &&
-    whatsappMarketingEnabled &&
-    tryOnEnabled !== false &&
-    !whatsappDismissed &&
-    !hasActiveMarketingWhatsappConsent(shopperProfile) &&
-    !whatsappRevoked &&
-    Boolean(getShopperProfileWriteConfig());
-
-  const shouldShowWhatsappManage =
-    step === 'result' &&
-    whatsappMarketingEnabled &&
-    tryOnEnabled !== false &&
-    hasActiveMarketingWhatsappConsent(shopperProfile) &&
-    !whatsappRevoked &&
-    Boolean(getShopperProfileWriteConfig());
-
-  const handleSaveWhatsappOptIn = async () => {
-    const config = getShopperProfileWriteConfig();
-    if (!config || !whatsappConsent || !whatsappPhone.trim()) return;
-    const modelImageUrl = sessionModelImageUrlRef.current?.trim() || null;
-    setWhatsappSaving(true);
-    setWhatsappError(null);
-    try {
-      if (sizeData && !hasActiveShopperConsent(shopperProfile)) {
-        const profile = await saveShopperProfile(config, sizeData, { event: 'profile_saved' });
-        if (profile) setShopperProfile(profile);
-      }
-      const saved = await saveShopperMarketingWhatsapp(config, whatsappPhone, {
-        modelImageUrl,
-        marketingPhotoConsent: whatsappPhotoConsent,
-      });
-      if (saved) setShopperProfile(saved);
-      setWhatsappSaved(true);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('OMAFIT_PII_ENCRYPTION_KEY') || msg.includes('503')) {
-        setWhatsappError(t('shopperWhatsAppEncryptionError'));
-      } else {
-        setWhatsappError(t('shopperWhatsAppError'));
-      }
-    } finally {
-      setWhatsappSaving(false);
-    }
-  };
-
-  const handleRevokeWhatsappOptIn = async () => {
-    const config = getShopperProfileWriteConfig();
-    if (!config) return;
-    setWhatsappRevoking(true);
-    setWhatsappError(null);
-    try {
-      const updated = await revokeShopperMarketingWhatsapp(config);
-      if (updated) setShopperProfile(updated);
-      setWhatsappRevoked(true);
-    } catch {
-      setWhatsappError(t('shopperWhatsAppError'));
-    } finally {
-      setWhatsappRevoking(false);
-    }
-  };
-
-  const shopperProfileFetchSeqRef = useRef(0);
-
-  const loadShopperProfile = React.useCallback(() => {
-    const config = getShopperProfileFetchConfig();
-    if (!config) return;
-
-    const seq = ++shopperProfileFetchSeqRef.current;
-    setShopperProfileLoading(true);
-
-    void fetchShopperProfile(config)
-      .then((profile) => {
-        if (shopperProfileFetchSeqRef.current !== seq) return;
-        setShopperProfile(profile);
-        if (profile?.email) {
-          setShopperSaveEmail(profile.email);
-        }
-      })
-      .catch((err) => {
-        if (shopperProfileFetchSeqRef.current === seq) {
-          console.warn('[shopperProfile] fetch error:', err);
-        }
-      })
-      .finally(() => {
-        if (shopperProfileFetchSeqRef.current === seq) {
-          setShopperProfileLoading(false);
-        }
-      });
-  }, [effectiveShopDomain, publicId]);
-
-  loadShopperProfileRef.current = loadShopperProfile;
-
-  useEffect(() => {
-    const incoming = String(shopperDeviceIdProp || '').trim();
-    if (!incoming) return;
-    if (setShopperDeviceIdFromParent(incoming)) {
-      loadShopperProfile();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopperDeviceIdProp]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.parent === window) return;
-    const deviceId = getShopperDeviceId();
-    if (!deviceId) return;
-    try {
-      window.parent.postMessage(
-        {
-          type: 'omafit-device-id-adopt',
-          deviceId,
-          shopDomain: normalizeShopDomain(effectiveShopDomain),
-        },
-        '*',
-      );
-    } catch {
-      /* ignore */
-    }
-  }, [effectiveShopDomain]);
-
-  const prevStepRef = useRef(step);
-
-  useEffect(() => {
-    loadShopperProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveShopDomain]);
-
-  useEffect(() => {
-    const enteredInfo = step === 'info' && prevStepRef.current !== 'info';
-    prevStepRef.current = step;
-    if (step === 'info') {
-      setRestoreOfferLogged(false);
-    }
-    if (enteredInfo) {
-      loadShopperProfile();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, effectiveShopDomain]);
-
-  useEffect(() => {
-    if (step !== 'info') {
-      setShowRestorePrompt(false);
-      return;
-    }
-    if (shopperProfileLoading) return;
-    setShowRestorePrompt(shouldOfferShopperRestore(shopperProfile));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, shopperProfile, shopperProfileLoading, effectiveShopDomain]);
-
-  useEffect(() => {
-    if (!showRestorePrompt || restoreOfferLogged) return;
-    const config = getShopperProfileWriteConfig();
-    if (!config) return;
-    setRestoreOfferLogged(true);
-    void recordShopperProfileEvent(config, 'profile_offered');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showRestorePrompt, restoreOfferLogged, publicId]);
-
-  useEffect(() => {
-    if (!shopperSaveConsent || shopperProfileSaved || shopperProfileSaving || !sizeData) return;
-    if (shopperMeasurementsMatchStoredProfile) return;
-    const config = getShopperProfileWriteConfig();
-    if (!config) return;
-    void handleSaveShopperProfile(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publicId, effectiveShopDomain, shopperSaveConsent, shopperProfileSaved, sizeData, shopperProfile?.updated_at]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !effectiveShopDomain) return;
-    const normalized = normalizeShopDomain(effectiveShopDomain);
-    try {
-      setShopperSaveDismissed(
-        Boolean(window.sessionStorage.getItem(`${SHOPPER_SAVE_DISMISS_PREFIX}${normalized}`)),
-      );
-    } catch {
-      setShopperSaveDismissed(false);
-    }
-  }, [effectiveShopDomain]);
-
-  useEffect(() => {
-    if (step !== 'result' || !sizeData) return;
-    const config = getShopperProfileWriteConfig();
-    if (!config || !shopperProfile || !hasActiveShopperConsent(shopperProfile)) return;
-
-    const historyKey = [
-      localProductHandle || productHandle || '',
-      recommendedSize || calculatedSize || '',
-      result || '',
-      analyticsSessionId || '',
-    ].join('|');
-    if (tryonHistoryRecordedRef.current === historyKey) return;
-    tryonHistoryRecordedRef.current = historyKey;
-
-    void appendTryonHistory(config, {
-      productHandle: localProductHandle || productHandle || null,
-      recommendedSize: recommendedSize || calculatedSize || null,
-      resultImageUrl: result || null,
-      tryonSessionId: analyticsSessionId,
-      modelImageUrl: sessionModelImageUrlRef.current,
-    }).then((updated) => {
-      if (updated) setShopperProfile(updated);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, result, recommendedSize, calculatedSize, analyticsSessionId, shopperProfile?.id]);
+  const {
+    shopperProfileLoading,
+    showRestorePrompt,
+    shopperSaveConsent,
+    shopperProfileSaving,
+    shopperSaveError,
+    shopperForgetting,
+    whatsappPhone,
+    setWhatsappPhone,
+    whatsappConsent,
+    setWhatsappConsent,
+    whatsappPhotoConsent,
+    setWhatsappPhotoConsent,
+    whatsappSaving,
+    whatsappSaved,
+    whatsappRevoking,
+    whatsappError,
+    setWhatsappDismissed,
+    handleAcceptShopperRestore,
+    handleUpdateShopperMeasurements,
+    handleForgetShopperProfile,
+    handleShopperSaveConsentChange,
+    handleDismissShopperSave,
+    shouldShowShopperSavePrompt,
+    shopperSavePromptShowsSaved,
+    shouldShowWhatsappOptIn,
+    shouldShowWhatsappManage,
+    handleSaveWhatsappOptIn,
+    handleRevokeWhatsappOptIn,
+    resetShopperUi,
+  } = useShopperProfileController({
+    t,
+    effectiveShopDomain,
+    publicId,
+    publicIdRef,
+    shopperDeviceId: shopperDeviceIdProp,
+    whatsappMarketingEnabled,
+    tryOnEnabled,
+    sizeData,
+    setSizeData,
+    setStep,
+    chartGenderScope,
+    defaultGender,
+    recommendedSize,
+    calculatedSize,
+    result,
+    analyticsSessionId,
+    localProductHandle,
+    productHandle,
+    sessionModelImageUrlRef,
+    setError,
+    step,
+    loadShopperProfileRef,
+    tryonHistoryRecordedRef,
+    onContinueWithoutPhoto: handleCalculatorContinueWithoutPhoto,
+  });
 
   useEffect(() => {
     const loadSizeChart = async () => {
@@ -4833,14 +3940,7 @@ const handleSubmit = async (
     embedTryOnInChatActiveRef.current = false;
     pendingEmbedTryOnChatCompletionRef.current = false;
     setTryOnLoadingInChat(false);
-    setShopperProfileSaved(false);
-    setShopperSaveError(null);
-    setShopperSaveConsent(false);
-    if (shouldOfferShopperRestore(shopperProfile)) {
-      setShowRestorePrompt(true);
-    } else {
-      setShowRestorePrompt(false);
-    }
+    resetShopperUi();
   };
 
   useEffect(() => {
@@ -6895,36 +5995,20 @@ const handleSubmit = async (
             </motion.div>
 
             <motion.div variants={tryonTextStaggerChild} className={isHeroLayout ? 'w-full max-w-sm' : ''}>
-              {shopperProfileLoading ? (
-                <div className="omafit-shopper-restore-loading flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  <span>{t('shopperProfileLoading')}</span>
-                </div>
-              ) : showRestorePrompt ? (
-                <ShopperProfilePrompt
-                  mode="restore"
-                  primaryColor={localPrimaryColor}
-                  contrastText={getContrastTextColor(localPrimaryColor)}
-                  t={t}
-                  onContinue={handleAcceptShopperRestore}
-                  onUpdateMeasurements={handleUpdateShopperMeasurements}
-                  onForget={handleForgetShopperProfile}
-                  forgetting={shopperForgetting}
-                />
-              ) : (
-              <button
-                type="button"
-                onClick={() => setStep('calculator')}
-                className={`flex w-full items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300 ${
-                  isHeroLayout
-                    ? 'omafit-hero-start-now py-3 text-base shadow-sm md:py-4 md:text-xl'
-                    : 'bg-primary py-3.5 text-lg text-white hover:bg-primary-dark md:py-4 md:text-xl'
-                }`}
-              >
-                {t('startNow')}
-                <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
-              </button>
-              )}
+              <TryOnInfoStartActions
+                variant="stacked"
+                isHeroLayout={isHeroLayout}
+                primaryColor={localPrimaryColor}
+                contrastText={getContrastTextColor(localPrimaryColor)}
+                t={t}
+                shopperProfileLoading={shopperProfileLoading}
+                showRestorePrompt={showRestorePrompt}
+                onContinueRestore={handleAcceptShopperRestore}
+                onUpdateMeasurements={handleUpdateShopperMeasurements}
+                onForgetProfile={handleForgetShopperProfile}
+                forgetting={shopperForgetting}
+                onStart={() => setStep('calculator')}
+              />
             </motion.div>
           </motion.div>
             </div>
@@ -6964,36 +6048,20 @@ const handleSubmit = async (
                     </h3>
                     <p className="text-sm text-gray-700 sm:text-base">{t('visualExperienceDesc')}</p>
                   </div>
-                  {shopperProfileLoading ? (
-                    <div className="omafit-shopper-restore-loading flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      <span>{t('shopperProfileLoading')}</span>
-                    </div>
-                  ) : showRestorePrompt ? (
-                    <ShopperProfilePrompt
-                      mode="restore"
-                      primaryColor={localPrimaryColor}
-                      contrastText={getContrastTextColor(localPrimaryColor)}
-                      t={t}
-                      onContinue={handleAcceptShopperRestore}
-                      onUpdateMeasurements={handleUpdateShopperMeasurements}
-                      onForget={handleForgetShopperProfile}
-                      forgetting={shopperForgetting}
-                    />
-                  ) : (
-                  <button
-                    type="button"
-                    onClick={() => setStep('calculator')}
-                    className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 text-base font-medium transition-all duration-300 sm:py-3.5 sm:text-lg ${
-                      isHeroLayout
-                        ? 'omafit-hero-start-now shadow-sm'
-                        : 'bg-primary text-white hover:bg-primary-dark'
-                    }`}
-                  >
-                    {t('startNow')}
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
-                  )}
+                  <TryOnInfoStartActions
+                    variant="embed"
+                    isHeroLayout={isHeroLayout}
+                    primaryColor={localPrimaryColor}
+                    contrastText={getContrastTextColor(localPrimaryColor)}
+                    t={t}
+                    shopperProfileLoading={shopperProfileLoading}
+                    showRestorePrompt={showRestorePrompt}
+                    onContinueRestore={handleAcceptShopperRestore}
+                    onUpdateMeasurements={handleUpdateShopperMeasurements}
+                    onForgetProfile={handleForgetShopperProfile}
+                    forgetting={shopperForgetting}
+                    onStart={() => setStep('calculator')}
+                  />
                 </motion.div>
               </motion.div>
             )}
@@ -7578,6 +6646,16 @@ const handleSubmit = async (
         onDismiss={() => setWhatsappDismissed(true)}
         saving={whatsappSaving}
         saved={whatsappSaved}
+        error={whatsappError}
+      />
+    ) : null}
+    {shouldShowWhatsappManage ? (
+      <ShopperWhatsAppOptInPrompt
+        mode="manage"
+        primaryColor={localPrimaryColor}
+        t={t}
+        onRevoke={() => void handleRevokeWhatsappOptIn()}
+        revoking={whatsappRevoking}
         error={whatsappError}
       />
     ) : null}
