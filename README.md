@@ -104,6 +104,8 @@ SPA (`.env.example`):
 
 `VITE_SITE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `FAL_KEY`, `INSTAGRAM_BUSINESS_ACCOUNT_ID`, `META_PAGE_ACCESS_TOKEN`, `META_GRAPH_API_VERSION`, `INSTAGRAM_PUBLISH_SECRET`, `VITE_OMAFIT_APP_URL`, `VITE_OMAFIT_WIDGET_HMAC_SECRET`, `VITE_WIDGET_CATALOG_HMAC_SECRET`
 
+`VITE_OMAFIT_WIDGET_HMAC_SECRET` e o alias `VITE_WIDGET_CATALOG_HMAC_SECRET` são lidos em `src/utils/omafitEnv.ts`. O Vite inclui no bundle do browser toda variável `VITE_*`. O widget calcula HMAC-SHA256 com esse valor e envia `signature` em `POST /api/widget/catalog-search`, `POST /api/widget/suggestion-events` e `GET /api/widget/product-by-handle` (`src/utils/omafitCatalogClient.ts`). A app `omafit` valida a assinatura com `WIDGET_CATALOG_HMAC_SECRET` ou `OMAFIT_WIDGET_HMAC_SECRET`. A chave está no JavaScript publicado. Quem lê o bundle consegue gerar uma assinatura que o backend aceita. Isso não é uma boundary de autenticação forte. Ver Known Technical Debt.
+
 Billing / Shopify (`.env.example.billing`):
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SHOPIFY_APP_URL`, `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `CRON_SECRET`, `SHOPIFY_WELCOME_EMAIL_SECRET`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNT_ID`, `ZOHO_FROM_ADDRESS`, `ZOHO_ACCOUNTS_URL`, `ZOHO_MAIL_API_URL`
@@ -160,7 +162,7 @@ Checagens de AR (não são o `npm test`): `npm run ar:ingest-validate`, `ar:qa-m
 | Try-on | não renderiza o widget | orquestra UI, upload, polling |
 | Sizing | pode guardar tabela / config | calcula no cliente (`sizeCalculation.ts`) e conversa com `validate-size` |
 
-O HMAC de busca de catálogo (`VITE_OMAFIT_WIDGET_HMAC_SECRET`) é o mesmo segredo da app Omafit que expõe `/api/widget/catalog-search`. O widget assina; o backend valida. Detalhe no `.env.example`.
+Busca de catálogo, telemetria de sugestões e produto por handle usam o mesmo valor nos dois lados: `VITE_OMAFIT_WIDGET_HMAC_SECRET` ou `VITE_WIDGET_CATALOG_HMAC_SECRET` no build do widget, e `WIDGET_CATALOG_HMAC_SECRET` ou `OMAFIT_WIDGET_HMAC_SECRET` na app `omafit`. O frontend monta a string canônica, assina e envia `signature`. O backend confere. Como a chave vai no bundle do browser, essa conferência não autentica o chamador.
 
 ## Known Technical Debt
 
@@ -174,6 +176,7 @@ Fatos deste checkout, sem proposta de correção embutida:
 - `legacy/shopify-app-old/` não compila aqui (`@shopify/shopify-app-remix` não está nas dependências). `@shopify/polaris` segue no `package.json` e no `optimizeDeps` do Vite.
 - Dependências do `package.json` sem import em `src/`: `firebase`, `@google-cloud/firestore`, `@fal-ai/client` (a fal do try-on é `npm:@fal-ai/client` dentro da Edge Function), `@splinetool/react-spline`, `@splinetool/runtime`, `gsap`, `@gsap/react`. Não foram removidas.
 - Anon key de fallback está hardcoded em `src/lib/supabase.ts` e `src/utils/supabaseFunctions.ts`.
+- **Limitação de segurança:** `VITE_OMAFIT_WIDGET_HMAC_SECRET` / `VITE_WIDGET_CATALOG_HMAC_SECRET` entram no bundle do browser. O frontend assina e o backend valida (`catalog-search`, `suggestion-events`, `product-by-handle`). A chave distribuída ao cliente não é prova de autenticidade e não deve ser tratada como boundary de autenticação forte. A implementação permanece como está.
 - `public/models/pose_landmarker_lite.task` não é referenciado. O runtime baixa o modelo do storage público do Google.
 - `ProductDetails.tsx`, `ProductForm.tsx`, `WidgetCustomizer.tsx`, `CtaBlockSurface.tsx` e `omafit-ar-manifest-v1.ts` não têm consumidores no grafo de imports.
 - Não há `supabase/config.toml`; `verify_jwt` das funções não está no git.
