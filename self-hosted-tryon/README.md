@@ -1,5 +1,7 @@
 # Omafit Self-Hosted Try-On
 
+Arquitetura, fila, storage e relação com a Edge Function: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 Base de API assíncrona para rodar `FASHN VTON v1.5` em EC2 GPU e integrar com as edge functions do Omafit sem quebrar o contrato atual do widget.
 
 ## Stack

@@ -1,5 +1,7 @@
 # App Folder - Shopify Billing Components
 
+> **Estado em 2026-09-28:** esta pasta foi movida para `legacy/shopify-app-old/` porque não faz parte do app Vite. Leia [STATUS.md](./STATUS.md) antes de tratar estes arquivos como código ativo. O guia abaixo descreve a intenção original da porta Remix → React Router, que não foi ligada em `src/App.tsx`.
+
 Esta pasta contém os componentes React para integração com Shopify Billing, convertidos de Remix para React Router DOM puro.
 
 ## 📁 Estrutura de Arquivos
@@ -157,9 +159,9 @@ npm run build
 
 ## 📚 Documentação Relacionada
 
-- [Shopify Billing Guide](../SHOPIFY_BILLING_GUIDE.md)
-- [Quick Start Billing](../QUICK_START_BILLING.md)
-- [Billing Integration Examples](../BILLING_INTEGRATION_EXAMPLES.md)
+- [Shopify Billing Guide](../../docs/billing/SHOPIFY_BILLING_GUIDE.md)
+- [Quick Start Billing](../../docs/billing/QUICK_START_BILLING.md)
+- [Billing Integration Examples](../../docs/billing/BILLING_INTEGRATION_EXAMPLES.md)
 
 ---
 

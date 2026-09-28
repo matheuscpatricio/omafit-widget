@@ -1,5 +1,7 @@
 # Self-hosted Try-On Deploy
 
+Arquitetura do serviço (API, fila, worker, env, storage): [self-hosted-tryon/ARCHITECTURE.md](../../self-hosted-tryon/ARCHITECTURE.md). Este arquivo continua sendo o guia de deploy. O diretório do serviço permanece `self-hosted-tryon/` de propósito: `docker-compose.yml` e os documentos de EC2 dependem desse caminho.
+
 Este documento descreve o deploy da stack self-hosted de try-on e a configuração necessária no Omafit para trocar o provider via feature flag.
 
 Para os comandos completos da EC2 Ubuntu 24.04, veja também:

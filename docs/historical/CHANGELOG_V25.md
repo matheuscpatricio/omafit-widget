@@ -21,7 +21,7 @@ Esta versão implementa o **modo de export canônico** como padrão para óculos
 - GLBs que **já seguem** o contrato funcionarão perfeitamente
 - Opt-out disponível temporariamente (será removido em v27)
 
-**Migração:** Ver [GLASSES_CANONICAL_V25_MIGRATION.md](./GLASSES_CANONICAL_V25_MIGRATION.md)
+**Migração:** Ver [GLASSES_CANONICAL_V25_MIGRATION.md](../ar/GLASSES_CANONICAL_V25_MIGRATION.md)
 
 ## ✨ Novas Funcionalidades
 
@@ -39,8 +39,8 @@ Esta versão implementa o **modo de export canônico** como padrão para óculos
 - Alinhamento puro aos landmarks 33/263 (olhos)
 
 ### 3. Documentação Completa
-- [GLB_CANONICAL_EXPORT_GUIDE.md](./GLB_CANONICAL_EXPORT_GUIDE.md) - Guia completo de export
-- [GLASSES_CANONICAL_V25_MIGRATION.md](./GLASSES_CANONICAL_V25_MIGRATION.md) - Guia de migração
+- [GLB_CANONICAL_EXPORT_GUIDE.md](../ar/GLB_CANONICAL_EXPORT_GUIDE.md) - Guia completo de export
+- [GLASSES_CANONICAL_V25_MIGRATION.md](../ar/GLASSES_CANONICAL_V25_MIGRATION.md) - Guia de migração
 - Comentários atualizados no código com explicação do contrato
 
 ### 4. Logs Melhorados
@@ -172,9 +172,9 @@ anchor.group (MindAR tracking)
 
 ## 📚 Referências
 
-- [Guia de Export Canônico](./GLB_CANONICAL_EXPORT_GUIDE.md)
-- [Guia de Migração v25](./GLASSES_CANONICAL_V25_MIGRATION.md)
-- [Resumo da Conversa](../agent-transcripts/) - Session que levou a esta implementação
+- [Guia de Export Canônico](../ar/GLB_CANONICAL_EXPORT_GUIDE.md)
+- [Guia de Migração v25](../ar/GLASSES_CANONICAL_V25_MIGRATION.md)
+- [Resumo da Conversa](../../agent-transcripts/) - Session que levou a esta implementação
 
 ## 🙏 Créditos
 

@@ -3,7 +3,7 @@ title: "feat: Consultor vendedor sénior v1"
 type: feat
 status: completed
 date: 2026-06-03
-origin: docs/plans/2026-06-03-001-feat-consultor-vendedor-contextual-plan.md
+origin: docs/historical/plans/2026-06-03-001-feat-consultor-vendedor-contextual-plan.md
 ---
 
 # Consultor vendedor sénior (v1)

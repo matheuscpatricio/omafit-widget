@@ -162,7 +162,7 @@ String(cfgAttr("arGlassesCanonicalBlenderExport", "0"))
 ## Recursos
 
 - [Guia Completo de Export Canônico](./GLB_CANONICAL_EXPORT_GUIDE.md)
-- [Changelog v25](./CHANGELOG.md#v25)
+- [Changelog v25](../historical/CHANGELOG_V25.md)
 - Suporte técnico: suporte@omafit.com
 
 ## Benefícios Técnicos

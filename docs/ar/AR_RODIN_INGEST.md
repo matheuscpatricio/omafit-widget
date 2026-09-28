@@ -4,7 +4,7 @@
 
 Pipeline: **fotos produto** → **fal.ai Rodin v2.5** → **recipe trimesh/Blender** por `wearableClass` → **GLB + manifest v1** → Supabase Storage → Shopify metafields → widget AR.
 
-Implementação: [`omafit/workers/ar-mesh-generate`](../../omafit/workers/ar-mesh-generate).
+Implementação: [`omafit/workers/ar-mesh-generate`](../../../omafit/workers/ar-mesh-generate).
 
 ## Wearable classes
 
@@ -19,7 +19,7 @@ Implementação: [`omafit/workers/ar-mesh-generate`](../../omafit/workers/ar-mes
 | `watch_round` | relógio | hybrid fit |
 | `necklace_chain` | colar | PMREM joias |
 
-Presets: [`presets/wearable-classes.json`](../public/ar/presets/wearable-classes.json) (cópia; fonte no worker).
+Presets: [`presets/wearable-classes.json`](../../public/ar/presets/wearable-classes.json) (cópia; fonte no worker).
 
 ## Env worker
 

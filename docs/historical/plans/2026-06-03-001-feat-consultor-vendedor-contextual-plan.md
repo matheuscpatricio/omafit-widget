@@ -3,7 +3,7 @@ title: "feat: Consultor contextual como vendedor previsível"
 type: feat
 status: active
 date: 2026-06-03
-origin: docs/brainstorms/2026-06-03-carousel-consultor-v2-requirements.md
+origin: docs/historical/brainstorms/2026-06-03-carousel-consultor-v2-requirements.md
 ---
 
 # Consultor contextual como vendedor previsível
