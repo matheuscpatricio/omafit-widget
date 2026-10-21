@@ -42,7 +42,15 @@ src/features/stylist/
 2. Extrair handlers de sugestão (try-on / ATC) e painel de chat para `components/`.
 3. Encaminhar `callGPTAssistant` para `StylistEngine.processTurn` com `completeTurn` = validate-size atual.
 4. Sessão retomável (memória do parent / sessionStorage sem fotos).
-5. Eventos de voz → mesmo `processTurn` (SDK ElevenLabs depois).
+5. **Gate voz:** centralizar tools comerciais + mint Enterprise + minutos no omafit.
+6. Eventos de voz → mesmo motor (SDK ElevenLabs **só após** gate). Ver `VOICE_FEASIBILITY_REPORT.md`.
+
+### Prova de voz (isolada, sem integração)
+
+- Código: `src/features/stylist/voice/`
+- Runner: `npm run stylist:voice-proof`
+- Relatório: `docs/stylist/VOICE_FEASIBILITY_REPORT.md`
+- **Não** montar microfone no `TryOnWidget` enquanto `architecture_ready_for_integration === false`.
 
 ## Contratos necessários no backend `omafit`
 
