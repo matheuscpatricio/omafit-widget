@@ -54,6 +54,12 @@ import { buildStylistBrief, formatCatalogPrice } from '../utils/stylistContext';
 import { resolveAnchorProductPrice } from '../utils/resolveAnchorProductPrice';
 import { evaluateStylistClarification } from '../utils/stylistClarification';
 import {
+  buildAssistantFallbackMessage,
+  buildChatHistoryForValidateSize,
+  buildInteractionLimitMessage,
+  type ChatMessage,
+} from '../features/stylist';
+import {
   fallbackStoreProfile,
   type StoreProfile,
 } from '../utils/storeProfile';
@@ -318,28 +324,7 @@ export function TryOnWidget({
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // GPT Assistant states - Full Chat Interface
-  interface ChatMessage {
-    role: 'assistant' | 'user';
-    content: string;
-    timestamp: number;
-    /** Imagem do provador quando o try-on veio de uma sugestão no chat (fica visível no thread). */
-    tryOnImageUrl?: string;
-    /** Primeiro resultado (PDP) vs try-on após sugestão — controla duplicata com o bloco no topo. */
-    tryOnResultVariant?: 'primary' | 'suggested';
-    /** Telemetria sugestões estilista (par âncora PDP → sugerido). */
-    stylistImpressionId?: string;
-    stylistAnchorHandle?: string;
-    suggestedProducts?: Array<{
-      handle: string;
-      title: string;
-      image_url?: string;
-      rationale?: string;
-      price_amount?: number | null;
-      currency_code?: string | null;
-      price_label?: string;
-    }>;
-  }
+  // GPT Assistant states - Full Chat Interface (tipos em features/stylist)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gptLoading, setGptLoading] = useState(false);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
@@ -4271,15 +4256,11 @@ const handleSubmit = async (
     const requestSeq = ++gptAssistSeqRef.current;
 
     if (interactionCount >= GPT_INTERACTION_LIMIT) {
-      const limitMessages = {
-        pt: 'Você atingiu o limite de interações por sessão.',
-        es: 'Has alcanzado el límite de interacciones por sesión.',
-        en: 'You have reached the interaction limit per session.'
-      };
-
+      const langLimit: 'pt' | 'es' | 'en' =
+        currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: limitMessages[currentLanguage],
+        content: buildInteractionLimitMessage(langLimit),
         timestamp: Date.now()
       }]);
       return;
@@ -4594,25 +4575,14 @@ const handleSubmit = async (
         selected_color_hex: selectedColorHex,
         variant_catalog: productCatalog.variants.slice(0, 55),
         complementary_product: complementaryProduct,
-        chat_history: (() => {
-          const base = chatMessages
-            .slice(-12)
-            .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
-            .map(m => ({ role: m.role, content: String(m.content || '').trim() }));
-          const q =
+        chat_history: buildChatHistoryForValidateSize(chatMessages, {
+          currentUserUtterance:
             (intencaoForPayload === 'custom_message' ||
               intencaoForPayload === 'consultor_outfit_inicial') &&
             customMessageForPayload
               ? String(customMessageForPayload).trim()
-              : '';
-          if (q) {
-            const last = base[base.length - 1];
-            if (!last || last.role !== 'user' || last.content !== q) {
-              base.push({ role: 'user', content: q });
-            }
-          }
-          return base;
-        })(),
+              : undefined,
+        }),
         ...(candidate_products ? { candidate_products } : {}),
         ...(anchorPrice.price_amount != null
           ? {
@@ -4842,34 +4812,19 @@ const handleSubmit = async (
       console.error('Erro ao chamar GPT:', error);
       const sz = String(calculatedSize || recommendedSize || '').trim();
       const allowOpeningExtras = !stylistOpeningExtrasConsumedRef.current;
-      const fallbackMessages = {
-        pt: !allowOpeningExtras
-          ? sz
-            ? 'Assistência instável. Veja o espelho virtual e tente novamente em instantes.'
-            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`
-          : sz
-            ? `Assistência instável. Tamanho sugerido: ${sz}. Veja o espelho e adicione ao carrinho se quiser.`
-            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`,
-        es: !allowOpeningExtras
-          ? sz
-            ? 'Sin asistente por ahora. Mira el espejo virtual e inténtalo de nuevo en unos instantes.'
-            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`
-          : sz
-            ? `Sin asistente por ahora. Talla sugerida: ${sz}. Mira el espejo y añade al carrito si te encaja.`
-            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`,
-        en: !allowOpeningExtras
-          ? sz
-            ? 'Assistant unavailable. Check the virtual mirror and try again in a moment.'
-            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`
-          : sz
-            ? `Assistant unavailable. Suggested size: ${sz}. Check the mirror and add to cart if you like it.`
-            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`,
-      };
+      const langFallback: 'pt' | 'es' | 'en' =
+        currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
+      const fallbackContent = buildAssistantFallbackMessage({
+        language: langFallback,
+        productName: localProductName,
+        recommendedSize: sz,
+        allowOpeningExtras,
+      });
 
       if (requestSeq !== gptAssistSeqRef.current) return;
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: fallbackMessages[currentLanguage],
+        content: fallbackContent,
         timestamp: Date.now()
       }]);
       stylistOpeningExtrasConsumedRef.current = true;

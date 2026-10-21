@@ -18,7 +18,8 @@
     "prepreview": "npm run sync:theme-ar",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "stylist:voice-proof": "vitest run src/features/stylist/voice/proof/runVoiceProof.test.ts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
