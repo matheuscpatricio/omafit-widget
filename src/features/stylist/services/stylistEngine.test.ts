@@ -140,7 +140,7 @@ describe('stylist engine', () => {
     expect(result.session.messages[0].role).toBe('user');
     expect(result.session.messages[1].suggestedProducts?.[0].handle).toBe('jeans');
     expect(result.session.recommended_products[0].handle).toBe('jeans');
-    expect(result.validate_size_chat_history.at(-1)?.content).toBe('quero casual');
+    expect(result.validate_size_chat_history[result.validate_size_chat_history.length - 1]?.content).toBe('quero casual');
   });
 
   it('falls back to textual message when AI call fails', async () => {

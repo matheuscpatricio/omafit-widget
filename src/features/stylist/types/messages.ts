@@ -69,6 +69,8 @@ export type StylistChatMessage = {
   suggestedProducts?: SuggestedProductCard[];
   /** Separação conteúdo conversacional ↔ ações (preparação multimodal). */
   structuredActions?: StylistStructuredAction[];
+  /** Origem da fala no thread compartilhado (ausente = texto). */
+  inputModality?: 'text' | 'voice';
 };
 
 /** Alias usado pelo TryOnWidget (mesmo shape). */

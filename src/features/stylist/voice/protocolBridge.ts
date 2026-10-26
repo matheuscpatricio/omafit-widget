@@ -86,6 +86,10 @@ export function mapClientToolToStructuredActions(
         type: 'selection_options',
         options: options
           .map((o) => {
+            if (typeof o === 'string') {
+              const label = o.trim();
+              return label ? { label, message: label } : null;
+            }
             const row = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>;
             const label = String(row.label || '').trim();
             const message = String(row.message || label).trim();

@@ -27,3 +27,10 @@ export {
   type StylistEngineTurnRequest,
   type StylistEngineTurnResult,
 } from './stylistEngine';
+export {
+  appendToSharedThread,
+  applyVoiceCorrection,
+  buildVoiceContextSummary,
+  structuredActionsToMessage,
+  voiceTranscriptToMessage,
+} from './sharedThread';
