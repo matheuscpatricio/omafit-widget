@@ -54,11 +54,21 @@ import { buildStylistBrief, formatCatalogPrice } from '../utils/stylistContext';
 import { resolveAnchorProductPrice } from '../utils/resolveAnchorProductPrice';
 import { evaluateStylistClarification } from '../utils/stylistClarification';
 import {
+  appendToSharedThread,
+  applyVoiceCorrection,
   buildAssistantFallbackMessage,
   buildChatHistoryForValidateSize,
   buildInteractionLimitMessage,
+  buildVoiceContextSummary,
+  mapClientToolToStructuredActions,
+  structuredActionsToMessage,
+  useStylistVoiceSession,
+  voiceTranscriptToMessage,
   type ChatMessage,
+  type VoiceClientToolHandler,
+  type VoiceTransportEvent,
 } from '../features/stylist';
+import { StylistVoiceControls } from '../features/stylist/components';
 import {
   fallbackStoreProfile,
   type StoreProfile,
@@ -5027,6 +5037,75 @@ const handleSubmit = async (
     };
   }, [heroPresentationGateActive, fontFamily]);
 
+  const stylistVoiceFeatureOn =
+    stylistEnabled && String(import.meta.env.VITE_OMAFIT_STYLIST_VOICE_ENABLED || '').trim() === 'true';
+
+  const appendVoiceActions = (toolName: string, params: Record<string, unknown>) => {
+    const msg = structuredActionsToMessage(mapClientToolToStructuredActions(toolName, params));
+    if (msg) setChatMessages((prev) => appendToSharedThread(prev, msg));
+    return msg ? 'shown' : 'nothing_to_show';
+  };
+
+  const voiceClientTools: Record<string, VoiceClientToolHandler> = {
+    show_product_cards: (params) => appendVoiceActions('show_product_cards', params),
+    show_selection_options: (params) => appendVoiceActions('show_selection_options', params),
+    request_try_on: (params) => {
+      const handle = String(params.handle || '').trim();
+      if (!handle) return 'missing_handle';
+      void handleSuggestedProductTryOn(handle, { autoSubmitTryOn: true });
+      return 'try_on_started';
+    },
+    add_to_cart: (params) => {
+      const handle = String(params.handle || '').trim();
+      const anchor = (localProductHandle || productHandle || '').trim();
+      if (!handle || handle === anchor) handleAddToCart();
+      else void handleSuggestedProductAddToCart(handle);
+      return 'add_to_cart_requested';
+    },
+    end_conversation: () => {
+      window.setTimeout(() => void stylistVoice.stop('agent_end'), 1500);
+      return 'ending';
+    },
+  };
+
+  const handleVoiceTransportEvent = (event: VoiceTransportEvent) => {
+    if (event.type === 'user_transcript' && event.is_final) {
+      setChatMessages((prev) => appendToSharedThread(prev, voiceTranscriptToMessage('user', event.text, event.at)));
+    } else if (event.type === 'agent_response') {
+      setChatMessages((prev) =>
+        appendToSharedThread(prev, voiceTranscriptToMessage('assistant', event.text, event.at))
+      );
+    } else if (event.type === 'agent_response_correction') {
+      setChatMessages((prev) => applyVoiceCorrection(prev, event.original, event.corrected));
+    }
+  };
+
+  const stylistVoice = useStylistVoiceSession({
+    enabled: stylistVoiceFeatureOn,
+    identity: { shopDomain: effectiveShopDomain, publicId: publicId || '', widgetSessionId: sessionId },
+    getContext: () => ({
+      language: currentLanguage,
+      storeName: localStoreName,
+      anchorProductTitle: localProductName,
+      anchorProductHandle: (localProductHandle || productHandle || '').trim(),
+      recommendedSize: String(calculatedSize || recommendedSize || ''),
+      threadSummary: buildVoiceContextSummary(chatMessagesRef.current),
+    }),
+    clientTools: voiceClientTools,
+    onTransportEvent: handleVoiceTransportEvent,
+  });
+
+  /** Mensagem digitada/clicada durante a voz vai para o agent; fora dela, segue o fluxo de texto. */
+  const submitStylistUserText = (message: string) => {
+    if (stylistVoice.isActive) {
+      setChatMessages((prev) => [...prev, { role: 'user', content: message, timestamp: Date.now() }]);
+      stylistVoice.sendUserMessage(message);
+      return;
+    }
+    setChatMessages((prev) => [...prev, { role: 'user', content: message, timestamp: Date.now() }]);
+    void callGPTAssistant('custom', undefined, message);
+  };
+
   // Verificar se o produto foi carregado
   if (!product) {
     return (
@@ -5352,6 +5431,7 @@ const handleSubmit = async (
                 message.role === 'assistant' &&
                 !message.content.trim() &&
                 !(message.suggestedProducts?.length) &&
+                !(message.structuredActions?.length) &&
                 !message.tryOnImageUrl
               ) {
                 return null;
@@ -5502,6 +5582,25 @@ const handleSubmit = async (
                       })}
                     </div>
                   ) : null}
+                  {message.role === 'assistant'
+                    ? (message.structuredActions || []).map((action, ai) =>
+                        action.type === 'selection_options' ? (
+                          <div key={`opts-${ai}`} className="mt-3 flex flex-wrap gap-2">
+                            {action.options.map((opt) => (
+                              <button
+                                key={opt.label}
+                                type="button"
+                                disabled={gptLoading}
+                                onClick={() => submitStylistUserText(opt.message)}
+                                className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null
+                      )
+                    : null}
                 </div>
               </motion.div>
             );
@@ -5725,6 +5824,17 @@ const handleSubmit = async (
                 </div>
               )}
 
+              {stylistVoiceFeatureOn && (
+                <StylistVoiceControls
+                  state={stylistVoice.state}
+                  language={currentLanguage}
+                  primaryColor={localPrimaryColor}
+                  disabled={gptLoading}
+                  onStart={() => void stylistVoice.start()}
+                  onStop={() => void stylistVoice.stop('user')}
+                />
+              )}
+
               <input
                 ref={chatPhotoInputRef}
                 type="file"
@@ -5751,12 +5861,7 @@ const handleSubmit = async (
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                       const message = e.currentTarget.value.trim();
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: message,
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('custom', undefined, message);
+                      submitStylistUserText(message);
                       e.currentTarget.value = '';
                     }
                   }}
@@ -5770,12 +5875,7 @@ const handleSubmit = async (
                     const input = wrap?.querySelector('input[type="text"]') as HTMLInputElement | null;
                     if (input && input.value.trim()) {
                       const message = input.value.trim();
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: message,
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('custom', undefined, message);
+                      submitStylistUserText(message);
                       input.value = '';
                     }
                   }}
