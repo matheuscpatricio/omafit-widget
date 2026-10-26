@@ -68,7 +68,13 @@ import {
   type VoiceClientToolHandler,
   type VoiceTransportEvent,
 } from '../features/stylist';
-import { StylistVoiceControls } from '../features/stylist/components';
+import {
+  StylistVoiceMicButton,
+  StylistVoiceStatus,
+  chatInputSlot,
+  isVoiceActive,
+  useStylistVoiceConsent,
+} from '../features/stylist/components';
 import {
   fallbackStoreProfile,
   type StoreProfile,
@@ -5094,6 +5100,21 @@ const handleSubmit = async (
     clientTools: voiceClientTools,
     onTransportEvent: handleVoiceTransportEvent,
   });
+  const [chatInputValue, setChatInputValue] = useState('');
+  const startStylistVoice = () => void stylistVoice.start();
+  const stylistVoiceConsent = useStylistVoiceConsent(startStylistVoice);
+  const stylistVoiceActive = isVoiceActive(stylistVoice.state);
+  const chatSlot = chatInputSlot({
+    featureOn: stylistVoiceFeatureOn,
+    inputValue: chatInputValue,
+    voiceActive: stylistVoiceActive,
+  });
+  const submitChatInput = () => {
+    const message = chatInputValue.trim();
+    if (!message) return;
+    submitStylistUserText(message);
+    setChatInputValue('');
+  };
 
   /** Mensagem digitada/clicada durante a voz vai para o agent; fora dela, segue o fluxo de texto. */
   const submitStylistUserText = (message: string) => {
@@ -5825,12 +5846,14 @@ const handleSubmit = async (
               )}
 
               {stylistVoiceFeatureOn && (
-                <StylistVoiceControls
+                <StylistVoiceStatus
                   state={stylistVoice.state}
                   language={currentLanguage}
                   primaryColor={localPrimaryColor}
-                  disabled={gptLoading}
-                  onStart={() => void stylistVoice.start()}
+                  askingConsent={stylistVoiceConsent.askingConsent}
+                  onAllow={stylistVoiceConsent.allow}
+                  onCancel={stylistVoiceConsent.cancel}
+                  showStop={stylistVoiceActive && chatSlot === 'send'}
                   onStop={() => void stylistVoice.stop('user')}
                 />
               )}
@@ -5858,30 +5881,31 @@ const handleSubmit = async (
                   placeholder={stylistEnabled ? t('chatPlaceholderStylist') : t('chatPlaceholder')}
                   className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
                   style={{ focusRing: localPrimaryColor }}
+                  value={chatInputValue}
+                  onChange={(e) => setChatInputValue(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      const message = e.currentTarget.value.trim();
-                      submitStylistUserText(message);
-                      e.currentTarget.value = '';
-                    }
+                    if (e.key === 'Enter') submitChatInput();
                   }}
                 />
-                <button
-                  type="button"
-                  className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
-                  style={{ backgroundColor: localPrimaryColor }}
-                  onClick={(e) => {
-                    const wrap = e.currentTarget.parentElement;
-                    const input = wrap?.querySelector('input[type="text"]') as HTMLInputElement | null;
-                    if (input && input.value.trim()) {
-                      const message = input.value.trim();
-                      submitStylistUserText(message);
-                      input.value = '';
-                    }
-                  }}
-                >
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                {chatSlot === 'send' ? (
+                  <button
+                    type="button"
+                    className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
+                    style={{ backgroundColor: localPrimaryColor }}
+                    onClick={submitChatInput}
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <StylistVoiceMicButton
+                    state={stylistVoice.state}
+                    language={currentLanguage}
+                    primaryColor={localPrimaryColor}
+                    disabled={gptLoading}
+                    onRequestStart={stylistVoiceConsent.requestStart}
+                    onStop={() => void stylistVoice.stop('user')}
+                  />
+                )}
               </div>
             </motion.div>
           )}

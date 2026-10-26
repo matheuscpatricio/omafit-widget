@@ -1,1 +1,12 @@
-export { StylistVoiceControls, voiceErrorMessage, type StylistVoiceControlsProps } from './StylistVoiceControls';
+export {
+  StylistVoiceMicButton,
+  StylistVoiceStatus,
+  useStylistVoiceConsent,
+  chatInputSlot,
+  shouldShowVoiceButton,
+  isVoiceActive,
+  voiceErrorMessage,
+  type ChatInputSlot,
+  type StylistVoiceMicButtonProps,
+  type StylistVoiceStatusProps,
+} from './StylistVoiceControls';

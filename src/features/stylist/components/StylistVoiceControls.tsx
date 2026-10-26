@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Loader2, Mic, MicOff, Square } from 'lucide-react';
 import type { VoiceControllerState } from '../voice/voiceSessionController';
 import type { StylistLanguage } from '../types';
@@ -83,7 +83,7 @@ function formatSeconds(s: number): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function hasStoredConsent(): boolean {
+export function hasStoredConsent(): boolean {
   try {
     return window.sessionStorage.getItem(CONSENT_KEY) === '1';
   } catch {
@@ -91,37 +91,131 @@ function hasStoredConsent(): boolean {
   }
 }
 
-export type StylistVoiceControlsProps = {
+export function isVoiceActive(state: VoiceControllerState): boolean {
+  return state.ui !== 'idle' && state.ui !== 'error' && state.ui !== 'disconnected';
+}
+
+export type ChatInputSlot = 'voice-start' | 'voice-stop' | 'send';
+
+/** Decide o que ocupa o slot à direita do input: microfone só com input vazio; digitou → enviar. */
+export function chatInputSlot({
+  featureOn,
+  inputValue,
+  voiceActive,
+}: {
+  featureOn: boolean;
+  inputValue: string;
+  voiceActive: boolean;
+}): ChatInputSlot {
+  if (!featureOn || inputValue.trim()) return 'send';
+  return voiceActive ? 'voice-stop' : 'voice-start';
+}
+
+export function shouldShowVoiceButton(args: { featureOn: boolean; inputValue: string; voiceActive: boolean }): boolean {
+  return chatInputSlot(args) !== 'send';
+}
+
+/** Consentimento (sessionStorage) compartilhado entre o botão compacto e o bloco de status. */
+export function useStylistVoiceConsent(onStart: () => void) {
+  const [askingConsent, setAskingConsent] = useState(false);
+  const requestStart = useCallback(() => {
+    if (hasStoredConsent()) onStart();
+    else setAskingConsent(true);
+  }, [onStart]);
+  const allow = useCallback(() => {
+    try {
+      window.sessionStorage.setItem(CONSENT_KEY, '1');
+    } catch {
+      /* sessionStorage indisponível */
+    }
+    setAskingConsent(false);
+    onStart();
+  }, [onStart]);
+  const cancel = useCallback(() => setAskingConsent(false), []);
+  return { askingConsent, requestStart, allow, cancel };
+}
+
+export type StylistVoiceMicButtonProps = {
   state: VoiceControllerState;
   language: StylistLanguage;
   primaryColor: string;
   disabled?: boolean;
-  onStart: () => void;
+  onRequestStart: () => void;
   onStop: () => void;
 };
 
-/** Botão de microfone + estado da conversa de voz, ao lado do input de texto. */
-export function StylistVoiceControls({
+/** Botão compacto (mesmo tamanho do enviar) que inicia/encerra a voz. */
+export function StylistVoiceMicButton({
   state,
   language,
   primaryColor,
   disabled,
-  onStart,
+  onRequestStart,
   onStop,
-}: StylistVoiceControlsProps) {
+}: StylistVoiceMicButtonProps) {
   const c = COPY[language] ?? COPY.pt;
-  const [askingConsent, setAskingConsent] = useState(false);
-  const active = state.ui !== 'idle' && state.ui !== 'error' && state.ui !== 'disconnected';
+  const active = isVoiceActive(state);
   const unavailable = state.errorCode === 'plan_required' || state.errorCode === 'minutes_exhausted';
+  if (active) {
+    return (
+      <button
+        type="button"
+        onClick={onStop}
+        className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
+        style={{ backgroundColor: primaryColor }}
+        aria-label={c.stop}
+        title={c.stop}
+      >
+        {state.ui === 'connecting' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Square className="w-5 h-5" />}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onRequestStart}
+      disabled={disabled || unavailable}
+      className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ backgroundColor: primaryColor }}
+      aria-label={c.start}
+      title={c.start}
+    >
+      {unavailable ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+    </button>
+  );
+}
+
+export type StylistVoiceStatusProps = {
+  state: VoiceControllerState;
+  language: StylistLanguage;
+  primaryColor: string;
+  askingConsent: boolean;
+  onAllow: () => void;
+  onCancel: () => void;
+  /** Mostra controle de encerrar aqui quando o slot do input está ocupado pelo enviar. */
+  showStop?: boolean;
+  onStop: () => void;
+};
+
+/** Consentimento, status, avisos de minutos e erros — renderizado acima da linha do input. */
+export function StylistVoiceStatus({
+  state,
+  language,
+  primaryColor,
+  askingConsent,
+  onAllow,
+  onCancel,
+  showStop,
+  onStop,
+}: StylistVoiceStatusProps) {
+  const c = COPY[language] ?? COPY.pt;
+  const active = isVoiceActive(state);
   const error = voiceErrorMessage(state.errorCode, language);
   const endedByLimit = !active && (state.endedReason === 'max_duration' || state.endedReason === 'limit');
-
-  const requestStart = () => {
-    if (hasStoredConsent()) onStart();
-    else setAskingConsent(true);
-  };
-
   const status = active ? c[state.ui] ?? '' : '';
+  const sessionNote = active && state.secondsLeftInSession != null && state.secondsLeftInSession <= 60;
+  const minutesNote = !active && state.minutesRemaining != null && !error && state.minutesRemaining <= 10;
+  if (!askingConsent && !active && !error && !endedByLimit && !minutesNote) return null;
 
   return (
     <div className="mb-3">
@@ -129,74 +223,56 @@ export function StylistVoiceControls({
         <div className="mb-2 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-700" role="dialog">
           <p className="mb-2">{c.consent}</p>
           <div className="flex justify-end gap-2">
-            <button type="button" className="px-3 py-1.5 text-gray-600" onClick={() => setAskingConsent(false)}>
+            <button type="button" className="px-3 py-1.5 text-gray-600" onClick={onCancel}>
               {c.cancel}
             </button>
             <button
               type="button"
               className="rounded-lg px-3 py-1.5 font-medium text-white"
               style={{ backgroundColor: primaryColor }}
-              onClick={() => {
-                try {
-                  window.sessionStorage.setItem(CONSENT_KEY, '1');
-                } catch {
-                  /* sessionStorage indisponível */
-                }
-                setAskingConsent(false);
-                onStart();
-              }}
+              onClick={onAllow}
             >
               {c.allow}
             </button>
           </div>
         </div>
       )}
-
-      <div className="flex items-center justify-center gap-3">
-        {active ? (
-          <button
-            type="button"
-            onClick={onStop}
-            className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition"
-            style={{ borderColor: primaryColor, color: primaryColor }}
-            aria-label={c.stop}
-          >
-            {state.ui === 'connecting' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <span className="relative flex h-3 w-3">
-                <span
-                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
-                  style={{ backgroundColor: primaryColor }}
-                />
-                <span className="relative inline-flex h-3 w-3 rounded-full" style={{ backgroundColor: primaryColor }} />
-              </span>
-            )}
-            <span>{status}</span>
-            <Square className="h-3.5 w-3.5" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={requestStart}
-            disabled={disabled || unavailable}
-            className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={c.start}
-          >
-            {unavailable ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            {c.start}
-          </button>
-        )}
-      </div>
-
-      {active && state.secondsLeftInSession != null && state.secondsLeftInSession <= 60 && (
+      {active && (
+        <div className="flex items-center justify-center gap-2 text-xs" style={{ color: primaryColor }} role="status">
+          {state.ui === 'connecting' ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <span className="relative flex h-2.5 w-2.5">
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
+                style={{ backgroundColor: primaryColor }}
+              />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: primaryColor }} />
+            </span>
+          )}
+          <span>{status}</span>
+          {showStop && (
+            <button
+              type="button"
+              onClick={onStop}
+              className="ml-1 flex items-center gap-1 rounded-lg border px-2 py-0.5"
+              style={{ borderColor: primaryColor }}
+              aria-label={c.stop}
+            >
+              <Square className="h-3 w-3" />
+              {c.stop}
+            </button>
+          )}
+        </div>
+      )}
+      {sessionNote && (
         <p className="mt-1 text-center text-xs text-gray-500">
-          {formatSeconds(state.secondsLeftInSession)} {c.session_left}
+          {formatSeconds(state.secondsLeftInSession as number)} {c.session_left}
         </p>
       )}
-      {!active && state.minutesRemaining != null && !error && state.minutesRemaining <= 10 && (
+      {minutesNote && (
         <p className="mt-1 text-center text-xs text-gray-500">
-          {Math.floor(state.minutesRemaining)} {c.minutes}
+          {Math.floor(state.minutesRemaining as number)} {c.minutes}
         </p>
       )}
       {error && <p className="mt-1 text-center text-xs text-gray-600">{error}</p>}
