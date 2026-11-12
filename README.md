@@ -84,7 +84,7 @@ Pastas em `supabase/functions/<nome>/`. Tabela de propósito, caller e auth: [su
 
 Grupos: commerce (`collections`, `get-products`, `verify-prices`), try-on (`tryon`, `tryon-status`, `tryon-upload-url`, `track-footwear-tryon`), AI (`validate-size`, `validate-footwear-chat`), ciclo Shopify (uninstall webhook e e-mails), mais Instagram, Stripe e `omafit-config`.
 
-`src/utils/shopperProfile.ts` chama `/functions/v1/shopper-profile`. Essa função não está neste repositório.
+`src/utils/shopperProfile.ts` chama `/functions/v1/shopper-profile`. Essa função não está neste repositório. O opt-in do provador grava e-mail (`save_marketing_email`) para a integração com a Klaviyo; este cliente não chama a Klaviyo.
 
 ## Self-hosted Inference
 
@@ -102,7 +102,7 @@ Só nomes. Valores ficam no ambiente, nunca no git.
 
 SPA (`.env.example`):
 
-`VITE_SITE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `FAL_KEY`, `INSTAGRAM_BUSINESS_ACCOUNT_ID`, `META_PAGE_ACCESS_TOKEN`, `META_GRAPH_API_VERSION`, `INSTAGRAM_PUBLISH_SECRET`, `VITE_OMAFIT_APP_URL`, `VITE_OMAFIT_WIDGET_HMAC_SECRET`, `VITE_WIDGET_CATALOG_HMAC_SECRET`
+`VITE_SITE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `FAL_KEY`, `INSTAGRAM_BUSINESS_ACCOUNT_ID`, `META_PAGE_ACCESS_TOKEN`, `META_GRAPH_API_VERSION`, `INSTAGRAM_PUBLISH_SECRET`, `VITE_OMAFIT_APP_URL`, `VITE_OMAFIT_WIDGET_HMAC_SECRET`, `VITE_WIDGET_CATALOG_HMAC_SECRET`, `VITE_EMAIL_MARKETING_ENABLED`, `VITE_EMAIL_MARKETING_SHOPS`
 
 `VITE_OMAFIT_WIDGET_HMAC_SECRET` e o alias `VITE_WIDGET_CATALOG_HMAC_SECRET` são lidos em `src/utils/omafitEnv.ts`. O Vite inclui no bundle do browser toda variável `VITE_*`. O widget calcula HMAC-SHA256 com esse valor e envia `signature` em `POST /api/widget/catalog-search`, `POST /api/widget/suggestion-events` e `GET /api/widget/product-by-handle` (`src/utils/omafitCatalogClient.ts`). A app `omafit` valida a assinatura com `WIDGET_CATALOG_HMAC_SECRET` ou `OMAFIT_WIDGET_HMAC_SECRET`. A chave está no JavaScript publicado. Quem lê o bundle consegue gerar uma assinatura que o backend aceita. Isso não é uma boundary de autenticação forte. Ver Known Technical Debt.
 

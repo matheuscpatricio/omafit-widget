@@ -8,13 +8,15 @@ import {
   applyForcedGenderToMeasurements,
   deleteShopperProfile,
   fetchShopperProfile,
-  hasActiveMarketingWhatsappConsent,
+  hasActiveMarketingEmailConsent,
   hasActiveShopperConsent,
+  isValidMarketingEmail,
   isValidShopperMeasurements,
+  normalizeMarketingEmail,
   normalizeShopDomain,
   recordShopperProfileEvent,
-  revokeShopperMarketingWhatsapp,
-  saveShopperMarketingWhatsapp,
+  revokeShopperMarketingEmail,
+  saveShopperMarketingEmail,
   saveShopperProfile,
   setShopperDeviceIdFromParent,
   getShopperDeviceId,
@@ -30,7 +32,7 @@ type Args = {
   publicId?: string;
   publicIdRef: MutableRefObject<string | undefined>;
   shopperDeviceId?: string;
-  whatsappMarketingEnabled: boolean;
+  emailMarketingEnabled: boolean;
   tryOnEnabled: boolean;
   sizeData: SizeCalculatorData | null;
   setSizeData: Dispatch<SetStateAction<SizeCalculatorData | null>>;
@@ -58,7 +60,7 @@ export function useShopperProfileController(args: Args) {
     publicId,
     publicIdRef,
     shopperDeviceId: shopperDeviceIdProp = '',
-    whatsappMarketingEnabled,
+    emailMarketingEnabled,
     tryOnEnabled,
     sizeData,
     setSizeData,
@@ -89,15 +91,14 @@ export function useShopperProfileController(args: Args) {
   const [shopperProfileSaved, setShopperProfileSaved] = useState(false);
   const [shopperSaveError, setShopperSaveError] = useState<string | null>(null);
   const [shopperSaveDismissed, setShopperSaveDismissed] = useState(false);
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [whatsappConsent, setWhatsappConsent] = useState(false);
-  const [whatsappPhotoConsent, setWhatsappPhotoConsent] = useState(false);
-  const [whatsappSaving, setWhatsappSaving] = useState(false);
-  const [whatsappSaved, setWhatsappSaved] = useState(false);
-  const [whatsappRevoked, setWhatsappRevoked] = useState(false);
-  const [whatsappRevoking, setWhatsappRevoking] = useState(false);
-  const [whatsappError, setWhatsappError] = useState<string | null>(null);
-  const [whatsappDismissed, setWhatsappDismissed] = useState(false);
+  const [marketingEmail, setMarketingEmail] = useState('');
+  const [marketingEmailConsent, setMarketingEmailConsent] = useState(false);
+  const [marketingEmailSaving, setMarketingEmailSaving] = useState(false);
+  const [marketingEmailSaved, setMarketingEmailSaved] = useState(false);
+  const [marketingEmailRevoked, setMarketingEmailRevoked] = useState(false);
+  const [marketingEmailRevoking, setMarketingEmailRevoking] = useState(false);
+  const [marketingEmailError, setMarketingEmailError] = useState<string | null>(null);
+  const [marketingEmailDismissed, setMarketingEmailDismissed] = useState(false);
   const [shopperForgetting, setShopperForgetting] = useState(false);
 
   const getShopperProfileFetchConfig = () => {
@@ -254,65 +255,72 @@ export function useShopperProfileController(args: Args) {
   const shopperSavePromptShowsSaved =
     shopperProfileSaved || shopperMeasurementsMatchStoredProfile;
 
-  const shouldShowWhatsappOptIn =
+  const shouldShowEmailOptIn =
     step === 'result' &&
-    whatsappMarketingEnabled &&
+    emailMarketingEnabled &&
     tryOnEnabled !== false &&
-    !whatsappDismissed &&
-    !hasActiveMarketingWhatsappConsent(shopperProfile) &&
-    !whatsappRevoked &&
+    !marketingEmailDismissed &&
+    !hasActiveMarketingEmailConsent(shopperProfile) &&
+    !marketingEmailRevoked &&
     Boolean(getShopperProfileWriteConfig());
 
-  const shouldShowWhatsappManage =
+  const shouldShowEmailManage =
     step === 'result' &&
-    whatsappMarketingEnabled &&
+    emailMarketingEnabled &&
     tryOnEnabled !== false &&
-    hasActiveMarketingWhatsappConsent(shopperProfile) &&
-    !whatsappRevoked &&
+    hasActiveMarketingEmailConsent(shopperProfile) &&
+    !marketingEmailRevoked &&
     Boolean(getShopperProfileWriteConfig());
 
-  const handleSaveWhatsappOptIn = async () => {
+  const handleSaveEmailOptIn = async () => {
     const config = getShopperProfileWriteConfig();
-    if (!config || !whatsappConsent || !whatsappPhone.trim()) return;
-    const modelImageUrl = sessionModelImageUrlRef.current?.trim() || null;
-    setWhatsappSaving(true);
-    setWhatsappError(null);
+    const email = normalizeMarketingEmail(marketingEmail);
+    if (!config || !marketingEmailConsent || !email) return;
+    if (!isValidMarketingEmail(email)) {
+      setMarketingEmailError(t('shopperEmailInvalid'));
+      return;
+    }
+    setMarketingEmailSaving(true);
+    setMarketingEmailError(null);
     try {
       if (sizeData && !hasActiveShopperConsent(shopperProfile)) {
-        const profile = await saveShopperProfile(config, sizeData, { event: 'profile_saved' });
+        const profile = await saveShopperProfile(config, sizeData, {
+          email,
+          event: 'profile_saved',
+        });
         if (profile) setShopperProfile(profile);
       }
-      const saved = await saveShopperMarketingWhatsapp(config, whatsappPhone, {
-        modelImageUrl,
-        marketingPhotoConsent: whatsappPhotoConsent,
-      });
+      const saved = await saveShopperMarketingEmail(config, email);
       if (saved) setShopperProfile(saved);
-      setWhatsappSaved(true);
+      setShopperSaveEmail(email);
+      setMarketingEmailSaved(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('OMAFIT_PII_ENCRYPTION_KEY') || msg.includes('503')) {
-        setWhatsappError(t('shopperWhatsAppEncryptionError'));
+      if (msg.includes('invalid_marketing_email')) {
+        setMarketingEmailError(t('shopperEmailInvalid'));
+      } else if (msg.includes('OMAFIT_PII_ENCRYPTION_KEY') || msg.includes('503')) {
+        setMarketingEmailError(t('shopperEmailEncryptionError'));
       } else {
-        setWhatsappError(t('shopperWhatsAppError'));
+        setMarketingEmailError(t('shopperEmailError'));
       }
     } finally {
-      setWhatsappSaving(false);
+      setMarketingEmailSaving(false);
     }
   };
 
-  const handleRevokeWhatsappOptIn = async () => {
+  const handleRevokeEmailOptIn = async () => {
     const config = getShopperProfileWriteConfig();
     if (!config) return;
-    setWhatsappRevoking(true);
-    setWhatsappError(null);
+    setMarketingEmailRevoking(true);
+    setMarketingEmailError(null);
     try {
-      const updated = await revokeShopperMarketingWhatsapp(config);
+      const updated = await revokeShopperMarketingEmail(config);
       if (updated) setShopperProfile(updated);
-      setWhatsappRevoked(true);
+      setMarketingEmailRevoked(true);
     } catch {
-      setWhatsappError(t('shopperWhatsAppError'));
+      setMarketingEmailError(t('shopperEmailError'));
     } finally {
-      setWhatsappRevoking(false);
+      setMarketingEmailRevoking(false);
     }
   };
 
@@ -331,6 +339,7 @@ export function useShopperProfileController(args: Args) {
         setShopperProfile(profile);
         if (profile?.email) {
           setShopperSaveEmail(profile.email);
+          setMarketingEmail((current) => current || profile.email || '');
         }
       })
       .catch((err) => {
@@ -481,17 +490,15 @@ export function useShopperProfileController(args: Args) {
     shopperProfileSaved,
     shopperSaveError,
     shopperForgetting,
-    whatsappPhone,
-    setWhatsappPhone,
-    whatsappConsent,
-    setWhatsappConsent,
-    whatsappPhotoConsent,
-    setWhatsappPhotoConsent,
-    whatsappSaving,
-    whatsappSaved,
-    whatsappRevoking,
-    whatsappError,
-    setWhatsappDismissed,
+    marketingEmail,
+    setMarketingEmail,
+    marketingEmailConsent,
+    setMarketingEmailConsent,
+    marketingEmailSaving,
+    marketingEmailSaved,
+    marketingEmailRevoking,
+    marketingEmailError,
+    setMarketingEmailDismissed,
     handleAcceptShopperRestore,
     handleUpdateShopperMeasurements,
     handleForgetShopperProfile,
@@ -499,10 +506,10 @@ export function useShopperProfileController(args: Args) {
     handleDismissShopperSave,
     shouldShowShopperSavePrompt,
     shopperSavePromptShowsSaved,
-    shouldShowWhatsappOptIn,
-    shouldShowWhatsappManage,
-    handleSaveWhatsappOptIn,
-    handleRevokeWhatsappOptIn,
+    shouldShowEmailOptIn,
+    shouldShowEmailManage,
+    handleSaveEmailOptIn,
+    handleRevokeEmailOptIn,
     resetShopperUi,
   };
 }

@@ -70,7 +70,7 @@ import {
 } from '../utils/supabaseFunctions';
 import { setShopperDeviceIdFromParent } from '../utils/shopperProfile';
 import { ShopperProfilePrompt } from './ShopperProfilePrompt';
-import { ShopperWhatsAppOptInPrompt } from './ShopperWhatsAppOptInPrompt';
+import { ShopperEmailOptInPrompt } from './ShopperEmailOptInPrompt';
 import {
   inferProductHandleFromReferrer,
   galleryUrlsEqual,
@@ -79,7 +79,7 @@ import {
   safeDecodeGarmentImage,
 } from '../utils/productImageGallery';
 import { hasGrowthPlusPlan } from '../utils/shopifyPlanAccess';
-import { isWhatsappMarketingEnabledForShop } from '../utils/whatsappPilotAccess';
+import { isEmailMarketingEnabledForShop } from '../utils/emailMarketingAccess';
 
 
 import {
@@ -520,7 +520,7 @@ export function TryOnWidget({
     Boolean(tryonLayoutBackgroundImage && tryonLayoutBackgroundImage.trim() !== ''),
   );
   const effectiveShopDomain = (localShopDomain || shopDomain || '').trim();
-  const whatsappMarketingEnabled = isWhatsappMarketingEnabledForShop(
+  const emailMarketingEnabled = isEmailMarketingEnabledForShop(
     effectiveShopDomain,
     stylistEnabled,
   );
@@ -2603,17 +2603,15 @@ export function TryOnWidget({
     shopperProfileSaving,
     shopperSaveError,
     shopperForgetting,
-    whatsappPhone,
-    setWhatsappPhone,
-    whatsappConsent,
-    setWhatsappConsent,
-    whatsappPhotoConsent,
-    setWhatsappPhotoConsent,
-    whatsappSaving,
-    whatsappSaved,
-    whatsappRevoking,
-    whatsappError,
-    setWhatsappDismissed,
+    marketingEmail,
+    setMarketingEmail,
+    marketingEmailConsent,
+    setMarketingEmailConsent,
+    marketingEmailSaving,
+    marketingEmailSaved,
+    marketingEmailRevoking,
+    marketingEmailError,
+    setMarketingEmailDismissed,
     handleAcceptShopperRestore,
     handleUpdateShopperMeasurements,
     handleForgetShopperProfile,
@@ -2621,10 +2619,10 @@ export function TryOnWidget({
     handleDismissShopperSave,
     shouldShowShopperSavePrompt,
     shopperSavePromptShowsSaved,
-    shouldShowWhatsappOptIn,
-    shouldShowWhatsappManage,
-    handleSaveWhatsappOptIn,
-    handleRevokeWhatsappOptIn,
+    shouldShowEmailOptIn,
+    shouldShowEmailManage,
+    handleSaveEmailOptIn,
+    handleRevokeEmailOptIn,
     resetShopperUi,
   } = useShopperProfileController({
     t,
@@ -2632,7 +2630,7 @@ export function TryOnWidget({
     publicId,
     publicIdRef,
     shopperDeviceId: shopperDeviceIdProp,
-    whatsappMarketingEnabled,
+    emailMarketingEnabled,
     tryOnEnabled,
     sizeData,
     setSizeData,
@@ -6631,32 +6629,29 @@ const handleSubmit = async (
         </div>
       </div>
     </motion.div>
-    {shouldShowWhatsappOptIn ? (
-      <ShopperWhatsAppOptInPrompt
+    {shouldShowEmailOptIn ? (
+      <ShopperEmailOptInPrompt
         primaryColor={localPrimaryColor}
         t={t}
-        phone={whatsappPhone}
-        onPhoneChange={setWhatsappPhone}
-        consentChecked={whatsappConsent}
-        onConsentChange={setWhatsappConsent}
-        showPhotoConsent={Boolean(sessionModelImageUrlRef.current?.startsWith('http'))}
-        photoConsentChecked={whatsappPhotoConsent}
-        onPhotoConsentChange={setWhatsappPhotoConsent}
-        onSubmit={() => void handleSaveWhatsappOptIn()}
-        onDismiss={() => setWhatsappDismissed(true)}
-        saving={whatsappSaving}
-        saved={whatsappSaved}
-        error={whatsappError}
+        email={marketingEmail}
+        onEmailChange={setMarketingEmail}
+        consentChecked={marketingEmailConsent}
+        onConsentChange={setMarketingEmailConsent}
+        onSubmit={() => void handleSaveEmailOptIn()}
+        onDismiss={() => setMarketingEmailDismissed(true)}
+        saving={marketingEmailSaving}
+        saved={marketingEmailSaved}
+        error={marketingEmailError}
       />
     ) : null}
-    {shouldShowWhatsappManage ? (
-      <ShopperWhatsAppOptInPrompt
+    {shouldShowEmailManage ? (
+      <ShopperEmailOptInPrompt
         mode="manage"
         primaryColor={localPrimaryColor}
         t={t}
-        onRevoke={() => void handleRevokeWhatsappOptIn()}
-        revoking={whatsappRevoking}
-        error={whatsappError}
+        onRevoke={() => void handleRevokeEmailOptIn()}
+        revoking={marketingEmailRevoking}
+        error={marketingEmailError}
       />
     ) : null}
     </>

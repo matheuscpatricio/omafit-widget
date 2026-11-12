@@ -74,7 +74,7 @@ Já cobertos:
 | `utils/storeProfile.test.ts` | perfil da loja |
 | `utils/retailCalendar.test.ts` | calendário do stylist |
 | `utils/shopperProfile.test.ts` | perfil (inclui path `shopper-profile`) |
-| `utils/whatsappPilotAccess.test.ts` | piloto WhatsApp |
+| `utils/emailMarketingAccess.test.ts` | opt-in de e-mail (Klaviyo) |
 
 Prioridade do que **não** tem teste, sem escrever a suíte agora:
 
@@ -130,7 +130,7 @@ A tabela abaixo é a classificação de cada arquivo de `src/` hoje. A coluna de
 | `src/components/ShoeARWidgetPage.tsx` | ar | rota `/widget-shoes` |
 | `src/components/ShopifyConfigPage.tsx` | pages / merchant | importado por App.tsx; mover só junto com o import da rota |
 | `src/components/ShopperProfilePrompt.tsx` | shopper-profile | acoplado ao try-on |
-| `src/components/ShopperWhatsAppOptInPrompt.tsx` | shopper-profile | acoplado ao try-on |
+| `src/components/ShopperEmailOptInPrompt.tsx` | shopper-profile | acoplado ao try-on |
 | `src/components/SizeCalculator.tsx` | sizing UI | SizeCalculator também é importado pelo hook de perfil |
 | `src/components/SizeChartManagerNew.tsx` | sizing UI | rota `/size-chart`; não é o algoritmo |
 | `src/components/TryOnWidget.tsx` | tryon central | não mover nem fatiar sem plano; ~6600 linhas |
@@ -234,8 +234,8 @@ A tabela abaixo é a classificação de cada arquivo de `src/` hoje. A coluna de
 | `src/utils/stylistFeedbackParser.ts` | stylist | parte com teste |
 | `src/utils/supabaseFunctions.ts` | shared / commerce / widget | catálogo, produto, env, supabase, layout URL |
 | `src/utils/supabaseStorageDisplayUrl.ts` | shared / commerce / widget | catálogo, produto, env, supabase, layout URL |
-| `src/utils/whatsappPilotAccess.test.ts` | shopper-profile teste | chama função shopper-profile ausente neste repo |
-| `src/utils/whatsappPilotAccess.ts` | shopper-profile | chama função shopper-profile ausente neste repo |
+| `src/utils/emailMarketingAccess.test.ts` | shopper-profile teste | chama função shopper-profile ausente neste repo |
+| `src/utils/emailMarketingAccess.ts` | shopper-profile | chama função shopper-profile ausente neste repo |
 | `src/utils/widgetFont.ts` | shared / commerce / widget | catálogo, produto, env, supabase, layout URL |
 | `src/vite-env.d.ts` | shell | não mover; entry do Vite |
 | `src/workers/mediapipe.worker.ts` | mediapipe worker | carregado por URL, não por import estático |

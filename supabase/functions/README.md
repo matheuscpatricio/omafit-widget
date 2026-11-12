@@ -51,7 +51,7 @@ O widget manda a anon key em `apikey` e `Authorization` via `src/utils/supabaseF
 
 ## Função usada pelo widget e ausente desta pasta
 
-`src/utils/shopperProfile.ts` chama `/functions/v1/shopper-profile`. Não existe `supabase/functions/shopper-profile/` aqui. O handler está em outro projeto ou ainda não foi versionado neste repo. Não criar uma pasta com esse nome sem o contrato atual.
+`src/utils/shopperProfile.ts` chama `/functions/v1/shopper-profile`. Não existe `supabase/functions/shopper-profile/` aqui. O handler está em outro projeto ou ainda não foi versionado neste repo. Não criar uma pasta com esse nome sem o contrato atual. O provador envia `save_marketing_email` e `revoke_marketing_email` (`email`, `marketing_email_consent`, `marketing_channel: "klaviyo"`) no lugar de `save_whatsapp` / `revoke_whatsapp`. A chamada à Klaviyo fica nesse handler.
 
 ## `_shared/`
 

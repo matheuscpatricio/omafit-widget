@@ -26,7 +26,8 @@ export type ShopperProfile = {
   updated_at: string;
   measurements: ShopperMeasurements;
   consent_active: boolean;
-  marketing_whatsapp_active: boolean;
+  /** Opt-in de e-mail de marketing. A sincronização com a Klaviyo fica no backend. */
+  marketing_email_active: boolean;
 };
 
 export type ShopperProfileConfig = {
@@ -104,10 +105,21 @@ export function hasActiveShopperConsent(profile: ShopperProfile | null | undefin
   return Boolean(profile?.consent_active);
 }
 
-export function hasActiveMarketingWhatsappConsent(
+const MARKETING_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizeMarketingEmail(value: string | null | undefined): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+export function isValidMarketingEmail(value: string | null | undefined): boolean {
+  const email = normalizeMarketingEmail(value);
+  return email.length > 0 && email.length <= 254 && MARKETING_EMAIL_PATTERN.test(email);
+}
+
+export function hasActiveMarketingEmailConsent(
   profile: ShopperProfile | null | undefined
 ): boolean {
-  return Boolean(profile?.marketing_whatsapp_active);
+  return Boolean(profile?.marketing_email_active);
 }
 
 export function getShopperDeviceId(): string {
@@ -191,22 +203,30 @@ export async function recordShopperProfileEvent(
   }
 }
 
-export function saveShopperMarketingWhatsapp(
+/**
+ * Guarda o opt-in de e-mail para a integração com a Klaviyo.
+ * A função `shopper-profile` (fora deste repo) deve aceitar `save_marketing_email`
+ * e devolver `marketing_email_active`. Este cliente não chama a Klaviyo.
+ */
+export function saveShopperMarketingEmail(
   config: ShopperProfileConfig,
-  phone: string,
-  options?: { modelImageUrl?: string | null; marketingPhotoConsent?: boolean }
+  email: string
 ): Promise<ShopperProfile | null> {
-  return postShopperProfile('save_whatsapp', config, {
-    phone: String(phone || '').trim(),
-    model_image_url: options?.modelImageUrl || null,
-    marketing_photo_consent: Boolean(options?.marketingPhotoConsent),
+  const normalized = normalizeMarketingEmail(email);
+  if (!isValidMarketingEmail(normalized)) {
+    return Promise.reject(new Error('invalid_marketing_email'));
+  }
+  return postShopperProfile('save_marketing_email', config, {
+    email: normalized,
+    marketing_email_consent: true,
+    marketing_channel: 'klaviyo',
   });
 }
 
-export function revokeShopperMarketingWhatsapp(
+export function revokeShopperMarketingEmail(
   config: ShopperProfileConfig
 ): Promise<ShopperProfile | null> {
-  return postShopperProfile('revoke_whatsapp', config);
+  return postShopperProfile('revoke_marketing_email', config);
 }
 
 export function appendTryonHistory(
