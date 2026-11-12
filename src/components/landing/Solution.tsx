@@ -11,45 +11,45 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    title: 'Medição Precisa com MediaPipe',
+    title: 'Precise sizing with MediaPipe',
     description:
-      'Análise de mais de 50 pontos corporais em tempo real pelo celular do cliente. Sem fita métrica, sem erro humano.',
-    bullets: ['98% de acurácia na recomendação', '<10s de captura', 'Roda 100% no dispositivo'],
+      'Real-time analysis of 50+ body landmarks on the shopper’s phone. No measuring tape, no guesswork.',
+    bullets: ['98% recommendation accuracy', '<10s capture', 'Runs 100% on-device'],
     accent: true,
   },
   {
-    title: 'Try-On Fotorrealista (Roupas e Calçados)',
+    title: 'Photorealistic try-on (apparel & footwear)',
     description:
-      'IA generativa renderiza a peça no corpo do cliente com sombreamento, tecido e caimento realistas. Ele vê antes de comprar.',
-    bullets: ['Roupas femininas e masculinas', 'Calçados e acessórios no mesmo fluxo', 'Qualidade fotográfica'],
+      'Generative AI renders the garment on the shopper with realistic shading, fabric, and drape. They see it before they buy.',
+    bullets: ["Women's and men's apparel", 'Footwear and accessories in one flow', 'Photographic quality'],
   },
   {
-    title: 'Visualização AR (Óculos e Acessórios)',
+    title: 'AR preview (glasses & accessories)',
     description:
-      'Realidade aumentada direta do navegador para óculos, pulseiras, relógios e mais. Zero fricção, tudo ao vivo.',
-    bullets: ['WebAR sem instalação', 'Tracking facial em tempo real', 'Compatível com iOS e Android'],
+      'In-browser augmented reality for glasses, bracelets, watches, and more. Zero friction, all live.',
+    bullets: ['WebAR—no app install', 'Real-time face tracking', 'iOS and Android compatible'],
   },
   {
-    title: 'Assistente ChatGPT Integrado',
+    title: 'Built-in ChatGPT assistant',
     description:
-      'Um consultor de moda inteligente 24/7 que conhece seu catálogo, responde dúvidas e sugere combinações.',
-    bullets: ['Conhece seu catálogo', 'Sugere looks completos', 'Fala a língua da sua marca'],
+      'A 24/7 style advisor that knows your catalog, answers questions, and suggests outfits.',
+    bullets: ['Knows your catalog', 'Suggests full looks', 'Speaks in your brand voice'],
   },
   {
-    title: 'Analytics e ROI',
+    title: 'Analytics & ROI',
     description:
-      'Painéis que ligam o uso do widget a resultados de negócio: estime o retorno sobre o investimento e acompanhe o perfil agregado de quem usa o provador — dados como altura, peso e biotipo médios da sua audiência, sempre anonimizados.',
+      'Dashboards that tie widget usage to business outcomes: estimate ROI and follow aggregated shopper profiles—height, weight, and body-type averages, always anonymized.',
     bullets: [
-      'Modelos de ROI com conversão, ticket e devoluções',
-      'Médias de altura, peso e biotipo dos usuários',
-      'Funil de engajamento e sessões de try-on',
+      'ROI models for conversion, AOV, and returns',
+      'Average height, weight, and body-type insights',
+      'Engagement funnel and try-on sessions',
     ],
   },
   {
-    title: 'Widget Personalizável',
+    title: 'Customizable widget',
     description:
-      'Cores, fontes, layout e copy adaptados à identidade da sua marca. Parece nativo da sua loja, não uma terceirização.',
-    bullets: ['100% white-label', 'Integração em minutos', 'Mobile-first'],
+      'Colors, fonts, layout, and copy aligned with your brand. Feels native to your store—not bolted on.',
+    bullets: ['100% white-label', 'Install in minutes', 'Mobile-first'],
   },
 ];
 
@@ -86,7 +86,7 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
             : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/85',
         )}
       >
-        {highlight ? 'Destaque' : 'Recurso'}
+        {highlight ? 'Highlight' : 'Feature'}
       </span>
       <h3
         className={cn(
@@ -258,19 +258,18 @@ export function Solution() {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-accent/10 px-3 py-1 text-[12px] font-medium text-oma-accent"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" aria-hidden />
-            A solução
+            The solution
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Omafit: A Inteligência que Transforma{' '}
-            <span className="text-oma-accent">Dúvida em Confiança</span> e Vendas.
+            Omafit: intelligence that turns{' '}
+            <span className="text-oma-accent">doubt into confidence</span> and sales.
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            Uma suíte completa de IA visual para moda, acessórios e calçados. Instalação rápida e fácil na sua
-            loja.
+            A full visual AI suite for apparel, accessories, and footwear. Fast, easy install on your store.
           </motion.p>
         </motion.div>
 

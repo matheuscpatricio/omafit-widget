@@ -82,9 +82,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   };
 
   const handleRequestDemo = () => {
-    const subject = encodeURIComponent('Demonstração personalizada - Omafit');
+    const subject = encodeURIComponent('Personalized Omafit demo');
     const body = encodeURIComponent(
-      'Olá, gostaria de agendar uma demonstração personalizada do Omafit para minha loja.\n\nNome da loja:\nCategoria (roupas / calçados / acessórios):\nVolume mensal estimado:\nMelhor horário para call:',
+      'Hi, I would like to schedule a personalized Omafit demo for my store.\n\nStore name:\nCategory (apparel / footwear / accessories):\nEstimated monthly volume:\nBest time for a call:',
     );
     window.location.href = `mailto:contato@omafit.co?subject=${subject}&body=${body}`;
   };

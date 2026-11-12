@@ -107,18 +107,18 @@ function mergePlansFromDb(rows: BillingPlan[]): BillingPlan[] {
 
 function formatArCount(name: string): string {
   const n = AR_ACCESSORIES[name];
-  if (n === 'unlimited') return 'Ilimitados';
+  if (n === 'unlimited') return 'Unlimited';
   return String(n);
 }
 
 function formatTryOnImages(plan: BillingPlan): string {
   if (plan.images_included >= UNLIMITED_THRESHOLD) {
-    return 'Imagens de try-on ilimitadas';
+    return 'Unlimited try-on images';
   }
   if (plan.name === 'free' || plan.images_included === 0) {
-    return '50 sessões de try-on incluídas para começar';
+    return '50 try-on sessions included to start';
   }
-  return `${plan.images_included.toLocaleString('pt-BR')} imagens de try-on / mês`;
+  return `${plan.images_included.toLocaleString('en-US')} try-on images / month`;
 }
 
 export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
@@ -204,20 +204,20 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-elevated/80 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
-            Planos transparentes
+            Transparent pricing
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Escolha o Plano que <span className="text-oma-accent">Impulsiona</span> o Seu Crescimento.
+            Choose the plan that <span className="text-oma-accent">fuels</span> your growth.
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            Do On-Demand ao Enterprise: pacotes claros de{' '}
-            <span className="font-semibold text-oma-cream">imagens de try-on</span> (ex.: Pro com{' '}
-            <span className="font-semibold text-oma-accent">3.000 imagens</span> por US$ 300) e limites de{' '}
-            <span className="font-semibold text-oma-cream">acessórios AR</span> (5 → 20 → 100 → ilimitado).
+            From On-Demand to Enterprise: clear{' '}
+            <span className="font-semibold text-oma-cream">try-on image</span> bundles (e.g. Pro with{' '}
+            <span className="font-semibold text-oma-accent">3,000 images</span> for US$ 300) and{' '}
+            <span className="font-semibold text-oma-cream">AR accessory</span> limits (5 → 20 → 100 → unlimited).
           </motion.p>
         </motion.div>
 
@@ -248,7 +248,7 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
           className="mt-10 text-center"
         >
           <p className="text-sm text-oma-muted">
-            Dúvidas sobre faturamento ou volume?{' '}
+            Questions about billing or volume?{' '}
             <ButtonLink
               variant="link"
               size="sm"
@@ -256,7 +256,7 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Fale com o time no WhatsApp
+              Chat with us on WhatsApp
             </ButtonLink>
           </p>
         </motion.div>
@@ -323,7 +323,7 @@ function PlanCard({
             isDark ? 'text-oma-cream/50' : 'text-oma-muted'
           }`}
         >
-          {isFree ? 'On-Demand' : 'Assinatura mensal'}
+          {isFree ? 'On-Demand' : 'Monthly subscription'}
         </div>
         <h3
           className={`mt-2 text-xl font-semibold tracking-tight ${
@@ -334,22 +334,22 @@ function PlanCard({
         </h3>
         <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-oma-cream/60' : 'text-oma-muted'}`}>
           {isFree
-            ? 'Comece sem mensalidade e escale conforme o uso.'
+            ? 'Start without a monthly fee and scale with usage.'
             : plan.name === 'growth'
-            ? 'Para marcas em aceleração com volume moderado.'
+            ? 'For brands scaling with moderate volume.'
             : plan.name === 'pro'
-            ? 'Escala e previsibilidade para operações maduras.'
-            : 'Máximo de imagens de try-on e AR para grandes catálogos.'}
+            ? 'Predictability for mature operations.'
+            : 'Maximum try-on images and AR for large catalogs.'}
         </p>
 
         <div className="mt-6 flex flex-col gap-1">
           {plan.monthly_price === 0 ? (
             <>
               <span className={`text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? 'text-oma-cream' : 'text-oma-ink'}`}>
-                Instalação grátis
+                Free install
               </span>
               <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
-                Sem mensalidade fixa — pague só pelo que usar além das 50 sessões incluídas.
+                No fixed monthly fee—pay only for usage beyond the 50 included sessions.
               </span>
             </>
           ) : (
@@ -357,7 +357,7 @@ function PlanCard({
               <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
                 US$ {plan.monthly_price}
               </span>
-              <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mês</span>
+              <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mo</span>
             </div>
           )}
         </div>
@@ -373,46 +373,46 @@ function PlanCard({
 
         <ul className="mt-6 space-y-2.5 flex-1">
           <PricingBullet inverted={isDark}>
-            {plan.name === 'free' && `${arLabel} acessórios AR incluídos`}
-            {plan.name === 'growth' && 'Até 20 acessórios AR incluídos'}
-            {plan.name === 'pro' && 'Até 100 acessórios AR incluídos'}
-            {plan.name === 'enterprise' && 'Acessórios AR ilimitados'}
+            {plan.name === 'free' && `${arLabel} AR accessories included`}
+            {plan.name === 'growth' && 'Up to 20 AR accessories included'}
+            {plan.name === 'pro' && 'Up to 100 AR accessories included'}
+            {plan.name === 'enterprise' && 'Unlimited AR accessories'}
           </PricingBullet>
           {plan.name === 'pro' && (
             <PricingBullet inverted={isDark}>
-              Faturamento fixo mensal — inclui 3.000 imagens de try-on
+              Fixed monthly billing — includes 3,000 try-on images
             </PricingBullet>
           )}
           {plan.name === 'enterprise' && (
             <PricingBullet inverted={isDark}>
-              Faturamento fixo mensal — imagens de try-on e AR ilimitados
+              Fixed monthly billing — unlimited try-on images and AR
             </PricingBullet>
           )}
           {!isFree && plan.price_per_extra_image > 0 && (
             <PricingBullet inverted={isDark}>
-              Imagens extras a US$ {plan.price_per_extra_image.toFixed(2)} cada
+              Extra images at US$ {plan.price_per_extra_image.toFixed(2)} each
             </PricingBullet>
           )}
           {isFree && (
             <PricingBullet inverted={isDark}>
-              US$ {plan.price_per_extra_image.toFixed(2)} por sessão de try-on após as 50 incluídas
+              US$ {plan.price_per_extra_image.toFixed(2)} per try-on session after the 50 included
             </PricingBullet>
           )}
-          <PricingBullet inverted={isDark}>Medição precisa (MediaPipe)</PricingBullet>
-          <PricingBullet inverted={isDark}>Try-on fotorrealista</PricingBullet>
-          <PricingBullet inverted={isDark}>Widget personalizável</PricingBullet>
+          <PricingBullet inverted={isDark}>Precise sizing (MediaPipe)</PricingBullet>
+          <PricingBullet inverted={isDark}>Photorealistic try-on</PricingBullet>
+          <PricingBullet inverted={isDark}>Customizable widget</PricingBullet>
           {plan.name !== 'free' && (
-            <PricingBullet inverted={isDark}>Assistente ChatGPT integrado</PricingBullet>
+            <PricingBullet inverted={isDark}>Integrated ChatGPT assistant</PricingBullet>
           )}
           {(plan.name === 'pro' || plan.name === 'enterprise') && (
-            <PricingBullet inverted={isDark}>Suporte prioritário</PricingBullet>
+            <PricingBullet inverted={isDark}>Priority support</PricingBullet>
           )}
         </ul>
 
         <div className="mt-8">
           {isFree ? (
             <Button variant="secondary" size="lg" className="w-full" onClick={cta} type="button">
-              Instalar grátis na Shopify
+              Install free on Shopify
               <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (
@@ -423,7 +423,7 @@ function PlanCard({
               onClick={cta}
               type="button"
             >
-              {plan.name === 'enterprise' ? 'Assinar Enterprise' : 'Assinar plano'}
+              {plan.name === 'enterprise' ? 'Subscribe to Enterprise' : 'Subscribe'}
               <ArrowRight className="w-4 h-4" />
             </Button>
           )}

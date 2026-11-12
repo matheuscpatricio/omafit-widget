@@ -10,10 +10,11 @@ interface NavbarProps {
 }
 
 const links = [
-  { href: '#solucao', label: 'Solução' },
-  { href: '#recursos', label: 'Recursos' },
-  { href: '#planos', label: 'Planos' },
+  { href: '#solucao', label: 'Solution' },
+  { href: '#recursos', label: 'Features' },
+  { href: '#planos', label: 'Pricing' },
   { href: '#faq', label: 'FAQ' },
+  { href: '/blog', label: 'Blog' },
 ];
 
 export function Navbar({ onOpenInstallModal }: NavbarProps) {
@@ -56,7 +57,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
           <div className="flex items-center justify-between h-16">
             <a
               href="#top"
-              aria-label="Omafit — início"
+              aria-label="Omafit — home"
               className={cn(
                 'group min-w-0 shrink-0 select-none rounded-md border px-2 py-1 transition-[background-color,box-shadow,backdrop-filter,opacity,border-color] duration-500 hover:opacity-95',
                 'outline-none ring-0 [-webkit-tap-highlight-color:transparent]',
@@ -95,7 +96,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                 variant="primary"
                 onClick={() => onOpenInstallModal?.()}
               >
-                Instalar
+                Install
               </Button>
             </div>
 
@@ -107,7 +108,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                   ? 'text-oma-ink hover:bg-oma-elevated'
                   : 'text-oma-cream [text-shadow:0_1px_12px_rgba(0,0,0,0.45)] hover:bg-oma-cream/10',
               )}
-              aria-label="Abrir menu"
+              aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -138,7 +139,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
               <div className="flex items-center justify-between mb-4">
                 <a
                   href="#top"
-                  aria-label="Omafit — início"
+                  aria-label="Omafit — home"
                   onClick={() => setMobileOpen(false)}
                   className="min-w-0 shrink-0 transition-opacity hover:opacity-95"
                 >
@@ -147,7 +148,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                 <button
                   onClick={() => setMobileOpen(false)}
                   className="grid h-10 w-10 place-items-center rounded-lg text-oma-ink hover:bg-oma-light/80"
-                  aria-label="Fechar menu"
+                  aria-label="Close menu"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -173,7 +174,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                   }}
                   className="grid h-11 place-items-center rounded-[6px] bg-[#D96845] font-bricolage text-sm font-medium tracking-[0.05em] text-[#F6F0E2] hover:bg-[var(--color-accent-dark)]"
                 >
-                  Instalar
+                  Install
                 </button>
               </div>
             </motion.div>

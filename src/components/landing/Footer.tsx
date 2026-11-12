@@ -11,14 +11,14 @@ export function Footer() {
           <div className="col-span-2 md:col-span-2">
             <a
               href="#top"
-              aria-label="Omafit — início"
+              aria-label="Omafit — home"
               className="inline-block transition-opacity hover:opacity-95"
             >
               <OmafitLogo variant="onDark" />
             </a>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-oma-muted">
-              Assistente Inteligente com IA fotorrealista para moda, calçados e acessórios.
-              Medidas precisas, try-on realista, menos devoluções.
+              Photorealistic AI assistant for apparel, footwear, and accessories.
+              Precise sizing, realistic try-on, fewer returns.
             </p>
 
             <div className="mt-5 flex items-center gap-2">
@@ -34,10 +34,10 @@ export function Footer() {
             </div>
           </div>
 
-          <FooterCol title="Produto">
-            <FooterLink href="#solucao">Solução</FooterLink>
-            <FooterLink href="#recursos">Recursos</FooterLink>
-            <FooterLink href="#planos">Planos</FooterLink>
+          <FooterCol title="Product">
+            <FooterLink href="#solucao">Solution</FooterLink>
+            <FooterLink href="#recursos">Features</FooterLink>
+            <FooterLink href="#planos">Pricing</FooterLink>
             <FooterLink
               href="https://apps.shopify.com/omafit"
               external
@@ -46,26 +46,27 @@ export function Footer() {
             </FooterLink>
           </FooterCol>
 
-          <FooterCol title="Suporte">
+          <FooterCol title="Support">
             <FooterLink href="#faq">FAQ</FooterLink>
-            <FooterLink href="/contato">Contato</FooterLink>
+            <FooterLink href="/contato">Contact</FooterLink>
             <FooterLink href="mailto:contato@omafit.co" external>
               contato@omafit.co
             </FooterLink>
           </FooterCol>
 
-          <FooterCol title="Empresa">
-            <FooterLink href="/privacidade">Privacidade</FooterLink>
-            <FooterLink href="#faq">Termos</FooterLink>
+          <FooterCol title="Company">
+            <FooterLink href="/blog">Blog</FooterLink>
+            <FooterLink href="/privacidade">Privacy</FooterLink>
+            <FooterLink href="#faq">Terms</FooterLink>
           </FooterCol>
         </div>
 
         <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-oma-line/40 pt-8 sm:flex-row sm:items-center">
           <p className="text-xs text-oma-muted">
-            &copy; {year} Omafit. Todos os direitos reservados.
+            &copy; {year} Omafit. All rights reserved.
           </p>
           <p className="text-xs text-oma-muted">
-            Feito com precisão em São Paulo, Brasil
+            Built with care in São Paulo, Brazil
           </p>
         </div>
       </div>

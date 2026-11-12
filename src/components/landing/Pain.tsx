@@ -36,15 +36,15 @@ export function Pain() {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-parchment/90 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
-            O problema
+            The problem
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Sua loja está ótima.{' '}
-            <span className="text-oma-muted">Mas você sofre por esses motivos.</span>
+            Your store looks great.{' '}
+            <span className="text-oma-muted">But you still bleed margin for these reasons.</span>
           </motion.h2>
         </motion.div>
 
@@ -59,10 +59,10 @@ export function Pain() {
             variants={itemVariants}
             className="text-lg leading-relaxed text-oma-muted sm:text-xl sm:leading-relaxed lg:text-[1.35rem] lg:leading-relaxed"
           >
-            Devoluções por tamanho ou caimento não desejados continuam a corroer sua margem: frete reverso,
-            reembolso e peça de volta ao estoque aumentam o custo e o seu cliente não compra nunca mais. No
-            checkout, a dúvida sobre o ajuste é um dos maiores motivos de abandono. Sem confiança na compra, o
-            cliente abandona o carrinho, e o tráfego que você conquistou não vira receita de forma estável.
+            Returns for wrong size or unwanted fit keep eating margin: reverse shipping, refunds, and
+            stock back on the shelf raise cost—and the customer may never buy again. At checkout, fit
+            doubt is a top reason for abandonment. Without purchase confidence, carts stall and the traffic
+            you paid for never turns into steady revenue.
           </motion.p>
         </motion.div>
       </div>

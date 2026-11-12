@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { getSiteUrl, LANDING_IMAGES } from '../../lib/site';
 
 const DEFAULT_TITLE =
-  'Omafit — Assistente de IA para moda na Shopify | Try-on, medidas e AR';
+  'Omafit — AI fashion assistant for Shopify | Try-on, sizing & AR';
 const DEFAULT_DESC =
-  'Reduza devoluções e aumente conversão com try-on fotorrealista, medição MediaPipe, AR para acessórios e widget para Shopify. Instalação gratuita na Shopify; On-Demand com 50 sessões de try-on incluídas. Growth, Pro (US$ 300/mês, 3.000 imagens) e Enterprise (US$ 600/mês).';
+  'Cut returns and lift conversion with photorealistic try-on, MediaPipe sizing, AR for accessories, and a Shopify widget. Free Shopify install; On-Demand includes 50 try-on sessions. Growth, Pro (US$ 300/mo, 3,000 images), and Enterprise (US$ 600/mo).';
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
@@ -27,8 +27,7 @@ function upsertLink(rel: string, href: string) {
 }
 
 /**
- * SEO on-page para a landing: título, meta tags, Open Graph, Twitter Card e JSON-LD.
- * Executa no mount; em SPA, crawlers que executam JS também enxergam (ex.: Google).
+ * On-page SEO for the landing: title, meta tags, Open Graph, Twitter Card, and JSON-LD.
  */
 export function LandingSEO() {
   useEffect(() => {
@@ -36,7 +35,7 @@ export function LandingSEO() {
     const ogImage = `${base}${LANDING_IMAGES.ogImage}`;
     const pageUrl = `${base}/`;
 
-    document.documentElement.lang = 'pt-BR';
+    document.documentElement.lang = 'en';
     document.title = DEFAULT_TITLE;
 
     upsertMeta('name', 'description', DEFAULT_DESC);
@@ -44,22 +43,22 @@ export function LandingSEO() {
       'Omafit',
       'Shopify',
       'virtual try-on',
-      'try on IA',
-      'moda e-commerce',
-      'reduzir devoluções',
-      'medição corporal',
+      'AI try-on',
+      'fashion e-commerce',
+      'reduce returns',
+      'body measurement',
       'MediaPipe',
-      'AR óculos',
-      'widget Shopify',
-      'assistente de compras',
-      'tamanho ideal roupa',
+      'AR eyewear',
+      'Shopify widget',
+      'shopping assistant',
+      'apparel sizing',
     ].join(', '));
     upsertMeta('name', 'robots', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
     upsertMeta('name', 'author', 'Omafit');
     upsertMeta('name', 'theme-color', '#D96845');
 
     upsertMeta('property', 'og:type', 'website');
-    upsertMeta('property', 'og:locale', 'pt_BR');
+    upsertMeta('property', 'og:locale', 'en_US');
     upsertMeta('property', 'og:url', pageUrl);
     upsertMeta('property', 'og:site_name', 'Omafit');
     upsertMeta('property', 'og:title', DEFAULT_TITLE);
@@ -67,7 +66,7 @@ export function LandingSEO() {
     upsertMeta('property', 'og:image', ogImage);
     upsertMeta('property', 'og:image:width', '1200');
     upsertMeta('property', 'og:image:height', '630');
-    upsertMeta('property', 'og:image:alt', 'Omafit — IA para moda e e-commerce');
+    upsertMeta('property', 'og:image:alt', 'Omafit — AI for fashion e-commerce');
 
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', DEFAULT_TITLE);
@@ -94,7 +93,7 @@ export function LandingSEO() {
           url: base,
           name: 'Omafit',
           publisher: { '@id': `${base}/#organization` },
-          inLanguage: 'pt-BR',
+          inLanguage: 'en',
         },
         {
           '@type': 'SoftwareApplication',

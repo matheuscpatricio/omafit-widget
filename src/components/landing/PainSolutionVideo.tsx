@@ -112,7 +112,7 @@ export function PainSolutionVideo() {
 
   return (
     <section
-      aria-label="Vídeo promocional Omafit"
+      aria-label="Omafit promotional video"
       className="relative mx-3 my-6 max-w-7xl sm:mx-4 sm:my-8 md:mx-6 lg:mx-auto lg:my-10"
     >
       <div className="overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated shadow-elegant-lg sm:rounded-3xl">
@@ -142,13 +142,13 @@ export function PainSolutionVideo() {
               aria-live="polite"
             >
               <Loader2 className="h-8 w-8 animate-spin text-oma-accent" aria-hidden />
-              <span className="text-sm">A preparar o vídeo…</span>
+              <span className="text-sm">Loading video…</span>
             </div>
           )}
 
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-oma-canvas/95 px-6 text-center text-sm text-oma-muted">
-              Não foi possível carregar o vídeo. Verifica a ligação à internet e tenta novamente.
+              Could not load the video. Check your connection and try again.
             </div>
           )}
 
@@ -163,7 +163,7 @@ export function PainSolutionVideo() {
                 'flex h-10 w-10 items-center justify-center rounded-full border border-oma-cream/20 bg-oma-elevated/85 text-oma-cream shadow-elegant backdrop-blur-sm transition hover:bg-oma-elevated hover:border-oma-accent/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oma-accent sm:h-11 sm:w-11',
                 (!ready || error) && 'cursor-not-allowed opacity-50',
               )}
-              aria-label={playing ? 'Pausar vídeo' : 'Reproduzir vídeo'}
+              aria-label={playing ? 'Pause video' : 'Play video'}
             >
               {buffering && playing ? (
                 <Loader2 className="h-5 w-5 animate-spin text-oma-accent" aria-hidden />

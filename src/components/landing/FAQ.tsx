@@ -9,36 +9,36 @@ interface FAQItem {
 
 const faqs: FAQItem[] = [
   {
-    q: 'Quanto tempo leva para instalar o Omafit na minha loja Shopify?',
-    a: 'A instalação é feita em poucos cliques direto pela Shopify App Store e leva tipicamente menos de 5 minutos. Após instalar, nosso widget já aparece nas páginas de produto configuradas e você pode ajustar cores, fontes e posição no painel administrativo.',
+    q: 'How long does it take to install Omafit on my Shopify store?',
+    a: 'Installation takes a few clicks from the Shopify App Store—typically under 5 minutes. After install, the widget appears on configured product pages and you can adjust colors, fonts, and placement in the admin.',
   },
   {
-    q: 'O Omafit funciona com quais plataformas?',
-    a: 'Hoje oferecemos integração nativa com Shopify. Nuvemshop, WooCommerce e Yampi estão no roadmap e chegam em breve. Para integrações customizadas (ERP, headless, apps mobile), nosso time Enterprise atende sob demanda.',
+    q: 'Which platforms does Omafit support?',
+    a: 'We offer native Shopify integration today. Nuvemshop, WooCommerce, and Yampi are on the roadmap. For custom integrations (ERP, headless, mobile apps), our Enterprise team can help on request.',
   },
   {
-    q: 'Como funciona a privacidade e segurança dos dados dos meus clientes?',
-    a: 'Somos LGPD e GDPR compliant. A captura biométrica com MediaPipe roda 100% no dispositivo do cliente — nenhuma imagem bruta sai do navegador dele para nossos servidores sem consentimento explícito. Armazenamos apenas métricas anonimizadas e dados estritamente necessários para a operação.',
+    q: 'How do you handle customer privacy and data security?',
+    a: 'We are LGPD and GDPR aligned. MediaPipe capture runs 100% on the shopper’s device—no raw images leave their browser without explicit consent. We store only anonymized metrics and data required to operate.',
   },
   {
-    q: 'A IA funciona com qualquer tipo de roupa ou produto?',
-    a: 'Sim. Nosso modelo de try-on foi treinado para vestuário feminino e masculino (vestidos, camisetas, calças, jaquetas, etc.), calçados (tênis, sandálias, botas) e acessórios via AR (óculos, bonés, relógios). Para categorias muito específicas, podemos treinar um fine-tune dedicado para sua marca.',
+    q: 'Does the AI work for all apparel and product types?',
+    a: 'Yes. Our try-on model covers women’s and men’s apparel (dresses, tees, pants, jackets, etc.), footwear, and AR accessories (glasses, caps, watches). For very specific categories, we can train a dedicated fine-tune for your brand.',
   },
   {
-    q: 'Como funciona a cobrança por imagem? Preciso me comprometer mensalmente?',
-    a: 'A instalação na Shopify é gratuita. No On-Demand você tem 50 sessões de try-on incluídas para começar, 5 acessórios AR e US$ 0,18 por sessão de try-on adicional. Growth: US$ 89/mês (700 imagens, 20 AR), imagens extras a US$ 0,12. Pro: US$ 300/mês com 3.000 imagens de try-on (100 AR). Enterprise: US$ 600/mês com try-on e AR ilimitados. Sem taxas ocultas.',
+    q: 'How does per-image billing work? Do I need a monthly commitment?',
+    a: 'Shopify install is free. On-Demand includes 50 try-on sessions, 5 AR accessories, and US$ 0.18 per additional try-on session. Growth: US$ 89/mo (700 images, 20 AR), extras at US$ 0.12. Pro: US$ 300/mo with 3,000 try-on images (100 AR). Enterprise: US$ 600/mo with unlimited try-on and AR. No hidden fees.',
   },
   {
-    q: 'O Omafit afeta a velocidade de carregamento da minha loja?',
-    a: 'Nosso widget é lazy-loaded e pesa menos de 50KB no bundle inicial. Ele só ativa a captura e processamento quando o cliente clica em "Provar". A performance da sua loja permanece intacta — validamos isso com Lighthouse e Core Web Vitals.',
+    q: 'Will Omafit slow down my store?',
+    a: 'The widget is lazy-loaded and the initial bundle is under 50KB. Capture and processing start only when the shopper clicks “Try on”. Store performance stays intact—we validate with Lighthouse and Core Web Vitals.',
   },
   {
-    q: 'Que tipo de suporte eu recebo após instalar?',
-    a: 'Quem usa o On-Demand tem acesso a documentação completa, tutoriais em vídeo e suporte por e-mail. Clientes Pro recebem suporte prioritário, onboarding guiado e canal direto via WhatsApp. Clientes Enterprise têm gerente de conta dedicado e SLA personalizado.',
+    q: 'What support do I get after install?',
+    a: 'On-Demand includes full docs, video tutorials, and email support. Pro customers get priority support, guided onboarding, and a direct WhatsApp channel. Enterprise includes a dedicated account manager and custom SLA.',
   },
   {
-    q: 'Posso personalizar o visual do widget para combinar com minha marca?',
-    a: 'Completamente. Cores, fontes, layout, copy, textos dos botões, ícones e posição na página são todos customizáveis. Nosso objetivo é que o widget pareça nativo da sua loja, não uma ferramenta terceirizada. Não há branding "Powered by Omafit" visível para o cliente final.',
+    q: 'Can I customize the widget to match my brand?',
+    a: 'Fully. Colors, fonts, layout, copy, button text, icons, and on-page placement are configurable. The goal is a native feel—not a third-party tool. No visible “Powered by Omafit” for end customers.',
   },
 ];
 
@@ -74,20 +74,20 @@ export function FAQ() {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-elevated/80 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
-            Tire suas dúvidas
+            Questions answered
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Perguntas Frequentes.
+            Frequently asked questions.
           </motion.h2>
           <motion.p
             variants={itemVariants}
             className="mt-5 text-lg text-oma-muted"
           >
-            Tudo que você precisa saber sobre instalação, segurança, integração e suporte.
+            Everything you need to know about install, security, integration, and support.
           </motion.p>
         </motion.div>
 
@@ -155,12 +155,12 @@ export function FAQ() {
           className="mt-12 text-center"
         >
           <p className="text-sm text-oma-muted">
-            Ainda tem dúvidas?{' '}
+            Still have questions?{' '}
             <a
               href="mailto:contato@omafit.co"
               className="font-medium text-oma-accent hover:underline underline-offset-4"
             >
-              Fale com nosso time →
+              Talk to our team →
             </a>
           </p>
         </motion.div>

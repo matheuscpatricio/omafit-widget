@@ -66,7 +66,7 @@ export function ImpactStats() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           className="landing-tagline text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-oma-muted"
         >
-          Dados Omafit
+          Omafit data
         </motion.p>
         <motion.h2
           id="impacto-heading"
@@ -77,7 +77,7 @@ export function ImpactStats() {
           className="mx-auto mt-3 max-w-2xl text-center text-2xl font-semibold tracking-tight text-oma-cream sm:text-3xl"
           style={{ letterSpacing: '-0.035em' }}
         >
-          Resultados que marcas como a sua já sentem no dia a dia.
+          Results brands like yours see in day-to-day operations.
         </motion.h2>
 
         <div className="mt-16 flex flex-col gap-16 sm:mt-20 sm:gap-20 md:gap-24">
@@ -89,11 +89,11 @@ export function ImpactStats() {
             className="text-center md:text-left"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">Redução de </span>
+              <span className="text-oma-muted">Up to </span>
               <CountUp end={63} suffix="%" className={cn(numClass, 'mx-1 align-baseline md:mx-1.5')} />
-              <span className="text-oma-muted"> das devoluções</span>
+              <span className="text-oma-muted"> fewer returns</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Menos frete reverso, mais margem e clientes que voltam a comprar com confiança.
+                Less reverse logistics, more margin, and customers who buy again with confidence.
               </span>
             </p>
           </motion.article>
@@ -106,11 +106,11 @@ export function ImpactStats() {
             className="text-center"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">O usuário que passa pelo Omafit tem </span>
+              <span className="text-oma-muted">Shoppers who use Omafit are </span>
               <CountUp end={3} suffix="×" className={cn(numClass, 'mx-1 align-baseline')} duration={1.9} />
-              <span className="text-oma-muted"> mais hipóteses de comprar</span>
+              <span className="text-oma-muted"> more likely to buy</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Experiência guiada de tamanho e visualização que desbloqueia o checkout.
+                Guided sizing and visualization that unlocks checkout.
               </span>
             </p>
           </motion.article>
@@ -123,11 +123,11 @@ export function ImpactStats() {
             className="text-center md:text-right"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">Taxa de abandono de carrinho </span>
+              <span className="text-oma-muted">Cart abandonment </span>
               <CountUp end={46} suffix="%" className={cn(numClass, 'mx-1 align-baseline md:mx-1.5')} />
-              <span className="text-oma-muted"> menor</span>
+              <span className="text-oma-muted"> lower</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Menos dúvida no tamanho e no visual — mais carrinhos concluídos.
+                Less doubt on size and look—more completed checkouts.
               </span>
             </p>
           </motion.article>
@@ -140,8 +140,8 @@ export function ImpactStats() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="mx-auto mt-14 max-w-2xl text-center text-xs leading-relaxed text-oma-muted sm:mt-16 sm:text-sm"
         >
-          Indicadores agregados de lojas acompanhadas pelo Omafit; o impacto na sua operação pode variar
-          consoante catálogo, tráfego e categoria.
+          Aggregated metrics from Omafit-powered stores; your results may vary by catalog, traffic, and
+          category.
         </motion.p>
       </div>
     </section>

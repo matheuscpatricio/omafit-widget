@@ -35,15 +35,15 @@ const itemVariants: Variants = {
 
 const marqueeItems = [
   'Shopify',
-  'Try-on IA',
+  'AI try-on',
   'MediaPipe',
   'WebAR',
-  'Menos devoluções',
-  'Mais conversão',
-  'Widget white-label',
+  'Fewer returns',
+  'Higher conversion',
+  'White-label widget',
   'ChatGPT',
-  'Calçados & roupas',
-  'Acessórios AR',
+  'Apparel & footwear',
+  'AR accessories',
 ];
 
 export function Hero({ onOpenInstallModal, onRequestDemo }: HeroProps) {

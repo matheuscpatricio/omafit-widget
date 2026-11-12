@@ -46,15 +46,15 @@ const slides: Slide[] = [
     hideBadge: true,
     title: (
       <span className="block text-balance">
-        O Fim Definitivo das Devoluções e o Início da{' '}
+        End size returns. Start real{' '}
         <span className="landing-tagline font-bold text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
-          Confiança
-        </span>
-        {' '}na Moda Online.
+          confidence
+        </span>{' '}
+        in online fashion.
       </span>
     ),
     body:
-      'O Omafit é o assistente inteligente que usa IA fotorrealista e medição precisa para garantir o caimento perfeito em roupas, calçados e acessórios. Reduza custos, aumente vendas e encante seus clientes.',
+      'Omafit is the intelligent assistant that uses photorealistic AI and precise measurement for the right fit in apparel, footwear, and accessories. Cut costs, grow sales, and delight shoppers.',
     topScrim: false,
     compact: true,
     showCtas: true,
@@ -63,10 +63,10 @@ const slides: Slide[] = [
   {
     id: 'fit',
     image: LANDING_IMAGES.heroLifestyleBoardwalk,
-    badge: 'Medição precisa',
+    badge: 'Precise sizing',
     title: (
       <>
-        Caimento certo com{' '}
+        The right fit with{' '}
         <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-tech !to-oma-cream">
           MediaPipe
         </ShimmerHeading>
@@ -74,24 +74,24 @@ const slides: Slide[] = [
       </>
     ),
     body:
-      'Nossa tecnologia de detecção corporal analisa o corpo do seu cliente com perfeição e indica o tamanho ideal.',
+      'Our body-detection technology analyzes your shopper and recommends the ideal size.',
     topScrim: true,
   },
   {
     id: 'chat-aov',
     image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Chat integrado',
+    badge: 'Built-in chat',
     title: (
       <span className="block text-balance">
-        Consultor de moda que aumenta{' '}
+        A style advisor that raises{' '}
         <span className="italic text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
-          ticket médio
+          average order value
         </span>
         .
       </span>
     ),
     body:
-      'Seu cliente experimenta um produto, o Omafit agirá como um consultor e indicará peças complementares para subir seu AOV.',
+      'When a shopper tries a product, Omafit acts as a consultant and suggests complementary pieces to grow your AOV.',
     topScrim: true,
   },
 ];
@@ -230,7 +230,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                             className="w-full justify-center shadow-lg"
                             onClick={() => onOpenInstallModal?.()}
                           >
-                            Instalar
+                            Install
                             <ArrowRight className="h-4 w-4" />
                           </Button>
                           <Button
@@ -241,7 +241,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                             onClick={onRequestDemo}
                           >
                             <Play className="h-4 w-4" />
-                            Demonstração
+                            Demo
                           </Button>
                         </motion.div>
                       )}
@@ -255,7 +255,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
             <div
               className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex justify-center gap-2"
               role="tablist"
-              aria-label="Slides do hero"
+              aria-label="Hero slides"
             >
               {slides.map((s, i) => (
                 <button
@@ -263,7 +263,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                   type="button"
                   role="tab"
                   aria-selected={i === current}
-                  aria-label={`Ir para slide ${i + 1}`}
+                  aria-label={`Go to slide ${i + 1}`}
                   className={cn(
                     'pointer-events-auto h-2 rounded-full transition-all duration-300',
                     i === current ? 'w-7 bg-oma-accent' : 'w-2 bg-oma-cream/45 hover:bg-oma-cream/65',

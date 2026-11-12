@@ -6,7 +6,6 @@ import { cn } from '../../lib/utils';
 interface InstallPlatformModalProps {
   open: boolean;
   onClose: () => void;
-  /** Chamado ao escolher Shopify (ex.: fluxo de signup / analytics). */
   onSelectShopify: () => void;
 }
 
@@ -45,7 +44,7 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
         >
           <button
             type="button"
-            aria-label="Fechar"
+            aria-label="Close"
             className="absolute inset-0 bg-black/55 backdrop-blur-sm"
             onClick={onClose}
           />
@@ -59,15 +58,15 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="install-platform-title" className="font-semibold text-oma-ink">
-                  Instalar Omafit
+                  Install Omafit
                 </h2>
-                <p className="mt-1 text-sm text-oma-muted">Escolha sua plataforma</p>
+                <p className="mt-1 text-sm text-oma-muted">Choose your platform</p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-oma-muted transition-colors hover:bg-oma-light/80 hover:text-oma-ink"
-                aria-label="Fechar"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -98,7 +97,7 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
                   Nuvemshop
                 </span>
                 <span className="rounded-full border border-oma-line/60 bg-oma-parchment px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-oma-muted">
-                  Em breve
+                  Coming soon
                 </span>
               </div>
             </div>

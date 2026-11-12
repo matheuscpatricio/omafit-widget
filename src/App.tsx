@@ -9,6 +9,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { ContactPage } from './components/ContactPage';
+import { BlogIndexPage } from './components/blog/BlogIndexPage';
+import { BlogArticlePage } from './components/blog/BlogArticlePage';
 import { supabase } from './lib/supabase';
 
 const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -110,6 +112,8 @@ function App() {
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
         <Route path="/contato" element={<ContactPage />} />
+        <Route path="/blog" element={<BlogIndexPage />} />
+        <Route path="/blog/:slug" element={<BlogArticlePage />} />
         <Route
           path="/pricing"
           element={
