@@ -4,7 +4,7 @@ import { getSiteUrl, LANDING_IMAGES } from '../../lib/site';
 const DEFAULT_TITLE =
   'Omafit — AI fashion assistant for Shopify | Try-on, sizing & AR';
 const DEFAULT_DESC =
-  'Cut returns and lift conversion with photorealistic try-on, MediaPipe sizing, AR for accessories, and a Shopify widget. Free Shopify install; On-Demand includes 50 try-on sessions. Growth, Pro (US$ 300/mo, 3,000 images), and Enterprise (US$ 600/mo).';
+  'Cut returns and lift conversion with photorealistic try-on, MediaPipe sizing, AR for accessories, and a Shopify widget. Plans from US$ 99/mo (Growth) to Enterprise, with 14-day trials on Growth, Pro, and Scale.';
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
@@ -103,8 +103,8 @@ export function LandingSEO() {
           offers: {
             '@type': 'AggregateOffer',
             priceCurrency: 'USD',
-            lowPrice: '0',
-            highPrice: '600',
+            lowPrice: '99',
+            highPrice: '2499',
             offerCount: '4',
           },
           description: DEFAULT_DESC,

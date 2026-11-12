@@ -4,70 +4,106 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button, ButtonLink } from '../ui/button';
 
+type PlanName = 'growth' | 'pro' | 'scale' | 'enterprise';
+
 interface BillingPlan {
-  name: string;
+  name: PlanName;
   display_name: string;
   monthly_price: number;
+  yearly_price: number;
   images_included: number;
   price_per_extra_image: number;
   currency: string;
   active: boolean;
+  trial_days?: number;
+  tagline: string;
+  features: string[];
 }
 
-/** Imagens de try-on incluídas por mês (coluna `images_included` no Supabase). */
 const UNLIMITED_THRESHOLD = 500_000;
 
-const AR_ACCESSORIES: Record<string, number | 'unlimited'> = {
-  free: 5,
-  growth: 20,
-  pro: 100,
-  enterprise: 'unlimited',
-};
-
-const PLAN_ORDER = ['free', 'growth', 'pro', 'enterprise'] as const;
+const PLAN_ORDER: PlanName[] = ['growth', 'pro', 'scale', 'enterprise'];
 
 const fallbackPlans: BillingPlan[] = [
   {
-    name: 'free',
-    display_name: 'On-Demand',
-    monthly_price: 0,
-    images_included: 0,
-    price_per_extra_image: 0.18,
-    currency: 'USD',
-    active: true,
-  },
-  {
     name: 'growth',
     display_name: 'Growth',
-    monthly_price: 89,
-    images_included: 700,
+    monthly_price: 99,
+    yearly_price: 999,
+    images_included: 1000,
     price_per_extra_image: 0.12,
     currency: 'USD',
     active: true,
+    trial_days: 14,
+    tagline: 'For brands getting started with virtual try-on at steady volume.',
+    features: [
+      '1,000 try-on sessions/month',
+      'Personalized size recommendations',
+      'AI-powered shopping assistant',
+      'Customizable widget design',
+      'Extra try-ons at $0.12 each',
+    ],
   },
   {
     name: 'pro',
     display_name: 'Pro',
-    monthly_price: 300,
-    images_included: 3000,
+    monthly_price: 399,
+    yearly_price: 3990,
+    images_included: 5000,
     price_per_extra_image: 0.08,
     currency: 'USD',
     active: true,
+    trial_days: 14,
+    tagline: 'Predictable volume and full styling tools for growing stores.',
+    features: [
+      '5,000 try-on sessions/month',
+      'Personalized size recommendations',
+      'AI Stylist and outfit recommendations',
+      'Customizable widget design',
+      'Extra try-ons at $0.08 each',
+    ],
+  },
+  {
+    name: 'scale',
+    display_name: 'Scale',
+    monthly_price: 999,
+    yearly_price: 9990,
+    images_included: 15000,
+    price_per_extra_image: 0.04,
+    currency: 'USD',
+    active: true,
+    trial_days: 14,
+    tagline: 'High session caps, analytics, and styling for serious catalogs.',
+    features: [
+      '15,000 try-on sessions/month',
+      'Fully customizable widget',
+      'AI Stylist and outfit recommendations',
+      'Analytics and shopper insights',
+      'Extra try-ons at $0.04 each',
+    ],
   },
   {
     name: 'enterprise',
     display_name: 'Enterprise',
-    monthly_price: 600,
+    monthly_price: 2499,
+    yearly_price: 24900,
     images_included: 999_999,
     price_per_extra_image: 0,
     currency: 'USD',
     active: true,
+    tagline: 'Unlimited try-on and white-glove support for large operations.',
+    features: [
+      'Unlimited try-on sessions',
+      'Fully customizable widget',
+      'AI Stylist and outfit recommendations',
+      'Dedicated support',
+      'Analytics and shopper insights',
+    ],
   },
 ];
 
 interface PricingProps {
-  onSelectFree?: () => void;
-  onSelectPaidPlan?: (planName: 'growth' | 'pro' | 'enterprise') => void;
+  onSelectPaidPlan?: (planName: PlanName) => void;
 }
 
 const containerVariants: Variants = {
@@ -105,23 +141,18 @@ function mergePlansFromDb(rows: BillingPlan[]): BillingPlan[] {
   });
 }
 
-function formatArCount(name: string): string {
-  const n = AR_ACCESSORIES[name];
-  if (n === 'unlimited') return 'Unlimited';
-  return String(n);
-}
-
-function formatTryOnImages(plan: BillingPlan): string {
+function formatSessionAllowance(plan: BillingPlan): string {
   if (plan.images_included >= UNLIMITED_THRESHOLD) {
-    return 'Unlimited try-on images';
+    return 'Unlimited try-on sessions';
   }
-  if (plan.name === 'free' || plan.images_included === 0) {
-    return '50 try-on sessions included to start';
-  }
-  return `${plan.images_included.toLocaleString('en-US')} try-on images / month`;
+  return `${plan.images_included.toLocaleString('en-US')} try-on sessions/month`;
 }
 
-export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
+function formatUsd(amount: number): string {
+  return amount.toLocaleString('en-US');
+}
+
+export function Pricing({ onSelectPaidPlan }: PricingProps) {
   const [plans, setPlans] = useState<BillingPlan[]>(() => mergePlansFromDb([]));
 
   useEffect(() => {
@@ -214,10 +245,9 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
             Choose the plan that <span className="text-oma-accent">fuels</span> your growth.
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            From On-Demand to Enterprise: clear{' '}
-            <span className="font-semibold text-oma-cream">try-on image</span> bundles (e.g. Pro with{' '}
-            <span className="font-semibold text-oma-accent">3,000 images</span> for US$ 300) and{' '}
-            <span className="font-semibold text-oma-cream">AR accessory</span> limits (5 → 20 → 100 → unlimited).
+            Monthly or annual billing. Growth, Pro, and Scale include a{' '}
+            <span className="font-semibold text-oma-cream">14-day trial</span>. Session bundles include
+            sizing, photorealistic try-on, and AI stylist tools.
           </motion.p>
         </motion.div>
 
@@ -234,7 +264,6 @@ export function Pricing({ onSelectFree, onSelectPaidPlan }: PricingProps) {
               plan={plan}
               variants={itemVariants}
               isPopular={plan.name === 'pro'}
-              onSelectFree={onSelectFree}
               onSelectPaidPlan={onSelectPaidPlan}
             />
           ))}
@@ -269,34 +298,22 @@ function PlanCard({
   plan,
   variants,
   isPopular,
-  onSelectFree,
   onSelectPaidPlan,
 }: {
   plan: BillingPlan;
   variants: Variants;
   isPopular: boolean;
-  onSelectFree?: () => void;
-  onSelectPaidPlan?: (planName: 'growth' | 'pro' | 'enterprise') => void;
+  onSelectPaidPlan?: (planName: PlanName) => void;
 }) {
   const isDark = isPopular;
-  const isFree = plan.name === 'free';
-  const arLabel = formatArCount(plan.name);
-  const imagesLine = formatTryOnImages(plan);
-
-  const cta = () => {
-    if (plan.name === 'free') {
-      onSelectFree?.();
-      return;
-    }
-    onSelectPaidPlan?.(plan.name as 'growth' | 'pro' | 'enterprise');
-  };
+  const sessionsLine = formatSessionAllowance(plan);
 
   return (
     <motion.div
       variants={variants}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex min-h-[520px] flex-col rounded-3xl border p-7 sm:p-8 ${
+      className={`relative flex min-h-[540px] flex-col rounded-3xl border p-7 sm:p-8 ${
         isDark
           ? 'overflow-hidden border border-oma-line/40 bg-oma-elevated text-oma-cream shadow-brand-glow'
           : 'border border-oma-line/40 bg-oma-parchment shadow-elegant hover:shadow-elegant-lg'
@@ -323,7 +340,7 @@ function PlanCard({
             isDark ? 'text-oma-cream/50' : 'text-oma-muted'
           }`}
         >
-          {isFree ? 'On-Demand' : 'Monthly subscription'}
+          {plan.trial_days ? `${plan.trial_days}-day free trial` : 'Custom contract'}
         </div>
         <h3
           className={`mt-2 text-xl font-semibold tracking-tight ${
@@ -333,33 +350,19 @@ function PlanCard({
           {plan.display_name}
         </h3>
         <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-oma-cream/60' : 'text-oma-muted'}`}>
-          {isFree
-            ? 'Start without a monthly fee and scale with usage.'
-            : plan.name === 'growth'
-            ? 'For brands scaling with moderate volume.'
-            : plan.name === 'pro'
-            ? 'Predictability for mature operations.'
-            : 'Maximum try-on images and AR for large catalogs.'}
+          {plan.tagline}
         </p>
 
         <div className="mt-6 flex flex-col gap-1">
-          {plan.monthly_price === 0 ? (
-            <>
-              <span className={`text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? 'text-oma-cream' : 'text-oma-ink'}`}>
-                Free install
-              </span>
-              <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
-                No fixed monthly fee—pay only for usage beyond the 50 included sessions.
-              </span>
-            </>
-          ) : (
-            <div className="flex items-baseline gap-1 flex-wrap">
-              <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
-                US$ {plan.monthly_price}
-              </span>
-              <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mo</span>
-            </div>
-          )}
+          <div className="flex items-baseline gap-1 flex-wrap">
+            <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
+              US$ {formatUsd(plan.monthly_price)}
+            </span>
+            <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mo</span>
+          </div>
+          <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
+            or US$ {formatUsd(plan.yearly_price)}/yr
+          </span>
         </div>
 
         <div
@@ -368,65 +371,28 @@ function PlanCard({
           }`}
         >
           <Check className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>{imagesLine}</span>
+          <span>{sessionsLine}</span>
         </div>
 
         <ul className="mt-6 space-y-2.5 flex-1">
-          <PricingBullet inverted={isDark}>
-            {plan.name === 'free' && `${arLabel} AR accessories included`}
-            {plan.name === 'growth' && 'Up to 20 AR accessories included'}
-            {plan.name === 'pro' && 'Up to 100 AR accessories included'}
-            {plan.name === 'enterprise' && 'Unlimited AR accessories'}
-          </PricingBullet>
-          {plan.name === 'pro' && (
-            <PricingBullet inverted={isDark}>
-              Fixed monthly billing — includes 3,000 try-on images
+          {plan.features.map((feature) => (
+            <PricingBullet key={feature} inverted={isDark}>
+              {feature}
             </PricingBullet>
-          )}
-          {plan.name === 'enterprise' && (
-            <PricingBullet inverted={isDark}>
-              Fixed monthly billing — unlimited try-on images and AR
-            </PricingBullet>
-          )}
-          {!isFree && plan.price_per_extra_image > 0 && (
-            <PricingBullet inverted={isDark}>
-              Extra images at US$ {plan.price_per_extra_image.toFixed(2)} each
-            </PricingBullet>
-          )}
-          {isFree && (
-            <PricingBullet inverted={isDark}>
-              US$ {plan.price_per_extra_image.toFixed(2)} per try-on session after the 50 included
-            </PricingBullet>
-          )}
-          <PricingBullet inverted={isDark}>Precise sizing (MediaPipe)</PricingBullet>
-          <PricingBullet inverted={isDark}>Photorealistic try-on</PricingBullet>
-          <PricingBullet inverted={isDark}>Customizable widget</PricingBullet>
-          {plan.name !== 'free' && (
-            <PricingBullet inverted={isDark}>Integrated ChatGPT assistant</PricingBullet>
-          )}
-          {(plan.name === 'pro' || plan.name === 'enterprise') && (
-            <PricingBullet inverted={isDark}>Priority support</PricingBullet>
-          )}
+          ))}
         </ul>
 
         <div className="mt-8">
-          {isFree ? (
-            <Button variant="secondary" size="lg" className="w-full" onClick={cta} type="button">
-              Install free on Shopify
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              onClick={cta}
-              type="button"
-            >
-              {plan.name === 'enterprise' ? 'Subscribe to Enterprise' : 'Subscribe'}
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
+          <Button
+            variant={isPopular ? 'primary' : 'secondary'}
+            size="lg"
+            className="w-full"
+            onClick={() => onSelectPaidPlan?.(plan.name)}
+            type="button"
+          >
+            {plan.trial_days ? `Start ${plan.trial_days}-day trial` : 'Talk to sales'}
+            <ArrowRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </motion.div>

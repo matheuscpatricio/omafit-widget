@@ -21,9 +21,10 @@ interface LandingPageProps {
   onLogin?: () => void;
 }
 
-const paidPlanPriceIds: Record<'growth' | 'pro' | 'enterprise', string> = {
+const paidPlanPriceIds: Record<'growth' | 'pro' | 'scale' | 'enterprise', string> = {
   growth: 'growth',
-  pro: 'price_PRO_3000_IMAGES',
+  pro: 'pro',
+  scale: 'scale',
   enterprise: 'enterprise',
 };
 
@@ -67,10 +68,10 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   }, []);
 
   const handleInstallShopify = () => {
-    onGetStarted('free');
+    onGetStarted('growth');
   };
 
-  const handleSelectPaidPlan = async (plan: 'growth' | 'pro' | 'enterprise') => {
+  const handleSelectPaidPlan = async (plan: 'growth' | 'pro' | 'scale' | 'enterprise') => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -116,7 +117,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
         <ImpactStats />
 
-        <Pricing onSelectFree={handleInstallShopify} onSelectPaidPlan={handleSelectPaidPlan} />
+        <Pricing onSelectPaidPlan={handleSelectPaidPlan} />
 
         <FAQ />
       </main>

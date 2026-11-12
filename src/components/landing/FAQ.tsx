@@ -26,7 +26,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'How does per-image billing work? Do I need a monthly commitment?',
-    a: 'Shopify install is free. On-Demand includes 50 try-on sessions, 5 AR accessories, and US$ 0.18 per additional try-on session. Growth: US$ 89/mo (700 images, 20 AR), extras at US$ 0.12. Pro: US$ 300/mo with 3,000 try-on images (100 AR). Enterprise: US$ 600/mo with unlimited try-on and AR. No hidden fees.',
+    a: 'Shopify app install is free. Growth: US$ 99/mo or US$ 999/yr — 1,000 sessions/mo, extras US$ 0.12. Pro: US$ 399/mo or US$ 3,990/yr — 5,000 sessions, extras US$ 0.08. Scale: US$ 999/mo or US$ 9,990/yr — 15,000 sessions, extras US$ 0.04. Enterprise: US$ 2,499/mo or US$ 24,900/yr — unlimited sessions. Growth, Pro, and Scale include a 14-day trial.',
   },
   {
     q: 'Will Omafit slow down my store?',
@@ -34,7 +34,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'What support do I get after install?',
-    a: 'On-Demand includes full docs, video tutorials, and email support. Pro customers get priority support, guided onboarding, and a direct WhatsApp channel. Enterprise includes a dedicated account manager and custom SLA.',
+    a: 'All plans include docs, tutorials, and email support. Pro and Scale add guided onboarding. Enterprise includes dedicated support and a custom SLA.',
   },
   {
     q: 'Can I customize the widget to match my brand?',

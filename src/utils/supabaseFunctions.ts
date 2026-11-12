@@ -1,5 +1,5 @@
 /** Mesmo projecto/anon key já expostos em `public/omafit-widget.js` e `src/lib/supabase.ts`. */
-const OMAFIT_SUPABASE_URL_FALLBACK = 'https://lhkgnirolvbmomeduoaj.supabase.co';
+export const OMAFIT_SUPABASE_URL_FALLBACK = 'https://lhkgnirolvbmomeduoaj.supabase.co';
 const OMAFIT_SUPABASE_ANON_KEY_FALLBACK =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxoa2duaXJvbHZibW9tZWR1b2FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NjE2NDYsImV4cCI6MjA2MzMzNzY0Nn0.aSBMJMT8TiAqvdO_Z9D_oINLaQrFMZIK5IEQJG6KaOI';
 
@@ -28,4 +28,19 @@ export function getSupabaseFunctionHeaders(
     Authorization: `Bearer ${key}`,
     ...(extra || {}),
   };
+}
+
+/** CDN/gateway 502 bodies que não são JSON de Edge Functions. */
+export function isHtmlLikeHttpBody(raw: string): boolean {
+  const head = raw.trimStart().slice(0, 96).toLowerCase();
+  return head.startsWith('<!doctype') || head.startsWith('<html');
+}
+
+export function formatTryOnHttpError(
+  status: number,
+  _raw: string,
+  fallback: string,
+): string {
+  void status;
+  return fallback;
 }
