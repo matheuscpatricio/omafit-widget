@@ -100,6 +100,7 @@ export function useShopperProfileController(args: Args) {
   const [marketingEmailError, setMarketingEmailError] = useState<string | null>(null);
   const [marketingEmailDismissed, setMarketingEmailDismissed] = useState(false);
   const [shopperForgetting, setShopperForgetting] = useState(false);
+  const shopperProfileFetchSeqRef = useRef(0);
 
   const getShopperProfileFetchConfig = () => {
     const shopDomain = normalizeShopDomain(effectiveShopDomain);
@@ -182,11 +183,17 @@ export function useShopperProfileController(args: Args) {
     setShopperForgetting(true);
     try {
       await deleteShopperProfile(config);
+      shopperProfileFetchSeqRef.current += 1;
       setShopperProfile(null);
       setShowRestorePrompt(false);
       setShopperProfileSaved(false);
       setShopperSaveConsent(false);
       setShopperSaveEmail('');
+      setMarketingEmail('');
+      setMarketingEmailConsent(false);
+      setMarketingEmailSaved(false);
+      setMarketingEmailError(null);
+      setMarketingEmailRevoked(false);
       dismissRestorePromptForSession(effectiveShopDomain);
     } catch {
       setError(t('shopperProfileDeleteError'));
@@ -323,8 +330,6 @@ export function useShopperProfileController(args: Args) {
       setMarketingEmailRevoking(false);
     }
   };
-
-  const shopperProfileFetchSeqRef = useRef(0);
 
   const loadShopperProfile = useCallback(() => {
     const config = getShopperProfileFetchConfig();
