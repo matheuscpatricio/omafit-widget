@@ -2,11 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Pause, Play } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const VIDEO_URL =
-  'https://lhkgnirolvbmomeduoaj.supabase.co/storage/v1/object/public/Video%20banner/VideoOmafit.mp4';
+/** Servido de `public/videos/` no deploy; cai para YouTube se falhar. */
+const VIDEO_URL = '/videos/hero.mp4';
+const YOUTUBE_VIDEO_ID = 'NR56_2hkH44';
+const YOUTUBE_EMBED_URL = `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?rel=0&modestbranding=1`;
 
 /** Frame de pré-visualização antes do play (~1,76s); a reprodução começa em 0s só no primeiro play. */
 const POSTER_TIME_SEC = 1.76;
+
+const sectionShell =
+  'relative mx-3 my-6 max-w-7xl sm:mx-4 sm:my-8 md:mx-6 lg:mx-auto lg:my-10';
+const frameShell =
+  'overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated shadow-elegant-lg sm:rounded-3xl';
+const aspectShell =
+  'relative aspect-video w-full bg-gradient-to-br from-oma-canvas via-oma-elevated/80 to-oma-canvas';
 
 function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
   return new Promise((resolve) => {
@@ -28,18 +37,41 @@ function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
   });
 }
 
+function YoutubeFallback() {
+  return (
+    <section aria-label="Omafit promotional video" className={sectionShell}>
+      <div className={frameShell}>
+        <div className={aspectShell}>
+          <iframe
+            className="absolute inset-0 h-full w-full"
+            src={YOUTUBE_EMBED_URL}
+            title="Omafit — virtual try-on demo"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function PainSolutionVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const posterReadyRef = useRef(false);
-  /** true após o primeiro play — só aí saltamos do poster (~1,76s) para 0s. */
   const hasStartedPlaybackRef = useRef(false);
+  const [useYoutube, setUseYoutube] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState(false);
+
+  const fallbackToYoutube = useCallback(() => {
+    setUseYoutube(true);
+  }, []);
 
   useEffect(() => {
+    if (useYoutube) return;
+
     const video = videoRef.current;
     if (!video) return;
 
@@ -69,15 +101,36 @@ export function PainSolutionVideo() {
       }
     };
 
+    const markReadyWithoutPoster = () => {
+      if (posterReadyRef.current || cancelled) return;
+      if (video.error) {
+        fallbackToYoutube();
+        return;
+      }
+      posterReadyRef.current = true;
+      setHasFrame(true);
+      setReady(true);
+    };
+
     const onLoadedMetadata = () => {
       void preparePosterFrame();
     };
 
+    const onLoadedData = () => {
+      if (!posterReadyRef.current) void preparePosterFrame();
+    };
+
+    const readyTimeout = window.setTimeout(() => {
+      if (video.error) fallbackToYoutube();
+      else markReadyWithoutPoster();
+    }, 12_000);
+
     video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('loadeddata', onLoadedData);
     try {
       video.load();
     } catch {
-      /* noop */
+      fallbackToYoutube();
     }
     if (video.readyState >= 1) {
       void preparePosterFrame();
@@ -85,13 +138,15 @@ export function PainSolutionVideo() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(readyTimeout);
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      video.removeEventListener('loadeddata', onLoadedData);
     };
-  }, []);
+  }, [useYoutube, fallbackToYoutube]);
 
   const togglePlay = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || !ready || error) return;
+    if (!video || !ready) return;
 
     try {
       if (video.paused) {
@@ -104,19 +159,20 @@ export function PainSolutionVideo() {
         video.pause();
       }
     } catch {
-      setError(true);
+      fallbackToYoutube();
     }
-  }, [ready, error]);
+  }, [ready, fallbackToYoutube]);
 
-  const showPreparing = !ready && !error;
+  if (useYoutube) {
+    return <YoutubeFallback />;
+  }
+
+  const showPreparing = !ready;
 
   return (
-    <section
-      aria-label="Omafit promotional video"
-      className="relative mx-3 my-6 max-w-7xl sm:mx-4 sm:my-8 md:mx-6 lg:mx-auto lg:my-10"
-    >
-      <div className="overflow-hidden rounded-2xl border border-oma-line/40 bg-oma-elevated shadow-elegant-lg sm:rounded-3xl">
-        <div className="relative aspect-video w-full bg-gradient-to-br from-oma-canvas via-oma-elevated/80 to-oma-canvas">
+    <section aria-label="Omafit promotional video" className={sectionShell}>
+      <div className={frameShell}>
+        <div className={aspectShell}>
           <video
             ref={videoRef}
             className={cn(
@@ -132,7 +188,7 @@ export function PainSolutionVideo() {
             onPause={() => setPlaying(false)}
             onWaiting={() => setBuffering(true)}
             onPlaying={() => setBuffering(false)}
-            onError={() => setError(true)}
+            onError={fallbackToYoutube}
           />
 
           {showPreparing && (
@@ -146,22 +202,16 @@ export function PainSolutionVideo() {
             </div>
           )}
 
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-oma-canvas/95 px-6 text-center text-sm text-oma-muted">
-              Could not load the video. Check your connection and try again.
-            </div>
-          )}
-
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_40%,rgba(217,104,69,0.06),transparent)]" />
 
           <div className="pointer-events-auto absolute bottom-3 left-3 z-10 sm:bottom-4 sm:left-4">
             <button
               type="button"
               onClick={togglePlay}
-              disabled={!ready || error}
+              disabled={!ready}
               className={cn(
                 'flex h-10 w-10 items-center justify-center rounded-full border border-oma-cream/20 bg-oma-elevated/85 text-oma-cream shadow-elegant backdrop-blur-sm transition hover:bg-oma-elevated hover:border-oma-accent/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oma-accent sm:h-11 sm:w-11',
-                (!ready || error) && 'cursor-not-allowed opacity-50',
+                !ready && 'cursor-not-allowed opacity-50',
               )}
               aria-label={playing ? 'Pause video' : 'Play video'}
             >
