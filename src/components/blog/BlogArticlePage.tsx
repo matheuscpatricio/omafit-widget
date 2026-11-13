@@ -23,13 +23,16 @@ export function BlogArticlePage() {
       '@id': `${pageUrl}#article`,
       headline: post.title,
       description: post.description,
+      abstract: post.geoAnswer,
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
-      inLanguage: 'en',
+      inLanguage: 'en-US',
       author: { '@type': 'Organization', name: 'Omafit', url: base },
       publisher: { '@id': `${base}/#organization` },
       mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
       keywords: post.keywords.join(', '),
+      ...(post.articleSection ? { articleSection: post.articleSection } : {}),
+      about: post.keywords.slice(0, 5).map((name) => ({ '@type': 'Thing', name })),
     },
     {
       '@type': 'BreadcrumbList',
@@ -66,6 +69,10 @@ export function BlogArticlePage() {
           {post.title}
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-oma-muted">{post.description}</p>
+        <p className="mt-3 rounded-xl border border-oma-line/40 bg-oma-elevated/50 px-4 py-3 text-sm leading-relaxed text-oma-cream">
+          <span className="font-medium text-oma-accent">Quick answer: </span>
+          {post.geoAnswer}
+        </p>
         <p className="mt-4 text-xs text-oma-muted">
           <time dateTime={post.publishedAt}>Published {formatBlogDate(post.publishedAt)}</time>
           {post.updatedAt !== post.publishedAt ? (

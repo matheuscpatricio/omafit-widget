@@ -42,6 +42,32 @@ export function BlogArticleBody({ blocks, faqs }: BlogArticleBodyProps) {
               ))}
             </ul>
           );
+        case 'ol':
+          return (
+            <ol key={i} className="list-decimal space-y-2 pl-5 text-oma-muted">
+              {block.items.map((item, j) => (
+                <li key={j} className="leading-relaxed">
+                  {item}
+                </li>
+              ))}
+            </ol>
+          );
+        case 'callout':
+          return (
+            <aside
+              key={i}
+              className={
+                block.variant === 'definition'
+                  ? 'rounded-2xl border border-oma-tech/35 bg-oma-tech/10 p-5 sm:p-6'
+                  : 'rounded-2xl border border-oma-accent/30 bg-oma-elevated/70 p-5 sm:p-6'
+              }
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-oma-accent">
+                {block.title}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-oma-cream">{block.text}</p>
+            </aside>
+          );
         case 'cta':
           return (
             <div
