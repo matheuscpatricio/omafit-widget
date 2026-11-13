@@ -7,13 +7,10 @@ type Props = {
   mode?: 'opt-in' | 'manage';
   primaryColor: string;
   t: Translate;
-  phone?: string;
-  onPhoneChange?: (value: string) => void;
+  email?: string;
+  onEmailChange?: (value: string) => void;
   consentChecked?: boolean;
   onConsentChange?: (checked: boolean) => void;
-  showPhotoConsent?: boolean;
-  photoConsentChecked?: boolean;
-  onPhotoConsentChange?: (checked: boolean) => void;
   onSubmit?: () => void;
   onDismiss?: () => void;
   onRevoke?: () => void;
@@ -23,17 +20,14 @@ type Props = {
   error?: string | null;
 };
 
-export function ShopperWhatsAppOptInPrompt({
+export function ShopperEmailOptInPrompt({
   mode = 'opt-in',
   primaryColor,
   t,
-  phone = '',
-  onPhoneChange,
+  email = '',
+  onEmailChange,
   consentChecked = false,
   onConsentChange,
-  showPhotoConsent = false,
-  photoConsentChecked = false,
-  onPhotoConsentChange,
   onSubmit,
   onDismiss,
   onRevoke,
@@ -43,8 +37,8 @@ export function ShopperWhatsAppOptInPrompt({
   error,
 }: Props) {
   return (
-    <div className="omafit-whatsapp-optin fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-lg">
-      <p className="mb-2 text-sm font-semibold text-gray-900">{t('shopperWhatsAppTitle')}</p>
+    <div className="omafit-email-optin fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-lg">
+      <p className="mb-2 text-sm font-semibold text-gray-900">{t('shopperEmailTitle')}</p>
       {mode === 'manage' ? (
         <button
           type="button"
@@ -52,18 +46,19 @@ export function ShopperWhatsAppOptInPrompt({
           disabled={revoking}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 disabled:opacity-60"
         >
-          {revoking ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t('shopperWhatsAppRevoke')}
+          {revoking ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t('shopperEmailRevoke')}
         </button>
       ) : saved ? (
-        <p className="text-sm text-gray-700">{t('shopperWhatsAppSaved')}</p>
+        <p className="text-sm text-gray-700">{t('shopperEmailSaved')}</p>
       ) : (
         <div className="space-y-2">
           <input
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(event) => onPhoneChange?.(event.target.value)}
-            placeholder={t('shopperWhatsAppPhone')}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => onEmailChange?.(event.target.value)}
+            placeholder={t('shopperEmailPlaceholder')}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
           />
           <label className="flex items-start gap-2 text-xs text-gray-700">
@@ -73,30 +68,19 @@ export function ShopperWhatsAppOptInPrompt({
               checked={consentChecked}
               onChange={(event) => onConsentChange?.(event.target.checked)}
             />
-            <span>{t('shopperWhatsAppConsent')}</span>
+            <span>{t('shopperEmailConsent')}</span>
           </label>
-          {showPhotoConsent ? (
-            <label className="flex items-start gap-2 text-xs text-gray-700">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={photoConsentChecked}
-                onChange={(event) => onPhotoConsentChange?.(event.target.checked)}
-              />
-              <span>{t('shopperWhatsAppPhotoConsent')}</span>
-            </label>
-          ) : null}
           <button
             type="button"
             onClick={onSubmit}
-            disabled={saving || !consentChecked || !phone.trim()}
+            disabled={saving || !consentChecked || !email.trim()}
             className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
             style={{ backgroundColor: primaryColor }}
           >
-            {saving ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t('shopperWhatsAppSubmit')}
+            {saving ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t('shopperEmailSubmit')}
           </button>
           <button type="button" onClick={onDismiss} className="w-full text-xs text-gray-500">
-            {t('shopperWhatsAppDismiss')}
+            {t('shopperEmailDismiss')}
           </button>
         </div>
       )}
