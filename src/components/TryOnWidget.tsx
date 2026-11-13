@@ -54,6 +54,28 @@ import { buildStylistBrief, formatCatalogPrice } from '../utils/stylistContext';
 import { resolveAnchorProductPrice } from '../utils/resolveAnchorProductPrice';
 import { evaluateStylistClarification } from '../utils/stylistClarification';
 import {
+  appendToSharedThread,
+  applyVoiceCorrection,
+  buildAssistantFallbackMessage,
+  buildChatHistoryForValidateSize,
+  buildInteractionLimitMessage,
+  buildVoiceContextSummary,
+  mapClientToolToStructuredActions,
+  structuredActionsToMessage,
+  useStylistVoiceSession,
+  voiceTranscriptToMessage,
+  type ChatMessage,
+  type VoiceClientToolHandler,
+  type VoiceTransportEvent,
+} from '../features/stylist';
+import {
+  StylistVoiceMicButton,
+  StylistVoiceStatus,
+  chatInputSlot,
+  isVoiceActive,
+  useStylistVoiceConsent,
+} from '../features/stylist/components';
+import {
   fallbackStoreProfile,
   type StoreProfile,
 } from '../utils/storeProfile';
@@ -318,28 +340,7 @@ export function TryOnWidget({
   const [isVisible, setIsVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // GPT Assistant states - Full Chat Interface
-  interface ChatMessage {
-    role: 'assistant' | 'user';
-    content: string;
-    timestamp: number;
-    /** Imagem do provador quando o try-on veio de uma sugestão no chat (fica visível no thread). */
-    tryOnImageUrl?: string;
-    /** Primeiro resultado (PDP) vs try-on após sugestão — controla duplicata com o bloco no topo. */
-    tryOnResultVariant?: 'primary' | 'suggested';
-    /** Telemetria sugestões estilista (par âncora PDP → sugerido). */
-    stylistImpressionId?: string;
-    stylistAnchorHandle?: string;
-    suggestedProducts?: Array<{
-      handle: string;
-      title: string;
-      image_url?: string;
-      rationale?: string;
-      price_amount?: number | null;
-      currency_code?: string | null;
-      price_label?: string;
-    }>;
-  }
+  // GPT Assistant states - Full Chat Interface (tipos em features/stylist)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gptLoading, setGptLoading] = useState(false);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
@@ -4271,15 +4272,11 @@ const handleSubmit = async (
     const requestSeq = ++gptAssistSeqRef.current;
 
     if (interactionCount >= GPT_INTERACTION_LIMIT) {
-      const limitMessages = {
-        pt: 'Você atingiu o limite de interações por sessão.',
-        es: 'Has alcanzado el límite de interacciones por sesión.',
-        en: 'You have reached the interaction limit per session.'
-      };
-
+      const langLimit: 'pt' | 'es' | 'en' =
+        currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: limitMessages[currentLanguage],
+        content: buildInteractionLimitMessage(langLimit),
         timestamp: Date.now()
       }]);
       return;
@@ -4594,25 +4591,14 @@ const handleSubmit = async (
         selected_color_hex: selectedColorHex,
         variant_catalog: productCatalog.variants.slice(0, 55),
         complementary_product: complementaryProduct,
-        chat_history: (() => {
-          const base = chatMessages
-            .slice(-12)
-            .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim().length > 0)
-            .map(m => ({ role: m.role, content: String(m.content || '').trim() }));
-          const q =
+        chat_history: buildChatHistoryForValidateSize(chatMessages, {
+          currentUserUtterance:
             (intencaoForPayload === 'custom_message' ||
               intencaoForPayload === 'consultor_outfit_inicial') &&
             customMessageForPayload
               ? String(customMessageForPayload).trim()
-              : '';
-          if (q) {
-            const last = base[base.length - 1];
-            if (!last || last.role !== 'user' || last.content !== q) {
-              base.push({ role: 'user', content: q });
-            }
-          }
-          return base;
-        })(),
+              : undefined,
+        }),
         ...(candidate_products ? { candidate_products } : {}),
         ...(anchorPrice.price_amount != null
           ? {
@@ -4842,34 +4828,19 @@ const handleSubmit = async (
       console.error('Erro ao chamar GPT:', error);
       const sz = String(calculatedSize || recommendedSize || '').trim();
       const allowOpeningExtras = !stylistOpeningExtrasConsumedRef.current;
-      const fallbackMessages = {
-        pt: !allowOpeningExtras
-          ? sz
-            ? 'Assistência instável. Veja o espelho virtual e tente novamente em instantes.'
-            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`
-          : sz
-            ? `Assistência instável. Tamanho sugerido: ${sz}. Veja o espelho e adicione ao carrinho se quiser.`
-            : `${localProductName ? `${localProductName}: ` : ''}Ótima escolha para o seu perfil — adicione ao carrinho.`,
-        es: !allowOpeningExtras
-          ? sz
-            ? 'Sin asistente por ahora. Mira el espejo virtual e inténtalo de nuevo en unos instantes.'
-            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`
-          : sz
-            ? `Sin asistente por ahora. Talla sugerida: ${sz}. Mira el espejo y añade al carrito si te encaja.`
-            : `${localProductName ? `${localProductName}: ` : ''}Te queda muy bien — agrégalo al carrito.`,
-        en: !allowOpeningExtras
-          ? sz
-            ? 'Assistant unavailable. Check the virtual mirror and try again in a moment.'
-            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`
-          : sz
-            ? `Assistant unavailable. Suggested size: ${sz}. Check the mirror and add to cart if you like it.`
-            : `${localProductName ? `${localProductName}: ` : ''}Great fit for you — add to cart.`,
-      };
+      const langFallback: 'pt' | 'es' | 'en' =
+        currentLanguage === 'es' ? 'es' : currentLanguage === 'en' ? 'en' : 'pt';
+      const fallbackContent = buildAssistantFallbackMessage({
+        language: langFallback,
+        productName: localProductName,
+        recommendedSize: sz,
+        allowOpeningExtras,
+      });
 
       if (requestSeq !== gptAssistSeqRef.current) return;
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: fallbackMessages[currentLanguage],
+        content: fallbackContent,
         timestamp: Date.now()
       }]);
       stylistOpeningExtrasConsumedRef.current = true;
@@ -5071,6 +5042,90 @@ const handleSubmit = async (
       window.clearTimeout(timeoutId);
     };
   }, [heroPresentationGateActive, fontFamily]);
+
+  const stylistVoiceFeatureOn =
+    stylistEnabled && String(import.meta.env.VITE_OMAFIT_STYLIST_VOICE_ENABLED || '').trim() === 'true';
+
+  const appendVoiceActions = (toolName: string, params: Record<string, unknown>) => {
+    const msg = structuredActionsToMessage(mapClientToolToStructuredActions(toolName, params));
+    if (msg) setChatMessages((prev) => appendToSharedThread(prev, msg));
+    return msg ? 'shown' : 'nothing_to_show';
+  };
+
+  const voiceClientTools: Record<string, VoiceClientToolHandler> = {
+    show_product_cards: (params) => appendVoiceActions('show_product_cards', params),
+    show_selection_options: (params) => appendVoiceActions('show_selection_options', params),
+    request_try_on: (params) => {
+      const handle = String(params.handle || '').trim();
+      if (!handle) return 'missing_handle';
+      void handleSuggestedProductTryOn(handle, { autoSubmitTryOn: true });
+      return 'try_on_started';
+    },
+    add_to_cart: (params) => {
+      const handle = String(params.handle || '').trim();
+      const anchor = (localProductHandle || productHandle || '').trim();
+      if (!handle || handle === anchor) handleAddToCart();
+      else void handleSuggestedProductAddToCart(handle);
+      return 'add_to_cart_requested';
+    },
+    end_conversation: () => {
+      window.setTimeout(() => void stylistVoice.stop('agent_end'), 1500);
+      return 'ending';
+    },
+  };
+
+  const handleVoiceTransportEvent = (event: VoiceTransportEvent) => {
+    if (event.type === 'user_transcript' && event.is_final) {
+      setChatMessages((prev) => appendToSharedThread(prev, voiceTranscriptToMessage('user', event.text, event.at)));
+    } else if (event.type === 'agent_response') {
+      setChatMessages((prev) =>
+        appendToSharedThread(prev, voiceTranscriptToMessage('assistant', event.text, event.at))
+      );
+    } else if (event.type === 'agent_response_correction') {
+      setChatMessages((prev) => applyVoiceCorrection(prev, event.original, event.corrected));
+    }
+  };
+
+  const stylistVoice = useStylistVoiceSession({
+    enabled: stylistVoiceFeatureOn,
+    identity: { shopDomain: effectiveShopDomain, publicId: publicId || '', widgetSessionId: sessionId },
+    getContext: () => ({
+      language: currentLanguage,
+      storeName: localStoreName,
+      anchorProductTitle: localProductName,
+      anchorProductHandle: (localProductHandle || productHandle || '').trim(),
+      recommendedSize: String(calculatedSize || recommendedSize || ''),
+      threadSummary: buildVoiceContextSummary(chatMessagesRef.current),
+    }),
+    clientTools: voiceClientTools,
+    onTransportEvent: handleVoiceTransportEvent,
+  });
+  const [chatInputValue, setChatInputValue] = useState('');
+  const startStylistVoice = () => void stylistVoice.start();
+  const stylistVoiceConsent = useStylistVoiceConsent(startStylistVoice);
+  const stylistVoiceActive = isVoiceActive(stylistVoice.state);
+  const chatSlot = chatInputSlot({
+    featureOn: stylistVoiceFeatureOn,
+    inputValue: chatInputValue,
+    voiceActive: stylistVoiceActive,
+  });
+  const submitChatInput = () => {
+    const message = chatInputValue.trim();
+    if (!message) return;
+    submitStylistUserText(message);
+    setChatInputValue('');
+  };
+
+  /** Mensagem digitada/clicada durante a voz vai para o agent; fora dela, segue o fluxo de texto. */
+  const submitStylistUserText = (message: string) => {
+    if (stylistVoice.isActive) {
+      setChatMessages((prev) => [...prev, { role: 'user', content: message, timestamp: Date.now() }]);
+      stylistVoice.sendUserMessage(message);
+      return;
+    }
+    setChatMessages((prev) => [...prev, { role: 'user', content: message, timestamp: Date.now() }]);
+    void callGPTAssistant('custom', undefined, message);
+  };
 
   // Verificar se o produto foi carregado
   if (!product) {
@@ -5397,6 +5452,7 @@ const handleSubmit = async (
                 message.role === 'assistant' &&
                 !message.content.trim() &&
                 !(message.suggestedProducts?.length) &&
+                !(message.structuredActions?.length) &&
                 !message.tryOnImageUrl
               ) {
                 return null;
@@ -5547,6 +5603,25 @@ const handleSubmit = async (
                       })}
                     </div>
                   ) : null}
+                  {message.role === 'assistant'
+                    ? (message.structuredActions || []).map((action, ai) =>
+                        action.type === 'selection_options' ? (
+                          <div key={`opts-${ai}`} className="mt-3 flex flex-wrap gap-2">
+                            {action.options.map((opt) => (
+                              <button
+                                key={opt.label}
+                                type="button"
+                                disabled={gptLoading}
+                                onClick={() => submitStylistUserText(opt.message)}
+                                className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null
+                      )
+                    : null}
                 </div>
               </motion.div>
             );
@@ -5770,6 +5845,19 @@ const handleSubmit = async (
                 </div>
               )}
 
+              {stylistVoiceFeatureOn && (
+                <StylistVoiceStatus
+                  state={stylistVoice.state}
+                  language={currentLanguage}
+                  primaryColor={localPrimaryColor}
+                  askingConsent={stylistVoiceConsent.askingConsent}
+                  onAllow={stylistVoiceConsent.allow}
+                  onCancel={stylistVoiceConsent.cancel}
+                  showStop={stylistVoiceActive && chatSlot === 'send'}
+                  onStop={() => void stylistVoice.stop('user')}
+                />
+              )}
+
               <input
                 ref={chatPhotoInputRef}
                 type="file"
@@ -5793,40 +5881,31 @@ const handleSubmit = async (
                   placeholder={stylistEnabled ? t('chatPlaceholderStylist') : t('chatPlaceholder')}
                   className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 transition-all"
                   style={{ focusRing: localPrimaryColor }}
+                  value={chatInputValue}
+                  onChange={(e) => setChatInputValue(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      const message = e.currentTarget.value.trim();
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: message,
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('custom', undefined, message);
-                      e.currentTarget.value = '';
-                    }
+                    if (e.key === 'Enter') submitChatInput();
                   }}
                 />
-                <button
-                  type="button"
-                  className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
-                  style={{ backgroundColor: localPrimaryColor }}
-                  onClick={(e) => {
-                    const wrap = e.currentTarget.parentElement;
-                    const input = wrap?.querySelector('input[type="text"]') as HTMLInputElement | null;
-                    if (input && input.value.trim()) {
-                      const message = input.value.trim();
-                      setChatMessages(prev => [...prev, {
-                        role: 'user',
-                        content: message,
-                        timestamp: Date.now()
-                      }]);
-                      callGPTAssistant('custom', undefined, message);
-                      input.value = '';
-                    }
-                  }}
-                >
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                {chatSlot === 'send' ? (
+                  <button
+                    type="button"
+                    className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:shadow-md shrink-0"
+                    style={{ backgroundColor: localPrimaryColor }}
+                    onClick={submitChatInput}
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <StylistVoiceMicButton
+                    state={stylistVoice.state}
+                    language={currentLanguage}
+                    primaryColor={localPrimaryColor}
+                    disabled={gptLoading}
+                    onRequestStart={stylistVoiceConsent.requestStart}
+                    onStop={() => void stylistVoice.stop('user')}
+                  />
+                )}
               </div>
             </motion.div>
           )}
