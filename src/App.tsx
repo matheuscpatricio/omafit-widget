@@ -8,7 +8,9 @@ import { AuthForm } from './components/AuthForm';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { ChatGptConnectPage } from './components/ChatGptConnectPage';
 import { ContactPage } from './components/ContactPage';
+import { PartnersPage } from './components/PartnersPage';
 import { BlogIndexPage } from './components/blog/BlogIndexPage';
 import { BlogArticlePage } from './components/blog/BlogArticlePage';
 import { supabase } from './lib/supabase';
@@ -110,8 +112,10 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPageWrapper />} />
         <Route path="/auth" element={<AuthWrapper />} />
+        <Route path="/chatgpt/connect" element={<ChatGptConnectPage />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
         <Route path="/contato" element={<ContactPage />} />
+        <Route path="/partners" element={<PartnersPage />} />
         <Route path="/blog" element={<BlogIndexPage />} />
         <Route path="/blog/:slug" element={<BlogArticlePage />} />
         <Route

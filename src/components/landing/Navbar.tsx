@@ -15,6 +15,7 @@ const links = [
   { href: '#planos', label: 'Pricing' },
   { href: '#faq', label: 'FAQ' },
   { href: '/blog', label: 'Blog' },
+  { href: '/partners', label: 'Partners' },
 ];
 
 export function Navbar({ onOpenInstallModal }: NavbarProps) {
