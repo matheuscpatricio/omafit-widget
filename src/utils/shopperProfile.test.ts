@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyForcedGenderToMeasurements,
   fetchShopperProfile,
-  hasActiveMarketingWhatsappConsent,
+  hasActiveMarketingEmailConsent,
   hasActiveShopperConsent,
+  isValidMarketingEmail,
   isValidShopperMeasurements,
   normalizeShopDomain,
+  saveShopperMarketingEmail,
   saveShopperProfile,
   setShopperDeviceIdFromParent,
   shopperMeasurementsEqual,
@@ -26,7 +28,7 @@ const profile: ShopperProfile = {
   updated_at: '2026-09-21T00:00:00.000Z',
   measurements,
   consent_active: true,
-  marketing_whatsapp_active: false,
+  marketing_email_active: false,
 };
 
 describe('shopper profile', () => {
@@ -52,8 +54,11 @@ describe('shopper profile', () => {
     expect(shopperMeasurementsEqual(measurements, { ...measurements })).toBe(true);
     expect(shopperMeasurementsEqual(measurements, { ...measurements, weight: 70 })).toBe(false);
     expect(hasActiveShopperConsent(profile)).toBe(true);
-    expect(hasActiveMarketingWhatsappConsent(profile)).toBe(false);
+    expect(hasActiveMarketingEmailConsent(profile)).toBe(false);
+    expect(hasActiveMarketingEmailConsent({ ...profile, marketing_email_active: true })).toBe(true);
     expect(hasActiveShopperConsent(null)).toBe(false);
+    expect(isValidMarketingEmail('Cliente@Loja.com')).toBe(true);
+    expect(isValidMarketingEmail('sem-arroba')).toBe(false);
   });
 
   it('adopts a parent device id only when it changes', () => {
@@ -89,5 +94,38 @@ describe('shopper profile', () => {
     const saveCall = fetchMock.mock.calls[1];
     expect(String(saveCall[0])).toContain('/functions/v1/shopper-profile');
     expect(JSON.parse(String(saveCall[1]?.body)).action).toBe('save');
+  });
+
+  it('saves a marketing email for the Klaviyo opt-in', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body || '{}')) as { action?: string; email?: string };
+      if (!String(url).includes('shopper-profile') || body.action !== 'save_marketing_email') {
+        return new Response(JSON.stringify({ error: 'unexpected' }), { status: 400 });
+      }
+      return new Response(
+        JSON.stringify({
+          profile: { ...profile, email: body.email, marketing_email_active: true },
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const saved = await saveShopperMarketingEmail(
+      { shopDomain: 'loja.myshopify.com', publicId: 'pub' },
+      'Cliente@Loja.com'
+    );
+    expect(saved?.marketing_email_active).toBe(true);
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      action?: string;
+      email?: string;
+      marketing_channel?: string;
+    };
+    expect(body.action).toBe('save_marketing_email');
+    expect(body.email).toBe('cliente@loja.com');
+    expect(body.marketing_channel).toBe('klaviyo');
+    await expect(
+      saveShopperMarketingEmail({ shopDomain: 'loja.myshopify.com', publicId: 'pub' }, 'invalido')
+    ).rejects.toThrow('invalid_marketing_email');
   });
 });
