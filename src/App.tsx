@@ -111,12 +111,12 @@ function App() {
       <OAuthRedirectHandler />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707]" /></div>}>
       <Routes>
-        <Route element={<PublicSiteLayout />}>
-          <Route path="/" element={<LandingPageWrapper />} />
-          <Route path="/contato" element={<ContactPage />} />
-          <Route path="/partners" element={<PartnersPage />} />
-          <Route path="/blog" element={<BlogIndexPage />} />
-          <Route path="/blog/:slug" element={<BlogArticlePage />} />
+        <Route path="/" element={<PublicSiteLayout />}>
+          <Route index element={<LandingPageWrapper />} />
+          <Route path="contato" element={<ContactPage />} />
+          <Route path="partners" element={<PartnersPage />} />
+          <Route path="blog" element={<BlogIndexPage />} />
+          <Route path="blog/:slug" element={<BlogArticlePage />} />
         </Route>
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/chatgpt/connect" element={<ChatGptConnectPage />} />
