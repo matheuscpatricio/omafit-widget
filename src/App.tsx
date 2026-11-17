@@ -13,7 +13,7 @@ import { ContactPage } from './components/ContactPage';
 import { PartnersPage } from './components/PartnersPage';
 import { BlogIndexPage } from './components/blog/BlogIndexPage';
 import { BlogArticlePage } from './components/blog/BlogArticlePage';
-import { PublicSiteLayout } from './components/PublicSiteLayout';
+import { LandingLocaleProvider } from './contexts/LandingLocaleContext';
 import { supabase } from './lib/supabase';
 
 const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -108,16 +108,15 @@ function OAuthRedirectHandler() {
 function App() {
   return (
     <Router>
-      <OAuthRedirectHandler />
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707]" /></div>}>
-      <Routes>
-        <Route path="/" element={<PublicSiteLayout />}>
-          <Route index element={<LandingPageWrapper />} />
-          <Route path="contato" element={<ContactPage />} />
-          <Route path="partners" element={<PartnersPage />} />
-          <Route path="blog" element={<BlogIndexPage />} />
-          <Route path="blog/:slug" element={<BlogArticlePage />} />
-        </Route>
+      <LandingLocaleProvider>
+        <OAuthRedirectHandler />
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707]" /></div>}>
+        <Routes>
+          <Route path="/" element={<LandingPageWrapper />} />
+          <Route path="/contato" element={<ContactPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/blog" element={<BlogIndexPage />} />
+          <Route path="/blog/:slug" element={<BlogArticlePage />} />
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/chatgpt/connect" element={<ChatGptConnectPage />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
@@ -211,8 +210,9 @@ function App() {
           }
         />
         <Route path="/widget-shoes" element={<ShoeARWidgetPage />} />
-      </Routes>
-      </Suspense>
+        </Routes>
+        </Suspense>
+      </LandingLocaleProvider>
     </Router>
   );
 }
