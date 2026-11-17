@@ -131,6 +131,8 @@ function FeatureMarqueeStrip({
   features: list,
   cardWidth,
   scrollSnap,
+  highlightLabel,
+  featureLabel,
 }: {
   features: LandingFeature[];
   cardWidth: number;
