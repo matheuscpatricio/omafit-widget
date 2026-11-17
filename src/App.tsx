@@ -13,6 +13,7 @@ import { ContactPage } from './components/ContactPage';
 import { PartnersPage } from './components/PartnersPage';
 import { BlogIndexPage } from './components/blog/BlogIndexPage';
 import { BlogArticlePage } from './components/blog/BlogArticlePage';
+import { PublicSiteLayout } from './components/PublicSiteLayout';
 import { supabase } from './lib/supabase';
 
 const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -110,14 +111,16 @@ function App() {
       <OAuthRedirectHandler />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#810707]" /></div>}>
       <Routes>
-        <Route path="/" element={<LandingPageWrapper />} />
+        <Route element={<PublicSiteLayout />}>
+          <Route path="/" element={<LandingPageWrapper />} />
+          <Route path="/contato" element={<ContactPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/blog" element={<BlogIndexPage />} />
+          <Route path="/blog/:slug" element={<BlogArticlePage />} />
+        </Route>
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/chatgpt/connect" element={<ChatGptConnectPage />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
-        <Route path="/contato" element={<ContactPage />} />
-        <Route path="/partners" element={<PartnersPage />} />
-        <Route path="/blog" element={<BlogIndexPage />} />
-        <Route path="/blog/:slug" element={<BlogArticlePage />} />
         <Route
           path="/pricing"
           element={

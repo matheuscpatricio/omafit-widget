@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { animate, motion, useInView, useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 function CountUp({
   end,
@@ -47,6 +48,9 @@ const numClass =
   'font-dm-mono font-semibold text-[clamp(2.75rem,11vw,6.5rem)] leading-[0.95] text-[#5BAF8A] [text-shadow:0_2px_40px_rgba(91,175,138,0.22)]';
 
 export function ImpactStats() {
+  const { t } = useLandingLocale();
+  const i = t.impact;
+
   return (
     <section
       id="impacto"
@@ -66,7 +70,7 @@ export function ImpactStats() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           className="landing-tagline text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-oma-muted"
         >
-          Omafit data
+          {i.tag}
         </motion.p>
         <motion.h2
           id="impacto-heading"
@@ -77,7 +81,7 @@ export function ImpactStats() {
           className="mx-auto mt-3 max-w-2xl text-center text-2xl font-semibold tracking-tight text-oma-cream sm:text-3xl"
           style={{ letterSpacing: '-0.035em' }}
         >
-          Results brands like yours see in day-to-day operations.
+          {i.title}
         </motion.h2>
 
         <div className="mt-16 flex flex-col gap-16 sm:mt-20 sm:gap-20 md:gap-24">
@@ -89,11 +93,11 @@ export function ImpactStats() {
             className="text-center md:text-left"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">Up to </span>
+              <span className="text-oma-muted">{i.stat1Prefix}</span>
               <CountUp end={63} suffix="%" className={cn(numClass, 'mx-1 align-baseline md:mx-1.5')} />
-              <span className="text-oma-muted"> fewer returns</span>
+              <span className="text-oma-muted">{i.stat1Suffix}</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Less reverse logistics, more margin, and customers who buy again with confidence.
+                {i.stat1Sub}
               </span>
             </p>
           </motion.article>
@@ -106,11 +110,11 @@ export function ImpactStats() {
             className="text-center"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">Shoppers who use Omafit are </span>
+              <span className="text-oma-muted">{i.stat2Prefix}</span>
               <CountUp end={3} suffix="×" className={cn(numClass, 'mx-1 align-baseline')} duration={1.9} />
-              <span className="text-oma-muted"> more likely to buy</span>
+              <span className="text-oma-muted">{i.stat2Suffix}</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Guided sizing and visualization that unlocks checkout.
+                {i.stat2Sub}
               </span>
             </p>
           </motion.article>
@@ -123,11 +127,11 @@ export function ImpactStats() {
             className="text-center md:text-right"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
-              <span className="text-oma-muted">Cart abandonment </span>
+              <span className="text-oma-muted">{i.stat3Prefix}</span>
               <CountUp end={46} suffix="%" className={cn(numClass, 'mx-1 align-baseline md:mx-1.5')} />
-              <span className="text-oma-muted"> lower</span>
+              <span className="text-oma-muted">{i.stat3Suffix}</span>
               <span className="mt-4 block text-base font-normal leading-relaxed text-oma-muted sm:text-lg">
-                Less doubt on size and look—more completed checkouts.
+                {i.stat3Sub}
               </span>
             </p>
           </motion.article>
@@ -140,8 +144,7 @@ export function ImpactStats() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="mx-auto mt-14 max-w-2xl text-center text-xs leading-relaxed text-oma-muted sm:mt-16 sm:text-sm"
         >
-          Aggregated metrics from Omafit-powered stores; your results may vary by catalog, traffic, and
-          category.
+          {i.disclaimer}
         </motion.p>
       </div>
     </section>

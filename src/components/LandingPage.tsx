@@ -14,6 +14,7 @@ import { FAQ } from './landing/FAQ';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
 import { InstallPlatformModal } from './landing/InstallPlatformModal';
+import { useLandingLocale } from '../contexts/LandingLocaleContext';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -28,8 +29,9 @@ const paidPlanPriceIds: Record<'growth' | 'pro' | 'scale' | 'enterprise', string
   enterprise: 'enterprise',
 };
 
-export function LandingPage({ onGetStarted }: LandingPageProps) {
+function LandingPageContent({ onGetStarted }: LandingPageProps) {
   const navigate = useNavigate();
+  const { t } = useLandingLocale();
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
@@ -83,10 +85,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   };
 
   const handleRequestDemo = () => {
-    const subject = encodeURIComponent('Personalized Omafit demo');
-    const body = encodeURIComponent(
-      'Hi, I would like to schedule a personalized Omafit demo for my store.\n\nStore name:\nCategory (apparel / footwear / accessories):\nEstimated monthly volume:\nBest time for a call:',
-    );
+    const subject = encodeURIComponent(t.demoEmail.subject);
+    const body = encodeURIComponent(t.demoEmail.body);
     window.location.href = `mailto:contato@omafit.co?subject=${subject}&body=${body}`;
   };
 
@@ -125,4 +125,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       <Footer />
     </div>
   );
+}
+
+export function LandingPage(props: LandingPageProps) {
+  return <LandingPageContent {...props} />;
 }

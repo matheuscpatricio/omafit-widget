@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import { Button } from '../ui/button';
-import { ShimmerHeading } from './magic/ShimmerHeading';
-import { LANDING_IMAGES } from '../../lib/site';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
+import { useHeroSlideDeck } from '../../hooks/useHeroSlideDeck';
 import { cn } from '../../lib/utils';
 
 export interface HeroDesktopSlidesProps {
@@ -11,84 +11,11 @@ export interface HeroDesktopSlidesProps {
   onRequestDemo?: () => void;
 }
 
-type Slide = {
-  id: string;
-  image: string;
-  badge: string;
-  title: ReactNode;
-  body: string;
-  topScrim?: boolean;
-  compact?: boolean;
-  showCtas?: boolean;
-  subtleOverlay?: boolean;
-  hideBadge?: boolean;
-  /** Recorte vertical da imagem (object-position); slide 2 favorece o topo. */
-  imageObjectPosition?: 'center' | 'top';
-};
-
-/** Mesmas três imagens/copy do hero mobile; desktop em 5:2 com autoplay. */
-const slides: Slide[] = [
-  {
-    id: 'intro',
-    image: LANDING_IMAGES.heroLifestyleRiver,
-    badge: 'Omafit',
-    hideBadge: true,
-    title: (
-      <span className="block text-balance">
-        End size returns. Start real{' '}
-        <span className="landing-tagline font-bold text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
-          confidence
-        </span>{' '}
-        in online fashion.
-      </span>
-    ),
-    body:
-      'Omafit is the intelligent assistant that uses photorealistic AI and precise measurement for the right fit in apparel, footwear, and accessories. Cut costs, grow sales, and delight shoppers.',
-    topScrim: false,
-    compact: true,
-    showCtas: true,
-    subtleOverlay: true,
-  },
-  {
-    id: 'fit',
-    image: LANDING_IMAGES.heroLifestyleBoardwalk,
-    badge: 'Precise sizing',
-    title: (
-      <>
-        The right fit with{' '}
-        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-tech !to-oma-cream">
-          MediaPipe
-        </ShimmerHeading>
-        .
-      </>
-    ),
-    body:
-      'Our body-detection technology analyzes your shopper and recommends the ideal size.',
-    topScrim: true,
-    imageObjectPosition: 'top',
-  },
-  {
-    id: 'chat-aov',
-    image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Built-in chat',
-    title: (
-      <span className="block text-balance">
-        A style advisor that raises{' '}
-        <span className="italic text-oma-accent [text-shadow:0_1px_14px_rgba(0,0,0,0.85)]">
-          average order value
-        </span>
-        .
-      </span>
-    ),
-    body:
-      'When a shopper tries a product, Omafit acts as a consultant and suggests complementary pieces to grow your AOV.',
-    topScrim: true,
-  },
-];
-
 const SLIDE_MS = 6000;
 
 export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDesktopSlidesProps) {
+  const { t } = useLandingLocale();
+  const slides = useHeroSlideDeck();
   const reduceMotion = useReducedMotion();
   const [index, setIndex] = useState(0);
 
@@ -207,7 +134,7 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
                     className="w-full justify-center shadow-lg sm:w-auto"
                     onClick={() => onOpenInstallModal?.()}
                   >
-                    Install
+                    {t.hero.install}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                   <Button
@@ -218,7 +145,7 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
                     onClick={onRequestDemo}
                   >
                     <Play className="h-4 w-4" />
-                    Book a personalized demo
+                    {t.hero.demo}
                   </Button>
                 </motion.div>
               )}
@@ -237,7 +164,7 @@ export function HeroDesktopSlides({ onOpenInstallModal, onRequestDemo }: HeroDes
               type="button"
               role="tab"
               aria-selected={i === active}
-              aria-label={`Go to slide ${i + 1}`}
+              aria-label={t.hero.slideAria(i + 1)}
               className={cn(
                 'pointer-events-auto h-2 rounded-full transition-all duration-300',
                 i === active ? 'w-8 bg-oma-accent' : 'w-2 bg-oma-cream/45 hover:bg-oma-cream/70',

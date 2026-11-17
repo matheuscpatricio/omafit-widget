@@ -1,4 +1,5 @@
 import { motion, type Variants } from 'framer-motion';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 const containerVariants: Variants = {
   hidden: {},
@@ -17,6 +18,9 @@ const itemVariants: Variants = {
 };
 
 export function Pain() {
+  const { t } = useLandingLocale();
+  const p = t.pain;
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-oma-elevated via-oma-canvas to-oma-elevated py-20 sm:py-28">
       <div
@@ -36,15 +40,15 @@ export function Pain() {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-parchment/90 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
-            The problem
+            {p.tag}
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Your store looks great.{' '}
-            <span className="text-oma-muted">But you still bleed margin for these reasons.</span>
+            {p.title}{' '}
+            <span className="text-oma-muted">{p.titleMuted}</span>
           </motion.h2>
         </motion.div>
 
@@ -59,10 +63,7 @@ export function Pain() {
             variants={itemVariants}
             className="text-lg leading-relaxed text-oma-muted sm:text-xl sm:leading-relaxed lg:text-[1.35rem] lg:leading-relaxed"
           >
-            Returns for wrong size or unwanted fit keep eating margin: reverse shipping, refunds, and
-            stock back on the shelf raise cost—and the customer may never buy again. At checkout, fit
-            doubt is a top reason for abandonment. Without purchase confidence, carts stall and the traffic
-            you paid for never turns into steady revenue.
+            {p.body}
           </motion.p>
         </motion.div>
       </div>

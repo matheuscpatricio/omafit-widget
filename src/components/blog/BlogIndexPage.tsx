@@ -3,8 +3,11 @@ import { getAllBlogPosts, formatBlogDate } from '../../lib/blog';
 import { PageSEO } from '../seo/PageSEO';
 import { getSiteUrl } from '../../lib/site';
 import { BlogLayout } from './BlogLayout';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 export function BlogIndexPage() {
+  const { locale, t } = useLandingLocale();
+  const b = t.blog;
   const posts = getAllBlogPosts();
   const base = getSiteUrl();
 
@@ -13,26 +16,25 @@ export function BlogIndexPage() {
       '@type': 'CollectionPage',
       '@id': `${base}/blog#webpage`,
       url: `${base}/blog`,
-      name: 'Omafit Blog — fashion, try-on & e-commerce',
-      description:
-        'Articles on virtual try-on, Shopify, body measurement, AR, and reducing returns for fashion stores.',
+      name: b.collectionName,
+      description: b.collectionDescription,
       isPartOf: { '@id': `${base}/#website` },
-      inLanguage: 'en',
+      inLanguage: t.htmlLang,
     },
     {
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${base}/` },
-        { '@type': 'ListItem', position: 2, name: 'Blog', item: `${base}/blog` },
+        { '@type': 'ListItem', position: 1, name: b.breadcrumbHome, item: `${base}/` },
+        { '@type': 'ListItem', position: 2, name: b.breadcrumbBlog, item: `${base}/blog` },
       ],
     },
   ];
 
   return (
-    <BlogLayout backHref="/" backLabel="Back to site">
+    <BlogLayout backHref="/" backLabel={b.backToSite}>
       <PageSEO
-        title="Omafit Blog — virtual try-on, Shopify & reducing returns"
-        description="Guides for fashion merchants: AI virtual try-on, MediaPipe sizing, AR for accessories, and PDP conversion on Shopify."
+        title={b.seoTitle}
+        description={b.seoDescription}
         path="/blog"
         keywords={[
           'fashion e-commerce blog',
@@ -46,14 +48,15 @@ export function BlogIndexPage() {
 
       <header className="mb-12">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-oma-muted">
-          For merchants
+          {b.forMerchants}
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl">
-          Omafit Blog
+          {b.indexTitle}
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-relaxed text-oma-muted">
-          Virtual try-on, the right size, and PDP conversion—written for Shopify fashion brands.
-        </p>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-oma-muted">{b.indexSubtitle}</p>
+        {b.articleLanguageNote ? (
+          <p className="mt-3 text-sm text-oma-muted/90">{b.articleLanguageNote}</p>
+        ) : null}
       </header>
 
       <ul className="space-y-8">
@@ -61,9 +64,9 @@ export function BlogIndexPage() {
           <li key={post.slug}>
             <article className="group rounded-2xl border border-oma-line/40 bg-oma-elevated/40 p-6 transition-colors hover:border-oma-accent/35 sm:p-8">
               <time dateTime={post.publishedAt} className="text-xs text-oma-muted">
-                {formatBlogDate(post.publishedAt)}
+                {formatBlogDate(post.publishedAt, locale)}
                 <span aria-hidden> · </span>
-                {post.readingTimeMinutes} min read
+                {post.readingTimeMinutes} {b.minRead}
               </time>
               <h2 className="mt-2 text-xl font-semibold text-oma-cream group-hover:text-oma-accent sm:text-2xl">
                 <Link
@@ -78,7 +81,7 @@ export function BlogIndexPage() {
                 to={`/blog/${post.slug}`}
                 className="mt-4 inline-block text-sm font-medium text-oma-accent hover:underline"
               >
-                Read article →
+                {b.readArticle}
               </Link>
             </article>
           </li>

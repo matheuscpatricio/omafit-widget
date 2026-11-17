@@ -1,5 +1,6 @@
 import { blogPosts } from '../content/blog/posts';
 import type { BlogPost } from '../content/blog/types';
+import type { LandingLocale } from '../locales/landing/types';
 
 export function getAllBlogPosts(): BlogPost[] {
   return [...blogPosts].sort(
@@ -11,8 +12,10 @@ export function getBlogPostBySlug(slug: string): BlogPost | undefined {
   return blogPosts.find((p) => p.slug === slug);
 }
 
-export function formatBlogDate(iso: string): string {
-  return new Intl.DateTimeFormat('en-US', {
+export function formatBlogDate(iso: string, locale: LandingLocale = 'en'): string {
+  const intl =
+    locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es-ES' : 'en-US';
+  return new Intl.DateTimeFormat(intl, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

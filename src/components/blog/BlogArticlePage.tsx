@@ -4,9 +4,12 @@ import { PageSEO } from '../seo/PageSEO';
 import { getSiteUrl } from '../../lib/site';
 import { BlogLayout } from './BlogLayout';
 import { BlogArticleBody } from './BlogArticleBody';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 export function BlogArticlePage() {
   const { slug } = useParams<{ slug: string }>();
+  const { locale, t } = useLandingLocale();
+  const b = t.blog;
   const post = slug ? getBlogPostBySlug(slug) : undefined;
 
   if (!post) {
@@ -26,7 +29,7 @@ export function BlogArticlePage() {
       abstract: post.geoAnswer,
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
-      inLanguage: 'en-US',
+      inLanguage: t.htmlLang,
       author: { '@type': 'Organization', name: 'Omafit', url: base },
       publisher: { '@id': `${base}/#organization` },
       mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
@@ -37,8 +40,8 @@ export function BlogArticlePage() {
     {
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${base}/` },
-        { '@type': 'ListItem', position: 2, name: 'Blog', item: `${base}/blog` },
+        { '@type': 'ListItem', position: 1, name: b.breadcrumbHome, item: `${base}/` },
+        { '@type': 'ListItem', position: 2, name: b.breadcrumbBlog, item: `${base}/blog` },
         { '@type': 'ListItem', position: 3, name: post.title, item: pageUrl },
       ],
     },
@@ -70,27 +73,33 @@ export function BlogArticlePage() {
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-oma-muted">{post.description}</p>
         <p className="mt-3 rounded-xl border border-oma-line/40 bg-oma-elevated/50 px-4 py-3 text-sm leading-relaxed text-oma-cream">
-          <span className="font-medium text-oma-accent">Quick answer: </span>
+          <span className="font-medium text-oma-accent">{b.quickAnswer} </span>
           {post.geoAnswer}
         </p>
+        {b.articleLanguageNote ? (
+          <p className="mt-3 text-sm text-oma-muted/90">{b.articleLanguageNote}</p>
+        ) : null}
         <p className="mt-4 text-xs text-oma-muted">
-          <time dateTime={post.publishedAt}>Published {formatBlogDate(post.publishedAt)}</time>
+          <time dateTime={post.publishedAt}>
+            {b.published} {formatBlogDate(post.publishedAt, locale)}
+          </time>
           {post.updatedAt !== post.publishedAt ? (
             <>
               {' '}
-              · Updated <time dateTime={post.updatedAt}>{formatBlogDate(post.updatedAt)}</time>
+              · {b.updated}{' '}
+              <time dateTime={post.updatedAt}>{formatBlogDate(post.updatedAt, locale)}</time>
             </>
           ) : null}
           <span aria-hidden> · </span>
-          {post.readingTimeMinutes} min read
+          {post.readingTimeMinutes} {b.minRead}
         </p>
       </header>
 
-      <BlogArticleBody blocks={post.blocks} faqs={post.faqs} />
+      <BlogArticleBody blocks={post.blocks} faqs={post.faqs} faqHeading={b.faqHeading} />
 
       {related.length > 0 ? (
         <aside className="mt-14 border-t border-oma-line/40 pt-10">
-          <h2 className="text-lg font-semibold text-oma-cream">Keep reading</h2>
+          <h2 className="text-lg font-semibold text-oma-cream">{b.keepReading}</h2>
           <ul className="mt-4 space-y-3">
             {related.map((r) => (
               <li key={r.slug}>

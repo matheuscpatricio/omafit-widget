@@ -4,9 +4,10 @@ import type { BlogBlock, BlogFaq } from '../../content/blog/types';
 type BlogArticleBodyProps = {
   blocks: BlogBlock[];
   faqs: BlogFaq[];
+  faqHeading?: string;
 };
 
-export function BlogArticleBody({ blocks, faqs }: BlogArticleBodyProps) {
+export function BlogArticleBody({ blocks, faqs, faqHeading = 'Frequently asked questions' }: BlogArticleBodyProps) {
   return (
   <article className="prose-oma space-y-6">
     {blocks.map((block, i) => {
@@ -103,7 +104,7 @@ export function BlogArticleBody({ blocks, faqs }: BlogArticleBodyProps) {
     {faqs.length > 0 ? (
       <section className="mt-12 border-t border-oma-line/40 pt-10" aria-labelledby="faq-heading">
         <h2 id="faq-heading" className="text-2xl font-semibold text-oma-cream">
-          Frequently asked questions
+          {faqHeading}
         </h2>
         <dl className="mt-6 space-y-6">
           {faqs.map((faq, i) => (

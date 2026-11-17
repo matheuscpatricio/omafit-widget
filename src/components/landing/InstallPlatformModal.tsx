@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Store, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 interface InstallPlatformModalProps {
   open: boolean;
@@ -10,6 +11,9 @@ interface InstallPlatformModalProps {
 }
 
 export function InstallPlatformModal({ open, onClose, onSelectShopify }: InstallPlatformModalProps) {
+  const { t } = useLandingLocale();
+  const m = t.installModal;
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -44,7 +48,7 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
         >
           <button
             type="button"
-            aria-label="Close"
+            aria-label={m.close}
             className="absolute inset-0 bg-black/55 backdrop-blur-sm"
             onClick={onClose}
           />
@@ -58,15 +62,15 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="install-platform-title" className="font-semibold text-oma-ink">
-                  Install Omafit
+                  {m.title}
                 </h2>
-                <p className="mt-1 text-sm text-oma-muted">Choose your platform</p>
+                <p className="mt-1 text-sm text-oma-muted">{m.subtitle}</p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-oma-muted transition-colors hover:bg-oma-light/80 hover:text-oma-ink"
-                aria-label="Close"
+                aria-label={m.close}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -83,9 +87,9 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
               >
                 <span className="flex items-center gap-2.5">
                   <Store className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
-                  Shopify
+                  {m.shopify}
                 </span>
-                <span className="text-[11px] font-normal opacity-90">App Store</span>
+                <span className="text-[11px] font-normal opacity-90">{m.shopifyHint}</span>
               </button>
 
               <div
@@ -97,7 +101,7 @@ export function InstallPlatformModal({ open, onClose, onSelectShopify }: Install
                   Nuvemshop
                 </span>
                 <span className="rounded-full border border-oma-line/60 bg-oma-parchment px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-oma-muted">
-                  Coming soon
+                  {m.nuvemSoon}
                 </span>
               </div>
             </div>

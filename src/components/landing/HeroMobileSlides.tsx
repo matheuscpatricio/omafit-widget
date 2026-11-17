@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import {
@@ -12,8 +12,8 @@ import {
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { BorderBeamCard } from './magic/BorderBeam';
-import { ShimmerHeading } from './magic/ShimmerHeading';
-import { LANDING_IMAGES } from '../../lib/site';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
+import { useHeroSlideDeck } from '../../hooks/useHeroSlideDeck';
 import { cn } from '../../lib/utils';
 
 export interface HeroMobileSlidesProps {
@@ -21,82 +21,9 @@ export interface HeroMobileSlidesProps {
   onRequestDemo?: () => void;
 }
 
-type Slide = {
-  id: string;
-  image: string;
-  badge: string;
-  title: ReactNode;
-  body: string;
-  topScrim?: boolean;
-  /** Copy mais curta + layout compacto (ex.: CTAs). */
-  compact?: boolean;
-  /** CTAs Instalar / Demonstração. */
-  showCtas?: boolean;
-  /** Vinheta só na parte inferior — deixa mais foto visível. */
-  subtleOverlay?: boolean;
-  /** Esconder pill do topo. */
-  hideBadge?: boolean;
-};
-
-const slides: Slide[] = [
-  {
-    id: 'intro',
-    image: LANDING_IMAGES.heroLifestyleRiver,
-    badge: 'Omafit',
-    hideBadge: true,
-    title: (
-      <span className="block text-balance">
-        End size returns. Start real{' '}
-        <span className="landing-tagline font-bold text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
-          confidence
-        </span>{' '}
-        in online fashion.
-      </span>
-    ),
-    body:
-      'Omafit is the intelligent assistant that uses photorealistic AI and precise measurement for the right fit in apparel, footwear, and accessories. Cut costs, grow sales, and delight shoppers.',
-    topScrim: false,
-    compact: true,
-    showCtas: true,
-    subtleOverlay: true,
-  },
-  {
-    id: 'fit',
-    image: LANDING_IMAGES.heroLifestyleBoardwalk,
-    badge: 'Precise sizing',
-    title: (
-      <>
-        The right fit with{' '}
-        <ShimmerHeading variant="light" className="italic !from-oma-cream !via-oma-tech !to-oma-cream">
-          MediaPipe
-        </ShimmerHeading>
-        .
-      </>
-    ),
-    body:
-      'Our body-detection technology analyzes your shopper and recommends the ideal size.',
-    topScrim: true,
-  },
-  {
-    id: 'chat-aov',
-    image: LANDING_IMAGES.heroLifestyleBeach,
-    badge: 'Built-in chat',
-    title: (
-      <span className="block text-balance">
-        A style advisor that raises{' '}
-        <span className="italic text-oma-accent [text-shadow:0_1px_16px_rgba(0,0,0,0.95)]">
-          average order value
-        </span>
-        .
-      </span>
-    ),
-    body:
-      'When a shopper tries a product, Omafit acts as a consultant and suggests complementary pieces to grow your AOV.',
-    topScrim: true,
-  },
-];
-
 export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobileSlidesProps) {
+  const { t } = useLandingLocale();
+  const slides = useHeroSlideDeck();
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
 
@@ -230,7 +157,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                             className="w-full justify-center shadow-lg"
                             onClick={() => onOpenInstallModal?.()}
                           >
-                            Install
+                            {t.hero.install}
                             <ArrowRight className="h-4 w-4" />
                           </Button>
                           <Button
@@ -241,7 +168,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                             onClick={onRequestDemo}
                           >
                             <Play className="h-4 w-4" />
-                            Demo
+                            {t.hero.demo}
                           </Button>
                         </motion.div>
                       )}
@@ -263,7 +190,7 @@ export function HeroMobileSlides({ onOpenInstallModal, onRequestDemo }: HeroMobi
                   type="button"
                   role="tab"
                   aria-selected={i === current}
-                  aria-label={`Go to slide ${i + 1}`}
+                  aria-label={t.hero.slideAria(i + 1)}
                   className={cn(
                     'pointer-events-auto h-2 rounded-full transition-all duration-300',
                     i === current ? 'w-7 bg-oma-accent' : 'w-2 bg-oma-cream/45 hover:bg-oma-cream/65',

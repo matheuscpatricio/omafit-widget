@@ -4,6 +4,7 @@ import { Marquee } from './magic/Marquee';
 import { useIsMdUp } from '../../hooks/useMediaQuery';
 import { HeroMobileSlides } from './HeroMobileSlides';
 import { HeroDesktopSlides } from './HeroDesktopSlides';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 interface HeroProps {
   onOpenInstallModal?: () => void;
@@ -33,20 +34,8 @@ const itemVariants: Variants = {
   },
 };
 
-const marqueeItems = [
-  'Shopify',
-  'AI try-on',
-  'MediaPipe',
-  'WebAR',
-  'Fewer returns',
-  'Higher conversion',
-  'White-label widget',
-  'ChatGPT',
-  'Apparel & footwear',
-  'AR accessories',
-];
-
 export function Hero({ onOpenInstallModal, onRequestDemo }: HeroProps) {
+  const { t } = useLandingLocale();
   const sectionRef = useRef<HTMLElement>(null);
   const isMdUp = useIsMdUp();
 
@@ -91,7 +80,7 @@ export function Hero({ onOpenInstallModal, onRequestDemo }: HeroProps) {
           <motion.div variants={itemVariants} className="w-full max-w-4xl md:mx-auto">
             <div className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 py-2 shadow-inner backdrop-blur-sm">
               <Marquee speed="slow" className="text-oma-cream">
-                {marqueeItems.map((label) => (
+                {t.hero.marquee.map((label) => (
                   <span
                     key={label}
                     className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium tracking-tight sm:text-sm"

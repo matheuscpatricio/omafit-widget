@@ -4,21 +4,23 @@ import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { OmafitLogo } from './OmafitLogo';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
+import { LandingLanguageSelector } from './LandingLanguageSelector';
 
 interface NavbarProps {
   onOpenInstallModal?: () => void;
 }
 
-const links = [
-  { href: '#solucao', label: 'Solution' },
-  { href: '#recursos', label: 'Features' },
-  { href: '#planos', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/partners', label: 'Partners' },
-];
-
 export function Navbar({ onOpenInstallModal }: NavbarProps) {
+  const { t } = useLandingLocale();
+  const links = [
+    { href: '#solucao', label: t.nav.solution },
+    { href: '#recursos', label: t.nav.features },
+    { href: '#planos', label: t.nav.pricing },
+    { href: '#faq', label: t.nav.faq },
+    { href: '/blog', label: t.nav.blog },
+    { href: '/partners', label: t.nav.partners },
+  ];
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -91,13 +93,14 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
             </nav>
 
             <div className="hidden md:flex items-center gap-2">
+              <LandingLanguageSelector solidBar={solidBar} />
               <Button
                 type="button"
                 size="sm"
                 variant="primary"
                 onClick={() => onOpenInstallModal?.()}
               >
-                Install
+                {t.nav.install}
               </Button>
             </div>
 
@@ -166,7 +169,8 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                   </a>
                 ))}
               </nav>
-              <div className="mt-4 grid gap-2">
+              <div className="mt-4 flex flex-col gap-3">
+                <LandingLanguageSelector solidBar />
                 <button
                   type="button"
                   onClick={() => {
@@ -175,7 +179,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
                   }}
                   className="grid h-11 place-items-center rounded-[6px] bg-[#D96845] font-bricolage text-sm font-medium tracking-[0.05em] text-[#F6F0E2] hover:bg-[var(--color-accent-dark)]"
                 >
-                  Install
+                  {t.nav.install}
                 </button>
               </div>
             </motion.div>

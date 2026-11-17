@@ -3,6 +3,8 @@ import { Check, Sparkles, ArrowRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button, ButtonLink } from '../ui/button';
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
+import type { LandingCopy, LandingLocale } from '../../locales/landing';
 
 type PlanName = 'growth' | 'pro' | 'scale' | 'enterprise';
 
@@ -141,11 +143,17 @@ function mergePlansFromDb(rows: BillingPlan[]): BillingPlan[] {
   });
 }
 
-function formatSessionAllowance(plan: BillingPlan): string {
+function formatSessionAllowance(
+  plan: BillingPlan,
+  locale: LandingLocale,
+  sessionUnlimited: string,
+  sessionPerMonth: (n: string) => string,
+): string {
   if (plan.images_included >= UNLIMITED_THRESHOLD) {
-    return 'Unlimited try-on sessions';
+    return sessionUnlimited;
   }
-  return `${plan.images_included.toLocaleString('en-US')} try-on sessions/month`;
+  const numberLocale = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es-ES' : 'en-US';
+  return sessionPerMonth(plan.images_included.toLocaleString(numberLocale));
 }
 
 function formatUsd(amount: number): string {
@@ -153,6 +161,8 @@ function formatUsd(amount: number): string {
 }
 
 export function Pricing({ onSelectPaidPlan }: PricingProps) {
+  const { locale, t } = useLandingLocale();
+  const p = t.pricing;
   const [plans, setPlans] = useState<BillingPlan[]>(() => mergePlansFromDb([]));
 
   useEffect(() => {
@@ -215,10 +225,16 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
     };
   }, []);
 
-  const ordered = useMemo(
-    () => PLAN_ORDER.map((name) => plans.find((p) => p.name === name)).filter(Boolean) as BillingPlan[],
-    [plans],
-  );
+  const ordered = useMemo(() => {
+    const list = PLAN_ORDER.map((name) => plans.find((plan) => plan.name === name)).filter(
+      Boolean,
+    ) as BillingPlan[];
+    return list.map((plan) => ({
+      ...plan,
+      tagline: p.plans[plan.name].tagline,
+      features: p.plans[plan.name].features,
+    }));
+  }, [plans, p]);
 
   return (
     <section id="planos" className="relative bg-oma-canvas py-20 sm:py-28">
@@ -235,19 +251,21 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-line/40 bg-oma-elevated/80 px-3 py-1 text-[12px] font-medium text-oma-muted"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" />
-            Transparent pricing
+            {p.tag}
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Choose the plan that <span className="text-oma-accent">fuels</span> your growth.
+            {p.title}
+            <span className="text-oma-accent">{p.titleAccent}</span>
+            {p.titleEnd}
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            Monthly or annual billing. Growth, Pro, and Scale include a{' '}
-            <span className="font-semibold text-oma-cream">14-day trial</span>. Session bundles include
-            sizing, photorealistic try-on, and AI stylist tools.
+            {p.subBefore}
+            <span className="font-semibold text-oma-cream">{p.trialDays}</span>
+            {p.subAfter}
           </motion.p>
         </motion.div>
 
@@ -265,6 +283,8 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
               variants={itemVariants}
               isPopular={plan.name === 'pro'}
               onSelectPaidPlan={onSelectPaidPlan}
+              pricingCopy={p}
+              locale={locale}
             />
           ))}
         </motion.div>
@@ -277,7 +297,7 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
           className="mt-10 text-center"
         >
           <p className="text-sm text-oma-muted">
-            Questions about billing or volume?{' '}
+            {p.billingQuestion}{' '}
             <ButtonLink
               variant="link"
               size="sm"
@@ -285,7 +305,7 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Chat with us on WhatsApp
+              {p.whatsapp}
             </ButtonLink>
           </p>
         </motion.div>
@@ -299,14 +319,23 @@ function PlanCard({
   variants,
   isPopular,
   onSelectPaidPlan,
+  pricingCopy,
+  locale,
 }: {
   plan: BillingPlan;
   variants: Variants;
   isPopular: boolean;
   onSelectPaidPlan?: (planName: PlanName) => void;
+  pricingCopy: LandingCopy['pricing'];
+  locale: LandingLocale;
 }) {
   const isDark = isPopular;
-  const sessionsLine = formatSessionAllowance(plan);
+  const sessionsLine = formatSessionAllowance(
+    plan,
+    locale,
+    pricingCopy.sessionUnlimited,
+    pricingCopy.sessionPerMonth,
+  );
 
   return (
     <motion.div
@@ -328,7 +357,7 @@ function PlanCard({
           <div className="absolute top-4 right-4 z-10">
             <span className="inline-flex items-center gap-1 rounded-full bg-oma-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-oma-cream">
               <Sparkles className="w-3 h-3" />
-              Popular
+              {pricingCopy.popular}
             </span>
           </div>
         </>
@@ -340,7 +369,9 @@ function PlanCard({
             isDark ? 'text-oma-cream/50' : 'text-oma-muted'
           }`}
         >
-          {plan.trial_days ? `${plan.trial_days}-day free trial` : 'Custom contract'}
+          {plan.trial_days
+            ? pricingCopy.trialFree(plan.trial_days)
+            : pricingCopy.customContract}
         </div>
         <h3
           className={`mt-2 text-xl font-semibold tracking-tight ${
@@ -358,10 +389,11 @@ function PlanCard({
             <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
               US$ {formatUsd(plan.monthly_price)}
             </span>
-            <span className="font-dm-mono text-sm text-[#5BAF8A]/90">/mo</span>
+            <span className="font-dm-mono text-sm text-[#5BAF8A]/90">{pricingCopy.perMo}</span>
           </div>
           <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
-            or US$ {formatUsd(plan.yearly_price)}/yr
+            or US$ {formatUsd(plan.yearly_price)}
+            {pricingCopy.perYr}
           </span>
         </div>
 
@@ -390,7 +422,9 @@ function PlanCard({
             onClick={() => onSelectPaidPlan?.(plan.name)}
             type="button"
           >
-            {plan.trial_days ? `Start ${plan.trial_days}-day trial` : 'Talk to sales'}
+            {plan.trial_days
+              ? pricingCopy.startTrial(plan.trial_days)
+              : pricingCopy.talkSales}
             <ArrowRight className="w-4 h-4" />
           </Button>
         </div>

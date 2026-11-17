@@ -1,57 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { cn } from '../../lib/utils';
-
-interface Feature {
-  title: string;
-  description: string;
-  bullets: string[];
-  accent?: boolean;
-}
-
-const features: Feature[] = [
-  {
-    title: 'Precise sizing with MediaPipe',
-    description:
-      'Real-time analysis of 50+ body landmarks on the shopper’s phone. No measuring tape, no guesswork.',
-    bullets: ['98% recommendation accuracy', '<10s capture', 'Runs 100% on-device'],
-    accent: true,
-  },
-  {
-    title: 'Photorealistic try-on (apparel & footwear)',
-    description:
-      'Generative AI renders the garment on the shopper with realistic shading, fabric, and drape. They see it before they buy.',
-    bullets: ["Women's and men's apparel", 'Footwear and accessories in one flow', 'Photographic quality'],
-  },
-  {
-    title: 'AR preview (glasses & accessories)',
-    description:
-      'In-browser augmented reality for glasses, bracelets, watches, and more. Zero friction, all live.',
-    bullets: ['WebAR—no app install', 'Real-time face tracking', 'iOS and Android compatible'],
-  },
-  {
-    title: 'Built-in ChatGPT assistant',
-    description:
-      'A 24/7 style advisor that knows your catalog, answers questions, and suggests outfits.',
-    bullets: ['Knows your catalog', 'Suggests full looks', 'Speaks in your brand voice'],
-  },
-  {
-    title: 'Analytics & ROI',
-    description:
-      'Dashboards that tie widget usage to business outcomes: estimate ROI and follow aggregated shopper profiles—height, weight, and body-type averages, always anonymized.',
-    bullets: [
-      'ROI models for conversion, AOV, and returns',
-      'Average height, weight, and body-type insights',
-      'Engagement funnel and try-on sessions',
-    ],
-  },
-  {
-    title: 'Customizable widget',
-    description:
-      'Colors, fonts, layout, and copy aligned with your brand. Feels native to your store—not bolted on.',
-    bullets: ['100% white-label', 'Install in minutes', 'Mobile-first'],
-  },
-];
+import { useLandingLocale } from '../../contexts/LandingLocaleContext';
+import type { LandingFeature } from '../../locales/landing';
 
 const containerVariants: Variants = {
   hidden: {},
@@ -67,7 +18,17 @@ const itemVariants: Variants = {
   },
 };
 
-function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boolean }) {
+function FeatureInfoCard({
+  feature,
+  compact,
+  highlightLabel,
+  featureLabel,
+}: {
+  feature: LandingFeature;
+  compact?: boolean;
+  highlightLabel: string;
+  featureLabel: string;
+}) {
   const highlight = Boolean(feature.accent);
 
   return (
@@ -86,7 +47,7 @@ function FeatureInfoCard({ feature, compact }: { feature: Feature; compact?: boo
             : 'border-oma-cream/15 bg-oma-cream/5 text-oma-cream/85',
         )}
       >
-        {highlight ? 'Highlight' : 'Feature'}
+        {highlight ? highlightLabel : featureLabel}
       </span>
       <h3
         className={cn(
@@ -171,9 +132,11 @@ function FeatureMarqueeStrip({
   cardWidth,
   scrollSnap,
 }: {
-  features: Feature[];
+  features: LandingFeature[];
   cardWidth: number;
   scrollSnap?: boolean;
+  highlightLabel: string;
+  featureLabel: string;
 }) {
   return (
     <div className="flex w-max max-w-none flex-nowrap gap-2 md:gap-4">
@@ -186,7 +149,12 @@ function FeatureMarqueeStrip({
           )}
           style={{ width: cardWidth, flexBasis: cardWidth }}
         >
-          <FeatureInfoCard feature={feature} compact />
+          <FeatureInfoCard
+            feature={feature}
+            compact
+            highlightLabel={highlightLabel}
+            featureLabel={featureLabel}
+          />
         </div>
       ))}
       {/** Mesma distância entre o último cartão e o primeiro da cópia do marquee (Widget ↔ MediaPipe). */}
@@ -196,7 +164,15 @@ function FeatureMarqueeStrip({
 }
 
 /** Uma fileira horizontal; ~2 / ~3 / ~4 cartões visíveis (<768 / md / lg+). Desktop: marquee duplicado. Mobile: arrastar com o dedo. */
-function SolutionAutoMarqueeGrid() {
+function SolutionAutoMarqueeGrid({
+  features,
+  highlightLabel,
+  featureLabel,
+}: {
+  features: LandingFeature[];
+  highlightLabel: string;
+  featureLabel: string;
+}) {
   const [paused, setPaused] = useState(false);
   const reduceMotion = useReducedMotion();
   const [viewportRef, cardWidth] = useMarqueeViewportCardWidth();
@@ -218,7 +194,13 @@ function SolutionAutoMarqueeGrid() {
   if (reduceMotion || isMobile) {
     return (
       <div ref={viewportRef} className={scrollStripClass}>
-        <FeatureMarqueeStrip features={features} cardWidth={cardWidth} scrollSnap />
+        <FeatureMarqueeStrip
+          features={features}
+          cardWidth={cardWidth}
+          scrollSnap
+          highlightLabel={highlightLabel}
+          featureLabel={featureLabel}
+        />
       </div>
     );
   }
@@ -232,10 +214,20 @@ function SolutionAutoMarqueeGrid() {
         onMouseLeave={() => setPaused(false)}
       >
         <div className="shrink-0">
-          <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
+          <FeatureMarqueeStrip
+            features={features}
+            cardWidth={cardWidth}
+            highlightLabel={highlightLabel}
+            featureLabel={featureLabel}
+          />
         </div>
         <div className="shrink-0">
-          <FeatureMarqueeStrip features={features} cardWidth={cardWidth} />
+          <FeatureMarqueeStrip
+            features={features}
+            cardWidth={cardWidth}
+            highlightLabel={highlightLabel}
+            featureLabel={featureLabel}
+          />
         </div>
       </div>
     </div>
@@ -243,6 +235,9 @@ function SolutionAutoMarqueeGrid() {
 }
 
 export function Solution() {
+  const { t } = useLandingLocale();
+  const s = t.solution;
+
   return (
     <section id="solucao" className="relative overflow-hidden bg-oma-canvas py-20 sm:py-28">
       <div className="relative z-[1] mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
@@ -258,18 +253,19 @@ export function Solution() {
             className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-accent/10 px-3 py-1 text-[12px] font-medium text-oma-accent"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" aria-hidden />
-            The solution
+            {s.tag}
           </motion.span>
           <motion.h2
             variants={itemVariants}
             className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
-            Omafit: intelligence that turns{' '}
-            <span className="text-oma-accent">doubt into confidence</span> and sales.
+            {s.title}
+            <span className="text-oma-accent">{s.titleAccent}</span>
+            {s.titleEnd}
           </motion.h2>
           <motion.p variants={itemVariants} className="mt-5 text-lg leading-relaxed text-oma-muted">
-            A full visual AI suite for apparel, accessories, and footwear. Fast, easy install on your store.
+            {s.sub}
           </motion.p>
         </motion.div>
 
@@ -286,7 +282,11 @@ export function Solution() {
               <div className="border-y border-oma-line/35 bg-oma-elevated/20 py-6 sm:rounded-2xl sm:border sm:shadow-elegant-lg sm:py-8 md:rounded-3xl md:py-10">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_50%_30%,rgba(217,104,69,0.08),transparent)] sm:rounded-2xl md:rounded-3xl" />
                 <div className="relative z-[1]">
-                  <SolutionAutoMarqueeGrid />
+                  <SolutionAutoMarqueeGrid
+                    features={s.features}
+                    highlightLabel={s.highlight}
+                    featureLabel={s.featureBadge}
+                  />
                 </div>
               </div>
             </div>
