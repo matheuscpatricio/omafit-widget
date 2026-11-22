@@ -173,7 +173,7 @@ export const LIKERT_ITEMS: PublicLikertItem[] = [
 
 export const OPEN_QUESTION = {
   id: 'C1',
-  text: 'A head de e-commerce de uma marca de moda de porte médio responde ao seu primeiro contato: “Já testamos um provador virtual e não funcionou.” O que você responderia e qual seria o seu próximo passo? (3 a 5 linhas)',
+  text: 'A head de e-commerce de uma marca de moda de porte médio responde ao seu primeiro contato: “Já testamos um provador virtual e não funcionou.” O que você responderia e qual seria o seu próximo passo?',
   maxChars: 600,
   minChars: 20,
   placeholder: 'Escreva sua resposta aqui…',

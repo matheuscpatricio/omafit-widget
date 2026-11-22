@@ -211,7 +211,7 @@ export function Etapa2AssessmentPage() {
     if (!currentBlock) return;
     const ans = draft.answers.forced_choice.find((a) => a.block_id === currentBlock.id);
     if (!ans?.most || !ans?.least) {
-      setError('Marque 1 frase como MAIS e 1 frase como MENOS para continuar.');
+      setError('Marque a frase MAIS e a frase MENOS para continuar.');
       return;
     }
     if (ans.most === ans.least) {
@@ -318,8 +318,8 @@ export function Etapa2AssessmentPage() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-neutral-800">
-        <Loader2 className="h-8 w-8 animate-spin text-neutral-500" aria-hidden />
+      <div className="flex min-h-screen items-center justify-center bg-white font-bricolage text-oma-ink">
+        <Loader2 className="h-8 w-8 animate-spin text-oma-accent" aria-hidden />
         <span className="sr-only">Carregando…</span>
       </div>
     );
@@ -328,28 +328,29 @@ export function Etapa2AssessmentPage() {
   const showProgress = questionStep !== null;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-neutral-900 antialiased">
+    <div className="min-h-screen bg-white font-bricolage text-oma-ink antialiased">
       <PageSEO
         title={ETAPA2_CONFIG.pageTitle}
-        description="Etapa 2 do processo seletivo — teste de estilo de trabalho."
+        description="Etapa 2 do processo seletivo — avaliação de perfil comportamental."
         path="/processo-seletivo/etapa-2"
         noindex
       />
 
-      <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-xl px-4 py-3 sm:px-6">
-          <div className={`flex items-center ${showProgress ? 'justify-between gap-4' : ''}`}>
-            <OmafitLogo variant="onLight" className="text-[20px]" />
-            {showProgress && (
-              <span className="shrink-0 text-xs text-neutral-500">
-                Etapa {questionStep} de {questionTotal}
-              </span>
-            )}
+      <header className="sticky top-0 z-20 border-b border-oma-line/15 bg-white/95 backdrop-blur">
+        <div className="mx-auto max-w-xl px-4 py-4 sm:px-6">
+          <div className="flex justify-center">
+            <OmafitLogo variant="onLight" className="text-[22px]" />
           </div>
           {showProgress && (
-            <div className="mt-2">
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between text-xs text-oma-muted">
+                <span>
+                  Etapa {questionStep} de {questionTotal}
+                </span>
+                <span>{Math.round(((questionStep ?? 0) / questionTotal) * 100)}%</span>
+              </div>
               <div
-                className="h-1.5 overflow-hidden rounded-full bg-neutral-200"
+                className="h-1.5 overflow-hidden rounded-full bg-oma-parchment"
                 role="progressbar"
                 aria-valuenow={questionStep ?? 0}
                 aria-valuemin={0}
@@ -357,7 +358,7 @@ export function Etapa2AssessmentPage() {
                 aria-label={`Progresso: etapa ${questionStep} de ${questionTotal}`}
               >
                 <div
-                  className="h-full rounded-full bg-neutral-800 transition-all duration-300"
+                  className="h-full rounded-full bg-oma-accent transition-all duration-300"
                   style={{ width: `${((questionStep ?? 0) / questionTotal) * 100}%` }}
                 />
               </div>
@@ -368,14 +369,14 @@ export function Etapa2AssessmentPage() {
 
       <main className="mx-auto max-w-xl px-4 py-8 sm:px-6 sm:py-10">
         {showResume && step !== 'thanks' && step !== 'already_submitted' && step !== 'expired' && (
-          <div className="mb-6 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
-            <p className="font-medium text-neutral-900">Bem-vindo(a) de volta!</p>
-            <p className="mt-1 text-neutral-600">
+          <div className="mb-6 rounded-xl border border-oma-accent/25 bg-oma-accent/5 px-4 py-3 text-sm">
+            <p className="font-medium text-oma-ink">Bem-vindo(a) de volta!</p>
+            <p className="mt-1 text-oma-muted">
               Suas respostas foram salvas. Continue de onde parou.
             </p>
             <button
               type="button"
-              className="mt-3 text-sm font-medium text-neutral-900 underline"
+              className="mt-3 text-sm font-medium text-oma-accent underline underline-offset-2"
               onClick={() => {
                 const resume = draftToStep(draft);
                 go(resume.step, resume.blockIndex);
@@ -402,23 +403,23 @@ export function Etapa2AssessmentPage() {
 
         {step === 'thanks' && (
           <section className="space-y-4 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
-              <CheckCircle2 className="h-6 w-6 text-neutral-800" aria-hidden />
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-oma-accent/30 bg-oma-accent/10">
+              <CheckCircle2 className="h-6 w-6 text-oma-accent" aria-hidden />
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+            <h1 className="text-2xl font-semibold tracking-tight text-oma-ink">
               Respostas enviadas. Obrigado!
             </h1>
-            <p className="text-neutral-600 leading-relaxed">
+            <p className="leading-relaxed text-oma-muted">
               Recebemos suas respostas
               {draft.candidate.name ? `, ${draft.candidate.name.split(' ')[0]}` : ''}. Obrigado pelo
               tempo dedicado ao processo.
             </p>
-            <p className="text-neutral-600 leading-relaxed">
+            <p className="leading-relaxed text-oma-muted">
               Entraremos em contato pelo e-mail informado até {ETAPA2_CONFIG.contactByDateLabel}.
             </p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-oma-muted">
               Dúvidas:{' '}
-              <a className="underline" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
+              <a className="text-oma-accent underline underline-offset-2" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
                 {ETAPA2_CONFIG.contactEmail}
               </a>
             </p>
@@ -428,13 +429,13 @@ export function Etapa2AssessmentPage() {
         {step === 'identity' && (
           <section className="space-y-6">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
                 Processo seletivo – {ETAPA2_CONFIG.roleTitle}
               </p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">
-                Etapa 2 – Teste de estilo de trabalho
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-oma-ink sm:text-[1.75rem]">
+                Avaliação de perfil comportamental
               </h1>
-              <p className="mt-2 text-neutral-600">
+              <p className="mt-2 text-oma-muted">
                 Precisamos só de duas informações para vincular suas respostas à sua candidatura.
               </p>
             </div>
@@ -474,35 +475,84 @@ export function Etapa2AssessmentPage() {
         {step === 'instructions' && (
           <section className="space-y-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-                Como funciona
-              </h1>
-              <p className="mt-3 text-neutral-600 leading-relaxed">
-                <strong className="text-neutral-900">Tempo estimado: 8 a 10 minutos.</strong> A
-                avaliação é dividida em três partes curtas.
+              <h1 className="text-2xl font-semibold tracking-tight text-oma-ink">Orientações</h1>
+              <p className="mt-3 leading-relaxed text-oma-muted">
+                <strong className="text-oma-ink">Tempo estimado: 8 a 10 minutos.</strong>
+              </p>
+              <p className="mt-3 leading-relaxed text-oma-muted">
+                A avaliação é dividida em três partes curtas e foi desenvolvida para compreender
+                melhor suas características comportamentais, sua forma de agir e como você costuma
+                lidar com diferentes situações no ambiente profissional.
               </p>
             </div>
-            <ul className="list-disc space-y-2 pl-5 text-sm text-neutral-600 leading-relaxed">
-              <li>Escolha um ambiente tranquilo e responda com atenção.</li>
-              <li>Seja espontâneo e sincero — não existem respostas certas ou erradas.</li>
-              <li>Não tente identificar a resposta “ideal”; queremos seu comportamento natural.</li>
-              <li>Confie na primeira impressão.</li>
-            </ul>
-            <div className="space-y-3 text-sm text-neutral-600 leading-relaxed">
-              <p>
-                <strong className="text-neutral-900">Parte A (~5 min):</strong> 12 blocos — marque 1
-                frase MAIS e 1 MENOS parecida com você.
+
+            <div className="space-y-3 text-sm leading-relaxed text-oma-muted">
+              <p className="font-medium text-oma-ink">
+                Antes de começar, confira algumas orientações importantes:
               </p>
-              <p>
-                <strong className="text-neutral-900">Parte B (~1 min):</strong> 5 afirmações de 1 a
-                5.
-              </p>
-              <p>
-                <strong className="text-neutral-900">Parte C (~3 min):</strong> uma pergunta aberta
-                em 3 a 5 linhas.
-              </p>
+              <ul className="list-disc space-y-2.5 pl-5">
+                <li>
+                  <strong className="text-oma-ink">Escolha um ambiente tranquilo:</strong> reserve
+                  alguns minutos para realizar a avaliação com atenção, evitando interrupções ou
+                  distrações.
+                </li>
+                <li>
+                  <strong className="text-oma-ink">Seja espontâneo e sincero:</strong> responda
+                  considerando como você realmente pensa, age e se comporta no dia a dia,
+                  especialmente no ambiente de trabalho.
+                </li>
+                <li>
+                  <strong className="text-oma-ink">Não existem respostas certas ou erradas:</strong>{' '}
+                  o objetivo é conhecer seu perfil comportamental, e não avaliar seus conhecimentos
+                  ou habilidades técnicas.
+                </li>
+                <li>
+                  <strong className="text-oma-ink">Não tente identificar a resposta ideal:</strong>{' '}
+                  não escolha alternativas pensando no que a empresa espera ou no que parece mais
+                  adequado para a posição. Queremos conhecer seu comportamento natural.
+                </li>
+                <li>
+                  <strong className="text-oma-ink">Confie na sua primeira impressão:</strong> evite
+                  analisar excessivamente cada pergunta. Geralmente, a resposta mais espontânea
+                  representa melhor a maneira como você realmente age.
+                </li>
+              </ul>
             </div>
-            <p className="text-xs text-neutral-500">
+
+            <div className="space-y-4 text-sm leading-relaxed text-oma-muted">
+              <h2 className="text-base font-semibold text-oma-ink">
+                Como a avaliação está organizada
+              </h2>
+              <div>
+                <p className="font-semibold text-oma-ink">
+                  Parte A — Escolha de comportamentos (aproximadamente 5 minutos)
+                </p>
+                <p className="mt-1">
+                  Você encontrará 12 blocos de frases. Em cada bloco, selecione uma frase que MAIS
+                  representa seu comportamento e outra que MENOS representa você.
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-oma-ink">
+                  Parte B — Escala de concordância (aproximadamente 1 minuto)
+                </p>
+                <p className="mt-1">
+                  Você deverá avaliar 5 afirmações utilizando uma escala de 1 a 5, em que 1 significa
+                  &quot;Discordo totalmente&quot; e 5 significa &quot;Concordo totalmente&quot;.
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-oma-ink">
+                  Parte C — Resposta aberta (aproximadamente 3 minutos)
+                </p>
+                <p className="mt-1">
+                  Uma pergunta discursiva para que você possa compartilhar sua percepção e
+                  experiências em 3 a 5 linhas.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-oma-muted">
               Suas respostas são salvas automaticamente. Se precisar sair, abra o mesmo link para
               continuar.
             </p>
@@ -513,14 +563,14 @@ export function Etapa2AssessmentPage() {
         {step === 'block' && currentBlock && (
           <section className="space-y-5">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Parte A – Escolha forçada · Bloco {currentBlock.number} de 12
+              <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
+                Parte A — Escolha de comportamentos · Bloco {currentBlock.number} de 12
               </p>
-              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-oma-ink sm:text-2xl">
                 {currentBlock.stem}
               </h1>
-              <p className="mt-2 text-sm text-neutral-600">
-                Marque 1 frase MAIS parecida com você e 1 frase MENOS parecida com você.
+              <p className="mt-2 text-sm text-oma-muted">
+                Marque a frase MAIS parecida com você e a frase MENOS parecida com você.
               </p>
             </div>
             <div className="space-y-3">
@@ -530,16 +580,16 @@ export function Etapa2AssessmentPage() {
                 return (
                   <div
                     key={s.id}
-                    className={`rounded-lg border p-4 ${
+                    className={`rounded-xl border p-4 ${
                       isMost
-                        ? 'border-neutral-900 bg-neutral-50'
+                        ? 'border-oma-accent/50 bg-oma-accent/5'
                         : isLeast
-                          ? 'border-neutral-300 bg-neutral-50'
-                          : 'border-neutral-200 bg-white'
+                          ? 'border-oma-line/25 bg-oma-parchment/40'
+                          : 'border-oma-line/15 bg-white'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed text-neutral-900">
-                      <span className="mr-2 font-semibold">{s.letter}.</span>
+                    <p className="text-sm leading-relaxed text-oma-ink">
+                      <span className="mr-2 font-semibold text-oma-accent">{s.letter}.</span>
                       {s.text}
                     </p>
                     <div className="mt-3 flex gap-2">
@@ -571,23 +621,44 @@ export function Etapa2AssessmentPage() {
         {step === 'likert' && (
           <section className="space-y-5">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Parte B – Proatividade, autonomia e foco
+              <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
+                Parte B — Escala de concordância
               </p>
-              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
-                Indique de 1 a 5
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-oma-ink sm:text-2xl">
+                Avalie cada afirmação
               </h1>
-              <p className="mt-2 text-sm text-neutral-600">
-                1 = Discordo totalmente · 5 = Concordo totalmente
-              </p>
+              <div className="mt-3 space-y-2 text-sm leading-relaxed text-oma-muted">
+                <p>
+                  Para cada afirmação abaixo, escolha <strong className="text-oma-ink">um único número de 1 a 5</strong> que
+                  melhor representa o quanto você concorda com ela:
+                </p>
+                <ul className="list-none space-y-1 rounded-xl border border-oma-line/15 bg-oma-parchment/40 px-4 py-3">
+                  <li>
+                    <strong className="text-oma-ink">1</strong> — Discordo totalmente
+                  </li>
+                  <li>
+                    <strong className="text-oma-ink">2</strong> — Discordo
+                  </li>
+                  <li>
+                    <strong className="text-oma-ink">3</strong> — Neutro (nem concordo nem discordo)
+                  </li>
+                  <li>
+                    <strong className="text-oma-ink">4</strong> — Concordo
+                  </li>
+                  <li>
+                    <strong className="text-oma-ink">5</strong> — Concordo totalmente
+                  </li>
+                </ul>
+                <p>Não há resposta certa ou errada. Responda com base no seu comportamento habitual no trabalho.</p>
+              </div>
             </div>
             <div className="space-y-4">
               {LIKERT_ITEMS.map((item) => {
                 const value = likertMap.get(item.id);
                 return (
-                  <div key={item.id} className="rounded-lg border border-neutral-200 p-4">
-                    <p className="text-sm leading-relaxed text-neutral-900">{item.text}</p>
-                    <div className="mt-3 flex justify-between text-[10px] text-neutral-500 sm:text-xs">
+                  <div key={item.id} className="rounded-xl border border-oma-line/15 p-4">
+                    <p className="text-sm leading-relaxed text-oma-ink">{item.text}</p>
+                    <div className="mt-3 flex justify-between text-[10px] text-oma-muted sm:text-xs">
                       <span>Discordo totalmente</span>
                       <span>Concordo totalmente</span>
                     </div>
@@ -601,10 +672,10 @@ export function Etapa2AssessmentPage() {
                             aria-pressed={active}
                             aria-label={`${opt.value}: ${opt.label}`}
                             onClick={() => setLikert(item.id, opt.value)}
-                            className={`flex h-11 min-h-[44px] items-center justify-center rounded-md border text-sm font-semibold ${
+                            className={`flex h-11 min-h-[44px] items-center justify-center rounded-lg border text-sm font-semibold ${
                               active
-                                ? 'border-neutral-900 bg-neutral-900 text-white'
-                                : 'border-neutral-200 bg-white text-neutral-900 hover:border-neutral-400'
+                                ? 'border-oma-accent bg-oma-accent text-oma-cream'
+                                : 'border-oma-line/20 bg-white text-oma-ink hover:border-oma-accent/40'
                             }`}
                           >
                             {opt.value}
@@ -613,7 +684,7 @@ export function Etapa2AssessmentPage() {
                       })}
                     </div>
                     {value != null && (
-                      <p className="mt-2 text-center text-xs text-neutral-600">
+                      <p className="mt-2 text-center text-xs text-oma-accent">
                         {LIKERT_SCALE.find((s) => s.value === value)?.label}
                       </p>
                     )}
@@ -629,13 +700,13 @@ export function Etapa2AssessmentPage() {
         {step === 'open' && (
           <section className="space-y-5">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Parte C – Pergunta situacional
+              <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
+                Parte C — Resposta aberta
               </p>
-              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
-                Sua resposta
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-oma-ink sm:text-2xl">
+                Resposta aberta
               </h1>
-              <p className="mt-3 text-sm leading-relaxed text-neutral-600">{OPEN_QUESTION.text}</p>
+              <p className="mt-3 text-sm leading-relaxed text-oma-muted">{OPEN_QUESTION.text}</p>
             </div>
             <div>
               <textarea
@@ -661,9 +732,9 @@ export function Etapa2AssessmentPage() {
                     { syncRemote: false },
                   );
                 }}
-                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+                className="w-full rounded-xl border border-oma-line/25 bg-white px-3 py-2.5 text-oma-ink placeholder:text-oma-muted/55 focus:border-oma-accent/50 focus:outline-none focus:ring-2 focus:ring-oma-accent/25"
               />
-              <p className="mt-1 text-right text-xs text-neutral-500">
+              <p className="mt-1 text-right text-xs text-oma-muted">
                 {openText.length}/{OPEN_QUESTION.maxChars} caracteres
               </p>
             </div>
@@ -675,26 +746,26 @@ export function Etapa2AssessmentPage() {
         {step === 'privacy' && (
           <section className="space-y-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+              <h1 className="text-2xl font-semibold tracking-tight text-oma-ink">
                 Privacidade e envio
               </h1>
-              <p className="mt-2 text-neutral-600">
+              <p className="mt-2 text-oma-muted">
                 Antes de enviar, leia como tratamos seus dados e confirme o consentimento.
               </p>
             </div>
 
-            <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
-              <h2 className="text-sm font-semibold text-neutral-900">
+            <div className="rounded-xl border border-oma-line/15 bg-oma-parchment/35 p-4">
+              <h2 className="text-sm font-semibold text-oma-ink">
                 Privacidade e uso dos dados (LGPD)
               </h2>
-              <div className="mt-3 max-h-40 overflow-y-auto rounded-md border border-neutral-200 bg-white p-3 text-sm leading-relaxed text-neutral-600">
+              <div className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-oma-line/15 bg-white p-3 text-sm leading-relaxed text-oma-muted">
                 {CONSENT_TEXT}
               </div>
 
-              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-neutral-900">
+              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-oma-ink">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 rounded border-neutral-300"
+                  className="mt-1 h-5 w-5 shrink-0 rounded border-oma-line/30 accent-[var(--color-accent,#D96845)]"
                   checked={agree}
                   onChange={(e) => {
                     const checked = e.target.checked;
@@ -711,14 +782,14 @@ export function Etapa2AssessmentPage() {
                   }}
                 />
                 <span>
-                  Li e concordo. <span className="text-neutral-500">(obrigatório)</span>
+                  Li e concordo. <span className="text-oma-accent">(obrigatório)</span>
                 </span>
               </label>
 
-              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-neutral-600">
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-oma-muted">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 rounded border-neutral-300"
+                  className="mt-1 h-5 w-5 shrink-0 rounded border-oma-line/30 accent-[var(--color-accent,#D96845)]"
                   checked={talentBank}
                   onChange={(e) => {
                     const checked = e.target.checked;
@@ -735,9 +806,9 @@ export function Etapa2AssessmentPage() {
               </label>
             </div>
 
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-oma-muted">
               Dúvidas:{' '}
-              <a className="underline" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
+              <a className="text-oma-accent underline underline-offset-2" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
                 {ETAPA2_CONFIG.contactEmail}
               </a>
             </p>
@@ -763,16 +834,16 @@ export function Etapa2AssessmentPage() {
 
       {confirmSubmit && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-oma-ink/40 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-submit-title"
         >
-          <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
-            <h2 id="confirm-submit-title" className="text-lg font-semibold text-neutral-900">
+          <div className="w-full max-w-md rounded-2xl border border-oma-line/15 bg-white p-6 shadow-elegant">
+            <h2 id="confirm-submit-title" className="text-lg font-semibold text-oma-ink">
               Tudo pronto?
             </h2>
-            <p className="mt-2 text-sm text-neutral-600">
+            <p className="mt-2 text-sm text-oma-muted">
               Depois de enviar, não será possível alterar as respostas.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -780,7 +851,7 @@ export function Etapa2AssessmentPage() {
                 type="button"
                 disabled={submitting}
                 onClick={() => setConfirmSubmit(false)}
-                className="rounded-md px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-oma-muted hover:bg-oma-parchment/60"
               >
                 Revisar
               </button>
@@ -788,7 +859,7 @@ export function Etapa2AssessmentPage() {
                 type="button"
                 disabled={submitting}
                 onClick={() => void handleSubmit()}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-oma-accent px-4 py-2.5 text-sm font-medium text-oma-cream hover:bg-oma-accentDark disabled:opacity-50"
               >
                 {submitting ? (
                   <>
@@ -826,7 +897,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-neutral-900">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-oma-ink">
         {label}
       </label>
       <input
@@ -837,7 +908,7 @@ function Field({
         maxLength={maxLength}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+        className="w-full rounded-xl border border-oma-line/25 bg-white px-3 py-2.5 text-oma-ink placeholder:text-oma-muted/55 focus:border-oma-accent/50 focus:outline-none focus:ring-2 focus:ring-oma-accent/25"
       />
     </div>
   );
@@ -862,7 +933,7 @@ function NavRow({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center justify-start gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          className="inline-flex items-center justify-start gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-oma-muted hover:bg-oma-parchment/60 hover:text-oma-ink"
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar
@@ -874,7 +945,7 @@ function NavRow({
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-neutral-900 px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 sm:w-auto"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-oma-accent px-5 py-3 text-sm font-medium text-oma-cream hover:bg-oma-accentDark disabled:opacity-50 sm:w-auto"
       >
         {nextLabel}
         <ArrowRight className="h-4 w-4" />
@@ -899,12 +970,12 @@ function ChoiceChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-[44px] min-w-[88px] rounded-md border px-3 text-xs font-semibold tracking-wide ${
+      className={`min-h-[44px] min-w-[88px] rounded-lg border px-3 text-xs font-semibold tracking-wide ${
         active
           ? muted
-            ? 'border-neutral-500 bg-neutral-200 text-neutral-900'
-            : 'border-neutral-900 bg-neutral-900 text-white'
-          : 'border-neutral-300 bg-white text-neutral-600 hover:border-neutral-500'
+            ? 'border-oma-line/40 bg-oma-parchment text-oma-ink'
+            : 'border-oma-accent bg-oma-accent text-oma-cream'
+          : 'border-oma-line/25 bg-white text-oma-muted hover:border-oma-accent/40 hover:text-oma-ink'
       }`}
     >
       {label}
@@ -914,7 +985,7 @@ function ChoiceChip({
 
 function ErrorText({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
       {children}
     </p>
   );
@@ -922,9 +993,9 @@ function ErrorText({ children }: { children: React.ReactNode }) {
 
 function StatusCard({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 text-center">
-      <h1 className="text-xl font-semibold text-neutral-900">{title}</h1>
-      <p className="mt-3 text-sm leading-relaxed text-neutral-600">{body}</p>
+    <section className="rounded-2xl border border-oma-line/15 bg-oma-parchment/40 p-6 text-center">
+      <h1 className="text-xl font-semibold text-oma-ink">{title}</h1>
+      <p className="mt-3 text-sm leading-relaxed text-oma-muted">{body}</p>
     </section>
   );
 }
