@@ -1,0 +1,185 @@
+{
+  "version": "2.0",
+  "note": "Arquivo interno — NÃO importar no bundle do candidato. Contém etiquetas de perfil e marcação reverse.",
+  "profiles": {
+    "E": "Executor",
+    "C": "Comunicador",
+    "P": "Planejador",
+    "A": "Analista"
+  },
+  "forced_choice_blocks": [
+    {
+      "id": "B1",
+      "number": 1,
+      "stem": "Numa negociação, eu…",
+      "statements": [
+        { "id": "B1A", "letter": "A", "text": "Vou direto ao ponto.", "profile": "E" },
+        { "id": "B1B", "letter": "B", "text": "Crio conexão primeiro.", "profile": "C" },
+        { "id": "B1C", "letter": "C", "text": "Levo números e dados.", "profile": "A" },
+        { "id": "B1D", "letter": "D", "text": "Sigo o roteiro que preparei.", "profile": "P" }
+      ]
+    },
+    {
+      "id": "B2",
+      "number": 2,
+      "stem": "Com um cliente novo, eu…",
+      "statements": [
+        { "id": "B2A", "letter": "A", "text": "Procuro contatos em comum.", "profile": "C" },
+        { "id": "B2B", "letter": "B", "text": "Estudo a empresa a fundo antes.", "profile": "A" },
+        { "id": "B2C", "letter": "C", "text": "Já proponho o próximo passo.", "profile": "E" },
+        { "id": "B2D", "letter": "D", "text": "Entendo a rotina dele com calma.", "profile": "P" }
+      ]
+    },
+    {
+      "id": "B3",
+      "number": 3,
+      "stem": "Minha semana ideal tem…",
+      "statements": [
+        { "id": "B3A", "letter": "A", "text": "Tempo para revisar propostas e números.", "profile": "A" },
+        { "id": "B3B", "letter": "B", "text": "Agenda organizada e previsível.", "profile": "P" },
+        { "id": "B3C", "letter": "C", "text": "Metas desafiadoras.", "profile": "E" },
+        { "id": "B3D", "letter": "D", "text": "Muitas reuniões e conversas.", "profile": "C" }
+      ]
+    },
+    {
+      "id": "B4",
+      "number": 4,
+      "stem": "Quando perco uma venda, eu…",
+      "statements": [
+        { "id": "B4A", "letter": "A", "text": "Reviso meu processo com calma.", "profile": "P" },
+        { "id": "B4B", "letter": "B", "text": "Parto logo para a próxima.", "profile": "E" },
+        { "id": "B4C", "letter": "C", "text": "Converso com o cliente para entender.", "profile": "C" },
+        { "id": "B4D", "letter": "D", "text": "Analiso em que etapa o funil falhou.", "profile": "A" }
+      ]
+    },
+    {
+      "id": "B5",
+      "number": 5,
+      "stem": "Num time comercial, costumo ser quem…",
+      "statements": [
+        { "id": "B5A", "letter": "A", "text": "Cuida da qualidade.", "profile": "A" },
+        { "id": "B5B", "letter": "B", "text": "Anima o grupo.", "profile": "C" },
+        { "id": "B5C", "letter": "C", "text": "Puxa o ritmo.", "profile": "E" },
+        { "id": "B5D", "letter": "D", "text": "Mantém a organização.", "profile": "P" }
+      ]
+    },
+    {
+      "id": "B6",
+      "number": 6,
+      "stem": "O que mais me incomoda é…",
+      "statements": [
+        { "id": "B6A", "letter": "A", "text": "Demora para decidir.", "profile": "E" },
+        { "id": "B6B", "letter": "B", "text": "Mudança de última hora.", "profile": "P" },
+        { "id": "B6C", "letter": "C", "text": "Trabalhar isolado(a).", "profile": "C" },
+        { "id": "B6D", "letter": "D", "text": "Proposta enviada com erro.", "profile": "A" }
+      ]
+    },
+    {
+      "id": "B7",
+      "number": 7,
+      "stem": "Numa apresentação, eu foco em…",
+      "statements": [
+        { "id": "B7A", "letter": "A", "text": "Mostrar provas e números.", "profile": "A" },
+        { "id": "B7B", "letter": "B", "text": "O resultado que o cliente terá.", "profile": "E" },
+        { "id": "B7C", "letter": "C", "text": "Explicar passo a passo como funciona.", "profile": "P" },
+        { "id": "B7D", "letter": "D", "text": "Contar uma boa história.", "profile": "C" }
+      ]
+    },
+    {
+      "id": "B8",
+      "number": 8,
+      "stem": "Para bater a meta, confio mais em…",
+      "statements": [
+        { "id": "B8A", "letter": "A", "text": "Meus relacionamentos.", "profile": "C" },
+        { "id": "B8B", "letter": "B", "text": "Minha garra.", "profile": "E" },
+        { "id": "B8C", "letter": "C", "text": "Minha disciplina diária.", "profile": "P" },
+        { "id": "B8D", "letter": "D", "text": "Meu método e meus dados.", "profile": "A" }
+      ]
+    },
+    {
+      "id": "B9",
+      "number": 9,
+      "stem": "Diante de um problema urgente, eu…",
+      "statements": [
+        { "id": "B9A", "letter": "A", "text": "Mantenho a calma e organizo.", "profile": "P" },
+        { "id": "B9B", "letter": "B", "text": "Levanto os fatos primeiro.", "profile": "A" },
+        { "id": "B9C", "letter": "C", "text": "Chamo as pessoas certas.", "profile": "C" },
+        { "id": "B9D", "letter": "D", "text": "Decido na hora.", "profile": "E" }
+      ]
+    },
+    {
+      "id": "B10",
+      "number": 10,
+      "stem": "Clientes costumam me ver como…",
+      "statements": [
+        { "id": "B10A", "letter": "A", "text": "Objetivo(a).", "profile": "E" },
+        { "id": "B10B", "letter": "B", "text": "Confiável.", "profile": "P" },
+        { "id": "B10C", "letter": "C", "text": "Cuidadoso(a).", "profile": "A" },
+        { "id": "B10D", "letter": "D", "text": "Simpático(a).", "profile": "C" }
+      ]
+    },
+    {
+      "id": "B11",
+      "number": 11,
+      "stem": "Num projeto novo, começo…",
+      "statements": [
+        { "id": "B11A", "letter": "A", "text": "Montando um cronograma.", "profile": "P" },
+        { "id": "B11B", "letter": "B", "text": "Envolvendo pessoas.", "profile": "C" },
+        { "id": "B11C", "letter": "C", "text": "Entendendo os requisitos.", "profile": "A" },
+        { "id": "B11D", "letter": "D", "text": "Pondo a mão na massa.", "profile": "E" }
+      ]
+    },
+    {
+      "id": "B12",
+      "number": 12,
+      "stem": "Num conflito com um parceiro, eu…",
+      "statements": [
+        { "id": "B12A", "letter": "A", "text": "Busco um acordo com bom humor.", "profile": "C" },
+        { "id": "B12B", "letter": "B", "text": "Uso fatos e critérios.", "profile": "A" },
+        { "id": "B12C", "letter": "C", "text": "Escuto e evito desgaste.", "profile": "P" },
+        { "id": "B12D", "letter": "D", "text": "Digo abertamente o que penso.", "profile": "E" }
+      ]
+    }
+  ],
+  "likert": {
+    "scale": [
+      { "value": 1, "label": "Discordo totalmente" },
+      { "value": 2, "label": "Discordo" },
+      { "value": 3, "label": "Neutro" },
+      { "value": 4, "label": "Concordo" },
+      { "value": 5, "label": "Concordo totalmente" }
+    ],
+    "items": [
+      {
+        "id": "L1",
+        "text": "Quando vejo uma oportunidade de negócio, ajo sem esperar alguém pedir.",
+        "reverse": false
+      },
+      {
+        "id": "L2",
+        "text": "Mantenho minha rotina de prospecção mesmo sem ninguém acompanhando.",
+        "reverse": false
+      },
+      {
+        "id": "L3",
+        "text": "Prefiro que outra pessoa defina minhas prioridades da semana.",
+        "reverse": true
+      },
+      {
+        "id": "L4",
+        "text": "Termino o que comecei antes de abrir novas frentes.",
+        "reverse": false
+      },
+      {
+        "id": "L5",
+        "text": "Depois de um “não”, procuro outro caminho até quem decide.",
+        "reverse": false
+      }
+    ]
+  },
+  "open_question": {
+    "id": "C1",
+    "text": "A head de e-commerce de uma marca de moda de porte médio responde ao seu primeiro contato: “Já testamos um provador virtual e não funcionou.” O que você responderia e qual seria o seu próximo passo? (3 a 5 linhas)",
+    "max_chars": 600
+  }
+}

@@ -13,6 +13,7 @@ import { ContactPage } from './components/ContactPage';
 import { PartnersPage } from './components/PartnersPage';
 import { BlogIndexPage } from './components/blog/BlogIndexPage';
 import { BlogArticlePage } from './components/blog/BlogArticlePage';
+import { Etapa2AssessmentPage } from './components/hiring/Etapa2AssessmentPage';
 import { LandingLocaleProvider } from './contexts/LandingLocaleContext';
 import { supabase } from './lib/supabase';
 
@@ -117,6 +118,7 @@ function App() {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/blog" element={<BlogIndexPage />} />
           <Route path="/blog/:slug" element={<BlogArticlePage />} />
+          <Route path="/processo-seletivo/etapa-2" element={<Etapa2AssessmentPage />} />
         <Route path="/auth" element={<AuthWrapper />} />
         <Route path="/chatgpt/connect" element={<ChatGptConnectPage />} />
         <Route path="/privacidade" element={<PrivacyPolicyPage />} />
