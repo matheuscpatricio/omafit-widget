@@ -475,7 +475,10 @@ export function Etapa2AssessmentPage() {
         {step === 'instructions' && (
           <section className="space-y-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-oma-ink">Orientações</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-oma-ink sm:text-[2rem]">
+                Orientações importantes
+              </h1>
+              <div className="mt-3 h-1 w-14 rounded-full bg-oma-accent" aria-hidden />
               <p className="mt-3 leading-relaxed text-oma-muted">
                 <strong className="text-oma-ink">Tempo estimado: 8 a 10 minutos.</strong>
               </p>
@@ -625,7 +628,7 @@ export function Etapa2AssessmentPage() {
                 Parte B — Escala de concordância
               </p>
               <h1 className="mt-2 text-xl font-semibold tracking-tight text-oma-ink sm:text-2xl">
-                Avalie cada afirmação
+                Indique de 1 a 5
               </h1>
               <div className="mt-3 space-y-2 text-sm leading-relaxed text-oma-muted">
                 <p>
@@ -701,7 +704,7 @@ export function Etapa2AssessmentPage() {
           <section className="space-y-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
-                Parte C — Resposta aberta
+                Parte C — Pergunta situacional
               </p>
               <h1 className="mt-2 text-xl font-semibold tracking-tight text-oma-ink sm:text-2xl">
                 Resposta aberta
@@ -747,7 +750,7 @@ export function Etapa2AssessmentPage() {
           <section className="space-y-6">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-oma-ink">
-                Privacidade e envio
+                Privacidade e dados
               </h1>
               <p className="mt-2 text-oma-muted">
                 Antes de enviar, leia como tratamos seus dados e confirme o consentimento.
@@ -801,7 +804,7 @@ export function Etapa2AssessmentPage() {
                   }}
                 />
                 <span>
-                  Autorizo manter meus dados no banco de talentos por até 2 anos (opcional).
+                  Autorizo manter meus dados no banco de talentos (opcional).
                 </span>
               </label>
             </div>

@@ -180,4 +180,4 @@ export const OPEN_QUESTION = {
 } as const;
 
 export const CONSENT_TEXT =
-  'Ao continuar, autorizo a Omafit a tratar os dados que fornecerei (nome, contatos, perfil profissional, respostas ao teste e materiais do estudo de caso) exclusivamente para avaliar minha candidatura ao cargo de Sócio(a) Comercial. Os dados serão acessados apenas pelos sócios da Omafit e pela pessoa convidada por eles para a entrevista da Etapa 3, sob dever de confidencialidade, e excluídos em até 6 meses após o encerramento do processo, salvo se eu autorizar a manutenção em banco de talentos. Entendo que o teste é indicativo, não é um teste psicológico e não é usado isoladamente para decisões. Posso solicitar acesso, correção ou exclusão dos meus dados a qualquer momento pelo e-mail contato@omafit.co.';
+  'Ao continuar, autorizo a Omafit a tratar os dados que fornecerei exclusivamente para avaliar minha candidatura ao cargo de Sócio(a) Comercial. Os dados serão acessados apenas pelos sócios da Omafit, sob dever de confidencialidade, e excluídos em até 6 meses após o encerramento do processo, salvo se eu autorizar a manutenção em banco de talentos.';
