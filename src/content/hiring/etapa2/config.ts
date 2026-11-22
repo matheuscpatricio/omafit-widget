@@ -9,5 +9,5 @@ export const ETAPA2_CONFIG = {
   consentTextVersion: '1.0',
   roleTitle: 'Sócio(a) Comercial',
   pageTitle: 'Omafit – Processo seletivo Sócio(a) Comercial',
-  storageKeyPrefix: 'omafit_etapa2_v2',
+  storageKeyPrefix: 'omafit_etapa2_v3_single',
 } as const;

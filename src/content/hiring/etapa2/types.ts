@@ -56,17 +56,19 @@ export type Etapa2Candidate = {
 
 export type Etapa2Status = 'in_progress' | 'submitted';
 
-/** Telas do fluxo (ordem de navegação). */
+/** Estado de UI (formulário único ou telas finais). */
 export type Etapa2Screen =
+  | 'form'
+  | 'thanks'
+  | 'already_submitted'
+  | 'expired'
+  /** Legado do fluxo multi-tela (compat. localStorage antigo). */
   | 'welcome'
   | 'identity'
   | 'instructions'
   | 'block'
   | 'likert'
-  | 'open'
-  | 'thanks'
-  | 'already_submitted'
-  | 'expired';
+  | 'open';
 
 export type Etapa2Draft = {
   response_id: string;
