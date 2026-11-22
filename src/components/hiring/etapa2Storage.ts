@@ -36,13 +36,13 @@ export function createEmptyDraft(inviteToken: string | null): Etapa2Draft {
       open: null,
     },
     blockIndex: 0,
-    screen: 'form',
+    screen: 'identity',
     timestamps: {
       started_at: null,
       last_saved_at: null,
       submitted_at: null,
     },
-    welcomeBackSeen: true,
+    welcomeBackSeen: false,
   };
 }
 
@@ -95,5 +95,26 @@ export function firstIncompleteScreen(draft: Etapa2Draft): {
   if (draft.status === 'submitted') {
     return { screen: 'already_submitted', blockIndex: 0 };
   }
-  return { screen: 'form', blockIndex: 0 };
+  if (!draft.candidate.name.trim() || !draft.candidate.email.trim()) {
+    return { screen: 'identity', blockIndex: 0 };
+  }
+  const complete = draft.answers.forced_choice.filter((a) => a.most && a.least);
+  if (complete.length === 0) return { screen: 'instructions', blockIndex: 0 };
+  for (let i = 0; i < 12; i += 1) {
+    if (!complete.some((a) => a.block_id === `B${i + 1}`)) {
+      return { screen: 'block', blockIndex: i };
+    }
+  }
+  if (draft.answers.likert.length < 5) return { screen: 'likert', blockIndex: 11 };
+  if (!draft.answers.open?.text?.trim()) return { screen: 'open', blockIndex: 11 };
+  if (!draft.consent.accepted) return { screen: 'privacy', blockIndex: 11 };
+  return { screen: 'privacy', blockIndex: 11 };
+}
+
+export function progressStep(screen: Etapa2Screen, blockIndex: number): number | null {
+  if (screen === 'block') return blockIndex + 1;
+  if (screen === 'likert') return 13;
+  if (screen === 'open') return 14;
+  if (screen === 'privacy') return 15;
+  return null;
 }

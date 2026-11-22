@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Loader2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { OmafitLogo } from '../landing/OmafitLogo';
-import { Button } from '../ui/button';
 import { PageSEO } from '../seo/PageSEO';
 import { ETAPA2_CONFIG } from '../../content/hiring/etapa2/config';
 import {
@@ -12,7 +11,7 @@ import {
   LIKERT_SCALE,
   OPEN_QUESTION,
 } from '../../content/hiring/etapa2/questions';
-import type { Etapa2Draft } from '../../content/hiring/etapa2/types';
+import type { Etapa2Draft, Etapa2Screen } from '../../content/hiring/etapa2/types';
 import {
   createEmptyDraft,
   isDeadlinePassed,
@@ -27,7 +26,34 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-type View = 'form' | 'thanks' | 'already_submitted' | 'expired';
+type Step =
+  | 'identity'
+  | 'instructions'
+  | 'block'
+  | 'likert'
+  | 'open'
+  | 'privacy'
+  | 'thanks'
+  | 'already_submitted'
+  | 'expired';
+
+function draftToStep(draft: Etapa2Draft): { step: Step; blockIndex: number } {
+  if (draft.status === 'submitted') return { step: 'already_submitted', blockIndex: 0 };
+  if (!draft.candidate.name.trim() || !draft.candidate.email.trim()) {
+    return { step: 'identity', blockIndex: 0 };
+  }
+  const complete = draft.answers.forced_choice.filter((a) => a.most && a.least);
+  if (complete.length === 0) return { step: 'instructions', blockIndex: 0 };
+  for (let i = 0; i < 12; i += 1) {
+    if (!complete.some((a) => a.block_id === `B${i + 1}`)) {
+      return { step: 'block', blockIndex: i };
+    }
+  }
+  if (draft.answers.likert.length < 5) return { step: 'likert', blockIndex: 11 };
+  if (!draft.answers.open?.text?.trim()) return { step: 'open', blockIndex: 11 };
+  if (!draft.consent.accepted) return { step: 'privacy', blockIndex: 11 };
+  return { step: 'privacy', blockIndex: 11 };
+}
 
 export function Etapa2AssessmentPage() {
   const [searchParams] = useSearchParams();
@@ -35,16 +61,18 @@ export function Etapa2AssessmentPage() {
 
   const [draft, setDraft] = useState<Etapa2Draft>(() => createEmptyDraft(inviteToken));
   const [hydrated, setHydrated] = useState(false);
-  const [view, setView] = useState<View>('form');
+  const [step, setStep] = useState<Step>('identity');
+  const [blockIndex, setBlockIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [agree, setAgree] = useState(false);
   const [talentBank, setTalentBank] = useState(false);
+  const [showResume, setShowResume] = useState(false);
 
   useEffect(() => {
     if (isDeadlinePassed()) {
-      setView('expired');
+      setStep('expired');
       setHydrated(true);
       return;
     }
@@ -52,41 +80,73 @@ export function Etapa2AssessmentPage() {
     const existing = loadDraft(inviteToken);
     if (existing?.status === 'submitted') {
       setDraft(existing);
-      setView('already_submitted');
+      setStep('already_submitted');
     } else if (existing) {
-      setDraft({ ...existing, screen: 'form', welcomeBackSeen: true });
+      setDraft(existing);
       setAgree(existing.consent.accepted);
       setTalentBank(existing.consent.talent_bank_opt_in);
-      setView('form');
+      const resume = draftToStep(existing);
+      setStep(resume.step);
+      setBlockIndex(resume.blockIndex);
+      const hasProgress =
+        !!existing.candidate.name ||
+        existing.answers.forced_choice.length > 0 ||
+        existing.answers.likert.length > 0;
+      if (hasProgress) setShowResume(true);
     } else {
       setDraft(createEmptyDraft(inviteToken));
-      setView('form');
+      setStep('identity');
     }
     setHydrated(true);
   }, [inviteToken]);
 
-  /** Atualização funcional — evita perder teclas no nome/e-mail por closure atrasada. */
   const persist = (
     updater: (prev: Etapa2Draft) => Etapa2Draft,
     options?: { syncRemote?: boolean },
   ) => {
     setDraft((prev) => {
       const next = updater(prev);
-      const withStart: Etapa2Draft = {
+      const withMeta: Etapa2Draft = {
         ...next,
-        screen: 'form',
         timestamps: {
           ...next.timestamps,
           started_at: next.timestamps.started_at ?? nowIso(),
         },
       };
-      const saved = saveDraft(withStart);
-      if (options?.syncRemote !== false) {
-        void upsertProgress(saved);
-      }
+      const saved = saveDraft(withMeta);
+      if (options?.syncRemote !== false) void upsertProgress(saved);
       return saved;
     });
   };
+
+  const go = (next: Step, nextBlock = blockIndex) => {
+    setError(null);
+    setShowResume(false);
+    setStep(next);
+    setBlockIndex(nextBlock);
+    persist((prev) => ({
+      ...prev,
+      screen: next as Etapa2Screen,
+      blockIndex: nextBlock,
+      welcomeBackSeen: true,
+    }), { syncRemote: false });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Progress: 12 blocos + likert + open + privacy = 15 etapas de pergunta
+  const questionStep =
+    step === 'block'
+      ? blockIndex + 1
+      : step === 'likert'
+        ? 13
+        : step === 'open'
+          ? 14
+          : step === 'privacy'
+            ? 15
+            : null;
+  const questionTotal = 15;
+
+  const currentBlock = FORCED_CHOICE_BLOCKS[blockIndex];
 
   const likertMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -95,16 +155,14 @@ export function Etapa2AssessmentPage() {
   }, [draft.answers.likert]);
 
   const openText = draft.answers.open?.text ?? '';
+  const blockAnswer = draft.answers.forced_choice.find((a) => a.block_id === currentBlock?.id);
 
-  const blockAnswer = (blockId: string) =>
-    draft.answers.forced_choice.find((a) => a.block_id === blockId);
-
-  const setMostLeast = (blockId: string, statementId: string, kind: 'most' | 'least') => {
+  const setMostLeast = (statementId: string, kind: 'most' | 'least') => {
+    if (!currentBlock) return;
     persist((prev) => {
-      const current = prev.answers.forced_choice.find((a) => a.block_id === blockId);
+      const current = prev.answers.forced_choice.find((a) => a.block_id === currentBlock.id);
       let most = current?.most ?? '';
       let least = current?.least ?? '';
-
       if (kind === 'most') {
         if (least === statementId) least = '';
         most = statementId;
@@ -112,13 +170,11 @@ export function Etapa2AssessmentPage() {
         if (most === statementId) most = '';
         least = statementId;
       }
-
-      const others = prev.answers.forced_choice.filter((a) => a.block_id !== blockId);
+      const others = prev.answers.forced_choice.filter((a) => a.block_id !== currentBlock.id);
       const entry =
         most || least
-          ? [{ block_id: blockId, most, least, answered_at: nowIso() }]
+          ? [{ block_id: currentBlock.id, most, least, answered_at: nowIso() }]
           : [];
-
       return {
         ...prev,
         answers: { ...prev.answers, forced_choice: [...others, ...entry] },
@@ -139,70 +195,64 @@ export function Etapa2AssessmentPage() {
     });
   };
 
-  const handleOpenChange = (text: string) => {
-    if (text.length > OPEN_QUESTION.maxChars) return;
-    persist(
-      (prev) => ({
-        ...prev,
-        answers: {
-          ...prev.answers,
-          open: {
-            question_id: OPEN_QUESTION.id,
-            text,
-            answered_at: nowIso(),
-          },
-        },
-      }),
-      { syncRemote: false },
-    );
-  };
-
-  const validate = (): string | null => {
-    if (!draft.candidate.name.trim()) return 'Informe seu nome completo.';
-    if (!EMAIL_RE.test(draft.candidate.email.trim())) return 'Informe um e-mail válido.';
-
-    for (const block of FORCED_CHOICE_BLOCKS) {
-      const ans = blockAnswer(block.id);
-      if (!ans?.most || !ans?.least) {
-        return `No bloco ${block.number}, marque 1 frase como MAIS e 1 como MENOS.`;
-      }
-      if (ans.most === ans.least) {
-        return `No bloco ${block.number}, escolha frases diferentes para MAIS e MENOS.`;
-      }
-    }
-
-    if (LIKERT_ITEMS.some((item) => !likertMap.has(item.id))) {
-      return 'Responda todas as frases da Parte B.';
-    }
-
-    const text = openText.trim();
-    if (!text) return 'Escreva sua resposta da Parte C para enviar.';
-    if (text.length < OPEN_QUESTION.minChars) {
-      return `Na Parte C, escreva pelo menos ${OPEN_QUESTION.minChars} caracteres.`;
-    }
-    if (openText.length > OPEN_QUESTION.maxChars) {
-      return 'Sua resposta passou do limite de 600 caracteres.';
-    }
-
-    if (!agree) return 'Marque “Li e concordo” para enviar.';
-
-    return null;
-  };
-
-  const requestSubmit = () => {
-    const message = validate();
-    if (message) {
-      setError(message);
+  const handleIdentityNext = () => {
+    if (!draft.candidate.name.trim()) {
+      setError('Informe seu nome completo.');
       return;
     }
-    setError(null);
-    setConfirmSubmit(true);
+    if (!EMAIL_RE.test(draft.candidate.email.trim())) {
+      setError('Informe um e-mail válido.');
+      return;
+    }
+    go('instructions');
+  };
+
+  const handleBlockNext = () => {
+    if (!currentBlock) return;
+    const ans = draft.answers.forced_choice.find((a) => a.block_id === currentBlock.id);
+    if (!ans?.most || !ans?.least) {
+      setError('Marque 1 frase como MAIS e 1 frase como MENOS para continuar.');
+      return;
+    }
+    if (ans.most === ans.least) {
+      setError('Escolha frases diferentes para MAIS e MENOS.');
+      return;
+    }
+    persist((prev) => ({
+      ...prev,
+      answers: {
+        ...prev.answers,
+        forced_choice: prev.answers.forced_choice.filter((a) => a.most && a.least),
+      },
+    }));
+    if (blockIndex >= 11) go('likert', 11);
+    else go('block', blockIndex + 1);
+  };
+
+  const handleLikertNext = () => {
+    if (LIKERT_ITEMS.some((item) => !likertMap.has(item.id))) {
+      setError('Responda todas as frases para continuar.');
+      return;
+    }
+    go('open');
+  };
+
+  const handleOpenNext = () => {
+    const text = openText.trim();
+    if (!text) {
+      setError('Escreva sua resposta para continuar.');
+      return;
+    }
+    if (text.length < OPEN_QUESTION.minChars) {
+      setError(`Escreva pelo menos ${OPEN_QUESTION.minChars} caracteres.`);
+      return;
+    }
+    go('privacy');
   };
 
   const handleSubmit = async () => {
-    const message = validate();
-    if (message) {
-      setError(message);
+    if (!agree) {
+      setError('Marque “Li e concordo” para enviar.');
       setConfirmSubmit(false);
       return;
     }
@@ -250,96 +300,145 @@ export function Etapa2AssessmentPage() {
       return;
     }
 
-    const saved = saveDraft(ready);
-    setDraft(saved);
-    setView('thanks');
+    setDraft(saveDraft(ready));
+    setStep('thanks');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBack = () => {
+    setError(null);
+    if (step === 'instructions') go('identity');
+    else if (step === 'block') {
+      if (blockIndex === 0) go('instructions');
+      else go('block', blockIndex - 1);
+    } else if (step === 'likert') go('block', 11);
+    else if (step === 'open') go('likert');
+    else if (step === 'privacy') go('open');
   };
 
   if (!hydrated) {
     return (
-      <div className="landing-page flex min-h-screen items-center justify-center bg-oma-canvas text-oma-cream">
-        <Loader2 className="h-8 w-8 animate-spin text-oma-accent" aria-hidden />
+      <div className="flex min-h-screen items-center justify-center bg-white text-neutral-800">
+        <Loader2 className="h-8 w-8 animate-spin text-neutral-500" aria-hidden />
         <span className="sr-only">Carregando…</span>
       </div>
     );
   }
 
+  const showProgress = questionStep !== null;
+
   return (
-    <div className="landing-page min-h-screen bg-oma-canvas text-oma-cream antialiased">
+    <div className="min-h-screen bg-white font-sans text-neutral-900 antialiased">
       <PageSEO
         title={ETAPA2_CONFIG.pageTitle}
-        description="Etapa 2 do processo seletivo Omafit — teste de estilo de trabalho."
+        description="Etapa 2 do processo seletivo — teste de estilo de trabalho."
         path="/processo-seletivo/etapa-2"
         noindex
       />
 
-      <header className="border-b border-oma-line/40 bg-oma-elevated/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center px-4 py-4 sm:px-6">
-          <OmafitLogo variant="onDark" className="text-[20px]" />
+      <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto max-w-xl px-4 py-3 sm:px-6">
+          <div className={`flex items-center ${showProgress ? 'justify-between gap-4' : ''}`}>
+            <OmafitLogo variant="onLight" className="text-[20px]" />
+            {showProgress && (
+              <span className="shrink-0 text-xs text-neutral-500">
+                Etapa {questionStep} de {questionTotal}
+              </span>
+            )}
+          </div>
+          {showProgress && (
+            <div className="mt-2">
+              <div
+                className="h-1.5 overflow-hidden rounded-full bg-neutral-200"
+                role="progressbar"
+                aria-valuenow={questionStep ?? 0}
+                aria-valuemin={0}
+                aria-valuemax={questionTotal}
+                aria-label={`Progresso: etapa ${questionStep} de ${questionTotal}`}
+              >
+                <div
+                  className="h-full rounded-full bg-neutral-800 transition-all duration-300"
+                  style={{ width: `${((questionStep ?? 0) / questionTotal) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
-        {view === 'expired' && (
+      <main className="mx-auto max-w-xl px-4 py-8 sm:px-6 sm:py-10">
+        {showResume && step !== 'thanks' && step !== 'already_submitted' && step !== 'expired' && (
+          <div className="mb-6 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
+            <p className="font-medium text-neutral-900">Bem-vindo(a) de volta!</p>
+            <p className="mt-1 text-neutral-600">
+              Suas respostas foram salvas. Continue de onde parou.
+            </p>
+            <button
+              type="button"
+              className="mt-3 text-sm font-medium text-neutral-900 underline"
+              onClick={() => {
+                const resume = draftToStep(draft);
+                go(resume.step, resume.blockIndex);
+              }}
+            >
+              Continuar
+            </button>
+          </div>
+        )}
+
+        {step === 'expired' && (
           <StatusCard
             title="Prazo encerrado"
             body={`O prazo para responder a este teste terminou. Se houve algum imprevisto, fale com a gente: ${ETAPA2_CONFIG.contactEmail}.`}
           />
         )}
 
-        {view === 'already_submitted' && (
+        {step === 'already_submitted' && (
           <StatusCard
             title="Teste já respondido"
             body={`Este teste já foi respondido. Obrigado! Dúvidas: ${ETAPA2_CONFIG.contactEmail}.`}
           />
         )}
 
-        {view === 'thanks' && (
-          <section className="space-y-5 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-oma-accent/40 bg-oma-accent/15">
-              <CheckCircle2 className="h-7 w-7 text-oma-accent" aria-hidden />
+        {step === 'thanks' && (
+          <section className="space-y-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
+              <CheckCircle2 className="h-6 w-6 text-neutral-800" aria-hidden />
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight">Respostas enviadas. Obrigado!</h1>
-            <p className="text-oma-muted leading-relaxed">
-              Recebemos suas respostas, {draft.candidate.name.split(' ')[0] || 'candidato(a)'}.
-              Obrigado pelo tempo dedicado ao processo da Omafit.
+            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+              Respostas enviadas. Obrigado!
+            </h1>
+            <p className="text-neutral-600 leading-relaxed">
+              Recebemos suas respostas
+              {draft.candidate.name ? `, ${draft.candidate.name.split(' ')[0]}` : ''}. Obrigado pelo
+              tempo dedicado ao processo.
             </p>
-            <p className="text-oma-muted leading-relaxed">
-              Os sócios vão analisar todas as candidaturas com os mesmos critérios e entraremos em
-              contato pelo e-mail informado até {ETAPA2_CONFIG.contactByDateLabel}.
+            <p className="text-neutral-600 leading-relaxed">
+              Entraremos em contato pelo e-mail informado até {ETAPA2_CONFIG.contactByDateLabel}.
             </p>
-            <p className="text-xs text-oma-muted">
-              Dúvidas ou pedidos sobre seus dados:{' '}
-              <a
-                className="text-oma-accent hover:underline"
-                href={`mailto:${ETAPA2_CONFIG.contactEmail}`}
-              >
+            <p className="text-xs text-neutral-500">
+              Dúvidas:{' '}
+              <a className="underline" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
                 {ETAPA2_CONFIG.contactEmail}
               </a>
-              .
             </p>
           </section>
         )}
 
-        {view === 'form' && (
-          <div className="space-y-10">
-            <section className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
+        {step === 'identity' && (
+          <section className="space-y-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
                 Processo seletivo – {ETAPA2_CONFIG.roleTitle}
               </p>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">
                 Etapa 2 – Teste de estilo de trabalho
               </h1>
-              <p className="text-oma-muted leading-relaxed">
-                Tempo estimado: 8 a 10 minutos. São três partes curtas. Não existem respostas certas
-                ou erradas — responda de forma espontânea, como você realmente age no trabalho.
+              <p className="mt-2 text-neutral-600">
+                Precisamos só de duas informações para vincular suas respostas à sua candidatura.
               </p>
-            </section>
-
-            {/* Identificação — topo */}
-            <section className="space-y-4 rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-oma-cream">Seus dados</h2>
+            </div>
+            <div className="space-y-4">
               <Field
                 label="Nome completo"
                 id="candidate-name"
@@ -348,10 +447,7 @@ export function Etapa2AssessmentPage() {
                 maxLength={120}
                 onChange={(v) =>
                   persist(
-                    (prev) => ({
-                      ...prev,
-                      candidate: { ...prev.candidate, name: v },
-                    }),
+                    (prev) => ({ ...prev, candidate: { ...prev.candidate, name: v } }),
                     { syncRemote: false },
                   )
                 }
@@ -364,102 +460,134 @@ export function Etapa2AssessmentPage() {
                 value={draft.candidate.email}
                 onChange={(v) =>
                   persist(
-                    (prev) => ({
-                      ...prev,
-                      candidate: { ...prev.candidate, email: v },
-                    }),
+                    (prev) => ({ ...prev, candidate: { ...prev.candidate, email: v } }),
                     { syncRemote: false },
                   )
                 }
               />
-            </section>
+            </div>
+            {error && <ErrorText>{error}</ErrorText>}
+            <NavRow hideBack onNext={handleIdentityNext} nextLabel="Continuar" />
+          </section>
+        )}
 
-            {/* Parte A */}
-            <section className="space-y-5">
-              <div>
-                <h2 className="text-xl font-semibold text-oma-cream">
-                  Parte A — Escolha de comportamentos
-                </h2>
-                <p className="mt-1 text-sm text-oma-muted">
-                  Em cada bloco, marque 1 frase MAIS parecida com você e 1 frase MENOS parecida com
-                  você.
-                </p>
-              </div>
+        {step === 'instructions' && (
+          <section className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+                Como funciona
+              </h1>
+              <p className="mt-3 text-neutral-600 leading-relaxed">
+                <strong className="text-neutral-900">Tempo estimado: 8 a 10 minutos.</strong> A
+                avaliação é dividida em três partes curtas.
+              </p>
+            </div>
+            <ul className="list-disc space-y-2 pl-5 text-sm text-neutral-600 leading-relaxed">
+              <li>Escolha um ambiente tranquilo e responda com atenção.</li>
+              <li>Seja espontâneo e sincero — não existem respostas certas ou erradas.</li>
+              <li>Não tente identificar a resposta “ideal”; queremos seu comportamento natural.</li>
+              <li>Confie na primeira impressão.</li>
+            </ul>
+            <div className="space-y-3 text-sm text-neutral-600 leading-relaxed">
+              <p>
+                <strong className="text-neutral-900">Parte A (~5 min):</strong> 12 blocos — marque 1
+                frase MAIS e 1 MENOS parecida com você.
+              </p>
+              <p>
+                <strong className="text-neutral-900">Parte B (~1 min):</strong> 5 afirmações de 1 a
+                5.
+              </p>
+              <p>
+                <strong className="text-neutral-900">Parte C (~3 min):</strong> uma pergunta aberta
+                em 3 a 5 linhas.
+              </p>
+            </div>
+            <p className="text-xs text-neutral-500">
+              Suas respostas são salvas automaticamente. Se precisar sair, abra o mesmo link para
+              continuar.
+            </p>
+            <NavRow onBack={handleBack} onNext={() => go('block', 0)} nextLabel="Iniciar o teste" />
+          </section>
+        )}
 
-              {FORCED_CHOICE_BLOCKS.map((block) => {
-                const ans = blockAnswer(block.id);
+        {step === 'block' && currentBlock && (
+          <section className="space-y-5">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Parte A – Escolha forçada · Bloco {currentBlock.number} de 12
+              </p>
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                {currentBlock.stem}
+              </h1>
+              <p className="mt-2 text-sm text-neutral-600">
+                Marque 1 frase MAIS parecida com você e 1 frase MENOS parecida com você.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {currentBlock.statements.map((s) => {
+                const isMost = blockAnswer?.most === s.id;
+                const isLeast = blockAnswer?.least === s.id;
                 return (
                   <div
-                    key={block.id}
-                    className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-4 sm:p-5"
+                    key={s.id}
+                    className={`rounded-lg border p-4 ${
+                      isMost
+                        ? 'border-neutral-900 bg-neutral-50'
+                        : isLeast
+                          ? 'border-neutral-300 bg-neutral-50'
+                          : 'border-neutral-200 bg-white'
+                    }`}
                   >
-                    <p className="text-xs font-semibold uppercase tracking-wider text-oma-accent">
-                      Bloco {block.number} de 12
+                    <p className="text-sm leading-relaxed text-neutral-900">
+                      <span className="mr-2 font-semibold">{s.letter}.</span>
+                      {s.text}
                     </p>
-                    <h3 className="mt-1 text-lg font-semibold text-oma-cream">{block.stem}</h3>
-                    <div className="mt-4 space-y-3">
-                      {block.statements.map((s) => {
-                        const isMost = ans?.most === s.id;
-                        const isLeast = ans?.least === s.id;
-                        return (
-                          <div
-                            key={s.id}
-                            className={`rounded-xl border p-3 transition-colors ${
-                              isMost
-                                ? 'border-oma-accent/50 bg-oma-accent/10'
-                                : isLeast
-                                  ? 'border-oma-line/60 bg-oma-canvas/50'
-                                  : 'border-oma-line/35 bg-oma-canvas/40'
-                            }`}
-                          >
-                            <p className="text-sm leading-relaxed text-oma-cream">
-                              <span className="mr-2 font-semibold text-oma-accent">{s.letter}.</span>
-                              {s.text}
-                            </p>
-                            <div className="mt-2 flex gap-2">
-                              <ChoiceChip
-                                active={isMost}
-                                label="MAIS"
-                                ariaLabel={`Bloco ${block.number}, frase ${s.letter}: MAIS`}
-                                onClick={() => setMostLeast(block.id, s.id, 'most')}
-                              />
-                              <ChoiceChip
-                                active={isLeast}
-                                label="MENOS"
-                                tone="muted"
-                                ariaLabel={`Bloco ${block.number}, frase ${s.letter}: MENOS`}
-                                onClick={() => setMostLeast(block.id, s.id, 'least')}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-3 flex gap-2">
+                      <ChoiceChip
+                        active={isMost}
+                        label="MAIS"
+                        onClick={() => setMostLeast(s.id, 'most')}
+                      />
+                      <ChoiceChip
+                        active={isLeast}
+                        label="MENOS"
+                        muted
+                        onClick={() => setMostLeast(s.id, 'least')}
+                      />
                     </div>
                   </div>
                 );
               })}
-            </section>
+            </div>
+            {error && <ErrorText>{error}</ErrorText>}
+            <NavRow
+              onBack={handleBack}
+              onNext={handleBlockNext}
+              nextLabel={blockIndex >= 11 ? 'Ir para a Parte B' : 'Próximo'}
+            />
+          </section>
+        )}
 
-            {/* Parte B */}
-            <section className="space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold text-oma-cream">
-                  Parte B — Escala de concordância
-                </h2>
-                <p className="mt-1 text-sm text-oma-muted">
-                  Indique de 1 (discordo totalmente) a 5 (concordo totalmente).
-                </p>
-              </div>
-
+        {step === 'likert' && (
+          <section className="space-y-5">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Parte B – Proatividade, autonomia e foco
+              </p>
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                Indique de 1 a 5
+              </h1>
+              <p className="mt-2 text-sm text-neutral-600">
+                1 = Discordo totalmente · 5 = Concordo totalmente
+              </p>
+            </div>
+            <div className="space-y-4">
               {LIKERT_ITEMS.map((item) => {
                 const value = likertMap.get(item.id);
                 return (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-4"
-                  >
-                    <p className="text-sm leading-relaxed text-oma-cream">{item.text}</p>
-                    <div className="mt-3 flex justify-between gap-1 text-[10px] text-oma-muted sm:text-xs">
+                  <div key={item.id} className="rounded-lg border border-neutral-200 p-4">
+                    <p className="text-sm leading-relaxed text-neutral-900">{item.text}</p>
+                    <div className="mt-3 flex justify-between text-[10px] text-neutral-500 sm:text-xs">
                       <span>Discordo totalmente</span>
                       <span>Concordo totalmente</span>
                     </div>
@@ -470,13 +598,13 @@ export function Etapa2AssessmentPage() {
                           <button
                             key={opt.value}
                             type="button"
-                            aria-label={`${opt.value}: ${opt.label}`}
                             aria-pressed={active}
+                            aria-label={`${opt.value}: ${opt.label}`}
                             onClick={() => setLikert(item.id, opt.value)}
-                            className={`flex h-11 min-h-[44px] items-center justify-center rounded-xl border text-sm font-semibold transition-colors ${
+                            className={`flex h-11 min-h-[44px] items-center justify-center rounded-md border text-sm font-semibold ${
                               active
-                                ? 'border-oma-accent bg-oma-accent text-oma-cream'
-                                : 'border-oma-line/50 bg-oma-canvas/70 text-oma-cream hover:border-oma-accent/40'
+                                ? 'border-neutral-900 bg-neutral-900 text-white'
+                                : 'border-neutral-200 bg-white text-neutral-900 hover:border-neutral-400'
                             }`}
                           >
                             {opt.value}
@@ -485,47 +613,88 @@ export function Etapa2AssessmentPage() {
                       })}
                     </div>
                     {value != null && (
-                      <p className="mt-2 text-center text-xs text-oma-accent">
+                      <p className="mt-2 text-center text-xs text-neutral-600">
                         {LIKERT_SCALE.find((s) => s.value === value)?.label}
                       </p>
                     )}
                   </div>
                 );
               })}
-            </section>
+            </div>
+            {error && <ErrorText>{error}</ErrorText>}
+            <NavRow onBack={handleBack} onNext={handleLikertNext} nextLabel="Ir para a Parte C" />
+          </section>
+        )}
 
-            {/* Parte C */}
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-xl font-semibold text-oma-cream">Parte C — Resposta aberta</h2>
-                <p className="mt-2 text-sm leading-relaxed text-oma-muted">{OPEN_QUESTION.text}</p>
-              </div>
+        {step === 'open' && (
+          <section className="space-y-5">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Parte C – Pergunta situacional
+              </p>
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                Sua resposta
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-600">{OPEN_QUESTION.text}</p>
+            </div>
+            <div>
               <textarea
                 id="open-answer"
                 rows={6}
                 value={openText}
                 placeholder={OPEN_QUESTION.placeholder}
-                onChange={(e) => handleOpenChange(e.target.value)}
-                className="w-full rounded-2xl border border-oma-line/50 bg-oma-canvas/80 px-4 py-3 text-oma-cream shadow-inner placeholder:text-oma-muted/55 focus:border-oma-accent/50 focus:outline-none focus:ring-2 focus:ring-oma-accent/35"
+                onChange={(e) => {
+                  const text = e.target.value;
+                  if (text.length > OPEN_QUESTION.maxChars) return;
+                  persist(
+                    (prev) => ({
+                      ...prev,
+                      answers: {
+                        ...prev.answers,
+                        open: {
+                          question_id: OPEN_QUESTION.id,
+                          text,
+                          answered_at: nowIso(),
+                        },
+                      },
+                    }),
+                    { syncRemote: false },
+                  );
+                }}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
               />
-              <p className="text-right text-xs text-oma-muted">
+              <p className="mt-1 text-right text-xs text-neutral-500">
                 {openText.length}/{OPEN_QUESTION.maxChars} caracteres
               </p>
-            </section>
+            </div>
+            {error && <ErrorText>{error}</ErrorText>}
+            <NavRow onBack={handleBack} onNext={handleOpenNext} nextLabel="Continuar" />
+          </section>
+        )}
 
-            {/* Privacidade — acima do enviar */}
-            <section className="space-y-4 rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-oma-cream">
+        {step === 'privacy' && (
+          <section className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+                Privacidade e envio
+              </h1>
+              <p className="mt-2 text-neutral-600">
+                Antes de enviar, leia como tratamos seus dados e confirme o consentimento.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+              <h2 className="text-sm font-semibold text-neutral-900">
                 Privacidade e uso dos dados (LGPD)
               </h2>
-              <div className="max-h-40 overflow-y-auto rounded-xl border border-oma-line/30 bg-oma-canvas/60 p-4 text-sm leading-relaxed text-oma-muted">
+              <div className="mt-3 max-h-40 overflow-y-auto rounded-md border border-neutral-200 bg-white p-3 text-sm leading-relaxed text-neutral-600">
                 {CONSENT_TEXT}
               </div>
 
-              <label className="flex cursor-pointer items-start gap-3 text-sm text-oma-cream">
+              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-neutral-900">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 rounded border-oma-line accent-[var(--color-accent,#D96845)]"
+                  className="mt-1 h-5 w-5 shrink-0 rounded border-neutral-300"
                   checked={agree}
                   onChange={(e) => {
                     const checked = e.target.checked;
@@ -542,91 +711,85 @@ export function Etapa2AssessmentPage() {
                   }}
                 />
                 <span>
-                  Li e concordo. <span className="text-oma-accent">(obrigatório)</span>
+                  Li e concordo. <span className="text-neutral-500">(obrigatório)</span>
                 </span>
               </label>
 
-              <label className="flex cursor-pointer items-start gap-3 text-sm text-oma-muted">
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-neutral-600">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 rounded border-oma-line accent-[var(--color-accent,#D96845)]"
+                  className="mt-1 h-5 w-5 shrink-0 rounded border-neutral-300"
                   checked={talentBank}
                   onChange={(e) => {
                     const checked = e.target.checked;
                     setTalentBank(checked);
                     persist((prev) => ({
                       ...prev,
-                      consent: {
-                        ...prev.consent,
-                        talent_bank_opt_in: checked,
-                      },
+                      consent: { ...prev.consent, talent_bank_opt_in: checked },
                     }));
                   }}
                 />
                 <span>
-                  Autorizo manter meus dados no banco de talentos da Omafit por até 2 anos
-                  (opcional).
+                  Autorizo manter meus dados no banco de talentos por até 2 anos (opcional).
                 </span>
               </label>
+            </div>
 
-              <p className="text-xs text-oma-muted">
-                Dúvidas ou pedidos sobre seus dados:{' '}
-                <a
-                  className="text-oma-accent hover:underline"
-                  href={`mailto:${ETAPA2_CONFIG.contactEmail}`}
-                >
-                  {ETAPA2_CONFIG.contactEmail}
-                </a>
-              </p>
-            </section>
+            <p className="text-xs text-neutral-500">
+              Dúvidas:{' '}
+              <a className="underline" href={`mailto:${ETAPA2_CONFIG.contactEmail}`}>
+                {ETAPA2_CONFIG.contactEmail}
+              </a>
+            </p>
 
-            {error && (
-              <p
-                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
-                role="alert"
-              >
-                {error}
-              </p>
-            )}
+            {error && <ErrorText>{error}</ErrorText>}
 
-            <Button
-              type="button"
-              size="lg"
-              className="w-full sm:w-auto"
-              disabled={submitting}
-              onClick={requestSubmit}
-            >
-              Enviar o teste
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+            <NavRow
+              onBack={handleBack}
+              onNext={() => {
+                if (!agree) {
+                  setError('Marque “Li e concordo” para enviar.');
+                  return;
+                }
+                setError(null);
+                setConfirmSubmit(true);
+              }}
+              nextLabel="Enviar respostas"
+              nextDisabled={submitting || !agree}
+            />
+          </section>
         )}
       </main>
 
       {confirmSubmit && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-submit-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-oma-line/40 bg-oma-elevated p-6 shadow-elegant">
-            <h2 id="confirm-submit-title" className="text-lg font-semibold text-oma-cream">
+          <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
+            <h2 id="confirm-submit-title" className="text-lg font-semibold text-neutral-900">
               Tudo pronto?
             </h2>
-            <p className="mt-2 text-sm text-oma-muted">
+            <p className="mt-2 text-sm text-neutral-600">
               Depois de enviar, não será possível alterar as respostas.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
+              <button
                 type="button"
-                variant="ghost"
                 disabled={submitting}
                 onClick={() => setConfirmSubmit(false)}
+                className="rounded-md px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
               >
                 Revisar
-              </Button>
-              <Button type="button" disabled={submitting} onClick={() => void handleSubmit()}>
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void handleSubmit()}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -635,7 +798,7 @@ export function Etapa2AssessmentPage() {
                 ) : (
                   'Enviar'
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -663,7 +826,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-oma-cream">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-neutral-900">
         {label}
       </label>
       <input
@@ -674,8 +837,48 @@ function Field({
         maxLength={maxLength}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-oma-line/50 bg-oma-canvas/80 px-4 py-3 text-oma-cream shadow-inner placeholder:text-oma-muted/55 focus:border-oma-accent/50 focus:outline-none focus:ring-2 focus:ring-oma-accent/35"
+        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
       />
+    </div>
+  );
+}
+
+function NavRow({
+  onBack,
+  onNext,
+  nextLabel,
+  nextDisabled,
+  hideBack,
+}: {
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel: string;
+  nextDisabled?: boolean;
+  hideBack?: boolean;
+}) {
+  return (
+    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+      {!hideBack && onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center justify-start gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </button>
+      ) : (
+        <span />
+      )}
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={nextDisabled}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-neutral-900 px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 sm:w-auto"
+      >
+        {nextLabel}
+        <ArrowRight className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -684,27 +887,24 @@ function ChoiceChip({
   active,
   label,
   onClick,
-  ariaLabel,
-  tone = 'accent',
+  muted,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
-  ariaLabel: string;
-  tone?: 'accent' | 'muted';
+  muted?: boolean;
 }) {
   return (
     <button
       type="button"
-      aria-label={ariaLabel}
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-[44px] min-w-[88px] rounded-xl border px-3 text-xs font-semibold tracking-wide transition-colors ${
+      className={`min-h-[44px] min-w-[88px] rounded-md border px-3 text-xs font-semibold tracking-wide ${
         active
-          ? tone === 'accent'
-            ? 'border-oma-accent bg-oma-accent text-oma-cream'
-            : 'border-oma-line bg-oma-line/40 text-oma-cream'
-          : 'border-oma-line/50 bg-oma-canvas/50 text-oma-muted hover:border-oma-accent/40 hover:text-oma-cream'
+          ? muted
+            ? 'border-neutral-500 bg-neutral-200 text-neutral-900'
+            : 'border-neutral-900 bg-neutral-900 text-white'
+          : 'border-neutral-300 bg-white text-neutral-600 hover:border-neutral-500'
       }`}
     >
       {label}
@@ -712,11 +912,19 @@ function ChoiceChip({
   );
 }
 
+function ErrorText({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+      {children}
+    </p>
+  );
+}
+
 function StatusCard({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-2xl border border-oma-line/40 bg-oma-elevated/90 p-6 text-center shadow-elegant">
-      <h1 className="text-2xl font-semibold text-oma-cream">{title}</h1>
-      <p className="mt-3 text-sm leading-relaxed text-oma-muted">{body}</p>
+    <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 text-center">
+      <h1 className="text-xl font-semibold text-neutral-900">{title}</h1>
+      <p className="mt-3 text-sm leading-relaxed text-neutral-600">{body}</p>
     </section>
   );
 }
