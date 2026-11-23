@@ -64,6 +64,15 @@
     <link rel="apple-touch-icon" href="/favicon.svg" />
   </head>
   <body>
+    <!-- Netlify Forms: captura envios da Etapa 2 (avaliação comportamental) → e-mail -->
+    <form name="etapa2-avaliacao" netlify netlify-honeypot="bot-field" hidden>
+      <input name="bot-field" />
+      <input name="subject" />
+      <input name="candidate_name" />
+      <input name="candidate_email" />
+      <input name="response_id" />
+      <textarea name="message"></textarea>
+    </form>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

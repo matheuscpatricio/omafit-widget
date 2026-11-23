@@ -10,13 +10,13 @@ type Body = {
   response_id?: string;
 };
 
+/**
+ * Envio opcional via Resend (se RESEND_API_KEY estiver no Netlify).
+ * O caminho principal é Netlify Forms no client; esta função é reforço.
+ */
 export const handler: Handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers: corsHeaders(),
-      body: '',
-    };
+    return { statusCode: 204, headers: corsHeaders(), body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -40,59 +40,42 @@ export const handler: Handler = async (event) => {
   }
 
   const resendKey = process.env.RESEND_API_KEY?.trim();
+  if (!resendKey) {
+    return json(503, {
+      ok: false,
+      error: 'RESEND_API_KEY not configured — use Netlify Forms path',
+    });
+  }
 
   try {
-    if (resendKey) {
-      const from = process.env.RESEND_FROM_EMAIL?.trim() || 'Omafit Avaliacao <onboarding@resend.dev>';
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from,
-          to: [TO_EMAIL],
-          reply_to: candidateEmail,
-          subject,
-          text,
-        }),
-      });
-
-      if (!res.ok) {
-        const detail = await res.text();
-        console.error('[hiring-etapa2-submit] Resend error:', detail);
-        return json(502, { ok: false, error: 'Email provider failed' });
-      }
-
-      return json(200, { ok: true, via: 'resend' });
-    }
-
-    // Fallback sem chave: FormSubmit → caixa contato@omafit.co
-    const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(TO_EMAIL)}`, {
+    const from =
+      process.env.RESEND_FROM_EMAIL?.trim() || 'Omafit Avaliacao <onboarding@resend.dev>';
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
+        Authorization: `Bearer ${resendKey}`,
         'Content-Type': 'application/json',
-        Accept: 'application/json',
       },
       body: JSON.stringify({
-        _subject: subject,
-        _template: 'box',
-        _captcha: 'false',
-        name: candidateName || candidateEmail,
-        email: candidateEmail,
-        response_id: body.response_id || '',
-        message: text,
+        from,
+        to: [TO_EMAIL],
+        reply_to: candidateEmail,
+        subject,
+        text,
       }),
     });
 
     if (!res.ok) {
       const detail = await res.text();
-      console.error('[hiring-etapa2-submit] FormSubmit error:', detail);
-      return json(502, { ok: false, error: 'Email provider failed' });
+      console.error('[hiring-etapa2-submit] Resend error:', detail);
+      return json(502, { ok: false, error: 'Email provider failed', detail });
     }
 
-    return json(200, { ok: true, via: 'formsubmit' });
+    return json(200, {
+      ok: true,
+      via: 'resend',
+      candidate_name: candidateName,
+    });
   } catch (err) {
     console.error('[hiring-etapa2-submit] exception:', err);
     return json(500, { ok: false, error: 'Submit failed' });
