@@ -7,6 +7,7 @@ export type SubmitResult =
   | { ok: false; message: string };
 
 const NETLIFY_FORM_NAME = 'etapa2-avaliacao';
+const EMAIL_TO = ETAPA2_CONFIG.contactEmail;
 
 function payloadFromDraft(draft: Etapa2Draft) {
   return {
@@ -27,7 +28,7 @@ function payloadFromDraft(draft: Etapa2Draft) {
   };
 }
 
-/** Backup local no navegador (não substitui o e-mail). */
+/** Backup local no navegador. */
 function archiveLocally(draft: Etapa2Draft): void {
   const key = `${ETAPA2_CONFIG.storageKeyPrefix}:submissions`;
   try {
@@ -43,6 +44,7 @@ function archiveLocally(draft: Etapa2Draft): void {
   }
 }
 
+/** Cópia no painel Netlify Forms (não envia e-mail sozinho). */
 async function submitViaNetlifyForms(input: {
   subject: string;
   text: string;
@@ -50,38 +52,96 @@ async function submitViaNetlifyForms(input: {
   candidate_email: string;
   response_id: string;
 }): Promise<boolean> {
-  const body = new URLSearchParams();
-  body.set('form-name', NETLIFY_FORM_NAME);
-  body.set('subject', input.subject);
-  body.set('candidate_name', input.candidate_name);
-  body.set('candidate_email', input.candidate_email);
-  body.set('response_id', input.response_id);
-  body.set('message', input.text);
+  try {
+    const body = new URLSearchParams();
+    body.set('form-name', NETLIFY_FORM_NAME);
+    body.set('subject', input.subject);
+    body.set('candidate_name', input.candidate_name);
+    body.set('candidate_email', input.candidate_email);
+    body.set('response_id', input.response_id);
+    body.set('message', input.text);
 
-  const res = await fetch('/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-
-  // Netlify Forms responde 200 em sucesso; 404 se o form ainda não foi detectado no build
-  return res.ok;
+    const res = await fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
-async function submitViaNetlifyFunction(input: {
+/**
+ * Envio real para contato@omafit.co via FormSubmit (do navegador).
+ * Na 1ª vez, o FormSubmit manda um e-mail de ATIVAÇÃO para contato@omafit.co —
+ * é preciso abrir e confirmar o link; depois as respostas chegam normalmente.
+ */
+async function submitViaFormSubmit(input: {
+  subject: string;
+  text: string;
+  candidate_name: string;
+  candidate_email: string;
+  response_id: string;
+}): Promise<{ ok: boolean; detail?: string }> {
+  try {
+    const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(EMAIL_TO)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        _subject: input.subject,
+        _template: 'box',
+        _replyto: input.candidate_email,
+        _captcha: 'false',
+        name: input.candidate_name || input.candidate_email,
+        email: input.candidate_email,
+        response_id: input.response_id,
+        message: input.text,
+      }),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: string | boolean;
+      message?: string;
+    };
+
+    const success =
+      res.ok &&
+      (data.success === true ||
+        data.success === 'true' ||
+        (typeof data.message === 'string' && /sent|sucesso|success/i.test(data.message)));
+
+    return {
+      ok: success,
+      detail: typeof data.message === 'string' ? data.message : undefined,
+    };
+  } catch (err) {
+    console.warn('[etapa2] FormSubmit exception:', err);
+    return { ok: false, detail: 'network_error' };
+  }
+}
+
+async function submitViaResendFunction(input: {
   subject: string;
   text: string;
   candidate_name: string;
   candidate_email: string;
   response_id: string;
 }): Promise<boolean> {
-  const res = await fetch('/.netlify/functions/hiring-etapa2-submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
-  return res.ok && !!data.ok;
+  try {
+    const res = await fetch('/.netlify/functions/hiring-etapa2-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+    return res.ok && !!data.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function submitEtapa2Response(draft: Etapa2Draft): Promise<SubmitResult> {
@@ -97,36 +157,39 @@ export async function submitEtapa2Response(draft: Etapa2Draft): Promise<SubmitRe
   };
 
   try {
-    // 1) Netlify Forms → notificação por e-mail (contato@omafit.co no painel Netlify)
-    const formsOk = await submitViaNetlifyForms(payload);
-    if (formsOk) {
-      // 2) Também tenta função (Resend), se configurada — não falha o fluxo se der erro
-      void submitViaNetlifyFunction(payload);
+    // Arquivo no Netlify Forms (painel) — independente do e-mail
+    void submitViaNetlifyForms(payload);
+
+    // E-mail real para a caixa que o Grok lê
+    const emailResult = await submitViaFormSubmit(payload);
+    if (emailResult.ok) {
+      void submitViaResendFunction(payload);
       return { ok: true, stored: 'email' };
     }
 
-    // Fallback: só a função (ex.: Resend com RESEND_API_KEY)
-    const fnOk = await submitViaNetlifyFunction(payload);
-    if (fnOk) {
+    // Fallback Resend (se RESEND_API_KEY estiver no Netlify)
+    const resendOk = await submitViaResendFunction(payload);
+    if (resendOk) {
       return { ok: true, stored: 'email' };
     }
 
+    console.warn('[etapa2] email failed:', emailResult.detail);
     return {
       ok: false,
       message:
-        'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo. Suas respostas continuam guardadas neste dispositivo.',
+        'Não conseguimos enviar o e-mail agora. Se for a primeira vez, verifique em contato@omafit.co um e-mail de ativação do FormSubmit e confirme o link. Depois tente enviar de novo.',
     };
   } catch (err) {
     console.warn('[etapa2] submit exception:', err);
     return {
       ok: false,
       message:
-        'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo. Suas respostas continuam guardadas neste dispositivo.',
+        'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo.',
     };
   }
 }
 
-/** Progresso só no dispositivo — sem banco remoto. */
+/** Progresso só no dispositivo. */
 export async function upsertProgress(_draft: Etapa2Draft): Promise<void> {
   /* no-op */
 }
