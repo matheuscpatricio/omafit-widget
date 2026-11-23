@@ -295,7 +295,8 @@ export function Etapa2AssessmentPage() {
 
     if (!result.ok) {
       setError(
-        'Não conseguimos salvar agora. Verifique sua conexão e tente de novo. Suas respostas continuam guardadas neste dispositivo.',
+        result.message ||
+          'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo.',
       );
       return;
     }

@@ -1,9 +1,9 @@
-import { supabase } from '../../lib/supabase';
 import type { Etapa2Draft } from '../../content/hiring/etapa2/types';
 import { ETAPA2_CONFIG } from '../../content/hiring/etapa2/config';
+import { buildEtapa2EmailContent } from './etapa2EmailBody';
 
 export type SubmitResult =
-  | { ok: true; stored: 'supabase' | 'local' }
+  | { ok: true; stored: 'email' | 'local' }
   | { ok: false; message: string };
 
 function payloadFromDraft(draft: Etapa2Draft) {
@@ -25,7 +25,7 @@ function payloadFromDraft(draft: Etapa2Draft) {
   };
 }
 
-/** Cópia local das submissões (útil enquanto o Supabase estiver indisponível). */
+/** Backup local no navegador (não substitui o e-mail). */
 function archiveLocally(draft: Etapa2Draft): void {
   const key = `${ETAPA2_CONFIG.storageKeyPrefix}:submissions`;
   try {
@@ -42,43 +42,48 @@ function archiveLocally(draft: Etapa2Draft): void {
 }
 
 export async function submitEtapa2Response(draft: Etapa2Draft): Promise<SubmitResult> {
-  const row = payloadFromDraft(draft);
   archiveLocally(draft);
 
+  const { subject, text } = buildEtapa2EmailContent(draft);
+  const candidate_name = draft.candidate.name.trim();
+  const candidate_email = draft.candidate.email.trim().toLowerCase();
+
   try {
-    const { error } = await supabase.from('hiring_etapa2_responses' as never).upsert(row as never, {
-      onConflict: 'id',
+    const res = await fetch('/.netlify/functions/hiring-etapa2-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject,
+        text,
+        candidate_name,
+        candidate_email,
+        response_id: draft.response_id,
+      }),
     });
 
-    if (error) {
-      console.warn('[etapa2] supabase upsert failed:', error.message);
-      // Mantém arquivo local e informa que precisa sincronizar depois
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+
+    if (!res.ok || !data.ok) {
+      console.warn('[etapa2] email submit failed:', data.error || res.status);
       return {
-        ok: true,
-        stored: 'local',
+        ok: false,
+        message:
+          'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo. Suas respostas continuam guardadas neste dispositivo.',
       };
     }
 
-    return { ok: true, stored: 'supabase' };
+    return { ok: true, stored: 'email' };
   } catch (err) {
     console.warn('[etapa2] submit exception:', err);
-    return { ok: true, stored: 'local' };
+    return {
+      ok: false,
+      message:
+        'Não conseguimos enviar suas respostas por e-mail. Verifique a conexão e tente de novo. Suas respostas continuam guardadas neste dispositivo.',
+    };
   }
 }
 
-export async function upsertProgress(draft: Etapa2Draft): Promise<void> {
-  if (draft.status === 'submitted') return;
-  const row = {
-    ...payloadFromDraft(draft),
-    status: 'in_progress' as const,
-    submitted_at: null,
-  };
-
-  try {
-    await supabase.from('hiring_etapa2_responses' as never).upsert(row as never, {
-      onConflict: 'id',
-    });
-  } catch {
-    /* progresso fica no localStorage */
-  }
+/** Progresso só no dispositivo — sem banco remoto. */
+export async function upsertProgress(_draft: Etapa2Draft): Promise<void> {
+  /* no-op */
 }
