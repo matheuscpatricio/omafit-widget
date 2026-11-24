@@ -86,23 +86,23 @@ export const pt: LandingCopy = {
     tag: 'Como funciona',
     title: 'Do tamanho à compra, no mesmo lugar.',
     lead:
-      'O Omafit é um assistente na página do produto. O cliente não sai da loja e não instala aplicativo. Em um fluxo só, ele tira a dúvida de tamanho, vê a peça em si e recebe sugestões do seu catálogo.',
+      'O Omafit fica na página do produto da sua loja. O cliente não baixa aplicativo e não sai do site. No mesmo fluxo ele descobre o tamanho, vê a peça no próprio corpo e recebe combinações do seu catálogo — e só então decide comprar.',
     steps: [
       {
-        title: 'Abre na página do produto',
-        body: 'O widget entra na ficha do item, com a cara da sua marca. O cliente toca para experimentar quando quiser.',
+        title: 'Entra direto na página do produto',
+        body: 'O widget aparece na ficha do item, com as cores e a tipografia da sua marca. O cliente continua na sua loja. Quando quiser tirar a dúvida, toca em experimentar. Nada é obrigatório e nada abre outro site.',
       },
       {
-        title: 'Descobre o tamanho',
-        body: 'Pelo celular, uma captura rápida lê o corpo e recomenda o tamanho daquela peça. Sem fita métrica e sem chute.',
+        title: 'Recebe o tamanho daquela peça',
+        body: 'Pelo celular, uma captura curta lê o corpo e cruza com a tabela daquele produto. A resposta é o tamanho recomendado para aquela roupa ou aquele calçado, não um número genérico. Sem fita métrica e sem o cliente chutar P, M ou G.',
       },
       {
-        title: 'Vê como fica',
-        body: 'A IA gera um try-on fotorealista: a roupa ou o calçado no próprio cliente, antes de colocar no carrinho.',
+        title: 'Vê a peça no próprio corpo',
+        body: 'Com o tamanho em mente, a IA gera uma imagem fotorealista do cliente vestindo o item: tecido, caimento e cor da peça que está na página. Ele confere se gosta do visual antes de colocar no carrinho.',
       },
       {
-        title: 'Recebe o que combina',
-        body: 'O assistente conhece o catálogo e sugere peças complementares, para aumentar o pedido sem empurrar item aleatório.',
+        title: 'Vê o que combina com a compra',
+        body: 'O assistente lê o catálogo da loja e sugere peças que funcionam com o que ele acabou de experimentar — outra cor, um calçado, um complemento. A sugestão nasce do produto que ele está vendo, não de uma vitrine genérica.',
       },
     ],
   },

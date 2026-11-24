@@ -86,23 +86,23 @@ export const en: LandingCopy = {
     tag: 'How it works',
     title: 'From size to checkout, in one place.',
     lead:
-      'Omafit is an assistant on the product page. Shoppers stay in your store and never install an app. In one flow they settle the size, see the item on themselves, and get suggestions from your catalog.',
+      'Omafit lives on your store’s product page. Shoppers do not download an app and do not leave your site. In the same flow they get a size, see the item on their body, and get pairings from your catalog — then they decide to buy.',
     steps: [
       {
-        title: 'Opens on the product page',
-        body: 'The widget sits on the product detail page, in your brand. Shoppers tap to try something on when they are ready.',
+        title: 'Starts on the product page',
+        body: 'The widget sits on the product detail page, in your colors and type. The shopper stays in your store. When they want to resolve a doubt, they tap to try it on. Nothing is required, and nothing opens another site.',
       },
       {
-        title: 'Gets a size',
-        body: 'A short capture on their phone reads the body and recommends the size for that item. No tape measure, no guessing.',
+        title: 'Gets the size for that item',
+        body: 'A short phone capture reads the body and matches it to that product’s size chart. The answer is the recommended size for that garment or shoe, not a generic number. No tape measure, and no guessing S, M, or L.',
       },
       {
-        title: 'Sees how it looks',
-        body: 'AI generates a photorealistic try-on: the garment or shoe on the shopper, before it goes in the cart.',
+        title: 'Sees the item on their body',
+        body: 'With the size in mind, AI generates a photorealistic image of the shopper wearing the piece: fabric, fit, and the color on the page. They check whether they like the look before adding it to the cart.',
       },
       {
-        title: 'Gets what pairs with it',
-        body: 'The assistant knows your catalog and suggests complementary pieces, so the order can grow without random upsells.',
+        title: 'Sees what goes with the purchase',
+        body: 'The assistant reads your catalog and suggests pieces that work with what they just tried — another color, a shoe, a complement. The suggestion comes from the product they are looking at, not a generic shelf.',
       },
     ],
   },
