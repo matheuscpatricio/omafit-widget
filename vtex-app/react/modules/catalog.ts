@@ -238,6 +238,7 @@ export type CartRequest = {
   recommendedSize?: string
   quantity?: number
   selectedItemId?: string
+  selectedOptions?: Record<string, string>
 }
 
 export type CartResolution =
@@ -248,6 +249,25 @@ function clampQuantity(value: number | undefined): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return 1
   return Math.max(1, Math.min(5, Math.round(parsed)))
+}
+
+function constraintOptions(options: Record<string, string> | undefined): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(options || {})) {
+    const normalized = optionKey(key)
+    if (normalized === 'Tamanho') continue
+    const text = String(value || '').trim()
+    if (text) result[normalized] = text
+  }
+  return result
+}
+
+function matchesConstraints(variant: CatalogVariant, constraints: Record<string, string>): boolean {
+  for (const [key, value] of Object.entries(constraints)) {
+    const actual = variant.selectedOptions[key] || ''
+    if (normalizeToken(actual) !== normalizeToken(value)) return false
+  }
+  return true
 }
 
 export function resolveCartTarget(
@@ -272,9 +292,20 @@ export function resolveCartTarget(
     : variants
   if (pool.length === 0) return { ok: false, reason: 'no-match' }
 
-  const selected = pool.find((variant) => variant.id === String(request.selectedItemId || ''))
-  const available = pool.find((variant) => variant.available)
-  const chosen = (selected && selected.available ? selected : available) || selected || pool[0]
+  const selectedId = String(request.selectedItemId || '')
+  const selectedVariant = variants.find((variant) => variant.id === selectedId)
+  const fromRequest = constraintOptions(request.selectedOptions)
+  const constraints = Object.keys(fromRequest).length
+    ? fromRequest
+    : constraintOptions(selectedVariant?.selectedOptions)
+  const narrowed = Object.keys(constraints).length
+    ? pool.filter((variant) => matchesConstraints(variant, constraints))
+    : pool
+  if (narrowed.length === 0) return { ok: false, reason: 'no-match' }
+
+  const selected = narrowed.find((variant) => variant.id === selectedId)
+  const available = narrowed.find((variant) => variant.available)
+  const chosen = (selected && selected.available ? selected : available) || selected || narrowed[0]
   if (!chosen.available) return { ok: false, reason: 'unavailable' }
   return { ok: true, itemId: chosen.id, seller: chosen.seller, quantity }
 }

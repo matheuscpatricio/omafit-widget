@@ -54,14 +54,15 @@ export default function AdminOmafit() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const loaded = !loading && !error
   useEffect(() => {
-    if (hydrated || loading) return
+    if (!loaded || hydrated) return
     const payload = data?.appSettings?.message
     if (payload) {
       setForm(normalizeSettings(payload).settings)
     }
     setHydrated(true)
-  }, [data, hydrated, loading])
+  }, [data, hydrated, loaded])
 
   const preview = useMemo(() => normalizeSettings(form), [form])
   const text = (id: string) => intl.formatMessage({ id })
@@ -75,8 +76,10 @@ export default function AdminOmafit() {
     setForm((current) => ({ ...current, ...patch }))
   }
 
+  const canSave = hydrated && loaded && preview.issues.length === 0
+
   const onSave = async () => {
-    if (preview.issues.length > 0) return
+    if (!canSave) return
     setSaved(false)
     await save({
       variables: {
@@ -255,7 +258,7 @@ export default function AdminOmafit() {
             variation="primary"
             onClick={() => void onSave()}
             isLoading={saveState.loading}
-            disabled={preview.issues.length > 0}
+            disabled={!canSave}
           >
             {text('admin/omafit.save')}
           </Button>

@@ -36,6 +36,18 @@ export type ParsedCartRequest = {
   variantId: string
   recommendedSize: string
   quantity: number
+  selectedOptions: Record<string, string>
+}
+
+function readOptionMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, string> = {}
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const name = key.trim()
+    const text = String(raw ?? '').trim()
+    if (name && text) result[name] = text
+  }
+  return result
 }
 
 export function parseCartRequest(data: unknown): ParsedCartRequest | null {
@@ -53,6 +65,7 @@ export function parseCartRequest(data: unknown): ParsedCartRequest | null {
       selection.recommended_size || selection.recommended_size_label || ''
     ).trim(),
     quantity: Number.isFinite(quantity) ? quantity : 1,
+    selectedOptions: readOptionMap(selection.selected_options),
   }
 }
 

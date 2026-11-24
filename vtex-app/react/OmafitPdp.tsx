@@ -229,6 +229,7 @@ export default function OmafitPdp({ publicId, linkText }: Props) {
         recommendedSize: request.recommendedSize,
         quantity: request.quantity,
         selectedItemId: String(selectedItem?.itemId || ''),
+        selectedOptions: request.selectedOptions,
       })
       if (!target.ok) {
         reply(false, target.reason === 'unknown-sku' ? 'unknownSku' : 'unavailable')

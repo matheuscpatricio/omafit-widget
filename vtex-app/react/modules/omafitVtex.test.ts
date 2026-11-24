@@ -111,10 +111,17 @@ test('catalog exposes sizes, colors and the selected sku first', () => {
   assert.equal(new Set(images).size, images.length)
 })
 
-test('cart adds only a sku of the current product', () => {
+test('cart keeps the selected color and only adds a sku of this product', () => {
   const catalog = buildProductCatalog(product, '101')
-  const sized = resolveCartTarget(catalog, { recommendedSize: 'M', selectedItemId: '101' })
-  assert.equal(sized.ok && sized.itemId, '103')
+  const otherColor = resolveCartTarget(catalog, { recommendedSize: 'M', selectedItemId: '101' })
+  assert.equal(otherColor.ok, false)
+  if (!otherColor.ok) assert.equal(otherColor.reason, 'unavailable')
+  const requestedColor = resolveCartTarget(catalog, {
+    recommendedSize: 'M',
+    selectedItemId: '101',
+    selectedOptions: { Cor: 'Branco', Tamanho: 'M' },
+  })
+  assert.equal(requestedColor.ok && requestedColor.itemId, '103')
   const explicit = resolveCartTarget(catalog, { variantId: '101' })
   assert.equal(explicit.ok && explicit.itemId, '101')
   const foreign = resolveCartTarget(catalog, { variantId: '999' })
@@ -241,10 +248,15 @@ test('cart and device messages are parsed and the iframe source is checked', () 
     type: 'omafit-add-to-cart-request',
     requestId: 'cart_1',
     quantity: 2,
-    selection: { selected_variant_id: '101', recommended_size: 'P' },
+    selection: {
+      selected_variant_id: '101',
+      recommended_size: 'P',
+      selected_options: { Cor: 'Preto', Tamanho: 'P' },
+    },
   })
   assert.equal(parsed?.variantId, '101')
   assert.equal(parsed?.quantity, 2)
+  assert.equal(parsed?.selectedOptions.Cor, 'Preto')
   assert.equal(parseCartRequest({ type: 'other' }), null)
 
   const iframe = { name: 'frame' }
