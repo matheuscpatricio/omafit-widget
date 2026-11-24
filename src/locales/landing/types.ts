@@ -72,6 +72,12 @@ export type LandingCopy = {
     titleMuted: string;
     body: string;
   };
+  how: {
+    tag: string;
+    title: string;
+    lead: string;
+    steps: { title: string; body: string }[];
+  };
   solution: {
     tag: string;
     title: string;

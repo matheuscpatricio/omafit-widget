@@ -82,6 +82,30 @@ export const es: LandingCopy = {
     body:
       'Las devoluciones por talla o ajuste erosionan el margen: envío inverso, reembolsos y stock de vuelta al estante cuestan caro — y el cliente puede no volver. En el checkout, la duda de talla es un motivo clave de abandono. Sin confianza en la compra, el carrito se frena y el tráfico pagado no se convierte en ingresos estables.',
   },
+  how: {
+    tag: 'Cómo funciona',
+    title: 'De la talla a la compra, en el mismo lugar.',
+    lead:
+      'Omafit es un asistente en la página de producto. El comprador no sale de tu tienda ni instala una app. En un solo flujo resuelve la talla, se ve con la prenda y recibe sugerencias de tu catálogo.',
+    steps: [
+      {
+        title: 'Abre en la página de producto',
+        body: 'El widget vive en la ficha del artículo, con tu marca. El comprador toca para probarlo cuando quiere.',
+      },
+      {
+        title: 'Descubre su talla',
+        body: 'En el móvil, una captura breve lee el cuerpo y recomienda la talla de esa pieza. Sin cinta métrica y sin adivinar.',
+      },
+      {
+        title: 'Ve cómo le queda',
+        body: 'La IA genera un try-on fotorrealista: la prenda o el calzado en el propio comprador, antes del carrito.',
+      },
+      {
+        title: 'Recibe lo que combina',
+        body: 'El asistente conoce tu catálogo y sugiere piezas complementarias, para subir el pedido sin empujar artículos al azar.',
+      },
+    ],
+  },
   solution: {
     tag: 'La solución',
     title: 'Omafit: inteligencia que convierte ',

@@ -82,6 +82,30 @@ export const pt: LandingCopy = {
     body:
       'Devoluções por tamanho ou caimento corroem margem: frete reverso, reembolso e estoque de volta à prateleira custam caro — e o cliente pode não voltar. Na finalização da compra, a dúvida de tamanho é uma das principais causas de abandono. Sem confiança na compra, o carrinho trava e o tráfego pago não vira receita recorrente.',
   },
+  how: {
+    tag: 'Como funciona',
+    title: 'Do tamanho à compra, no mesmo lugar.',
+    lead:
+      'O Omafit é um assistente na página do produto. O cliente não sai da loja e não instala aplicativo. Em um fluxo só, ele tira a dúvida de tamanho, vê a peça em si e recebe sugestões do seu catálogo.',
+    steps: [
+      {
+        title: 'Abre na página do produto',
+        body: 'O widget entra na ficha do item, com a cara da sua marca. O cliente toca para experimentar quando quiser.',
+      },
+      {
+        title: 'Descobre o tamanho',
+        body: 'Pelo celular, uma captura rápida lê o corpo e recomenda o tamanho daquela peça. Sem fita métrica e sem chute.',
+      },
+      {
+        title: 'Vê como fica',
+        body: 'A IA gera um try-on fotorealista: a roupa ou o calçado no próprio cliente, antes de colocar no carrinho.',
+      },
+      {
+        title: 'Recebe o que combina',
+        body: 'O assistente conhece o catálogo e sugere peças complementares, para aumentar o pedido sem empurrar item aleatório.',
+      },
+    ],
+  },
   solution: {
     tag: 'A solução',
     title: 'Omafit: inteligência que transforma ',

@@ -82,6 +82,30 @@ export const en: LandingCopy = {
     body:
       'Returns for wrong size or unwanted fit keep eating margin: reverse shipping, refunds, and stock back on the shelf raise cost—and the customer may never buy again. At checkout, fit doubt is a top reason for abandonment. Without purchase confidence, carts stall and the traffic you paid for never turns into steady revenue.',
   },
+  how: {
+    tag: 'How it works',
+    title: 'From size to checkout, in one place.',
+    lead:
+      'Omafit is an assistant on the product page. Shoppers stay in your store and never install an app. In one flow they settle the size, see the item on themselves, and get suggestions from your catalog.',
+    steps: [
+      {
+        title: 'Opens on the product page',
+        body: 'The widget sits on the product detail page, in your brand. Shoppers tap to try something on when they are ready.',
+      },
+      {
+        title: 'Gets a size',
+        body: 'A short capture on their phone reads the body and recommends the size for that item. No tape measure, no guessing.',
+      },
+      {
+        title: 'Sees how it looks',
+        body: 'AI generates a photorealistic try-on: the garment or shoe on the shopper, before it goes in the cart.',
+      },
+      {
+        title: 'Gets what pairs with it',
+        body: 'The assistant knows your catalog and suggests complementary pieces, so the order can grow without random upsells.',
+      },
+    ],
+  },
   solution: {
     tag: 'The solution',
     title: 'Omafit: intelligence that turns ',

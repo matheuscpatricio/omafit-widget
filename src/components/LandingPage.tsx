@@ -7,6 +7,7 @@ import { Navbar } from './landing/Navbar';
 import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
 import { PainSolutionVideo } from './landing/PainSolutionVideo';
+import { HowItWorks } from './landing/HowItWorks';
 import { Solution } from './landing/Solution';
 import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
@@ -112,6 +113,8 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
         <Pain />
 
         <PainSolutionVideo />
+
+        <HowItWorks />
 
         <Solution />
 
