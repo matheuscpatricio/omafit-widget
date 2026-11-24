@@ -258,7 +258,7 @@ export const es: LandingCopy = {
       },
       {
         q: '¿Cómo funciona la facturación por sesión?',
-        a: 'Empezar en plataformas compatibles es gratis. Growth: US$ 99/mes — 1.000 sesiones. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: US$ 2.499 — ilimitado. Growth, Pro y Scale: 14 días de prueba.',
+        a: 'Empezar en plataformas compatibles es gratis. Growth: US$ 99/mes — 1.000 sesiones. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: a consultar, sesiones ilimitadas. Growth, Pro y Scale: 14 días de prueba.',
       },
       {
         q: '¿Omafit ralentiza mi tienda?',

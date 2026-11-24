@@ -258,7 +258,7 @@ export const pt: LandingCopy = {
       },
       {
         q: 'Como funciona a cobrança por sessão?',
-        a: 'Começar nas plataformas suportadas é gratuito. Growth: US$ 99/mês — 1.000 sessões. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: US$ 2.499 — ilimitado. Growth, Pro e Scale têm 14 dias de teste.',
+        a: 'Começar nas plataformas suportadas é gratuito. Growth: US$ 99/mês — 1.000 sessões. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: sob consulta, sessões ilimitadas. Growth, Pro e Scale têm 14 dias de teste.',
       },
       {
         q: 'O Omafit deixa a loja lenta?',

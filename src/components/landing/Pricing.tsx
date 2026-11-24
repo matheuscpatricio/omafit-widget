@@ -378,18 +378,20 @@ function PlanCard({
           {plan.tagline}
         </p>
 
-        <div className="mt-6 flex flex-col gap-1">
-          <div className="flex items-baseline gap-1 flex-wrap">
-            <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
-              US$ {formatUsd(plan.monthly_price)}
+        {plan.name === 'enterprise' ? null : (
+          <div className="mt-6 flex flex-col gap-1">
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <span className="font-dm-mono text-4xl font-semibold tracking-tight text-[#5BAF8A]">
+                US$ {formatUsd(plan.monthly_price)}
+              </span>
+              <span className="font-dm-mono text-sm text-[#5BAF8A]/90">{pricingCopy.perMo}</span>
+            </div>
+            <span className="text-sm leading-snug text-oma-cream/65">
+              or US$ {formatUsd(plan.yearly_price)}
+              {pricingCopy.perYr}
             </span>
-            <span className="font-dm-mono text-sm text-[#5BAF8A]/90">{pricingCopy.perMo}</span>
           </div>
-          <span className="text-sm leading-snug text-oma-cream/65">
-            or US$ {formatUsd(plan.yearly_price)}
-            {pricingCopy.perYr}
-          </span>
-        </div>
+        )}
 
         <div
           className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-dm-mono text-[12px] font-medium text-[#5BAF8A]"

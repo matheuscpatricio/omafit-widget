@@ -259,7 +259,7 @@ export const en: LandingCopy = {
       },
       {
         q: 'How does per-image billing work?',
-        a: 'Getting started is free on supported platforms. Growth: US$ 99/mo — 1,000 sessions/mo. Pro: US$ 399/mo — 5,000 sessions. Scale: US$ 999/mo — 15,000 sessions. Enterprise: US$ 2,499/mo — unlimited. Growth, Pro, and Scale include a 14-day trial.',
+        a: 'Getting started is free on supported platforms. Growth: US$ 99/mo — 1,000 sessions/mo. Pro: US$ 399/mo — 5,000 sessions. Scale: US$ 999/mo — 15,000 sessions. Enterprise: custom pricing, unlimited sessions. Growth, Pro, and Scale include a 14-day trial.',
       },
       {
         q: 'Will Omafit slow down my store?',
