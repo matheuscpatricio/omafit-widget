@@ -26,6 +26,7 @@ import {
 import { canOpenWidget, resolveRuntimeSettings, safePrimaryColor } from './modules/settings'
 import { buildShopDomain } from './modules/shopDomain'
 import { buildWidgetContext, buildWidgetUrl, widgetOrigin } from './modules/widgetUrl'
+import { loadStoreProduct, searchStoreCatalog, type VtexParentProduct } from './modules/vtexCatalog'
 
 const CSS_HANDLES = [
   'container',
@@ -69,6 +70,7 @@ export default function OmafitPdp({ publicId, linkText }: Props) {
     () => `omafit-dialog-${Math.random().toString(36).slice(2, 10)}`
   )
   const frameRef = useRef<HTMLIFrameElement | null>(null)
+  const extraSkus = useRef<Map<string, string>>(new Map())
   const product = productContext?.product
   const selectedItem = productContext?.selectedItem
 
@@ -211,6 +213,58 @@ export default function OmafitPdp({ publicId, linkText }: Props) {
         adoptDeviceId(storage, adopted)
         return
       }
+      const data = event.data as { type?: string; requestId?: string; query?: string; excludeHandle?: string; handle?: string }
+      if (data?.type === 'omafit-vtex-catalog-search' || data?.type === 'omafit-vtex-product-by-handle') {
+        const requestId = String(data.requestId || '')
+        const replyCatalog = (payload: Record<string, unknown>) => {
+          frame.postMessage(payload, origin)
+        }
+        const remember = (product: VtexParentProduct | null) => {
+          for (const variant of product?.catalog.variants || []) {
+            if (variant.id) extraSkus.current.set(variant.id, variant.seller || '1')
+          }
+        }
+        if (data.type === 'omafit-vtex-catalog-search') {
+          searchStoreCatalog(String(data.query || ''), String(data.excludeHandle || ''), window.location.origin)
+            .then((found) => {
+              found.products.forEach(remember)
+              replyCatalog({
+                type: 'omafit-vtex-catalog-search-result',
+                requestId,
+                candidates: found.candidates,
+                error: found.error,
+              })
+            })
+            .catch(() =>
+              replyCatalog({
+                type: 'omafit-vtex-catalog-search-result',
+                requestId,
+                candidates: [],
+                error: 'vtex_search_failed',
+              })
+            )
+          return
+        }
+        loadStoreProduct(String(data.handle || ''), window.location.origin)
+          .then((found) => {
+            remember(found.product)
+            replyCatalog({
+              type: 'omafit-vtex-product-by-handle-result',
+              requestId,
+              product: found.product,
+              error: found.error,
+            })
+          })
+          .catch(() =>
+            replyCatalog({
+              type: 'omafit-vtex-product-by-handle-result',
+              requestId,
+              product: null,
+              error: 'vtex_search_failed',
+            })
+          )
+        return
+      }
       const request = parseCartRequest(event.data)
       if (!request || !catalog) return
       const reply = (ok: boolean, messageId: keyof typeof CART_MESSAGE) => {
@@ -231,6 +285,14 @@ export default function OmafitPdp({ publicId, linkText }: Props) {
         selectedItemId: String(selectedItem?.itemId || ''),
         selectedOptions: request.selectedOptions,
       })
+      const suggestedSeller = extraSkus.current.get(request.variantId)
+      if (!target.ok && target.reason === 'unknown-sku' && suggestedSeller && request.variantId) {
+        const quantity = Math.max(1, Math.min(5, Math.round(Number(request.quantity) || 1)))
+        addItems([{ id: request.variantId, quantity, seller: suggestedSeller }])
+          .then(() => reply(true, 'added'))
+          .catch(() => reply(false, 'failed'))
+        return
+      }
       if (!target.ok) {
         reply(false, target.reason === 'unknown-sku' ? 'unknownSku' : 'unavailable')
         return

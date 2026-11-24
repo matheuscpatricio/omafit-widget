@@ -13,6 +13,7 @@ import { adoptDeviceId, isTrustedWidgetSource, parseCartRequest, readOrCreateDev
 import { canOpenWidget, normalizeSettings, resolveRuntimeSettings } from './settings.ts'
 import { backendShopDomain, buildShopDomain } from './shopDomain.ts'
 import { buildWidgetContext, buildWidgetUrl, encodeForSecondDecode } from './widgetUrl.ts'
+import { findVtexProductByHandle, mapVtexSearchHits } from './vtexCatalog.ts'
 
 const product = {
   productId: '10',
@@ -286,4 +287,32 @@ test('cart and device messages are parsed and the iframe source is checked', () 
   assert.equal(readOrCreateDeviceId(storage), created)
   adoptDeviceId(storage, 'from-iframe')
   assert.equal(readOrCreateDeviceId(storage), 'from-iframe')
+})
+
+test('VTEX search maps linkText, sku and skips the current product', () => {
+  const raw = [
+    {
+      productId: 9,
+      productName: 'Calça',
+      linkText: 'calca',
+      categories: ['/Roupas/Calcas/'],
+      items: [
+        {
+          itemId: '501',
+          name: 'M',
+          images: [{ imageUrl: 'https://cdn.example/calca.jpg' }],
+          variations: [{ name: 'Tamanho', values: ['M'] }],
+          sellers: [{ sellerId: '1', commertialOffer: { AvailableQuantity: 2, Price: 120 } }],
+        },
+      ],
+    },
+    { productId: 10, productName: 'Camiseta', linkText: 'camiseta', items: [{ itemId: '1' }] },
+  ]
+  const mapped = mapVtexSearchHits(raw, 'camiseta', 'https://loja.myvtex.com')
+  assert.equal(mapped.candidates.length, 1)
+  assert.equal(mapped.candidates[0]?.handle, 'calca')
+  assert.equal(mapped.candidates[0]?.url, 'https://loja.myvtex.com/calca/p')
+  assert.equal(mapped.products[0]?.catalog.variants[0]?.id, '501')
+  const found = findVtexProductByHandle(raw, 'calca', 'https://loja.myvtex.com')
+  assert.equal(found?.catalog.sizes[0], 'M')
 })

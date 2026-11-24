@@ -55,7 +55,7 @@
   "admin/omafit.error.color": "Use a hex color, for example #810707.",
   "admin/omafit.error.radius": "Radius must be a number.",
   "admin/omafit.error.excluded": "The category list is too long.",
-  "admin/omafit.gap.body": "Saving here stores the id in VTEX only. It does not create the shop in Omafit. Size charts, stylist flags and widget configuration are looked up by the shop domain above. There is no VTEX install endpoint in the Shopify or Nuvemshop backends. Try-on still runs when this public id belongs to an Omafit user with an active subscription.",
+  "admin/omafit.gap.body": "Paste the public id from omafit.co. First, at omafit.co/vtex, link this account name to your subscription. That registers the store and stamps the size chart. Until the Supabase migration is applied, the try-on can open but the chart and stylist stay unresolved.",
   "admin/editor.omafit.publicId.title": "Omafit public id",
   "admin/editor.omafit.publicId.description": "Optional override of the id saved in the Omafit admin page.",
   "admin/editor.omafit.linkText.title": "Button label"

@@ -55,7 +55,7 @@
   "admin/omafit.error.color": "Use uma cor hexadecimal, por exemplo #810707.",
   "admin/omafit.error.radius": "O raio precisa ser um número.",
   "admin/omafit.error.excluded": "A lista de categorias está longa demais.",
-  "admin/omafit.gap.body": "Salvar aqui grava o ID só na VTEX. Não cria a loja no Omafit. Tabelas de tamanho, flags do consultor e a configuração do widget são buscadas por este shop domain. Não existe endpoint de instalação VTEX nos backends Shopify ou Nuvemshop. O provador funciona quando este ID público pertence a um usuário Omafit com assinatura ativa.",
+  "admin/omafit.gap.body": "Cole o ID público gerado em omafit.co. Antes, em omafit.co/vtex, ligue o nome desta conta à sua assinatura. Isso grava a loja e marca a tabela de medidas. Sem essa ligação o provador ainda abre, mas a tabela e o consultor dependem da migration no Supabase.",
   "admin/editor.omafit.publicId.title": "ID público Omafit",
   "admin/editor.omafit.publicId.description": "Substitui, se preenchido, o ID salvo na página Omafit do Admin.",
   "admin/editor.omafit.linkText.title": "Texto do botão"

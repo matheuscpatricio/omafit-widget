@@ -20,6 +20,7 @@ import { supabase } from './lib/supabase';
 const DashboardPage = lazy(() => import('./components/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const AdvancedAnalytics = lazy(() => import('./components/AdvancedAnalytics').then(m => ({ default: m.AdvancedAnalytics })));
 const ShopifyConfigPage = lazy(() => import('./components/ShopifyConfigPage').then(m => ({ default: m.ShopifyConfigPage })));
+const VtexConnectPage = lazy(() => import('./components/VtexConnectPage').then(m => ({ default: m.VtexConnectPage })));
 const WidgetGeneratorPage = lazy(() => import('./components/WidgetGeneratorPage').then(m => ({ default: m.WidgetGeneratorPage })));
 const AccountSettingsPage = lazy(() => import('./components/AccountSettingsPage').then(m => ({ default: m.AccountSettingsPage })));
 const SizeChartManagerNew = lazy(() => import('./components/SizeChartManagerNew').then(m => ({ default: m.SizeChartManagerNew })));
@@ -151,6 +152,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Layout onNavigate={(path: string) => {}}><ShopifyConfigPage /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vtex"
+          element={
+            <ProtectedRoute>
+              <Layout onNavigate={(path: string) => {}}><VtexConnectPage /></Layout>
             </ProtectedRoute>
           }
         />

@@ -273,12 +273,22 @@ export function SizeChartManagerNew() {
         let chartId = charts[gender].id;
 
         if (!chartId) {
+          const { data: linkedStore } = await supabase
+            .from('store_links')
+            .select('shop_domain')
+            .eq('user_id', user?.id)
+            .eq('platform', 'vtex')
+            .limit(1)
+            .maybeSingle();
           const { data: newChart, error: chartError } = await supabase
             .from('size_charts')
             .insert({
               user_id: user?.id,
               gender,
-              measurement_names: charts[gender].measurementNames
+              measurement_names: charts[gender].measurementNames,
+              shop_domain: linkedStore?.shop_domain || null,
+              collection_handle: '',
+              product_handle: '',
             })
             .select()
             .single();

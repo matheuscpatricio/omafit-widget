@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#f4f4f5"/>
+  <rect x="80" y="70" width="1280" height="760" rx="16" fill="#ffffff" stroke="#d4d4d8"/>
+  <text x="120" y="140" font-family="Arial, sans-serif" font-size="32" fill="#18181b">Admin VTEX · Omafit</text>
+  <text x="120" y="190" font-family="Arial, sans-serif" font-size="20" fill="#71717a">Substitua este arquivo por um print de /admin/omafit depois do vtex link.</text>
+  <rect x="120" y="240" width="520" height="56" rx="8" fill="#fafafa" stroke="#e4e4e7"/>
+  <text x="140" y="274" font-family="Arial, sans-serif" font-size="18" fill="#3f3f46">ID público wgt_pub_…</text>
+  <rect x="120" y="320" width="220" height="48" rx="8" fill="#810707"/>
+  <text x="168" y="350" font-family="Arial, sans-serif" font-size="18" fill="#ffffff">Salvar</text>
+</svg>

@@ -811,6 +811,7 @@ export function ShoeARWidget({
 
         const { record: sizeChartRecord, error: chartError } = await resolveSizeChartRecord(supabase, {
           shopDomain: effectiveShopDomain,
+          publicId,
           gender: '',
           productHandle: effectiveProductHandle,
           collectionHandle: normalizedCollectionHandle,

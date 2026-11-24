@@ -106,6 +106,16 @@ Builders usados: `react` 3.x, `store` 0.x, `admin` 0.x, `messages` 1.x, `docs` 0
 
 ## Validar sem conta VTEX
 
+## Conta Omafit e consultor
+
+O lojista liga a conta em `omafit.co/vtex` (página deste repositório). Isso não grava `shop_domain` em `widget_keys`: o trigger Shopify apagaria o `user_id`. O vínculo fica em `store_links`, a tabela de medidas ganha `{conta}.myvtex.com`, e a PDP acha a tabela do dashboard pelo `public_id` mesmo quando `shop_domain` ainda está vazio.
+
+O consultor, na VTEX, pede a busca ao bloco da loja. O bloco chama `/api/catalog_system/pub/products/search` na própria vitrine. Os repositórios `omafit` e `omafit-nuvem` não entram nisso.
+
+O passo a passo que só o dono executa (SQL no Supabase, `vtex login`, link, publish e ficha da App Store) está em [OWNER_CHECKLIST.md](OWNER_CHECKLIST.md). Textos e ícone: [app-store/](app-store/).
+
+## Validar sem conta VTEX
+
 Na raiz do repositório, com Node 22:
 
 ```bash
