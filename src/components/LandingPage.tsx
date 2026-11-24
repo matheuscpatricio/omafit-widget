@@ -8,6 +8,7 @@ import { Hero } from './landing/Hero';
 import { Pain } from './landing/Pain';
 import { PainSolutionVideo } from './landing/PainSolutionVideo';
 import { HowItWorks } from './landing/HowItWorks';
+import { ScrollReveal } from './landing/ScrollReveal';
 import { Solution } from './landing/Solution';
 import { ImpactStats } from './landing/ImpactStats';
 import { Pricing } from './landing/Pricing';
@@ -110,22 +111,38 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
           onRequestDemo={handleRequestDemo}
         />
 
-        <Pain />
+        <ScrollReveal>
+          <Pain />
+        </ScrollReveal>
 
-        <PainSolutionVideo />
+        <ScrollReveal>
+          <PainSolutionVideo />
+        </ScrollReveal>
 
-        <HowItWorks />
+        <ScrollReveal>
+          <HowItWorks />
+        </ScrollReveal>
 
-        <Solution />
+        <ScrollReveal>
+          <Solution />
+        </ScrollReveal>
 
-        <ImpactStats />
+        <ScrollReveal>
+          <ImpactStats />
+        </ScrollReveal>
 
-        <Pricing onSelectPaidPlan={handleSelectPaidPlan} />
+        <ScrollReveal>
+          <Pricing onSelectPaidPlan={handleSelectPaidPlan} />
+        </ScrollReveal>
 
-        <FAQ />
+        <ScrollReveal>
+          <FAQ />
+        </ScrollReveal>
       </main>
 
-      <Footer />
+      <ScrollReveal>
+        <Footer />
+      </ScrollReveal>
     </div>
   );
 }
