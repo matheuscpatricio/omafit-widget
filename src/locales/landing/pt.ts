@@ -77,10 +77,12 @@ export const pt: LandingCopy = {
   },
   pain: {
     tag: 'O problema',
-    title: 'Sua loja é linda.',
-    titleMuted: 'Mesmo assim a margem escorre por estes motivos.',
+    title: 'Sua marca investe para vender.',
+    titleMuted: 'Dúvidas sobre tamanho podem comprometer o resultado.',
     body:
-      'Devoluções por tamanho ou caimento corroem margem: frete reverso, reembolso e estoque de volta à prateleira custam caro — e o cliente pode não voltar. Na finalização da compra, a dúvida de tamanho é uma das principais causas de abandono. Sem confiança na compra, o carrinho trava e o tráfego pago não vira receita recorrente.',
+      'Quando o cliente não sabe qual tamanho escolher ou como a peça vai vestir, a compra pode não acontecer. E quando a peça não atende à expectativa, a devolução consome margem com logística reversa, reembolso e estoque indisponível para nova venda.',
+    close:
+      'Omafit ajuda sua marca a reduzir a incerteza na jornada de compra — com mais confiança para escolher e mais oportunidades de converter.',
   },
   how: {
     tag: 'Como funciona',

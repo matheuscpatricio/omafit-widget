@@ -71,6 +71,7 @@ export type LandingCopy = {
     title: string;
     titleMuted: string;
     body: string;
+    close: string;
   };
   how: {
     tag: string;

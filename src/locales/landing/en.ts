@@ -77,10 +77,12 @@ export const en: LandingCopy = {
   },
   pain: {
     tag: 'The problem',
-    title: 'Your store looks great.',
-    titleMuted: 'But you still bleed margin for these reasons.',
+    title: 'Your brand invests to sell.',
+    titleMuted: 'Size doubt can undermine the result.',
     body:
-      'Returns for wrong size or unwanted fit keep eating margin: reverse shipping, refunds, and stock back on the shelf raise cost—and the customer may never buy again. At checkout, fit doubt is a top reason for abandonment. Without purchase confidence, carts stall and the traffic you paid for never turns into steady revenue.',
+      'When a shopper does not know which size to choose or how the piece will fit, the purchase may never happen. And when the item misses the expectation, the return eats margin through reverse logistics, refunds, and stock that cannot be sold again.',
+    close:
+      'Omafit helps your brand reduce uncertainty in the purchase journey — more confidence to choose, and more chances to convert.',
   },
   how: {
     tag: 'How it works',

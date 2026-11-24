@@ -65,6 +65,12 @@ export function Pain() {
           >
             {p.body}
           </motion.p>
+          <motion.p
+            variants={itemVariants}
+            className="mt-6 text-lg leading-relaxed text-oma-cream sm:text-xl lg:text-[1.35rem]"
+          >
+            {p.close}
+          </motion.p>
         </motion.div>
       </div>
     </section>

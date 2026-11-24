@@ -77,10 +77,12 @@ export const es: LandingCopy = {
   },
   pain: {
     tag: 'El problema',
-    title: 'Tu tienda se ve increíble.',
-    titleMuted: 'Aun así pierdes margen por estas razones.',
+    title: 'Tu marca invierte para vender.',
+    titleMuted: 'Las dudas de talla pueden comprometer el resultado.',
     body:
-      'Las devoluciones por talla o ajuste erosionan el margen: envío inverso, reembolsos y stock de vuelta al estante cuestan caro — y el cliente puede no volver. En el checkout, la duda de talla es un motivo clave de abandono. Sin confianza en la compra, el carrito se frena y el tráfico pagado no se convierte en ingresos estables.',
+      'Cuando el cliente no sabe qué talla elegir o cómo le va a quedar la prenda, la compra puede no ocurrir. Y cuando la pieza no cumple la expectativa, la devolución consume margen con logística inversa, reembolso y stock que no está disponible para una nueva venta.',
+    close:
+      'Omafit ayuda a tu marca a reducir la incertidumbre en el recorrido de compra — con más confianza para elegir y más oportunidades de convertir.',
   },
   how: {
     tag: 'Cómo funciona',
