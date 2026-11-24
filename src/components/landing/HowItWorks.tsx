@@ -58,12 +58,8 @@ export function HowItWorks() {
               transition={{ duration: 0.7, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
               whileHover={{ y: -6 }}
             >
-              <Card className="group relative h-full overflow-hidden rounded-[1.75rem] border-white/10 bg-white/[0.04] p-7 text-oma-cream shadow-[0_20px_50px_-28px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-colors duration-500 hover:border-white/20 hover:bg-white/[0.07]">
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                />
-                <div className="flex flex-col gap-4">
+              <Card className="landing-glass h-full p-7 transition-colors duration-500 hover:border-white/20 hover:bg-white/[0.07]">
+                <div className="relative flex flex-col gap-4">
                   <span className="text-[13px] font-medium tracking-[0.18em] text-oma-cream/45">
                     {String(index + 1).padStart(2, '0')}
                   </span>

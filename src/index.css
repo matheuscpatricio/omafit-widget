@@ -55,6 +55,26 @@
     font-family: 'Gloock', Georgia, serif;
     letter-spacing: -0.02em;
   }
+
+  .landing-glass {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--color-text-light);
+    box-shadow: 0 20px 50px -28px rgb(0 0 0 / 0.7);
+    backdrop-filter: blur(24px);
+  }
+
+  .landing-glass::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.4), transparent);
+  }
 }
 
 /* OMAFIT logo - Bungee (fora do @layer para maior especificidade sobre Tailwind) */

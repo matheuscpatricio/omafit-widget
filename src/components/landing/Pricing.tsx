@@ -342,10 +342,8 @@ function PlanCard({
       variants={variants}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex min-h-[540px] flex-col rounded-3xl border p-7 sm:p-8 ${
-        isDark
-          ? 'overflow-hidden border border-oma-line/40 bg-oma-elevated text-oma-cream shadow-brand-glow'
-          : 'border border-oma-line/40 bg-oma-parchment shadow-elegant hover:shadow-elegant-lg'
+      className={`landing-glass relative flex min-h-[540px] flex-col p-7 text-oma-cream sm:p-8 ${
+        isDark ? 'border-white/25 bg-white/[0.08]' : ''
       }`}
     >
       {isPopular && (
@@ -365,22 +363,18 @@ function PlanCard({
 
       <div className={isPopular ? 'relative' : ''}>
         <div
-          className={`text-[11px] font-semibold uppercase tracking-wider ${
-            isDark ? 'text-oma-cream/50' : 'text-oma-muted'
-          }`}
+          className="text-[11px] font-semibold uppercase tracking-wider text-oma-cream/50"
         >
           {plan.trial_days
             ? pricingCopy.trialFree(plan.trial_days)
             : pricingCopy.customContract}
         </div>
         <h3
-          className={`mt-2 text-xl font-semibold tracking-tight ${
-            isDark ? 'text-oma-cream' : 'text-oma-ink'
-          }`}
+          className="mt-2 text-xl font-semibold tracking-tight text-oma-cream"
         >
           {plan.display_name}
         </h3>
-        <p className={`mt-1 text-sm leading-snug ${isDark ? 'text-oma-cream/60' : 'text-oma-muted'}`}>
+        <p className="mt-1 text-sm leading-snug text-oma-cream/60">
           {plan.tagline}
         </p>
 
@@ -391,16 +385,14 @@ function PlanCard({
             </span>
             <span className="font-dm-mono text-sm text-[#5BAF8A]/90">{pricingCopy.perMo}</span>
           </div>
-          <span className={`text-sm leading-snug ${isDark ? 'text-oma-cream/65' : 'text-oma-muted'}`}>
+          <span className="text-sm leading-snug text-oma-cream/65">
             or US$ {formatUsd(plan.yearly_price)}
             {pricingCopy.perYr}
           </span>
         </div>
 
         <div
-          className={`mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-oma-line/40 px-3 py-1.5 font-dm-mono text-[12px] font-medium text-[#5BAF8A] ${
-            isDark ? 'bg-oma-cream/[0.08]' : 'bg-oma-light/80'
-          }`}
+          className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-dm-mono text-[12px] font-medium text-[#5BAF8A]"
         >
           <Check className="w-3.5 h-3.5 flex-shrink-0" />
           <span>{sessionsLine}</span>
@@ -408,7 +400,7 @@ function PlanCard({
 
         <ul className="mt-6 space-y-2.5 flex-1">
           {plan.features.map((feature) => (
-            <PricingBullet key={feature} inverted={isDark}>
+            <PricingBullet key={feature} inverted>
               {feature}
             </PricingBullet>
           ))}

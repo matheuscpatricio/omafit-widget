@@ -90,7 +90,7 @@ export function ImpactStats() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-12%', amount: 0.15 }}
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center md:text-left"
+            className="landing-glass p-8 text-center md:text-left"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
               <span className="text-oma-muted">{i.stat1Prefix}</span>
@@ -107,7 +107,7 @@ export function ImpactStats() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-12%', amount: 0.15 }}
             transition={{ duration: 0.8, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center"
+            className="landing-glass p-8 text-center"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
               <span className="text-oma-muted">{i.stat2Prefix}</span>
@@ -124,7 +124,7 @@ export function ImpactStats() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-12%', amount: 0.15 }}
             transition={{ duration: 0.8, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center md:text-right"
+            className="landing-glass p-8 text-center md:text-right"
           >
             <p className="mx-auto max-w-4xl text-balance text-lg leading-snug text-oma-cream/90 sm:text-xl md:text-2xl md:leading-snug">
               <span className="text-oma-muted">{i.stat3Prefix}</span>

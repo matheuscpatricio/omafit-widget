@@ -56,16 +56,16 @@ export function FAQ() {
           whileInView="visible"
           viewport={{ once: true, margin: '-80px' }}
           variants={containerVariants}
-          className="mt-12 divide-y divide-oma-line/40 border-y border-oma-line/40"
+          className="mt-12 flex flex-col gap-3"
         >
           {f.items.map((faq, i) => {
             const isOpen = openIndex === i;
             return (
-              <motion.div key={faq.q} variants={itemVariants}>
+              <motion.div key={faq.q} variants={itemVariants} className="landing-glass px-6">
                 <button
                   type="button"
                   onClick={() => setOpenIndex(isOpen ? null : i)}
-                  className="flex w-full items-start justify-between gap-4 py-5 text-left transition-colors hover:text-oma-cream"
+                  className="relative flex w-full items-start justify-between gap-4 py-5 text-left transition-colors hover:text-oma-cream"
                   aria-expanded={isOpen}
                 >
                   <span className="text-base font-medium text-oma-cream sm:text-lg">{faq.q}</span>
@@ -82,7 +82,7 @@ export function FAQ() {
                       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <p className="pb-5 text-sm leading-relaxed text-oma-muted sm:text-base">{faq.a}</p>
+                      <p className="relative pb-5 text-sm leading-relaxed text-oma-muted sm:text-base">{faq.a}</p>
                     </motion.div>
                   ) : null}
                 </AnimatePresence>

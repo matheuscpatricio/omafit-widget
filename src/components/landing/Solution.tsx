@@ -34,8 +34,8 @@ function FeatureInfoCard({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col rounded-xl border border-oma-line/45 bg-gradient-to-br from-oma-elevated/98 to-oma-canvas/90 shadow-elegant sm:rounded-2xl',
-        highlight && 'ring-1 ring-oma-accent/30',
+        'landing-glass flex h-full min-h-0 flex-col',
+        highlight && 'border-white/20',
         compact ? 'p-3.5 sm:p-4' : 'p-6 sm:p-8',
       )}
     >
@@ -281,7 +281,7 @@ export function Solution() {
         >
           <motion.div variants={itemVariants} className="sm:mx-auto sm:max-w-7xl">
             <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 sm:left-auto sm:mx-auto sm:w-full sm:max-w-7xl sm:translate-x-0">
-              <div className="border-y border-oma-line/35 bg-oma-elevated/20 py-6 sm:rounded-2xl sm:border sm:shadow-elegant-lg sm:py-8 md:rounded-3xl md:py-10">
+              <div className="landing-glass py-6 sm:py-8 md:py-10">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_50%_30%,rgba(217,104,69,0.08),transparent)] sm:rounded-2xl md:rounded-3xl" />
                 <div className="relative z-[1]">
                   <SolutionAutoMarqueeGrid
