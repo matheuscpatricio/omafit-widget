@@ -4,11 +4,11 @@ export const es: LandingCopy = {
   htmlLang: 'es',
   ogLocale: 'es_ES',
   seo: {
-    title: 'Omafit — Asistente de moda con IA para Shopify | Try-on, tallas y AR',
+    title: 'Omafit — Asistente de moda con IA para e-commerce | Tallas y try-on',
     description:
-      'Reduce devoluciones y sube conversión con try-on fotorrealista, MediaPipe, AR para accesorios y widget Shopify. Planes desde US$ 99/mes.',
+      'Omafit es el asistente de IA en la página de producto: talla correcta, try-on fotorrealista y asesoría de estilo en un widget integrable. Lo implementamos en cualquier tienda de moda. Desde US$ 99/mes.',
     keywords:
-      'Omafit, Shopify, try-on virtual, IA moda, ecommerce, reducir devoluciones, MediaPipe, gafas AR, widget Shopify',
+      'Omafit, e-commerce moda, try-on virtual, IA moda, recomendación de talla, tienda online, reducir devoluciones, MediaPipe, widget, stylist IA',
   },
   nav: {
     solution: 'Solución',
@@ -30,7 +30,7 @@ export const es: LandingCopy = {
         titleHighlight: 'confianza',
         titleAfter: ' en moda online.',
         body:
-          'Omafit es el asistente inteligente que usa IA fotorrealista y medición precisa para el ajuste correcto en ropa, calzado y accesorios. Reduce costos, vende más y fideliza compradores.',
+          'Omafit es el asistente de compra con IA en las páginas de producto de tu tienda. Responde “¿cuál es mi talla?”, “¿cómo me queda?” y “¿con qué lo combino?” — para que compren con confianza y devuelvan menos. Lo implementamos en cualquier tienda online.',
         hideBadge: true,
         compact: true,
         showCtas: true,
@@ -63,16 +63,16 @@ export const es: LandingCopy = {
     demo: 'Reservar demo personalizada',
     slideAria: (n) => `Ir a la diapositiva ${n}`,
     marquee: [
-      'Shopify',
+      'E-commerce de moda',
       'Try-on con IA',
       'MediaPipe',
-      'WebAR',
+      'En el PDP',
       'Menos devoluciones',
       'Más conversión',
       'Widget white-label',
-      'ChatGPT',
+      'Stylist IA',
       'Ropa y calzado',
-      'Accesorios AR',
+      'Cualquier tienda',
     ],
   },
   pain: {
@@ -87,7 +87,8 @@ export const es: LandingCopy = {
     title: 'Omafit: inteligencia que convierte ',
     titleAccent: 'la duda en confianza',
     titleEnd: ' y ventas.',
-    sub: 'Suite visual con IA para ropa, accesorios y calzado. Instalación rápida en tu tienda.',
+    sub:
+      'Un asistente para e-commerce de moda: talla, try-on y styling en el PDP, con tu marca. Implementamos Omafit en cualquier tienda — plataforma estándar o stack a medida.',
     highlight: 'Destacado',
     featureBadge: 'Función',
     features: [
@@ -102,12 +103,13 @@ export const es: LandingCopy = {
         title: 'Try-on fotorrealista (ropa y calzado)',
         description:
           'La IA renderiza la prenda en el comprador con sombra, tejido y caída realistas. Lo ven antes de comprar.',
-        bullets: ['Ropa mujer y hombre', 'Calzado y accesorios en un flujo', 'Calidad fotográfica'],
+        bullets: ['Ropa mujer y hombre', 'Calzado en el mismo flujo', 'Calidad fotográfica en móvil'],
       },
       {
-        title: 'Vista AR (gafas y accesorios)',
-        description: 'Realidad aumentada en el navegador para gafas, pulseras, relojes y más. Sin app.',
-        bullets: ['WebAR—sin instalar app', 'Seguimiento facial en tiempo real', 'iOS y Android'],
+        title: 'Un flujo en la página de producto',
+        description:
+          'Omafit está donde se decide la compra: el PDP. El comprador pasa de talla a try-on a styling sin apps ni redirecciones; tú mantienes el journey en tu tienda.',
+        bullets: ['Widget para tu tienda', 'Journey mobile-first', 'White-label y on-brand'],
       },
       {
         title: 'Asistente ChatGPT integrado',
@@ -128,7 +130,7 @@ export const es: LandingCopy = {
         title: 'Widget personalizable',
         description:
           'Colores, fuentes, layout y textos alineados a tu marca. Parece nativo — no un plugin ajeno.',
-        bullets: ['100% white-label', 'Instalación en minutos', 'Mobile-first'],
+        bullets: ['100% white-label', 'Cualquier tienda', 'Mobile-first'],
       },
     ],
   },
@@ -215,12 +217,12 @@ export const es: LandingCopy = {
     sub: 'Instalación, seguridad, integración y soporte — lo que debes saber.',
     items: [
       {
-        q: '¿Cuánto tarda instalar Omafit en Shopify?',
-        a: 'Unos clics en la Shopify App Store — normalmente menos de 5 minutos. Luego el widget aparece en producto y puedes ajustar colores, fuentes y posición en el admin.',
+        q: '¿Cuánto tarda instalar Omafit en mi tienda?',
+        a: 'Normalmente menos de 5 minutos. Integra Omafit en tu e-commerce, actívalo en las páginas de producto y personaliza colores, fuentes y posición desde el panel.',
       },
       {
         q: '¿Qué plataformas soporta Omafit?',
-        a: 'Hoy integración nativa con Shopify. Nuvemshop, WooCommerce y Yampi en roadmap. Para ERP, headless o apps, el equipo Enterprise puede ayudar.',
+        a: 'Implementamos Omafit en cualquier tienda de moda — SaaS, marketplace o headless. Hay conectores para los stacks más usados; Nuvemshop, WooCommerce, Yampi y más en roadmap. Para ERP, apps nativas o integración custom, Enterprise define tu proyecto.',
       },
       {
         q: '¿Cómo manejan privacidad y seguridad?',
@@ -228,11 +230,11 @@ export const es: LandingCopy = {
       },
       {
         q: '¿La IA sirve para todos los productos?',
-        a: 'Sí: ropa mujer y hombre, calzado y accesorios AR (gafas, gorras, relojes). Categorías muy específicas pueden tener fine-tune dedicado.',
+        a: 'Sí. Omafit cubre ropa mujer y hombre y calzado, con tallas y try-on pensados para PDPs de moda. Para catálogos de nicho o marca propia, hablamos de fine-tune dedicado.',
       },
       {
         q: '¿Cómo funciona la facturación por sesión?',
-        a: 'Instalar en Shopify es gratis. Growth: US$ 99/mes — 1.000 sesiones. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: US$ 2.499 — ilimitado. Growth, Pro y Scale: 14 días de prueba.',
+        a: 'Empezar en plataformas compatibles es gratis. Growth: US$ 99/mes — 1.000 sesiones. Pro: US$ 399 — 5.000. Scale: US$ 999 — 15.000. Enterprise: US$ 2.499 — ilimitado. Growth, Pro y Scale: 14 días de prueba.',
       },
       {
         q: '¿Omafit ralentiza mi tienda?',
@@ -250,14 +252,14 @@ export const es: LandingCopy = {
   },
   footer: {
     blurb:
-      'Asistente de IA fotorrealista para ropa, calzado y accesorios. Talla precisa, try-on realista, menos devoluciones.',
+      'Asistente de IA para e-commerce de moda: talla, try-on y styling en la página de producto — menos devoluciones, compradores más seguros.',
     product: 'Producto',
     support: 'Soporte',
     company: 'Empresa',
     solution: 'Solución',
     features: 'Funciones',
     pricing: 'Precios',
-    shopifyApp: 'App Shopify',
+    shopifyApp: 'Instalar el widget',
     faq: 'FAQ',
     contact: 'Contacto',
     blog: 'Blog',
@@ -271,7 +273,7 @@ export const es: LandingCopy = {
   },
   installModal: {
     title: 'Instalar Omafit',
-    subtitle: 'Elige tu plataforma',
+    subtitle: 'Lo implementamos en cualquier tienda. Empieza aquí:',
     close: 'Cerrar',
     shopify: 'Shopify',
     shopifyHint: 'Instalar desde App Store',

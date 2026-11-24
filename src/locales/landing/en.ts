@@ -4,11 +4,11 @@ export const en: LandingCopy = {
   htmlLang: 'en',
   ogLocale: 'en_US',
   seo: {
-    title: 'Omafit — AI fashion assistant for Shopify | Try-on, sizing & AR',
+    title: 'Omafit — AI fashion assistant for e-commerce | Sizing & try-on',
     description:
-      'Cut returns and lift conversion with photorealistic try-on, MediaPipe sizing, AR for accessories, and a Shopify widget. Plans from US$ 99/mo.',
+      'Omafit is the AI assistant on your product pages: precise sizing, photorealistic try-on, and style guidance in one embeddable widget. We implement on any fashion store. From US$ 99/mo.',
     keywords:
-      'Omafit, Shopify, virtual try-on, AI try-on, fashion e-commerce, reduce returns, MediaPipe, AR eyewear, Shopify widget',
+      'Omafit, fashion e-commerce, virtual try-on, AI try-on, size recommendation, online store, reduce returns, MediaPipe, storefront widget, AI stylist',
   },
   nav: {
     solution: 'Solution',
@@ -30,7 +30,7 @@ export const en: LandingCopy = {
         titleHighlight: 'confidence',
         titleAfter: ' in online fashion.',
         body:
-          'Omafit is the intelligent assistant that uses photorealistic AI and precise measurement for the right fit in apparel, footwear, and accessories. Cut costs, grow sales, and delight shoppers.',
+          'Omafit is the AI shopping assistant on your store’s product pages. It answers “What size am I?”, “How will this look on me?”, and “What goes with this?”—so people buy with confidence and return less. We can implement on any online store.',
         hideBadge: true,
         compact: true,
         showCtas: true,
@@ -63,16 +63,16 @@ export const en: LandingCopy = {
     demo: 'Book a personalized demo',
     slideAria: (n) => `Go to slide ${n}`,
     marquee: [
-      'Shopify',
+      'Fashion e-commerce',
       'AI try-on',
-      'MediaPipe',
-      'WebAR',
+      'MediaPipe sizing',
+      'On your PDP',
       'Fewer returns',
       'Higher conversion',
       'White-label widget',
-      'ChatGPT',
+      'AI stylist',
       'Apparel & footwear',
-      'AR accessories',
+      'Any fashion store',
     ],
   },
   pain: {
@@ -87,7 +87,8 @@ export const en: LandingCopy = {
     title: 'Omafit: intelligence that turns ',
     titleAccent: 'doubt into confidence',
     titleEnd: ' and sales.',
-    sub: 'A full visual AI suite for apparel, accessories, and footwear. Fast, easy install on your store.',
+    sub:
+      'One assistant for fashion e-commerce: size confidence, photorealistic try-on, and catalog-aware styling—on your product pages, fully on brand. We implement Omafit on any store, from ready-made platforms to custom stacks.',
     highlight: 'Highlight',
     featureBadge: 'Feature',
     features: [
@@ -102,13 +103,13 @@ export const en: LandingCopy = {
         title: 'Photorealistic try-on (apparel & footwear)',
         description:
           'Generative AI renders the garment on the shopper with realistic shading, fabric, and drape. They see it before they buy.',
-        bullets: ["Women's and men's apparel", 'Footwear and accessories in one flow', 'Photographic quality'],
+        bullets: ["Women's and men's apparel", 'Footwear in the same flow', 'Photographic quality on mobile'],
       },
       {
-        title: 'AR preview (glasses & accessories)',
+        title: 'One flow on the product page',
         description:
-          'In-browser augmented reality for glasses, bracelets, watches, and more. Zero friction, all live.',
-        bullets: ['WebAR—no app install', 'Real-time face tracking', 'iOS and Android compatible'],
+          'Omafit sits where the decision is made—the PDP. Shoppers move from size to try-on to styling without extra apps or redirects; you keep them on your store.',
+        bullets: ['Embeddable store widget', 'Mobile-first journey', 'White-label, on-brand UX'],
       },
       {
         title: 'Built-in ChatGPT assistant',
@@ -130,7 +131,7 @@ export const en: LandingCopy = {
         title: 'Customizable widget',
         description:
           'Colors, fonts, layout, and copy aligned with your brand. Feels native to your store—not bolted on.',
-        bullets: ['100% white-label', 'Install in minutes', 'Mobile-first'],
+        bullets: ['100% white-label', 'Deploy on any store', 'Mobile-first'],
       },
     ],
   },
@@ -217,12 +218,12 @@ export const en: LandingCopy = {
     sub: 'Everything you need to know about install, security, integration, and support.',
     items: [
       {
-        q: 'How long does it take to install Omafit on my Shopify store?',
-        a: 'Installation takes a few clicks from the Shopify App Store—typically under 5 minutes. After install, the widget appears on configured product pages and you can adjust colors, fonts, and placement in the admin.',
+        q: 'How long does it take to install Omafit on my store?',
+        a: 'Usually under 5 minutes. Add Omafit to your e-commerce stack, enable it on product pages, and customize colors, fonts, and placement from your admin.',
       },
       {
         q: 'Which platforms does Omafit support?',
-        a: 'We offer native Shopify integration today. Nuvemshop, WooCommerce, and Yampi are on the roadmap. For custom integrations (ERP, headless, mobile apps), our Enterprise team can help on request.',
+        a: 'We implement Omafit on any fashion store—SaaS, marketplace, or headless. Ready connectors cover the most common stacks; Nuvemshop, WooCommerce, Yampi, and others are on the roadmap. For ERP, native apps, or fully custom setups, Enterprise can scope your integration.',
       },
       {
         q: 'How do you handle customer privacy and data security?',
@@ -230,11 +231,11 @@ export const en: LandingCopy = {
       },
       {
         q: 'Does the AI work for all apparel and product types?',
-        a: 'Yes. Our try-on model covers women’s and men’s apparel, footwear, and AR accessories (glasses, caps, watches). For very specific categories, we can train a dedicated fine-tune for your brand.',
+        a: 'Yes. Omafit covers women’s and men’s apparel and footwear, with sizing and try-on tuned for fashion PDPs. For niche catalogs or private labels, our team can discuss custom fine-tuning.',
       },
       {
         q: 'How does per-image billing work?',
-        a: 'Shopify app install is free. Growth: US$ 99/mo — 1,000 sessions/mo. Pro: US$ 399/mo — 5,000 sessions. Scale: US$ 999/mo — 15,000 sessions. Enterprise: US$ 2,499/mo — unlimited. Growth, Pro, and Scale include a 14-day trial.',
+        a: 'Getting started is free on supported platforms. Growth: US$ 99/mo — 1,000 sessions/mo. Pro: US$ 399/mo — 5,000 sessions. Scale: US$ 999/mo — 15,000 sessions. Enterprise: US$ 2,499/mo — unlimited. Growth, Pro, and Scale include a 14-day trial.',
       },
       {
         q: 'Will Omafit slow down my store?',
@@ -252,14 +253,14 @@ export const en: LandingCopy = {
   },
   footer: {
     blurb:
-      'Photorealistic AI assistant for apparel, footwear, and accessories. Precise sizing, realistic try-on, fewer returns.',
+      'The AI assistant for fashion e-commerce: sizing, try-on, and style guidance on your product pages—fewer returns, more confident buyers.',
     product: 'Product',
     support: 'Support',
     company: 'Company',
     solution: 'Solution',
     features: 'Features',
     pricing: 'Pricing',
-    shopifyApp: 'Shopify App',
+    shopifyApp: 'Install the widget',
     faq: 'FAQ',
     contact: 'Contact',
     blog: 'Blog',
@@ -273,7 +274,7 @@ export const en: LandingCopy = {
   },
   installModal: {
     title: 'Install Omafit',
-    subtitle: 'Choose your platform',
+    subtitle: 'We implement on any store. Start here:',
     close: 'Close',
     shopify: 'Shopify',
     shopifyHint: 'Install from the App Store',
