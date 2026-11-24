@@ -1,0 +1,29 @@
+[
+  {
+    "section": "storeSetup",
+    "titleId": "admin/omafit.navigation.group",
+    "subSection": "omafit",
+    "searchKeyWordsHelpers": "admin/omafit.navigation.search",
+    "subSectionItems": [
+      {
+        "labelId": "admin/omafit.navigation.label",
+        "path": "/admin/omafit",
+        "searchKeyWordsHelpers": "admin/omafit.navigation.search"
+      }
+    ]
+  },
+  {
+    "section": "storeFront",
+    "adminVersion": 4,
+    "titleId": "admin/omafit.navigation.group",
+    "subSection": "omafit",
+    "searchKeyWordsHelpers": "admin/omafit.navigation.search",
+    "subSectionItems": [
+      {
+        "labelId": "admin/omafit.navigation.label",
+        "path": "/admin/omafit",
+        "searchKeyWordsHelpers": "admin/omafit.navigation.search"
+      }
+    ]
+  }
+]

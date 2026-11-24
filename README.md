@@ -50,6 +50,7 @@ self-hosted-tryon/    API FastAPI + worker GPU. Não é o frontend
 scripts/              sync do tema, checagens AR, helpers de deploy/Instagram
 docs/                 documentação por assunto
 legacy/shopify-app-old/   porta Remix/Polaris não ligada ao Vite
+vtex-app/             app VTEX IO (bloco de PDP + admin). Ver vtex-app/README.md
 ```
 
 Índice: [docs/README.md](docs/README.md).
@@ -151,6 +152,10 @@ Vitest: `src/**/*.test.ts`, ao lado do código.
 HTML de prova manual continua em `public/` porque o dev server precisa servi-los junto de `omafit-widget.js`. Motivo e URLs: [docs/architecture/manual-tests.md](docs/architecture/manual-tests.md).
 
 Checagens de AR (não são o `npm test`): `npm run ar:ingest-validate`, `ar:qa-matrix`, `ar:meta-quest-audit`, `ar:certified-manifest-stub`.
+
+## VTEX IO
+
+`vtex-app/` é o app que uma loja VTEX instala. O bloco `omafit-pdp` abre o mesmo `/widget` deste repositório com o produto da PDP. A configuração do lojista fica no Admin VTEX (`/admin/omafit`). Link, publicação na App Store e o que ainda depende de Supabase ou da app Shopify estão em [vtex-app/README.md](vtex-app/README.md).
 
 ## Relationship with `omafit`
 
