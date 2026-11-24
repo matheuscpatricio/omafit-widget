@@ -1,6 +1,5 @@
 import { motion, type Variants } from 'framer-motion';
 import { Card } from '../ui/card';
-import { cn } from '../../lib/utils';
 import { useLandingLocale } from '../../contexts/LandingLocaleContext';
 
 const containerVariants: Variants = {
@@ -16,20 +15,6 @@ const itemVariants: Variants = {
     transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
   },
 };
-
-function Pin({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden
-      className={cn('size-7 text-oma-accent', className)}
-    >
-      <path d="M16 3a1 1 0 0 1 .117 1.993l-.117.007v4.764l1.894 3.789a1 1 0 0 1 .1.331l.006.116v2a1 1 0 0 1-.883.993l-.117.007h-4v4a1 1 0 0 1-1.993.117L11 17v-4H7a1 1 0 0 1-.993-.883L6 12v-2a1 1 0 0 1 .06-.34l.046-.107 1.894-3.791V5a1 1 0 0 1-.117-1.993L8 3h8z" />
-    </svg>
-  );
-}
 
 export function HowItWorks() {
   const { t } = useLandingLocale();
@@ -47,7 +32,7 @@ export function HowItWorks() {
         >
           <motion.span
             variants={itemVariants}
-            className="landing-tagline inline-flex items-center rounded-full border border-oma-accent/35 bg-oma-accent/10 px-3 py-1 text-[12px] font-medium text-oma-accent"
+            className="landing-tagline inline-flex items-center rounded-full border border-oma-cream/15 bg-oma-cream/5 px-3 py-1 text-[12px] font-medium text-oma-cream/80 backdrop-blur-md"
           >
             {h.tag}
           </motion.span>
@@ -63,23 +48,29 @@ export function HowItWorks() {
           </motion.p>
         </motion.div>
 
-        <ol className="mx-auto mt-12 grid max-w-5xl gap-5 sm:grid-cols-2">
+        <ol className="mx-auto mt-14 grid max-w-5xl gap-4 sm:grid-cols-2">
           {h.steps.map((step, index) => (
             <motion.li
               key={step.title}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 28 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.55, delay: index * 0.06 }}
+              transition={{ duration: 0.7, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -6 }}
             >
-              <Card className="h-full rounded-[1.4rem] border-oma-line/40 bg-oma-canvas/80 p-2 text-oma-cream shadow-elegant">
-                <Pin className="mx-auto mb-3" />
-                <div className="flex h-full flex-col gap-2 rounded-2xl border border-oma-accent/25 bg-oma-accent/10 p-5">
-                  <span className="text-3xl font-semibold tracking-tight text-oma-accent">
+              <Card className="group relative h-full overflow-hidden rounded-[1.75rem] border-white/10 bg-white/[0.04] p-7 text-oma-cream shadow-[0_20px_50px_-28px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-colors duration-500 hover:border-white/20 hover:bg-white/[0.07]">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                />
+                <div className="flex flex-col gap-4">
+                  <span className="text-[13px] font-medium tracking-[0.18em] text-oma-cream/45">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  <h3 className="text-xl font-semibold leading-tight text-oma-cream">{step.title}</h3>
-                  <p className="text-sm leading-relaxed text-oma-muted">{step.body}</p>
+                  <h3 className="text-[1.35rem] font-semibold tracking-tight text-oma-cream">
+                    {step.title}
+                  </h3>
+                  <p className="text-[15px] leading-relaxed text-oma-cream/65">{step.body}</p>
                 </div>
               </Card>
             </motion.li>
