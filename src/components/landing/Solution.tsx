@@ -250,16 +250,9 @@ export function Solution() {
           variants={containerVariants}
           className="mx-auto max-w-3xl text-center"
         >
-          <motion.span
-            variants={itemVariants}
-            className="landing-tagline inline-flex items-center gap-2 rounded-full border border-oma-accent/35 bg-oma-accent/10 px-3 py-1 text-[12px] font-medium text-oma-accent"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-oma-accent" aria-hidden />
-            {s.tag}
-          </motion.span>
           <motion.h2
             variants={itemVariants}
-            className="mt-5 text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
+            className="text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl lg:text-5xl"
             style={{ letterSpacing: '-0.035em' }}
           >
             {s.title}

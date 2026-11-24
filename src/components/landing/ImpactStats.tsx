@@ -63,22 +63,13 @@ export function ImpactStats() {
       />
 
       <div className="relative z-[1] mx-auto max-w-5xl px-5 sm:px-8 lg:px-10">
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="landing-tagline text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-oma-muted"
-        >
-          {i.tag}
-        </motion.p>
         <motion.h2
           id="impacto-heading"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
           transition={{ duration: 0.65, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto mt-3 max-w-2xl text-center text-2xl font-semibold tracking-tight text-oma-cream sm:text-3xl"
+          className="mx-auto max-w-2xl text-center text-2xl font-semibold tracking-tight text-oma-cream sm:text-3xl"
           style={{ letterSpacing: '-0.035em' }}
         >
           {i.title}

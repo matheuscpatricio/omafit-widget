@@ -30,12 +30,6 @@ export function HowItWorks() {
           variants={containerVariants}
           className="mx-auto flex max-w-3xl flex-col items-center gap-5 text-center"
         >
-          <motion.span
-            variants={itemVariants}
-            className="landing-tagline inline-flex items-center rounded-full border border-oma-cream/15 bg-oma-cream/5 px-3 py-1 text-[12px] font-medium text-oma-cream/80 backdrop-blur-md"
-          >
-            {h.tag}
-          </motion.span>
           <motion.h2
             variants={itemVariants}
             className="text-3xl font-semibold tracking-tight text-oma-cream sm:text-4xl"
