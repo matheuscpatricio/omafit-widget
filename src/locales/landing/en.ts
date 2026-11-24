@@ -90,19 +90,19 @@ export const en: LandingCopy = {
     steps: [
       {
         title: 'Starts on the product page',
-        body: 'The widget sits on the product detail page, in your colors and type. The shopper stays in your store. When they want to resolve a doubt, they tap to try it on. Nothing is required, and nothing opens another site.',
+        body: 'The Omafit try-on appears on the product page, styled with your brand. The shopper chooses when to try something on.',
       },
       {
-        title: 'Gets the size for that item',
-        body: 'A short phone capture reads the body and matches it to that product’s size chart. The answer is the recommended size for that garment or shoe, not a generic number. No tape measure, and no guessing S, M, or L.',
+        title: 'Finds the right size',
+        body: 'With a quick phone capture, Omafit reads the shopper’s measurements and recommends the best size for that item — no tape measure and no trial and error.',
       },
       {
-        title: 'Sees the item on their body',
-        body: 'With the size in mind, AI generates a photorealistic image of the shopper wearing the piece: fabric, fit, and the color on the page. They check whether they like the look before adding it to the cart.',
+        title: 'Sees the look',
+        body: 'AI creates a realistic preview of the garment on the shopper, so they feel more confident before they buy.',
       },
       {
-        title: 'Sees what goes with the purchase',
-        body: 'The assistant reads your catalog and suggests pieces that work with what they just tried — another color, a shoe, a complement. The suggestion comes from the product they are looking at, not a generic shelf.',
+        title: 'Discovers pairings',
+        body: 'The assistant understands your catalog and suggests pieces that go with what the shopper chose — relevant recommendations that can complete the order.',
       },
     ],
   },

@@ -89,20 +89,20 @@ export const pt: LandingCopy = {
       'O Omafit fica na página do produto da sua loja. O cliente não baixa aplicativo e não sai do site. No mesmo fluxo ele descobre o tamanho, vê a peça no próprio corpo e recebe combinações do seu catálogo — e só então decide comprar.',
     steps: [
       {
-        title: 'Entra direto na página do produto',
-        body: 'O widget aparece na ficha do item, com as cores e a tipografia da sua marca. O cliente continua na sua loja. Quando quiser tirar a dúvida, toca em experimentar. Nada é obrigatório e nada abre outro site.',
+        title: 'Começa na página do produto',
+        body: 'O provador Omafit aparece na página do produto, personalizado com a identidade da sua marca. O cliente escolhe quando experimentar.',
       },
       {
-        title: 'Recebe o tamanho daquela peça',
-        body: 'Pelo celular, uma captura curta lê o corpo e cruza com a tabela daquele produto. A resposta é o tamanho recomendado para aquela roupa ou aquele calçado, não um número genérico. Sem fita métrica e sem o cliente chutar P, M ou G.',
+        title: 'Encontra o tamanho certo',
+        body: 'Com uma captura rápida pelo celular, o Omafit analisa as medidas do cliente e recomenda o tamanho mais adequado para aquela peça, sem fita métrica nem tentativa e erro.',
       },
       {
-        title: 'Vê a peça no próprio corpo',
-        body: 'Com o tamanho em mente, a IA gera uma imagem fotorealista do cliente vestindo o item: tecido, caimento e cor da peça que está na página. Ele confere se gosta do visual antes de colocar no carrinho.',
+        title: 'Visualiza o look',
+        body: 'A IA cria uma prévia realista da roupa no próprio cliente, para ele ter mais segurança antes de comprar.',
       },
       {
-        title: 'Vê o que combina com a compra',
-        body: 'O assistente lê o catálogo da loja e sugere peças que funcionam com o que ele acabou de experimentar — outra cor, um calçado, um complemento. A sugestão nasce do produto que ele está vendo, não de uma vitrine genérica.',
+        title: 'Descobre combinações',
+        body: 'O assistente entende o catálogo e sugere peças que combinam com a escolha do cliente, recomendações relevantes, que podem complementar o pedido.',
       },
     ],
   },

@@ -90,19 +90,19 @@ export const es: LandingCopy = {
     steps: [
       {
         title: 'Empieza en la página de producto',
-        body: 'El widget está en la ficha del artículo, con los colores y la tipografía de tu marca. El comprador sigue en tu tienda. Cuando quiere resolver la duda, toca para probarlo. Nada es obligatorio y no se abre otro sitio.',
+        body: 'El probador Omafit aparece en la página de producto, personalizado con la identidad de tu marca. El cliente elige cuándo probarse.',
       },
       {
-        title: 'Recibe la talla de esa pieza',
-        body: 'En el móvil, una captura breve lee el cuerpo y la cruza con la tabla de ese producto. La respuesta es la talla recomendada para esa prenda o ese calzado, no un número genérico. Sin cinta métrica y sin adivinar S, M o L.',
+        title: 'Encuentra la talla correcta',
+        body: 'Con una captura rápida en el móvil, Omafit analiza las medidas del cliente y recomienda la talla más adecuada para esa prenda, sin cinta métrica ni prueba y error.',
       },
       {
-        title: 'Ve la pieza en su cuerpo',
-        body: 'Con la talla en mente, la IA genera una imagen fotorrealista del comprador con el artículo: tejido, caída y el color de la página. Comprueba si le gusta el look antes de añadirlo al carrito.',
+        title: 'Visualiza el look',
+        body: 'La IA crea una vista previa realista de la prenda en el propio cliente, para que compre con más seguridad.',
       },
       {
-        title: 'Ve qué combina con la compra',
-        body: 'El asistente lee tu catálogo y sugiere piezas que funcionan con lo que acaba de probar — otro color, un calzado, un complemento. La sugerencia nace del producto que está viendo, no de un escaparate genérico.',
+        title: 'Descubre combinaciones',
+        body: 'El asistente entiende el catálogo y sugiere piezas que combinan con la elección del cliente: recomendaciones relevantes que pueden completar el pedido.',
       },
     ],
   },
