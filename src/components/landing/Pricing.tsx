@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button, ButtonLink } from '../ui/button';
 import { useLandingLocale } from '../../contexts/LandingLocaleContext';
-import type { LandingCopy, LandingLocale } from '../../locales/landing';
+import type { LandingCopy } from '../../locales/landing';
 
 type PlanName = 'growth' | 'pro' | 'scale' | 'enterprise';
 
@@ -21,8 +21,6 @@ interface BillingPlan {
   tagline: string;
   features: string[];
 }
-
-const UNLIMITED_THRESHOLD = 500_000;
 
 const PLAN_ORDER: PlanName[] = ['growth', 'pro', 'scale', 'enterprise'];
 
@@ -143,25 +141,12 @@ function mergePlansFromDb(rows: BillingPlan[]): BillingPlan[] {
   });
 }
 
-function formatSessionAllowance(
-  plan: BillingPlan,
-  locale: LandingLocale,
-  sessionUnlimited: string,
-  sessionPerMonth: (n: string) => string,
-): string {
-  if (plan.images_included >= UNLIMITED_THRESHOLD) {
-    return sessionUnlimited;
-  }
-  const numberLocale = locale === 'pt' ? 'pt-BR' : locale === 'es' ? 'es-ES' : 'en-US';
-  return sessionPerMonth(plan.images_included.toLocaleString(numberLocale));
-}
-
 function formatUsd(amount: number): string {
   return amount.toLocaleString('en-US');
 }
 
 export function Pricing({ onSelectPaidPlan }: PricingProps) {
-  const { locale, t } = useLandingLocale();
+  const { t } = useLandingLocale();
   const p = t.pricing;
   const [plans, setPlans] = useState<BillingPlan[]>(() => mergePlansFromDb([]));
 
@@ -284,7 +269,6 @@ export function Pricing({ onSelectPaidPlan }: PricingProps) {
               isPopular={plan.name === 'pro'}
               onSelectPaidPlan={onSelectPaidPlan}
               pricingCopy={p}
-              locale={locale}
             />
           ))}
         </motion.div>
@@ -320,22 +304,14 @@ function PlanCard({
   isPopular,
   onSelectPaidPlan,
   pricingCopy,
-  locale,
 }: {
   plan: BillingPlan;
   variants: Variants;
   isPopular: boolean;
   onSelectPaidPlan?: (planName: PlanName) => void;
   pricingCopy: LandingCopy['pricing'];
-  locale: LandingLocale;
 }) {
   const isDark = isPopular;
-  const sessionsLine = formatSessionAllowance(
-    plan,
-    locale,
-    pricingCopy.sessionUnlimited,
-    pricingCopy.sessionPerMonth,
-  );
 
   return (
     <motion.div
@@ -392,13 +368,6 @@ function PlanCard({
             </span>
           </div>
         )}
-
-        <div
-          className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-dm-mono text-[12px] font-medium text-[#5BAF8A]"
-        >
-          <Check className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>{sessionsLine}</span>
-        </div>
 
         <ul className="mt-6 space-y-2.5 flex-1">
           {plan.features.map((feature) => (
