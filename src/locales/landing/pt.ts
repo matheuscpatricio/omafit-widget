@@ -13,7 +13,7 @@ export const pt: LandingCopy = {
   nav: {
     solution: 'Solução',
     features: 'Recursos',
-    pricing: 'Planos',
+    pricing: 'Clientes',
     faq: 'FAQ',
     blog: 'Blog',
     partners: 'Parceiros',
@@ -175,6 +175,37 @@ export const pt: LandingCopy = {
     disclaimer:
       'Métricas agregadas de lojas com Omafit; seus resultados variam conforme catálogo, tráfego e categoria.',
   },
+  insights: {
+    title: 'Conheça quem compra da sua marca.',
+    lead:
+      'Cada experimento vira sinal. O Omafit mostra o perfil de quem usa o provador: corpo, peças e tamanhos — para a marca decidir coleção, grade e estoque com menos achismo.',
+    exampleNote: 'Números de exemplo, no formato que a marca vê no painel.',
+    averagesTitle: 'Perfil médio de quem experimenta',
+    averages: [
+      { label: 'Altura média', value: '1,68 m' },
+      { label: 'Peso médio', value: '64 kg' },
+      { label: 'Biotipo mais comum', value: 'Ampulheta · 34%' },
+    ],
+    sizeChartTitle: 'Tamanho mais escolhido',
+    sizeChartName: 'Participação das recomendações aceitas',
+    sizes: [
+      { label: 'PP', share: 8 },
+      { label: 'P', share: 18 },
+      { label: 'M', share: 41 },
+      { label: 'G', share: 23 },
+      { label: 'GG', share: 10 },
+    ],
+    tableTitle: 'Peças que mais passam pelo provador',
+    colGarment: 'Peça',
+    colTries: 'Experimentos',
+    colSize: 'Tamanho mais escolhido',
+    rows: [
+      { garment: 'Vestido midi', tries: '1.280', size: 'M' },
+      { garment: 'Calça reta', tries: '980', size: '38' },
+      { garment: 'Camisa oversized', tries: '860', size: 'G' },
+      { garment: 'Tênis casual', tries: '640', size: '37' },
+    ],
+  },
   pricing: {
     tag: 'Planos transparentes',
     title: 'Escolha o plano que ',
@@ -284,7 +315,7 @@ export const pt: LandingCopy = {
     company: 'Empresa',
     solution: 'Solução',
     features: 'Recursos',
-    pricing: 'Planos',
+    pricing: 'Clientes',
     shopifyApp: 'Instalar o widget',
     faq: 'FAQ',
     contact: 'Contato',

@@ -13,7 +13,7 @@ export const es: LandingCopy = {
   nav: {
     solution: 'Solución',
     features: 'Funciones',
-    pricing: 'Precios',
+    pricing: 'Clientes',
     faq: 'FAQ',
     blog: 'Blog',
     partners: 'Socios',
@@ -175,6 +175,37 @@ export const es: LandingCopy = {
     disclaimer:
       'Métricas agregadas de tiendas con Omafit; tus resultados varían según catálogo, tráfico y categoría.',
   },
+  insights: {
+    title: 'Conoce a quien compra tu marca.',
+    lead:
+      'Cada prueba se vuelve una señal. Omafit muestra quién usa el probador: cuerpo, prendas y tallas — para decidir colección, curva de tallas y stock con menos suposiciones.',
+    exampleNote: 'Cifras de ejemplo, con la forma que la marca ve en el panel.',
+    averagesTitle: 'Perfil medio de quien se prueba',
+    averages: [
+      { label: 'Altura media', value: '1,68 m' },
+      { label: 'Peso medio', value: '64 kg' },
+      { label: 'Biotipo más común', value: 'Reloj de arena · 34%' },
+    ],
+    sizeChartTitle: 'Talla más elegida',
+    sizeChartName: 'Participación de recomendaciones aceptadas',
+    sizes: [
+      { label: 'XS', share: 8 },
+      { label: 'S', share: 18 },
+      { label: 'M', share: 41 },
+      { label: 'L', share: 23 },
+      { label: 'XL', share: 10 },
+    ],
+    tableTitle: 'Prendas que más pasan por el probador',
+    colGarment: 'Prenda',
+    colTries: 'Pruebas',
+    colSize: 'Talla más elegida',
+    rows: [
+      { garment: 'Vestido midi', tries: '1.280', size: 'M' },
+      { garment: 'Pantalón recto', tries: '980', size: '38' },
+      { garment: 'Camisa oversized', tries: '860', size: 'L' },
+      { garment: 'Zapatilla casual', tries: '640', size: '37' },
+    ],
+  },
   pricing: {
     tag: 'Precios transparentes',
     title: 'Elige el plan que ',
@@ -284,7 +315,7 @@ export const es: LandingCopy = {
     company: 'Empresa',
     solution: 'Solución',
     features: 'Funciones',
-    pricing: 'Precios',
+    pricing: 'Clientes',
     shopifyApp: 'Instalar el widget',
     faq: 'FAQ',
     contact: 'Contacto',

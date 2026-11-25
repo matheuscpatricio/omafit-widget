@@ -13,7 +13,7 @@ export const en: LandingCopy = {
   nav: {
     solution: 'Solution',
     features: 'Features',
-    pricing: 'Pricing',
+    pricing: 'Shoppers',
     faq: 'FAQ',
     blog: 'Blog',
     partners: 'Partners',
@@ -176,6 +176,37 @@ export const en: LandingCopy = {
     disclaimer:
       'Aggregated metrics from Omafit-powered stores; your results may vary by catalog, traffic, and category.',
   },
+  insights: {
+    title: 'Learn who shops your brand.',
+    lead:
+      'Every try-on becomes a signal. Omafit shows who uses the fitting room: body, garments, and sizes — so the brand can plan assortment, size runs, and stock with fewer guesses.',
+    exampleNote: 'Sample figures, in the shape a brand sees in the dashboard.',
+    averagesTitle: 'Average profile of people who try on',
+    averages: [
+      { label: 'Average height', value: '1.68 m' },
+      { label: 'Average weight', value: '64 kg' },
+      { label: 'Most common body type', value: 'Hourglass · 34%' },
+    ],
+    sizeChartTitle: 'Size chosen most often',
+    sizeChartName: 'Share of accepted recommendations',
+    sizes: [
+      { label: 'XS', share: 8 },
+      { label: 'S', share: 18 },
+      { label: 'M', share: 41 },
+      { label: 'L', share: 23 },
+      { label: 'XL', share: 10 },
+    ],
+    tableTitle: 'Garments tried on most',
+    colGarment: 'Garment',
+    colTries: 'Try-ons',
+    colSize: 'Size chosen most',
+    rows: [
+      { garment: 'Midi dress', tries: '1,280', size: 'M' },
+      { garment: 'Straight trousers', tries: '980', size: '38' },
+      { garment: 'Oversized shirt', tries: '860', size: 'L' },
+      { garment: 'Casual sneaker', tries: '640', size: '37' },
+    ],
+  },
   pricing: {
     tag: 'Transparent pricing',
     title: 'Choose the plan that ',
@@ -285,7 +316,7 @@ export const en: LandingCopy = {
     company: 'Company',
     solution: 'Solution',
     features: 'Features',
-    pricing: 'Pricing',
+    pricing: 'Shoppers',
     shopifyApp: 'Install the widget',
     faq: 'FAQ',
     contact: 'Contact',

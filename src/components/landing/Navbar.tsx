@@ -16,7 +16,7 @@ export function Navbar({ onOpenInstallModal }: NavbarProps) {
   const links = [
     { href: '#solucao', label: t.nav.solution },
     { href: '#recursos', label: t.nav.features },
-    { href: '#planos', label: t.nav.pricing },
+    { href: '#clientes', label: t.nav.pricing },
     { href: '#faq', label: t.nav.faq },
     { href: '/blog', label: t.nav.blog },
     { href: '/partners', label: t.nav.partners },

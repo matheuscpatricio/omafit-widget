@@ -37,7 +37,7 @@ export function Footer() {
           <FooterCol title={f.product}>
             <FooterLink href="#solucao">{f.solution}</FooterLink>
             <FooterLink href="#recursos">{f.features}</FooterLink>
-            <FooterLink href="#planos">{f.pricing}</FooterLink>
+            <FooterLink href="#clientes">{f.pricing}</FooterLink>
             <FooterLink href="https://apps.shopify.com/omafit" external>
               {f.shopifyApp}
             </FooterLink>

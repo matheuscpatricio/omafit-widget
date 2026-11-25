@@ -103,6 +103,21 @@ export type LandingCopy = {
     stat3Sub: string;
     disclaimer: string;
   };
+  insights: {
+    title: string;
+    lead: string;
+    exampleNote: string;
+    averagesTitle: string;
+    averages: { label: string; value: string }[];
+    sizeChartTitle: string;
+    sizeChartName: string;
+    sizes: { label: string; share: number }[];
+    tableTitle: string;
+    colGarment: string;
+    colTries: string;
+    colSize: string;
+    rows: { garment: string; tries: string; size: string }[];
+  };
   pricing: {
     tag: string;
     title: string;

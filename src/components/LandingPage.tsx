@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Lenis from '@studio-freight/lenis';
-import { supabase } from '../lib/supabase';
 
 import { Navbar } from './landing/Navbar';
 import { Hero } from './landing/Hero';
@@ -11,7 +9,7 @@ import { HowItWorks } from './landing/HowItWorks';
 import { ScrollReveal } from './landing/ScrollReveal';
 import { Solution } from './landing/Solution';
 import { ImpactStats } from './landing/ImpactStats';
-import { Pricing } from './landing/Pricing';
+import { ShopperInsights } from './landing/ShopperInsights';
 import { FAQ } from './landing/FAQ';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
@@ -24,15 +22,7 @@ interface LandingPageProps {
   onLogin?: () => void;
 }
 
-const paidPlanPriceIds: Record<'growth' | 'pro' | 'scale' | 'enterprise', string> = {
-  growth: 'growth',
-  pro: 'pro',
-  scale: 'scale',
-  enterprise: 'enterprise',
-};
-
 function LandingPageContent({ onGetStarted }: LandingPageProps) {
-  const navigate = useNavigate();
   const { t } = useLandingLocale();
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
@@ -73,17 +63,6 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
 
   const handleInstallShopify = () => {
     onGetStarted('growth');
-  };
-
-  const handleSelectPaidPlan = async (plan: 'growth' | 'pro' | 'scale' | 'enterprise') => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session) {
-      navigate('/dashboard');
-      return;
-    }
-    onGetStarted(paidPlanPriceIds[plan]);
   };
 
   const handleRequestDemo = () => {
@@ -132,7 +111,7 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
         </ScrollReveal>
 
         <ScrollReveal>
-          <Pricing onSelectPaidPlan={handleSelectPaidPlan} />
+          <ShopperInsights />
         </ScrollReveal>
 
         <ScrollReveal>
