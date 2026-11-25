@@ -208,7 +208,7 @@ export const es: LandingCopy = {
   },
   closing: {
     title: 'Mira Omafit en tu tienda.',
-    lead: 'En una conversación, mostramos cómo el cliente encuentra la talla correcta, visualiza la prenda y descubre qué combina — en la página de producto.',
+    lead: 'En una conversación, mostramos cómo tu cliente encuentra la talla correcta, visualiza la prenda y descubre qué combina, directo en la página de producto.',
   },
   pricing: {
     tag: 'Precios transparentes',
