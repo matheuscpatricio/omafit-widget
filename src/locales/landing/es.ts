@@ -207,8 +207,8 @@ export const es: LandingCopy = {
     ],
   },
   closing: {
-    title: 'Lleva Omafit a tu tienda.',
-    lead: 'Talla, prueba virtual y combinaciones en la página de producto, en cualquier e-commerce de moda.',
+    title: 'Mira Omafit en tu tienda.',
+    lead: 'En una conversación, mostramos cómo el cliente encuentra la talla correcta, visualiza la prenda y descubre qué combina — en la página de producto.',
   },
   pricing: {
     tag: 'Precios transparentes',

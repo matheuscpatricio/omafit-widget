@@ -208,8 +208,8 @@ export const en: LandingCopy = {
     ],
   },
   closing: {
-    title: 'Bring Omafit to your store.',
-    lead: 'Sizing, virtual try-on, and outfit suggestions on the product page, for any fashion store.',
+    title: 'See Omafit on your store.',
+    lead: 'In one conversation, we show how shoppers find the right size, see the garment on themselves, and discover what goes with it — right on the product page.',
   },
   pricing: {
     tag: 'Transparent pricing',

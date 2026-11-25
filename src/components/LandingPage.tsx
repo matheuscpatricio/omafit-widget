@@ -112,10 +112,7 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
         </ScrollReveal>
 
         <ScrollReveal>
-          <ClosingCta
-            onOpenInstallModal={() => setInstallModalOpen(true)}
-            onRequestDemo={handleRequestDemo}
-          />
+          <ClosingCta onRequestDemo={handleRequestDemo} />
         </ScrollReveal>
 
         <ScrollReveal>
