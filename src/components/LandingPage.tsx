@@ -10,6 +10,7 @@ import { ScrollReveal } from './landing/ScrollReveal';
 import { Solution } from './landing/Solution';
 import { ImpactStats } from './landing/ImpactStats';
 import { ShopperInsights } from './landing/ShopperInsights';
+import { ClosingCta } from './landing/ClosingCta';
 import { FAQ } from './landing/FAQ';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
@@ -107,7 +108,11 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
         </ScrollReveal>
 
         <ScrollReveal>
-          <ShopperInsights
+          <ShopperInsights />
+        </ScrollReveal>
+
+        <ScrollReveal>
+          <ClosingCta
             onOpenInstallModal={() => setInstallModalOpen(true)}
             onRequestDemo={handleRequestDemo}
           />

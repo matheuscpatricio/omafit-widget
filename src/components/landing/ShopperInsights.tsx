@@ -1,14 +1,7 @@
-import { ArrowRight, Play } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useLandingLocale } from '../../contexts/LandingLocaleContext';
-import { Button } from '../ui/button';
 
-interface ShopperInsightsProps {
-  onOpenInstallModal?: () => void;
-  onRequestDemo?: () => void;
-}
-
-export function ShopperInsights({ onOpenInstallModal, onRequestDemo }: ShopperInsightsProps) {
+export function ShopperInsights() {
   const { t } = useLandingLocale();
   const copy = t.insights;
   const reduce = useReducedMotion();
@@ -84,32 +77,6 @@ export function ShopperInsights({ onOpenInstallModal, onRequestDemo }: ShopperIn
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-6 border-t border-white/10 pt-12">
-          <p className="text-2xl font-semibold tracking-tight text-oma-cream md:text-3xl">{copy.cta}</p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button
-              type="button"
-              variant="primary"
-              size="lg"
-              className="w-full justify-center sm:w-auto"
-              onClick={() => onOpenInstallModal?.()}
-            >
-              {t.hero.install}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              className="w-full justify-center border-oma-cream/25 bg-oma-parchment/95 text-white hover:bg-oma-light hover:text-white sm:w-auto [&_svg]:text-white"
-              onClick={onRequestDemo}
-            >
-              <Play className="h-4 w-4" />
-              {t.hero.demo}
-            </Button>
           </div>
         </div>
       </div>

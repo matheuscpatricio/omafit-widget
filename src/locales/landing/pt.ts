@@ -205,7 +205,10 @@ export const pt: LandingCopy = {
       { garment: 'Camisa oversized', tries: '860', size: 'G' },
       { garment: 'Tênis casual', tries: '640', size: '37' },
     ],
-    cta: 'Leve esses dados para a sua loja.',
+  },
+  closing: {
+    title: 'Leve o Omafit para a sua loja.',
+    lead: 'Tamanho, prova virtual e combinações na página do produto, em qualquer e-commerce de moda.',
   },
   pricing: {
     tag: 'Planos transparentes',

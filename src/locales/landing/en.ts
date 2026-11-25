@@ -206,7 +206,10 @@ export const en: LandingCopy = {
       { garment: 'Oversized shirt', tries: '860', size: 'L' },
       { garment: 'Casual sneaker', tries: '640', size: '37' },
     ],
-    cta: 'Bring this data to your store.',
+  },
+  closing: {
+    title: 'Bring Omafit to your store.',
+    lead: 'Sizing, virtual try-on, and outfit suggestions on the product page, for any fashion store.',
   },
   pricing: {
     tag: 'Transparent pricing',
