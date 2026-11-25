@@ -13,7 +13,7 @@ export const es: LandingCopy = {
   nav: {
     solution: 'Solución',
     features: 'Funciones',
-    pricing: 'Clientes',
+    pricing: 'Datos',
     faq: 'FAQ',
     blog: 'Blog',
     partners: 'Socios',
@@ -178,7 +178,7 @@ export const es: LandingCopy = {
   insights: {
     title: 'Conoce a quien compra tu marca.',
     lead:
-      'Cada prueba se vuelve una señal. Omafit muestra quién usa el probador: cuerpo, prendas y tallas — para decidir colección, curva de tallas y stock con menos suposiciones.',
+      'Conoce exactamente quién compra tu marca y sus medidas. Tu marca podrá decidir modelajes, stock y colecciones con datos y sin suposiciones.',
     exampleNote: 'Cifras de ejemplo, con la forma que la marca ve en el panel.',
     averagesTitle: 'Perfil medio de quien se prueba',
     averages: [
@@ -205,6 +205,7 @@ export const es: LandingCopy = {
       { garment: 'Camisa oversized', tries: '860', size: 'L' },
       { garment: 'Zapatilla casual', tries: '640', size: '37' },
     ],
+    cta: 'Lleva estos datos a tu tienda.',
   },
   pricing: {
     tag: 'Precios transparentes',
@@ -315,7 +316,7 @@ export const es: LandingCopy = {
     company: 'Empresa',
     solution: 'Solución',
     features: 'Funciones',
-    pricing: 'Clientes',
+    pricing: 'Datos',
     shopifyApp: 'Instalar el widget',
     faq: 'FAQ',
     contact: 'Contacto',

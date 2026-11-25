@@ -14,7 +14,6 @@ import { FAQ } from './landing/FAQ';
 import { Footer } from './landing/Footer';
 import { LandingSEO } from './landing/LandingSEO';
 import { InstallPlatformModal } from './landing/InstallPlatformModal';
-import { useLandingLocale } from '../contexts/LandingLocaleContext';
 
 interface LandingPageProps {
   onGetStarted: (priceId?: string) => void;
@@ -23,7 +22,6 @@ interface LandingPageProps {
 }
 
 function LandingPageContent({ onGetStarted }: LandingPageProps) {
-  const { t } = useLandingLocale();
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
@@ -66,9 +64,7 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
   };
 
   const handleRequestDemo = () => {
-    const subject = encodeURIComponent(t.demoEmail.subject);
-    const body = encodeURIComponent(t.demoEmail.body);
-    window.location.href = `mailto:contato@omafit.co?subject=${subject}&body=${body}`;
+    window.open('https://cal.com/omafit/book-a-call', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -111,7 +107,10 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
         </ScrollReveal>
 
         <ScrollReveal>
-          <ShopperInsights />
+          <ShopperInsights
+            onOpenInstallModal={() => setInstallModalOpen(true)}
+            onRequestDemo={handleRequestDemo}
+          />
         </ScrollReveal>
 
         <ScrollReveal>

@@ -117,6 +117,7 @@ export type LandingCopy = {
     colTries: string;
     colSize: string;
     rows: { garment: string; tries: string; size: string }[];
+    cta: string;
   };
   pricing: {
     tag: string;

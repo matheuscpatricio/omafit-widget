@@ -13,7 +13,7 @@ export const en: LandingCopy = {
   nav: {
     solution: 'Solution',
     features: 'Features',
-    pricing: 'Shoppers',
+    pricing: 'Data',
     faq: 'FAQ',
     blog: 'Blog',
     partners: 'Partners',
@@ -179,7 +179,7 @@ export const en: LandingCopy = {
   insights: {
     title: 'Learn who shops your brand.',
     lead:
-      'Every try-on becomes a signal. Omafit shows who uses the fitting room: body, garments, and sizes — so the brand can plan assortment, size runs, and stock with fewer guesses.',
+      'See exactly who buys from your brand, and their measurements. Your brand can decide silhouettes, stock, and collections with data instead of guesswork.',
     exampleNote: 'Sample figures, in the shape a brand sees in the dashboard.',
     averagesTitle: 'Average profile of people who try on',
     averages: [
@@ -206,6 +206,7 @@ export const en: LandingCopy = {
       { garment: 'Oversized shirt', tries: '860', size: 'L' },
       { garment: 'Casual sneaker', tries: '640', size: '37' },
     ],
+    cta: 'Bring this data to your store.',
   },
   pricing: {
     tag: 'Transparent pricing',
@@ -316,7 +317,7 @@ export const en: LandingCopy = {
     company: 'Company',
     solution: 'Solution',
     features: 'Features',
-    pricing: 'Shoppers',
+    pricing: 'Data',
     shopifyApp: 'Install the widget',
     faq: 'FAQ',
     contact: 'Contact',
