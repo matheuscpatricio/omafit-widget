@@ -1,4 +1,7 @@
 import { parseStoreProfileFromApi } from './storeProfile';
+import { fetchVtexCatalogFromParent, fetchVtexProductFromParent, isVtexShopDomain } from './vtexCatalogBridge';
+
+export { isVtexShopDomain };
 
 export type OmafitCatalogCandidate = {
   handle: string;
@@ -203,6 +206,14 @@ export async function fetchOmafitCatalogSearch(params: {
   collectionHandles?: string[];
   stylistBrief?: import('./stylistContext').StylistBrief;
 }): Promise<OmafitCatalogSearchResult> {
+  if (isVtexShopDomain(params.shopDomain)) {
+    return fetchVtexCatalogFromParent({
+      shopDomain: params.shopDomain,
+      userMessage: params.userMessage,
+      excludeHandle: params.excludeHandle,
+      productName: params.productName,
+    });
+  }
   const timestamp = String(Math.floor(Date.now() / 1000));
   const collection_type = String(params.collectionType || 'upper');
   const exclude_handle = String(params.excludeHandle || '');
@@ -495,6 +506,9 @@ export async function fetchOmafitProductByHandle(params: {
   } | null;
   error: string | null;
 }> {
+  if (isVtexShopDomain(params.shopDomain)) {
+    return fetchVtexProductFromParent({ shopDomain: params.shopDomain, handle: params.handle });
+  }
   const timestamp = String(Math.floor(Date.now() / 1000));
   const handle = String(params.handle || '').trim();
   const public_id = String(params.publicId || '');

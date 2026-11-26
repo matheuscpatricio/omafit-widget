@@ -1,0 +1,19 @@
+{
+  "omafit-pdp": {
+    "component": "OmafitPdp",
+    "render": "client",
+    "content": {
+      "properties": {
+        "publicId": {
+          "title": "admin/editor.omafit.publicId.title",
+          "description": "admin/editor.omafit.publicId.description",
+          "type": "string"
+        },
+        "linkText": {
+          "title": "admin/editor.omafit.linkText.title",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

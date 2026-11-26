@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#fafafa"/>
+  <rect x="80" y="80" width="560" height="700" rx="12" fill="#e4e4e7"/>
+  <text x="250" y="440" font-family="Arial, sans-serif" font-size="22" fill="#52525b">Foto do produto</text>
+  <text x="700" y="160" font-family="Arial, sans-serif" font-size="32" fill="#18181b">Página de produto</text>
+  <text x="700" y="210" font-family="Arial, sans-serif" font-size="18" fill="#71717a">Print do bloco omafit-pdp no Site Editor, com o botão visível.</text>
+  <text x="700" y="320" font-family="Arial, sans-serif" font-size="22" fill="#810707" text-decoration="underline">Experimentar virtualmente</text>
+</svg>

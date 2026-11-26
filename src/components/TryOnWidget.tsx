@@ -13,6 +13,7 @@ import {
   mapSizeChartSizesToEntries,
   resolveSizeChartRecord,
 } from '../utils/resolveSizeChart';
+import { isVtexShopDomain } from '../utils/vtexCatalogBridge';
 import { widgetTranslations, detectWidgetLanguage, type WidgetTranslationKey } from '../locales/widget-translations';
 import { useMediaPipePose } from '../hooks/useMediaPipePose';
 import { useShopperProfileController } from '../hooks/useShopperProfileController';
@@ -1627,10 +1628,13 @@ export function TryOnWidget({
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error } = await supabase.rpc('get_shop_widget_flags', {
-          p_shop_domain: domain,
-          p_public_id: pub,
-        });
+        const { data, error } = await supabase.rpc(
+          isVtexShopDomain(domain) ? 'get_vtex_widget_flags' : 'get_shop_widget_flags',
+          {
+            p_shop_domain: domain,
+            p_public_id: pub,
+          }
+        );
         if (cancelled) return;
         if (error) {
           setStylistPlanFromDb(false);
@@ -2734,6 +2738,7 @@ export function TryOnWidget({
 
         const { record: sizeChartRecord, error: chartError } = await resolveSizeChartRecord(supabase, {
           shopDomain: effectiveShopDomain,
+          publicId,
           gender: searchGender,
           productHandle: effectiveProductHandle,
           collectionHandle: handleForChart,
@@ -3016,7 +3021,9 @@ const validatePhotoForCollection = (
     const { baseUrl: omafitBase, secret: omafitSecret, isReady } = getOmafitCatalogRuntimeConfig();
     const hasShopDomain = Boolean(String(effectiveShopDomain || '').trim());
     const hasPublicId = Boolean(String(publicId || '').trim());
-    if (!isReady || !omafitBase || !omafitSecret || !hasShopDomain || !hasPublicId) return;
+    const vtexCatalog = isVtexShopDomain(effectiveShopDomain);
+    if (!hasShopDomain || !hasPublicId) return;
+    if (!vtexCatalog && (!isReady || !omafitBase || !omafitSecret)) return;
 
     const collectionHandlesLine = mergeCatalogCollectionHandles().join(', ');
     const ctx = collectionHandlesLine ? ` | coleções Shopify: ${collectionHandlesLine}` : '';
@@ -4373,7 +4380,9 @@ const handleSubmit = async (
       const hasShopDomain = Boolean(String(effectiveShopDomain || '').trim());
       const hasPublicId = Boolean(String(publicId || '').trim());
       const canOmafitSearch =
-        hasOmafitUrl && hasOmafitSecret && hasShopDomain && hasPublicId;
+        hasShopDomain &&
+        hasPublicId &&
+        (isVtexShopDomain(effectiveShopDomain) || (hasOmafitUrl && hasOmafitSecret));
 
       let shopifyCollectionHandles = mergeCatalogCollectionHandles();
 

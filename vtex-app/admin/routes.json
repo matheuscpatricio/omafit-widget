@@ -1,0 +1,6 @@
+{
+  "admin.app.omafit": {
+    "component": "AdminOmafit",
+    "path": "/admin/omafit"
+  }
+}

@@ -23,6 +23,7 @@ export function Layout({ children, onNavigate }: LayoutProps) {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/dashboard' },
     { id: 'analytics', label: 'Analytics Avançado', icon: TrendingUp, path: '/analytics' },
     { id: 'cadastro-loja', label: 'Cadastro de Loja', icon: Store, path: '/cadastro-loja' },
+    { id: 'vtex', label: 'Loja VTEX', icon: Store, path: '/vtex' },
     { id: 'widget-generator', label: 'Gerador de Widget', icon: Code, path: '/widget-generator' },
     { id: 'collections', label: 'Coleções', icon: Grid, path: '/collections' },
     { id: 'size-chart', label: 'Tabela de Medidas', icon: Ruler, path: '/size-chart' },

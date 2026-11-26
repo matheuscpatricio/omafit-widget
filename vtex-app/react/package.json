@@ -1,0 +1,19 @@
+{
+  "name": "omafit-store-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import ../scripts/register-ts.mjs --test modules/omafitVtex.test.ts"
+  },
+  "dependencies": {
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
+    "react-intl": "^3.12.1"
+  },
+  "devDependencies": {
+    "@types/react": "^16.14.55",
+    "@types/react-dom": "^16.9.24",
+    "typescript": "5.5.4"
+  }
+}
