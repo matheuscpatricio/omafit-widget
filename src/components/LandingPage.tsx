@@ -22,7 +22,7 @@ interface LandingPageProps {
   onLogin?: () => void;
 }
 
-function LandingPageContent({ onGetStarted }: LandingPageProps) {
+function LandingPageContent(_props: LandingPageProps) {
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ function LandingPageContent({ onGetStarted }: LandingPageProps) {
   }, []);
 
   const handleInstallShopify = () => {
-    onGetStarted('growth');
+    window.open('https://apps.shopify.com/omafit', '_blank', 'noopener,noreferrer');
   };
 
   const handleRequestDemo = () => {
